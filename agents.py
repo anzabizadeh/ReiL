@@ -19,27 +19,35 @@ from contextlib import contextmanager
 
 
 def main():
+    print('This is a simple game. a random number is generated and the agent should move left or right to get to target.')
     myAgent = RLAgent(gamma=.1, alpha=0.5, epsilon=0.2, Rplus=0, Ne=2,
                       default_actions=[-1, 0, 1])
-    target = 10
-    for i in range(100):
+    myAgent.status = 'training'
+    target = rand.randint(1, 100)
+    print('target={: d}'.format(target))
+    for i in range(30):
         state = rand.randint(1, target)
+        print('game {: d} state={: d}'.format(i, state))
         while state != target:
             action = myAgent.act(state)
+            print(action)
             state = min(max(state + action, 0), target)
             myAgent.learn(state=state, reward=state-target)
         myAgent.learn(state=state, reward=1)
     print(myAgent._state_action_list)
+
     for state in range(1, target):
         print(myAgent.act(state, method=''))
 
 
 class Agent:
+    '''Super class of all agent classes. This class provides basic methods including act, learn, reset, load, save, and report Load and save are implemented.'''
     def __init__(self, **kwargs):
         self._training_flag = True
 
     @property
     def status(self):
+        ''' Returns the status of the agent as 'training' or 'testing' '''
         if self._training_flag:
             return 'training'
         else:
@@ -47,18 +55,24 @@ class Agent:
 
     @status.setter
     def status(self, value):
+        ''' Sets the status of the agent as 'training' or 'testing' '''
         self._training_flag = (value == 'training')
 
     def act(self, state, **kwargs):
+        ''' This function gets the state and returns agent's action.
+            If state is 'training' (_training_flag=false), then this function should not return any random move due to exploration.'''
         pass
 
     def learn(self, **kwargs):
+        ''' Shoud get state, action, reward or history to learn. ''' 
         pass
 
     def reset(self):
+        ''' Resets the agent at the end of a learning episode. ''' 
         pass
 
     def load(self, **kwargs):
+        ''' uses pickle to load an agent using filename. '''
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
@@ -67,6 +81,7 @@ class Agent:
             self.__dict__ = pickle.load(f)
 
     def save(self, **kwargs):
+        ''' uses pickle to save the agent to a file. '''
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
@@ -75,11 +90,13 @@ class Agent:
             pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
 
     def report(self, **kwargs):
+        ''' Should generate a report and return the string. ''' 
         raise NotImplementedError
 
 
 class UserAgent(Agent):
     def act(self, state, **kwargs):
+        ''' Displays current state and asks user for input. '''
         try:
             state = '\n'+kwargs['printable']+'\n'
         except KeyError:
@@ -87,11 +104,13 @@ class UserAgent(Agent):
         action = None
         while action is None:
             action = input('Choose action for this state: {}'.format(state))
-        return int(action)
+        return action
 
 
 class RandomAgent(Agent):
+    ''' This agent acts randomly ''' 
     def act(self, state, **kwargs):
+        ''' states and a set of possible actions are given to the function and it chooses an action randomly. ''' 
         try:  # possible actions
             return rand.choice(kwargs['actions'])
         except KeyError:
