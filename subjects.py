@@ -2,7 +2,14 @@
 """
 Created on Fri Feb  2 21:35:10 2018
 
-@author: Sadjad
+@author: Sadjad Anzabi Zadeh
+
+This module contains classes of different types of subjects.
+
+Classes:
+    Subject (Super Class)
+    MNKBoard (Super Class): this is not a subject, but one of the super classes of MNKGame class.
+    MNKGame
 
 mnkboard(m=3, n=3, k=3, players=2)
     set_piece(player, **kwargs)
@@ -22,9 +29,13 @@ mnkgame(mnkboard)(m=3, n=3, k=3, players=2)
 
 """
 
+import pickle
+
 
 def main():
-    ''' constructs a board and fills it randomly until games finishes.  '''
+    '''
+    Constructs a board and fills it randomly until games finishes.
+    '''
     import random as r
     row, col, criteria, players = 6, 8, 4, 4
     board = MNKGame(m=row, n=col, k=criteria, p=players)
@@ -38,19 +49,28 @@ def main():
 
 
 class Subject:
+    '''
+    Super class of all subject classes. This class provides basic methods including is_terminated, register, take_effect, reset, load, save, and printable.
+    Register, load and save are implemented.
+    '''
     def __init__(self):
-        self._player_list = {}
+        self._agent_list = {}
 
     @property
     def is_terminated(self):
         pass
 
-    def register(self, player_name):
+    def register(self, agent_name):
+        '''
+        Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
+        \nArguments:
+        \n    agent_name: the name of the agent to be registered.
+        '''
         try:
-            return self._player_list[player_name]
+            return self._agent_list[agent_name]
         except KeyError:
-            _id = len(self._player_list) + 1
-            self._player_list[player_name] = _id
+            _id = len(self._agent_list) + 1
+            self._agent_list[agent_name] = _id
             return _id
 
     def take_effect(self, _id, action):
@@ -60,6 +80,11 @@ class Subject:
         pass
 
     def load(self, **kwargs):
+        '''
+        Loads an agent.
+        \nArguments:
+        \n    filename: the name of the file to be loaded.
+        '''
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
@@ -68,6 +93,11 @@ class Subject:
             self.__dict__ = pickle.load(f)
 
     def save(self, **kwargs):
+        '''
+        Saves an agent.
+        \nArguments:
+        \n    filename: the name of the file to be saved.
+        '''
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
@@ -81,11 +111,14 @@ class Subject:
 
 class MNKBoard:
     def __init__(self, **kwargs):
-        ''' Initializes an instance of mnkgame. \n
-            m: number of rows \n
-            n: number of columns \n
-            k: winning criteria \n
-            players: number of players'''
+        '''
+        Initializes an instance of mnkgame.
+        \nArguments:
+        \n    m: number of rows
+        \n    n: number of columns
+        \n    k: winning criteria
+        \n    players: number of players
+        '''
 
         try:  # m
             self._m = kwargs['m']
@@ -107,13 +140,15 @@ class MNKBoard:
         self._board = [0]*(self._m*self._n)
 
     def set_piece(self, player, **kwargs):
-        ''' This function sets a piece for a player.
-            You can either specify the location by index using 'index' named
-            argument or row and column using 'row' and 'column'. \n
-            Note that the board starts from index=0 (row=0, column=0). \n
-            An attempt to set a piece for an undefined player or in an
-            unspecified location will result in ValueError.'''
-
+        '''
+        Sets a piece for a player. An attempt to set a piece for an undefined player
+        or in an unspecified location will result in ValueError.
+        \nArguments:
+        \n    player: ID of the player whose piece will be set on the board.
+        \n    index: If provided, the piece is set using 'index'. Index starts from 0 and assumes the board to be a list.
+        \n    row: The row in which the piece is set.
+        \n    column: The column in which the piece is set.
+        '''
         if (player <= 0) | (player > self._players):
             raise ValueError('player not found.')
         if not kwargs:
@@ -125,21 +160,37 @@ class MNKBoard:
 
     @property
     def state(self):
+        '''
+        Returns the state of the board as a list.
+        '''
         return self._board
 
     @property
     def possible_actions(self):
+        '''
+        Returns a list of indexes of empty squares.
+        '''  
         return list(self.get_action_set())
 
     def get_board(self, format_='vector'):
+        '''
+        Returns the board.
+        \nArguments:
+        \n    format_: 'vector' returns the board as a list. 'matrix' returns the board as a 2D list. Default is 'vector'. Other values result in ValueError Exception.
+        '''
         if format_.lower() == 'vector':
             return self._board
         elif format_.lower() == 'matrix':
             return self._matrix(self._board)
         else:
-            raise TypeError('format should be either vector or matrix')
+            raise ValueError('format should be either vector or matrix')
 
     def get_action_set(self, format_='vector'):
+        '''
+        Returns a list of indexes of empty squares.
+        \nArguments:
+        \n    format_: 'vector' returns actions in index format. 'matrix' returns actions in row column format. Default is 'vector'. Other values result in ValueError Exception.
+        '''  
         index = (i for i in range(self._m*self._n) if self._board[i] == 0)
         for action in index:
             if format_.lower() == 'vector':
@@ -150,13 +201,24 @@ class MNKBoard:
                 raise TypeError('format should be either vector or matrix')
 
     def reset(self):
+        '''
+        Empties the board.
+        '''
         self._board = [0]*(self._m*self._n)
 
     def printable(self):
+        '''
+        Returns a printable format string of the board.
+        ''' 
         return ('\n'.join([''.join(['{:4}'.format(item) for item in row])
                            for row in self._matrix()]))
 
     def _matrix(self, *args):
+        '''
+        Gets a board and returns it in 2D list format.
+        \nArguments:
+        \n    args[0]: the board to be converted. If no arguments is supplied, current object's board is returned.
+        '''
         if not args:
             vector = self._board
         else:
@@ -171,35 +233,53 @@ class MNKBoard:
 
 
 class MNKGame(MNKBoard, Subject):
-    '''mnkgame class builds an m by n board (using mnkboard superclass)
-       in which p players can play. Winner is the player who can put k pieces
-       in on row, column, or diagonal.
-       '''
+    '''
+    Builds an m by n board (using mnkboard super class)
+    in which p players can play. Winner is the player who can put k pieces
+    in on row, column, or diagonal.
+    '''
     # _board is a row vector. (row, column) and index start from 0
     # _board_status: None: no winner yet,
     #                1..players: winner,
     #                0: stall,
     #               -1: illegal board
     def __init__(self, **kwargs):
-        ''' Initializes an instance of mnkgame. \n
-            m: number of rows \n
-            n: number of columns \n
-            k: winning criteria \n
-            players: number of players'''
+        '''
+        Initializes an instance of mnkgame.
+        \nArguments:
+        \n    m: number of rows
+        \n    n: number of columns
+        \n    k: winning criteria
+        \n    players: number of players
+        '''
         MNKBoard.__init__(self, **kwargs)
         Subject.__init__(self)
         self._board_status = None
 
     @property
     def is_terminated(self):
+        '''
+        Returns True if no moves is left (either the board is full or a player has won).
+        '''
         if self.board_status is None:
             return False
         return True
 
     def register(self, player_name):
+        '''
+        Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
+        \nArguments:
+        \n    agent_name: the name of the agent to be registered.
+        '''
         return Subject.register(self, player_name)
 
     def take_effect(self, _id, action):
+        '''
+        Sets a piece for the given player on the board.
+        \nArguments:
+        \n    _id: ID of the player who sets the piece.
+        \n    action: the location in which the piece is set. Can be either in index format or row column format.
+        ''' 
         self.set_piece(_id, index=action, update='yes')
         if self.board_status is None:
             return 0
@@ -210,16 +290,27 @@ class MNKGame(MNKBoard, Subject):
         return 0
 
     def reset(self):
+        '''
+        Empties the board.
+        '''
         MNKBoard.reset(self)
         self._board_status = None
 
     def set_piece(self, player, **kwargs):
-        ''' This function sets a piece for a player.
-            You can either specify the location by index using 'index' named
-            argument or row and column using 'row' and 'column'. \n
-            Note that the board starts from index=0 (row=0, column=0). \n
-            An attempt to set a piece for an undefined player or in an
-            unspecified location will result in ValueError.'''
+        '''
+        This function sets a piece for a player.
+        You can either specify the location by index using 'index' named
+        argument or row and column using 'row' and 'column'. \n
+        Note that the board starts from index=0 (row=0, column=0). \n
+        An attempt to set a piece for an undefined player or in an
+        unspecified location will result in ValueError.
+        \nArguments:
+        \n    player: ID of the player whose piece will be set on the board.
+        \n    update: if 'yes', the board status is updated after the move. Default is 'yes'.
+        \n    index: If provided, the piece is set using 'index'. Index starts from 0 and assumes the board to be a list.
+        \n    row: The row in which the piece is set.
+        \n    column: The column in which the piece is set.
+        '''
 
         MNKBoard.set_piece(self, player, **kwargs)
         try:  # update
@@ -235,16 +326,26 @@ class MNKGame(MNKBoard, Subject):
 
     @property
     def board_status(self):
+        '''
+        Returns board status. If there is a winner, the winner's ID is returned. If the game is not finished, None is returned.
+        If the game is a draw, 0 is returned.
+        ''' 
         return self._board_status
 
     def _update_board_status(self, player, **kwargs):
-        # player wins: player | doesn't win: None | Stall: 0
-        '''_update_board_status gets a player and the location of the latest
-            change and tries to find a sequence of length k of the specified
-            player around that location. \n
-            sequence found (win): return player \n
-            sequence found and board is full (stall): return 0 \n
-            sequence found and board is not full (ongoing): return None'''
+        # player wins: player | doesn't win: None | draw: 0
+        '''
+        Gets a player and the location of the latest change and tries to find a sequence of length k of the specified
+        player around that location. \n
+        sequence found (win): return player \n
+        sequence found and board is full (stall): return 0 \n
+        sequence found and board is not full (ongoing): return None
+        \nArguments:
+        \n    player: ID of the player whose piece will be set on the board.
+        \n    index: If provided, the piece is set using 'index'. Index starts from 0 and assumes the board to be a list.
+        \n    row: The row in which the piece is set.
+        \n    column: The column in which the piece is set.
+        '''
         if not kwargs:
             raise TypeError('No (row, column) or index found')
         try:

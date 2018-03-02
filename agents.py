@@ -2,20 +2,25 @@
 """
 Created on Sun Feb  4 19:01:29 2018
 
-@author: Sadjad
+@author: Sadjad Anzabi Zadeh
 
-rlagent(**kwargs): gamma, alpha, epsilon, Rplus, Ne, state_action_list
-    previous_action
-    act(state, **kwargs): actions, method={*'e-greedy', ''}
-    learn(state, reward)
-    reset()
+This module contains classes of different types of agents.
 
-
+Classes:
+    Agent (Super Class)
+    UserAgent
+    RandomAgent
+    RLAgent (Q-learning)
+    NeuralAgent (Not Implemented Yet)
 """
+
+# KNOWN ISSUES:
+# UserAgent should be revised.
+# Implement NeuralAgent.
+# RLAgent should be QAgent or should be extended to cover other types of RL.
 
 import random as rand
 import pickle
-from contextlib import contextmanager
 
 
 def main():
@@ -41,13 +46,17 @@ def main():
 
 
 class Agent:
-    '''Super class of all agent classes. This class provides basic methods including act, learn, reset, load, save, and report Load and save are implemented.'''
+    '''
+    Super class of all agent classes. This class provides basic methods including act, learn, reset, load, save, and report Load and save are implemented.
+    '''
     def __init__(self, **kwargs):
         self._training_flag = True
 
     @property
     def status(self):
-        ''' Returns the status of the agent as 'training' or 'testing' '''
+        '''
+        Returns the status of the agent as 'training' or 'testing'.
+        '''
         if self._training_flag:
             return 'training'
         else:
@@ -55,24 +64,36 @@ class Agent:
 
     @status.setter
     def status(self, value):
-        ''' Sets the status of the agent as 'training' or 'testing' '''
+        '''
+        Sets the status of the agent as 'training' or 'testing'.
+        '''
         self._training_flag = (value == 'training')
 
     def act(self, state, **kwargs):
-        ''' This function gets the state and returns agent's action.
-            If state is 'training' (_training_flag=false), then this function should not return any random move due to exploration.'''
+        '''
+        This function gets the state and returns agent's action.
+        If state is 'training' (_training_flag=false), then this function should not return any random move due to exploration.
+        '''
         pass
 
     def learn(self, **kwargs):
-        ''' Shoud get state, action, reward or history to learn. ''' 
+        '''
+        Shoud get state, action, reward or history to learn.
+        ''' 
         pass
 
     def reset(self):
-        ''' Resets the agent at the end of a learning episode. ''' 
+        '''
+        Resets the agent at the end of a learning episode.
+        ''' 
         pass
 
     def load(self, **kwargs):
-        ''' uses pickle to load an agent using filename. '''
+        '''
+        Loads an agent.
+        \nArguments:
+        \n    filename: the name of the file to be loaded.
+        '''
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
@@ -81,7 +102,11 @@ class Agent:
             self.__dict__ = pickle.load(f)
 
     def save(self, **kwargs):
-        ''' uses pickle to save the agent to a file. '''
+        '''
+        Saves an agent.
+        \nArguments:
+        \n    filename: the name of the file to be saved.
+        '''
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
@@ -90,13 +115,21 @@ class Agent:
             pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
 
     def report(self, **kwargs):
-        ''' Should generate a report and return the string. ''' 
+        '''
+        Should generate a report and return the string.
+        ''' 
         raise NotImplementedError
 
 
 class UserAgent(Agent):
+    '''
+    This class is used to get the action from the user.
+    '''
     def act(self, state, **kwargs):
-        ''' Displays current state and asks user for input. '''
+        # NOTE TO MYSELF: This implementation is not good! It should get either the state or the printable.
+        '''
+        Displays current state and asks user for input. The result is a string.
+        '''
         try:
             state = '\n'+kwargs['printable']+'\n'
         except KeyError:
@@ -108,9 +141,16 @@ class UserAgent(Agent):
 
 
 class RandomAgent(Agent):
-    ''' This agent acts randomly ''' 
+    '''
+    This agent acts randomly.
+    ''' 
     def act(self, state, **kwargs):
-        ''' states and a set of possible actions are given to the function and it chooses an action randomly. ''' 
+        '''
+        States and a set of possible actions are given to the function and it chooses an action randomly.
+        \nArguments:
+        \n    state: the state for which the action should be returned. This argument is solely to keep the method's signature unified.
+        \n    actions: the set of possible actions to choose from. If not provided, an empty list is returned. 
+        ''' 
         try:  # possible actions
             return rand.choice(kwargs['actions'])
         except KeyError:
@@ -118,21 +158,28 @@ class RandomAgent(Agent):
 
 
 class NeuralAgent(Agent):
+    '''
+    This class should implement a Neural Network learner. NOT IMPLEMENTED YET!
+    '''
     def __init__(self, **kwargs):
-        pass
+        raise NotImplementedError
 
 
 class RLAgent(Agent):
+    '''
+    A Q-learning agent.
+    '''
     def __init__(self, **kwargs):
-        '''Initializes an Reinforcement Learning Agent. \n
-           Parameters:
-               gamma: discount factor
-               alpha: learning rate
-               epsilon: exploration rate
-               Rplus: optimistic estimate of the reward at each state
-               Ne: the least number of visits
-               default_actions: list of default actions
-               state_action_list: list from a previous training
+        '''
+        Initializes an Reinforcement Learning Agent.
+        \nArguments:
+        \n    gamma: discount factor
+        \n    alpha: learning rate
+        \n    epsilon: exploration rate
+        \n    Rplus: optimistic estimate of the reward at each state
+        \n    Ne: the least number of visits
+        \n    default_actions: list of default actions
+        \n    state_action_list: list from a previous training
         '''
         Agent.__init__(self, **kwargs)
         try:  # discount factor
@@ -165,6 +212,12 @@ class RLAgent(Agent):
             self._state_action_list = {}
 
     def _q(self, state, action):
+        '''
+        Returns the Q value of a state action pair. In training mode, exploration using Ne and R+ are used, otherwise exact Q estimate is returned.
+        \nArguments:
+        \n    state: the state for which Q-value is returned.
+        \n    action: the action for which Q-value is returned.
+        '''
         if self._training_flag:
             try:
                 if self._state_action_list[(state, action)][1] > self._n_e:
@@ -180,10 +233,20 @@ class RLAgent(Agent):
             return 0
 
     def state_q(self, state):
+        '''
+        Returns the list of Q values of a state.
+        \nArguments:
+        \n    state: the state for which Q-value is returned.
+        '''
         return list(self._q(sa[0], sa[1]) for sa in self._state_action_list
                     if sa[0] == state)
 
     def _max_q(self, state):
+        '''
+        Returns MAX(Q) of a state.
+        \nArguments:
+        \n    state: the state for which MAX(Q) is returned.
+        '''
         try:
             max_q = max(self._q(sa[0], sa[1]) for sa in self._state_action_list
                         if sa[0] == state)
@@ -192,6 +255,12 @@ class RLAgent(Agent):
         return max_q
 
     def _N(self, state, action):
+        '''
+        Returns the number of times a state action pair is visited.
+        \nArguments:
+        \n    state: the state for which N is returned.
+        \n    action: the action for which N is returned.
+        '''
         try:
             return self._state_action_list[(state, action)][1]
         except KeyError:
@@ -202,6 +271,12 @@ class RLAgent(Agent):
         return self._previous_action
 
     def act(self, state, **kwargs):
+        '''
+        Gets a state and returns the best action.
+        \nArguments:
+        \n    actions: a set of possible actions.
+        \n    method: 'e-greedy' allows for exploration epsilon percent of times during training mode.
+        '''
         try:
             state = tuple(state)
         except TypeError:
@@ -231,6 +306,13 @@ class RLAgent(Agent):
         return action
 
     def learn(self, **kwargs):
+        '''
+        Learns either based on state reward pair or history. Agent should be in 'training' mode. Otherwise, a ValueError exception is raised.
+        \nArguments:
+        \n    history: a list consisting of state, action, reward of an episode. If both history and state reward provided, only history is used.
+        \n    state: state resulted from the previous action on the previous state.
+        \n    reward: the reward of the previous action.
+        '''
         if not self._training_flag:
             raise ValueError('Not in training mode!')
         try:  # history
@@ -276,6 +358,9 @@ class RLAgent(Agent):
                 (new_q, new_N)})
 
     def reset(self):
+        '''
+        Resets the agent. Should be called at the end of an episode of learning when state reward pair is used in learning  
+        '''
         self._previous_state = None
         self._previous_action = None
 
