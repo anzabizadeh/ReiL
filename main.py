@@ -5,14 +5,14 @@ Created on Mon Feb 19 15:47:46 2018
 @author: Sadjad
 """
 
-from rlagent import RLAgent, RandomAgent, UserAgent
-from mnkgame import MNKGame
+from agents import RLAgent, RandomAgent, UserAgent
+from subjects import MNKGame
 import pickle
 import time
-import Environment
+from environments import Environment
 
 def main():
-    env = Environment.Environment()
+    env = Environment()
     try:
         env.load(filename='mnk333env-agentbyagent-testbyrandom')
     except FileNotFoundError:
@@ -41,7 +41,7 @@ def main():
     fig.canvas.draw()
     plt.show(block=False)
     try:
-        for i in range(runs):
+        for _ in range(runs):
             fig.canvas.draw()
             plt.draw_all()
             env.elapse(episodes=training_episodes, reset='all',
