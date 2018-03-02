@@ -318,10 +318,13 @@ class RLAgent(Agent):
         try:  # history
             history = kwargs['history']
             previous_state = tuple(history[0])
-            for i in range(1, len(history)-2, 3):
+            for i in range(1, len(history), 3):
                 previous_action = history[i]
                 reward = history[i+1]
-                state = tuple(history[i+2])
+                try:
+                    state = tuple(history[i+2])
+                except IndexError:
+                    state = None
                 q_sa = self._q(previous_state, previous_action)
                 max_q = self._max_q(state)
 

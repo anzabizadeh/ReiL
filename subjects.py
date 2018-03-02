@@ -280,7 +280,7 @@ class MNKGame(MNKBoard, Subject):
         \n    _id: ID of the player who sets the piece.
         \n    action: the location in which the piece is set. Can be either in index format or row column format.
         ''' 
-        self.set_piece(_id, index=action, update='yes')
+        self.set_piece(_id, index=int(action), update='yes')
         if self.board_status is None:
             return 0
         if self.board_status == _id:

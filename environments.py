@@ -304,15 +304,24 @@ class Environment:
                             reward = subject.take_effect(_id, action)
                             if reporting == 'all':
                                 report_string += '\n'+subject.printable()+'\n'
-                            if tally & (reward>0) & (subject.is_terminated):
-                                win_count[agent_name] += 1
-
-                            if learning_method == 'every step':
-                                agent.learn(state=subject.state, reward=reward)
-                            elif learning_method == 'history':
-                                history[agent_name].append(state)
-                                history[agent_name].append(action)
-                                history[agent_name].append(reward)
+                            if subject.is_terminated:
+                                if tally & (reward>0):
+                                    win_count[agent_name] += 1
+                                for affected_agent in self._agent.keys():
+                                    if learning_method == 'every step':
+                                        self._agent[affected_agent].learn(state=subject.state,
+                                            reward=reward if affected_agent == agent_name else -reward)
+                                    elif learning_method == 'history':
+                                        history[affected_agent].append(state)
+                                        history[affected_agent].append(action)
+                                        history[affected_agent].append(reward if affected_agent == agent_name else -reward)
+                            else:
+                                if learning_method == 'every step':
+                                    agent.learn(state=subject.state, reward=reward)
+                                elif learning_method == 'history':
+                                    history[agent_name].append(state)
+                                    history[agent_name].append(action)
+                                    history[agent_name].append(reward)
                     if termination == 'all':
                         done = True
                         for sub in self._subject.values():
