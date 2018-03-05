@@ -157,14 +157,6 @@ class RandomAgent(Agent):
             return []
 
 
-class NeuralAgent(Agent):
-    '''
-    This class should implement a Neural Network learner. NOT IMPLEMENTED YET!
-    '''
-    def __init__(self, **kwargs):
-        raise NotImplementedError
-
-
 class RLAgent(Agent):
     '''
     A Q-learning agent.
@@ -366,6 +358,171 @@ class RLAgent(Agent):
         '''
         self._previous_state = None
         self._previous_action = None
+
+
+
+from sklearn.neural_network import MLPRegressor
+from sklearn import exceptions
+
+
+class NeuralAgent(RLAgent):
+    '''
+    This class should implement a Neural Network learner. NOT FULLY IMPLEMENTED YET!
+    '''
+    def __init__(self, **kwargs):
+        '''
+        Initializes an Reinforcement Learning Agent.
+        \nArguments:
+        \n    solver: the solver method. Default = 'lbfgs'
+        \n    alpha: learning rate. Default = 1e-5
+        \n    gamma: discount factor. Default = 1
+        \n    hidden_layer_sizes: tuple containintg hidden layer sizes
+        \n    random_state: random state. Default = 1
+        \n    default_actions: list of default actions
+        \n    state_action_list: list from a previous training
+        '''
+        Agent.__init__(self, **kwargs)
+        try:
+            self._solver = kwargs['solver']
+        except KeyError:
+            self._solver = 'lbfgs'
+        try:
+            self._alpha = kwargs['alpha']
+        except KeyError:
+            self._alpha = 1e-5
+        try:
+            self._gamma = kwargs['gamma']
+        except KeyError:
+            self._gamma = 1
+        try:
+            self._hidden_layer_sizes = kwargs['hidden_layer_sizes']
+        except KeyError:
+            self._hidden_layer_sizes = (10)
+        try:
+            self._random_state = kwargs['random_state']
+        except KeyError:
+            self._random_state = 1
+        try:
+            defaul_actions_list = kwargs['default_actions']
+            self._size_of_action_space = len(defaul_actions_list)
+            self._default_actions = {}
+            for i in self._size_of_action_space:
+                self._default_actions[] = [0]*self._size_of_action_space
+                self._default_actions[a][]
+        except KeyError:
+            raise ValueError('default_actions should be specified for Neural Agent')
+        try:
+            self._state_action_list = kwargs['state_action_list']
+        except KeyError:
+            self._state_action_list = {}
+        self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha, hidden_layer_sizes=self._hidden_layer_sizes, random_state=self._random_state, max_iter=1)
+
+    def _q(self, state, action):
+        X = [list(state) + list([action])]
+        try:
+            result = self._clf.predict(X)
+            # print(result, end=' ')
+            return result
+        except exceptions.NotFittedError:
+            return 0
+
+    def _max_q(self, state):
+        '''
+        Returns MAX(Q) of a state.
+        \nArguments:
+        \n    state: the state for which MAX(Q) is returned.
+        '''
+        try:
+            max_q = max(self._q(state, action) for action in self._default_actions)
+        except ValueError:
+            max_q = 0
+        return max_q
+
+    def learn(self, **kwargs):
+        '''
+        Learns either based on state reward pair or history. Agent should be in 'training' mode. Otherwise, a ValueError exception is raised.
+        \nArguments:
+        \n    history: a list consisting of state, action, reward of an episode. If both history and state reward provided, only history is used.
+        \n    state: state resulted from the previous action on the previous state.
+        \n    reward: the reward of the previous action.
+        '''
+        if not self._training_flag:
+            raise ValueError('Not in training mode!')
+        X = []
+        y = []
+        try:  # history
+            history = kwargs['history']
+            previous_state = tuple(history[0])
+            for i in range(1, len(history), 3):
+                previous_action = history[i]
+                reward = history[i+1]
+                q_sa = self._q(previous_state, previous_action)
+                try:
+                    state = tuple(history[i+2])
+                    max_q = self._max_q(state)
+                    new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
+                except IndexError:
+                    new_q = q_sa + self._alpha*(reward-q_sa)
+                X.append(list(previous_state)+[previous_action])
+                y.append(new_q)
+                previous_state = state
+
+            self._clf.fit(X, y)
+
+            return
+        except KeyError:
+            pass
+
+        try:  # state
+            state = tuple(kwargs['state'])
+        except TypeError:
+            state = tuple([kwargs['state']])
+        except KeyError:
+            state = None
+        try:  # reward
+            reward = kwargs['reward']
+        except KeyError:
+            reward = None
+
+        q_sa = self._q(self._previous_state, self._previous_action)
+        max_q = self._max_q(state)
+
+        new_N = self._N(self._previous_state, self._previous_action) + 1
+        new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
+
+        self._state_action_list.update({
+                (self._previous_state, self._previous_action):
+                (new_q, new_N)})
+
+    def act(self, state, **kwargs):
+        '''
+        Gets a state and returns the best action.
+        \nArguments:
+        \n    actions: a set of possible actions.
+        '''
+        # try:
+        #     state = tuple(state)
+        # except TypeError:
+        #     state = tuple([state])
+        scaled_state = [s-1 for s in state]
+        self._previous_state = state
+        try:  # possible actions
+            possible_actions = []
+            for a in kwargs['actions']:
+                possible_actions.append([0]*len(action))
+                possible_actions[-1][a] = 1
+            # possible_actions = kwargs['actions']
+        except KeyError:
+            possible_actions = self._default_actions
+
+        action_q = ((action, self._q(state, action))
+                    for action in possible_actions)
+        result = max(action_q, key=lambda x: x[1])
+        action = result[0]
+        # print(result)
+        self._previous_action = action
+        return action
+
 
 
 if __name__ == '__main__':
