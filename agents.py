@@ -21,6 +21,7 @@ Classes:
 
 import random as rand
 import pickle
+import valueset as vs
 
 
 def main():
@@ -131,12 +132,12 @@ class UserAgent(Agent):
         Displays current state and asks user for input. The result is a string.
         '''
         try:
-            state = '\n'+kwargs['printable']+'\n'
+            s = '\n'+kwargs['printable']+'\n'
         except KeyError:
-            pass
+            s = state.to_list()
         action = None
         while action is None:
-            action = input('Choose action for this state: {}'.format(state))
+            action = input('Choose action for this state: {}'.format(s))
         return action
 
 
@@ -152,7 +153,7 @@ class RandomAgent(Agent):
         \n    actions: the set of possible actions to choose from. If not provided, an empty list is returned. 
         ''' 
         try:  # possible actions
-            return rand.choice(kwargs['actions'])
+            return rand.choice(kwargs['actions'].to_list())
         except KeyError:
             return []
 
@@ -197,7 +198,7 @@ class RLAgent(Agent):
         try:  # list of default actions
             self._default_actions = kwargs['default_actions']
         except KeyError:
-            self._default_actions = []
+            self._default_actions = vs.ValueSet()
         try:  # state action list
             self._state_action_list = kwargs['state_action_list']
         except KeyError:
@@ -269,10 +270,6 @@ class RLAgent(Agent):
         \n    actions: a set of possible actions.
         \n    method: 'e-greedy' allows for exploration epsilon percent of times during training mode.
         '''
-        try:
-            state = tuple(state)
-        except TypeError:
-            state = tuple([state])
         self._previous_state = state
         try:  # possible actions
             possible_actions = kwargs['actions']
@@ -289,10 +286,10 @@ class RLAgent(Agent):
 
         if (self._training_flag) & \
            (method == 'e-greedy') & (rand.random() < self._epsilon):
-            action = rand.choice(possible_actions)
+            action = rand.choice(possible_actions.value)
         else:
             action_q = ((action, self._q(state, action))
-                        for action in possible_actions)
+                        for action in possible_actions.value)
             action = max(action_q, key=lambda x: x[1])[0]
         self._previous_action = action
         return action
@@ -309,12 +306,12 @@ class RLAgent(Agent):
             raise ValueError('Not in training mode!')
         try:  # history
             history = kwargs['history']
-            previous_state = tuple(history[0])
+            previous_state = history[0]
             for i in range(1, len(history), 3):
                 previous_action = history[i]
                 reward = history[i+1]
                 try:
-                    state = tuple(history[i+2])
+                    state = history[i+2]
                 except IndexError:
                     state = None
                 q_sa = self._q(previous_state, previous_action)
@@ -331,10 +328,8 @@ class RLAgent(Agent):
         except KeyError:
             pass
 
-        try:  # state
-            state = tuple(kwargs['state'])
-        except TypeError:
-            state = tuple([kwargs['state']])
+        try:
+            state = kwargs['state']
         except KeyError:
             state = None
         try:  # reward

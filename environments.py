@@ -13,6 +13,7 @@ Classes:
 
 from agents import RLAgent, RandomAgent, UserAgent
 from subjects import MNKGame
+import valueset as vs
 import pickle
 
 
@@ -36,7 +37,7 @@ def main():
         # assign method receives a list of agent subject tuples
         env.assign(assignment)
 
-    runs = 10000
+    runs = 100
     training_episodes = 100
     test_episodes = 100
     results = {'RLS 1': [], 'RLS 2': []}
@@ -297,7 +298,7 @@ class Environment:
                         subject_name, _id = self._assignment_list[agent_name]
                         subject = self._subject[subject_name]
                         if not subject.is_terminated:
-                            state = subject.state.copy()
+                            state = subject.state
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
                                                printable=subject.printable())

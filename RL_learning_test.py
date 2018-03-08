@@ -9,13 +9,18 @@ from agents import RLAgent, RandomAgent, NeuralAgent
 from subjects import MNKGame
 from environments import Environment
 import time
+import matplotlib.pyplot as plt
 
 
 def main():
     m = 3
     n = 3
     k = 3
+<<<<<<< HEAD
     filename='mnk' + str(m) + str(n)+ str(k) # + '_good_result'
+=======
+    filename='mnk' + str(m) + str(n) + str(k)
+>>>>>>> ecc119651f6c6f788fec3cb135cb869a763bf4e7
     RND = RandomAgent()
     try:
         env = Environment(filename=filename)
@@ -34,9 +39,15 @@ def main():
         env.add_subject(name_subject_pair=subjects)
         env.assign(assignment)
 
+<<<<<<< HEAD
     runs = 100
     training_episodes = 500
     test_episodes = 10
+=======
+    runs = 50
+    training_episodes = 100
+    test_episodes = 100
+>>>>>>> ecc119651f6c6f788fec3cb135cb869a763bf4e7
     results = {'RLS 1': [], 'RLS 2': []}
     try:
         for i in range(runs):
@@ -50,17 +61,31 @@ def main():
                                reporting='none', tally='yes')
             for key in results:
                 results[key].append(tally[key])
+<<<<<<< HEAD
             # state_count = len(env._agent['RLS 1']._state_action_list)
             # Q = sum(s[0] for s in env._agent['RLS 1']._state_action_list.values())
             # N = sum(s[1] for s in env._agent['RLS 1']._state_action_list.values())
             # print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: } N: {: }, Q: {: 4.1f}, per! N:{: 4.1f}, Q:{: 4.3f}'
             #     .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count, N, Q, N/state_count, Q/state_count))
             print('{}: run {: }: win 1: {: }, win 2: {: }'.format(time.ctime(), i, tally['RLS 1'], tally['RLS 2']))
+=======
+            state_count = len(env._agent['RLS 1']._state_action_list)
+            Q = sum(s[0] for s in env._agent['RLS 1']._state_action_list.values())
+            N = sum(s[1] for s in env._agent['RLS 1']._state_action_list.values())
+            print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: } N: {: }, Q: {: 4.1f}, per! N:{: 4.1f}, Q:{: 4.3f}'
+                .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count, N, Q, N/state_count, Q/state_count))
+            # print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: }'
+            #     .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count))
+>>>>>>> ecc119651f6c6f788fec3cb135cb869a763bf4e7
             env._agent['RLS 2'] = agent_temp['RLS 2']
             env.save(object_name='all', filename=filename)
-            print('saved!')
+            # print('saved!')
     except KeyboardInterrupt:
         pass
+        
+    plt.plot(results['RLS 1'])
+    plt.axis([0, runs, 0, 100])
+    plt.show()
 
 
 if __name__ == '__main__':
