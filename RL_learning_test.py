@@ -33,8 +33,8 @@ def main():
         env.add_subject(name_subject_pair=subjects)
         env.assign(assignment)
 
-    runs = 200
-    training_episodes = 20
+    runs = 50
+    training_episodes = 100
     test_episodes = 100
     results = {'RLS 1': [], 'RLS 2': []}
     try:
@@ -50,12 +50,12 @@ def main():
             for key in results:
                 results[key].append(tally[key])
             state_count = len(env._agent['RLS 1']._state_action_list)
-            # Q = sum(s[0] for s in env._agent['RLS 1']._state_action_list.values())
-            # N = sum(s[1] for s in env._agent['RLS 1']._state_action_list.values())
-            # print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: } N: {: }, Q: {: 4.1f}, per! N:{: 4.1f}, Q:{: 4.3f}'
-            #     .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count, N, Q, N/state_count, Q/state_count))
-            print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: }'
-                .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count))
+            Q = sum(s[0] for s in env._agent['RLS 1']._state_action_list.values())
+            N = sum(s[1] for s in env._agent['RLS 1']._state_action_list.values())
+            print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: } N: {: }, Q: {: 4.1f}, per! N:{: 4.1f}, Q:{: 4.3f}'
+                .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count, N, Q, N/state_count, Q/state_count))
+            # print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: }'
+            #     .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count))
             env._agent['RLS 2'] = agent_temp['RLS 2']
             env.save(object_name='all', filename=filename)
             # print('saved!')
