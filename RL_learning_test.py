@@ -33,8 +33,8 @@ def main():
         env.add_subject(name_subject_pair=subjects)
         env.assign(assignment)
 
-    runs = 200
-    training_episodes = 20
+    runs = 100
+    training_episodes = 100
     test_episodes = 100
     results = {'RLS 1': [], 'RLS 2': []}
     try:
