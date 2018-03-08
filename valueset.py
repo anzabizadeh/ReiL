@@ -109,6 +109,15 @@ class ValueSet():
         normal = ((factor * (v - self.min) + lower_bound) for v in self.value)
         return ValueSet(*list(normal))
 
+    def __eq__(self, other):
+        try:
+            return self._value == other._value
+        except AttributeError:
+            return False
+        
+
+    def __hash__(self):
+        return self.value.__hash__()
 
 if __name__ == '__main__':
     main()
