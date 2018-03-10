@@ -19,7 +19,10 @@ def main():
 class ValueSet():
     def __init__(self, *args):
         self.value = args
-        if self._one_type:
+        if not self.value:
+            self._min = None
+            self._max = None
+        elif self._one_type:
             self._min = min(self.value)
             self._max = max(self.value)
 
@@ -29,27 +32,34 @@ class ValueSet():
 
     @value.setter
     def value(self, value):
-        if value:
-            self._scalable = True
-            self._enumerable = True
-            self._one_type = True
-            temp = []
+        self._scalable = True
+        self._enumerable = True
+        self._one_type = True
+        try:
+            _ = (e for e in value)
             first_type = type(value[0])
-            for val in value:
-                if not isinstance(val, first_type):
-                    self._one_type = False
-                if not isinstance(val, int):
-                    if isinstance(val, float):
-                        self._enumerable = False
-                    else:
-                        self._scalable = False
-                temp.append(val)
-            self._value = tuple(temp)
-        else:
-            self._scalable = False
-            self._enumerable = False
-            self._one_type = False
-            self._value = tuple([])
+            v = value
+        except TypeError:
+            first_type = type(value)
+            v = [value]
+        except IndexError:
+            first_type = type(value)
+            v = []
+
+        for val in v:
+            if not isinstance(val, first_type):
+                self._one_type = False
+            if not isinstance(val, int):
+                if isinstance(val, float):
+                    self._enumerable = False
+                else:
+                    self._scalable = False
+        self._value = tuple(v)
+        # else:
+        #     self._scalable = False
+        #     self._enumerable = False
+        #     self._one_type = True
+        #     self._value = tuple([])
 
     @property
     def max(self):
@@ -61,11 +71,13 @@ class ValueSet():
     @max.setter
     def max(self, value):
         if not self._one_type:
-            raise TypeError('Mixed data doesn\'t have max!')
+            raise TypeError('Mixed data doesn\'t have min!')
+        if self._max is None:
+            self._max = value
+            return
         if value < max(self.value):
             raise ValueError('The provided value is less than the biggest number I have.')
         self._max = value
-        return value
 
     @property
     def min(self):
@@ -78,10 +90,12 @@ class ValueSet():
     def min(self, value):
         if not self._one_type:
             raise TypeError('Mixed data doesn\'t have min!')
+        if self._min is None:
+            self._min = value
+            return
         if value > min(self.value):
             raise ValueError('The provided value is greater than the smallest number I have.')
         self._min = value
-        return value
 
     def to_list(self):
         return list(self._value)

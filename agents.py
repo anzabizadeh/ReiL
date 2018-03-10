@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Feb  4 19:01:29 2018
-
-@author: Sadjad Anzabi Zadeh
-
 This module contains classes of different types of agents.
+==========================================================
+
+The :mod:`agents` 
+
+Created on Sun Feb  4 19:01:29 2018
+@author: Sadjad Anzabi Zadeh
+-----------------------------------
 
 Classes:
     Agent (Super Class)
@@ -22,28 +25,50 @@ Classes:
 import random as rand
 import pickle
 import valueset as vs
+from sklearn.neural_network import MLPRegressor
+from sklearn import exceptions
+import numpy as np
 
 
 def main():
     print('This is a simple game. a random number is generated and the agent should move left or right to get to target.')
-    myAgent = RLAgent(gamma=.1, alpha=0.5, epsilon=0.2, Rplus=0, Ne=2,
-                      default_actions=[-1, 0, 1])
-    myAgent.status = 'training'
-    target = rand.randint(1, 100)
-    print('target={: d}'.format(target))
+    # sample_agent = RLAgent(gamma=.1, alpha=0.5, epsilon=0.2, Rplus=0, Ne=2,
+    #                   default_actions=[-1, 0, 1])
+    # sample_agent.status = 'training'
+    sample_agent = NeuralAgent(hidden_layer_sizes=(100,), default_actions=[vs.ValueSet(-1), vs.ValueSet(0), vs.ValueSet(1)])
+    sample_agent.status = 'training'
+    state = vs.ValueSet()
+    state.min = 0
+    state.max = 100
+    action = vs.ValueSet()
+    action.min = -1
+    action.max = 1
+    target = vs.ValueSet(rand.randint(1, 100))
+    print('target=', target.to_list())
     for i in range(30):
-        state = rand.randint(1, target)
-        print('game {: d} state={: d}'.format(i, state))
+        state.value = rand.randint(1, target.to_list()[0])
+        print('game ', i, ' state= ', state.to_list())
+        max_iteration = 50
         while state != target:
-            action = myAgent.act(state)
-            print(action)
-            state = min(max(state + action, 0), target)
-            myAgent.learn(state=state, reward=state-target)
-        myAgent.learn(state=state, reward=1)
-    print(myAgent._state_action_list)
+            history = []
+            itr = 0
+            while itr <= max_iteration:
+                itr += 1
+                history.append(state)
+                action.value = sample_agent.act(state).value
+                history.append(action)
+                print(state.to_list()[0], ' -> ', action.to_list()[0], end=', ')
+                state.value = min(max(state.value[0] + action.value[0], 0), target.value[0])
+                reward = state.to_list()[0]-target.to_list()[0]
+                history.append(reward)
+        # sample_agent.learn(state=state, reward=1)
+            sample_agent.learn(history=history)
+    
+    if isinstance(sample_agent, RLAgent):
+        print(sample_agent._state_action_list)
 
     for state in range(1, target):
-        print(myAgent.act(state, method=''))
+        print(sample_agent.act(state, method=''))
 
 
 class Agent:
@@ -153,7 +178,7 @@ class RandomAgent(Agent):
         \n    actions: the set of possible actions to choose from. If not provided, an empty list is returned. 
         ''' 
         try:  # possible actions
-            return rand.choice(kwargs['actions'].to_list())
+            return rand.choice(kwargs['actions'])
         except KeyError:
             return []
 
@@ -286,10 +311,10 @@ class RLAgent(Agent):
 
         if (self._training_flag) & \
            (method == 'e-greedy') & (rand.random() < self._epsilon):
-            action = rand.choice(possible_actions.value)
+            action = rand.choice(possible_actions)
         else:
             action_q = ((action, self._q(state, action))
-                        for action in possible_actions.value)
+                        for action in possible_actions)
             action = max(action_q, key=lambda x: x[1])[0]
         self._previous_action = action
         return action
@@ -356,10 +381,6 @@ class RLAgent(Agent):
 
 
 
-from sklearn.neural_network import MLPRegressor
-from sklearn import exceptions
-
-
 class NeuralAgent(RLAgent):
     '''
     This class should implement a Neural Network learner. NOT FULLY IMPLEMENTED YET!
@@ -398,22 +419,19 @@ class NeuralAgent(RLAgent):
         except KeyError:
             self._random_state = 1
         try:
-            defaul_actions_list = kwargs['default_actions']
-            self._size_of_action_space = len(defaul_actions_list)
-            self._default_actions = {}
-            for i in self._size_of_action_space:
-                self._default_actions[] = [0]*self._size_of_action_space
-                self._default_actions[a][]
+            self._default_actions = kwargs['default_actions']
         except KeyError:
             raise ValueError('default_actions should be specified for Neural Agent')
         try:
             self._state_action_list = kwargs['state_action_list']
         except KeyError:
             self._state_action_list = {}
-        self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha, hidden_layer_sizes=self._hidden_layer_sizes, random_state=self._random_state, max_iter=1)
+        self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha, hidden_layer_sizes=self._hidden_layer_sizes,
+                                 random_state=self._random_state, max_iter=2, warm_start=True)
 
     def _q(self, state, action):
-        X = [list(state) + list([action])]
+        X = np.append(state.binary_representation().to_nparray(), action.binary_representation().to_nparray())
+        X = X.reshape(1, -1)
         try:
             result = self._clf.predict(X)
             # print(result, end=' ')
@@ -443,25 +461,42 @@ class NeuralAgent(RLAgent):
         '''
         if not self._training_flag:
             raise ValueError('Not in training mode!')
-        X = []
-        y = []
+        X = np.array([], ndmin=2)
+        y = np.array([], ndmin=2)
         try:  # history
             history = kwargs['history']
-            previous_state = tuple(history[0])
+            previous_state = history[0]
             for i in range(1, len(history), 3):
                 previous_action = history[i]
                 reward = history[i+1]
                 q_sa = self._q(previous_state, previous_action)
                 try:
-                    state = tuple(history[i+2])
+                    state = history[i+2]
                     max_q = self._max_q(state)
                     new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
                 except IndexError:
-                    new_q = q_sa + self._alpha*(reward-q_sa)
-                X.append(list(previous_state)+[previous_action])
-                y.append(new_q)
+                    new_q = reward
+                    # new_q = q_sa + self._alpha*(reward-q_sa)
+                state_action = np.append(previous_state.binary_representation().to_nparray(), previous_action.binary_representation().to_nparray())
+                try:
+                    X = np.vstack((X, state_action))
+                    y = np.append(y, new_q)
+                except ValueError:
+                    X = state_action
+                    y = np.array([new_q])
                 previous_state = state
 
+            # try:
+            #     old_q = self._clf.predict(X)
+            #     old_coef = self._clf.coefs_
+            #     self._clf.fit(X, y)
+            #     print('before training:')
+            #     print(old_coef)
+            #     print('after training:')
+            #     print(self._clf.coefs_)
+            #     # diff_q = old_q - self._clf.predict(X)
+            #     # print('{: 2.2f}'.format(sum(diff_q)), end='\t')
+            # except AttributeError:
             self._clf.fit(X, y)
 
             return
@@ -495,18 +530,9 @@ class NeuralAgent(RLAgent):
         \nArguments:
         \n    actions: a set of possible actions.
         '''
-        # try:
-        #     state = tuple(state)
-        # except TypeError:
-        #     state = tuple([state])
-        scaled_state = [s-1 for s in state]
-        self._previous_state = state
+        self._previous_state = state.value
         try:  # possible actions
-            possible_actions = []
-            for a in kwargs['actions']:
-                possible_actions.append([0]*len(action))
-                possible_actions[-1][a] = 1
-            # possible_actions = kwargs['actions']
+            possible_actions = kwargs['actions']
         except KeyError:
             possible_actions = self._default_actions
 
@@ -517,7 +543,6 @@ class NeuralAgent(RLAgent):
         # print(result)
         self._previous_action = action
         return action
-
 
 
 if __name__ == '__main__':

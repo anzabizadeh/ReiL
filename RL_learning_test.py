@@ -16,38 +16,29 @@ def main():
     m = 3
     n = 3
     k = 3
-<<<<<<< HEAD
-    filename='mnk' + str(m) + str(n)+ str(k) # + '_good_result'
-=======
-    filename='mnk' + str(m) + str(n) + str(k)
->>>>>>> ecc119651f6c6f788fec3cb135cb869a763bf4e7
+    filename='mnk' + str(m) + str(n) + str(k) + '_ann'
     RND = RandomAgent()
     try:
         env = Environment(filename=filename)
         print('{}: loaded'.format(time.ctime()))
     except (ModuleNotFoundError, FileNotFoundError):
         env = Environment()
-        RLS1 = NeuralAgent(hidden_layer_sizes=(10, 5))
-        RLS2 = NeuralAgent(hidden_layer_sizes=(10, 5))
+        board = MNKGame(m=m, n=n, k=k)
+        RLS1 = NeuralAgent(hidden_layer_sizes=(100,), default_actions=board.possible_actions, alpha=0.2)
+        # RLS2 = NeuralAgent(hidden_layer_sizes=(20, 10), default_actions=board.possible_actions)
         # RLS1 = RLAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
-        # RLS2 = RLAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
+        RLS2 = RLAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
         agents = {'RLS 1': RLS1, 'RLS 2': RLS2}
-        subjects = {'board RLS': MNKGame(m=m, n=n, k=k)}
+        subjects = {'board RLS': board}
         assignment = [('RLS 1', 'board RLS'), ('RLS 2', 'board RLS')]
 
         env.add_agent(name_agent_pair=agents)
         env.add_subject(name_subject_pair=subjects)
         env.assign(assignment)
 
-<<<<<<< HEAD
     runs = 100
-    training_episodes = 500
-    test_episodes = 10
-=======
-    runs = 50
-    training_episodes = 100
+    training_episodes = 10
     test_episodes = 100
->>>>>>> ecc119651f6c6f788fec3cb135cb869a763bf4e7
     results = {'RLS 1': [], 'RLS 2': []}
     try:
         for i in range(runs):
@@ -66,14 +57,14 @@ def main():
             # N = sum(s[1] for s in env._agent['RLS 1']._state_action_list.values())
             # print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: } N: {: }, Q: {: 4.1f}, per! N:{: 4.1f}, Q:{: 4.3f}'
             #     .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count, N, Q, N/state_count, Q/state_count))
-            print('{}: run {: }: win 1: {: }, win 2: {: }'.format(time.ctime(), i, tally['RLS 1'], tally['RLS 2']))
+            print('{}: run {: }: not lose 1: {: }'.format(time.ctime(), i, test_episodes - tally['RLS 2']))
             env._agent['RLS 2'] = agent_temp['RLS 2']
             env.save(object_name='all', filename=filename)
             # print('saved!')
     except KeyboardInterrupt:
         pass
         
-    plt.plot(results['RLS 1'])
+    plt.plot(list((test_episodes-r for r in results['RLS 2'])))
     plt.axis([0, runs, 0, 100])
     plt.show()
 
