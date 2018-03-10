@@ -189,7 +189,10 @@ class MNKBoard:
         '''
         Returns the state of the board as a list.
         '''
-        return vs.ValueSet(*self._board)
+        s = vs.ValueSet(*self._board)
+        s.min = 0
+        s.max = self._players
+        return s
 
     def get_board(self, format_='vector'):
         '''
@@ -288,8 +291,14 @@ class MNKGame(MNKBoard, Subject):
     def possible_actions(self):
         '''
         Returns a list of indexes of empty squares.
-        '''  
-        return vs.ValueSet(*list(self.get_action_set()))
+        '''
+        actions = []
+        for a in list(self.get_action_set()):
+            temp = vs.ValueSet(a)
+            temp.max = len(self._board) - 1
+            temp.min = 0
+            actions.append(temp)
+        return actions
 
     def register(self, player_name):
         '''
@@ -306,7 +315,7 @@ class MNKGame(MNKBoard, Subject):
         \n    _id: ID of the player who sets the piece.
         \n    action: the location in which the piece is set. Can be either in index format or row column format.
         ''' 
-        self.set_piece(_id, index=int(action), update='yes')
+        self.set_piece(_id, index=int(action.value[0]), update='yes')
         if self.board_status is None:
             return 0
         if self.board_status == _id:
