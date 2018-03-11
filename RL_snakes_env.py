@@ -5,10 +5,11 @@ Created on Fri Feb 16 09:23:38 2018
 @author: Sadjad
 """
 
-from agents import RLAgent, RandomAgent
-from subjects import Snake
-from environments import Environment
 import time
+
+from rl.agents import QAgent, RandomAgent
+from rl.environments import Environment
+from rl.subjects import Snake
 
 
 def main():
@@ -18,7 +19,7 @@ def main():
         print('{}: loaded'.format(time.ctime()))
     except (ModuleNotFoundError, FileNotFoundError):
         env = Environment()
-        RLS1 = RLAgent(gamma=0.6, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0, default_actions=['left', 'none', 'right'])
+        RLS1 = QAgent(gamma=0.6, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0, default_actions=['left', 'none', 'right'])
         agents = {'snake': RLS1}
         subjects = {'board': Snake(m=10, n=10)}
         assignment = [('snake', 'board')]

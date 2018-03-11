@@ -5,10 +5,12 @@ Created on Fri Feb 16 09:23:38 2018
 @author: Sadjad
 """
 
-from agents import RandomAgent
-from subjects import MNKGame
-from environments import Environment
 import numpy as np
+
+from rl.agents import RandomAgent
+from rl.environments import Environment
+from rl.subjects import MNKGame
+
 
 def main():
     env = Environment()

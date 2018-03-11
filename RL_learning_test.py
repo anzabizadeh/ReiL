@@ -5,11 +5,13 @@ Created on Fri Feb 16 09:23:38 2018
 @author: Sadjad
 """
 
-from agents import RLAgent, RandomAgent, NeuralAgent
-from subjects import MNKGame
-from environments import Environment
 import time
+
 import matplotlib.pyplot as plt
+
+from rl.agents import ANNAgent, QAgent, RandomAgent
+from rl.environments import Environment
+from rl.subjects import MNKGame
 
 
 def main():
@@ -24,10 +26,10 @@ def main():
     except (ModuleNotFoundError, FileNotFoundError):
         env = Environment()
         board = MNKGame(m=m, n=n, k=k)
-        RLS1 = NeuralAgent(hidden_layer_sizes=(100,), default_actions=board.possible_actions, alpha=0.2)
-        # RLS2 = NeuralAgent(hidden_layer_sizes=(20, 10), default_actions=board.possible_actions)
-        # RLS1 = RLAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
-        RLS2 = RLAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
+        RLS1 = ANNAgent(hidden_layer_sizes=(100,), default_actions=board.possible_actions, alpha=0.2)
+        # RLS2 = ANNAgent(hidden_layer_sizes=(20, 10), default_actions=board.possible_actions)
+        # RLS1 = QAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
+        RLS2 = QAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
         agents = {'RLS 1': RLS1, 'RLS 2': RLS2}
         subjects = {'board RLS': board}
         assignment = [('RLS 1', 'board RLS'), ('RLS 2', 'board RLS')]

@@ -5,9 +5,9 @@ Created on Fri Feb 16 09:23:38 2018
 @author: Sadjad
 """
 
-from agents import RLAgent, UserAgent
-from subjects import MNKGame
-from environments import Environment
+from rl.agents import QAgent, UserAgent
+from rl.environments import Environment
+from rl.subjects import MNKGame
 
 
 def main():
