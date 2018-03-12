@@ -26,10 +26,11 @@ def main():
     except (ModuleNotFoundError, FileNotFoundError):
         env = Environment()
         board = MNKGame(m=m, n=n, k=k)
-        RLS1 = ANNAgent(hidden_layer_sizes=(100,), default_actions=board.possible_actions, alpha=0.2)
+        RLS1 = ANNAgent(epsilon=0.05, hidden_layer_sizes=(100,),
+                        default_actions=board.possible_actions, alpha=0.2)
+        RLS2 = QAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
         # RLS2 = ANNAgent(hidden_layer_sizes=(20, 10), default_actions=board.possible_actions)
         # RLS1 = QAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
-        RLS2 = QAgent(gamma=1, alpha=0.2, epsilon=0.3, Rplus=0, Ne=0)
         agents = {'RLS 1': RLS1, 'RLS 2': RLS2}
         subjects = {'board RLS': board}
         assignment = [('RLS 1', 'board RLS'), ('RLS 2', 'board RLS')]
@@ -54,17 +55,11 @@ def main():
                                reporting='none', tally='yes')
             for key in results:
                 results[key].append(tally[key])
-            # state_count = len(env._agent['RLS 1']._state_action_list)
-            # Q = sum(s[0] for s in env._agent['RLS 1']._state_action_list.values())
-            # N = sum(s[1] for s in env._agent['RLS 1']._state_action_list.values())
-            # print('{}: run {: }: win 1: {: }, win 2: {: }, state: #: {: } N: {: }, Q: {: 4.1f}, per! N:{: 4.1f}, Q:{: 4.3f}'
-            #     .format(time.ctime(), i, tally['RLS 1'], tally['RLS 2'], state_count, N, Q, N/state_count, Q/state_count))
             print('{}: run {: }: not lose 1: {: }'.format(time.ctime(), i, test_episodes - tally['RLS 2']))
             env._agent['RLS 2'] = agent_temp['RLS 2']
             env.save(object_name='all', filename=filename)
-            # print('saved!')
     except KeyboardInterrupt:
-        pass
+        print('caught Ctrl+C')
         
     plt.plot(list((test_episodes-r for r in results['RLS 2'])))
     plt.axis([0, runs, 0, 100])

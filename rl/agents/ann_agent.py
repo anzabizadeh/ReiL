@@ -13,21 +13,21 @@ A Q-learning agent with Neural Network Q-function approximator
 # Implement NeuralAgent.
 
 import numpy as np
+from random import choice, random
 from sklearn import exceptions
 from sklearn.neural_network import MLPRegressor
 
-from .agent import Agent
+from rl.agents.agent import Agent
 
 
 def main():
-    from ..valueset import ValueSet
+    from rl.valueset.valueset import ValueSet
     from random import randint
 
     print('This is a simple game. a random number is generated and the agent should move left or right to get to target.')
-    # sample_agent = RLAgent(gamma=.1, alpha=0.5, epsilon=0.2, Rplus=0, Ne=2,
-    #                   default_actions=[-1, 0, 1])
-    # sample_agent.status = 'training'
-    sample_agent = ANNAgent(hidden_layer_sizes=(100,), default_actions=[ValueSet(-1), ValueSet(0), ValueSet(1)])
+
+    action_set = ValueSet(-1, 0, 1).as_valueset_array()
+    sample_agent = ANNAgent(epsilon=0.1, hidden_layer_sizes=(100,), default_actions=action_set)
     sample_agent.status = 'training'
     state = ValueSet()
     state.min = 0
@@ -98,6 +98,10 @@ class ANNAgent(Agent):
             self._gamma = kwargs['gamma']
         except KeyError:
             self._gamma = 1
+        try:
+            self._epsilon = kwargs['epsilon']
+        except KeyError:
+            self._epsilon = 0
         try:
             self._hidden_layer_sizes = kwargs['hidden_layer_sizes']
         except KeyError:
@@ -236,10 +240,14 @@ class ANNAgent(Agent):
         except KeyError:
             possible_actions = self._default_actions
 
-        action_q = ((action, self._q(state, action))
-                    for action in possible_actions)
-        result = max(action_q, key=lambda x: x[1])
-        action = result[0]
+
+        if (self._training_flag) & (random() < self._epsilon):
+            action = choice(possible_actions)
+        else:
+            action_q = ((action, self._q(state, action))
+                        for action in possible_actions)
+            result = max(action_q, key=lambda x: x[1])
+            action = result[0]
         # print(result)
         self._previous_action = action
         return action

@@ -19,6 +19,9 @@ def main():
     s = ValueSet(1, 7, 10, 3)
     print(s.binary_representation().value)
     print(s.normalizer(0, 1).value, s.to_nparray())
+    array = s.as_valueset_array()
+    for a in array:
+        print(a.value, a.max, a.min)
 
 class ValueSet():
     '''
@@ -156,6 +159,14 @@ class ValueSet():
     def to_nparray(self):
         ''' return the value as numpy array.'''
         return np.array(list(self._value))
+
+    def as_valueset_array(self):
+        ''' return the value as a list of ValueSets.'''
+        array = [ValueSet(v) for v in self._value]
+        for a in array:
+            a.max = self.max
+            a.min = self.min
+        return array
 
     def binary_representation(self):
         '''

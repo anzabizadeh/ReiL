@@ -71,13 +71,15 @@ class MNKGame(MNKBoard, Subject):
     @property
     def possible_actions(self):
         '''Return a list of indexes of empty squares.'''
-        actions = []
-        for a in list(self.get_action_set()):
-            temp = ValueSet(a)
-            temp.max = len(self._board) - 1
-            temp.min = 0
-            actions.append(temp)
-        return actions
+        actions = ValueSet(*list(self.get_action_set()))
+        actions.min = 0
+        actions.max = len(self._board) - 1
+        # for a in list(self.get_action_set()):
+        #     temp = ValueSet(a)
+        #     temp.max = len(self._board) - 1
+        #     temp.min = 0
+        #     actions.append(temp)
+        return actions.as_valueset_array()
 
     def register(self, player_name):
         '''
