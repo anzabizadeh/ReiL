@@ -1,21 +1,13 @@
 # -*- coding: utf-8 -*-
-"""
-The :mod:`agents` provides the super class and some classes for reinforcement learning.
+'''
+ANNAgent class
+=================
 
-Classes
--------
-    - `Agent`: the super class of all agent classes
-    - `UserAgent`: an agent that shows asks for user's choice of action
-    - `RandomAgent`: an agent that randomly chooses an action
-    - `RLAgent`: the Q-learning agent
-    - `NeuralAgent`: the agent with neural network as a  (Not Implemented Yet)
+A Q-learning agent with Neural Network Q-function approximator
 
-@author: Sadjad Anzabi Zadeh
------------------------------------
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
 
-Classes:
-    Agent (Super Class)
-"""
 
 # KNOWN ISSUES:
 # Implement NeuralAgent.
@@ -70,19 +62,28 @@ def main():
 
 class ANNAgent(Agent):
     '''
-    This class should implement a Neural Network learner. NOT FULLY IMPLEMENTED YET!
+    A Q-learning agent with neural network Q-function approximator.
+
+    Methods
+    -------
+        act: return an action based on the given state.
+        learn: learn using either history or action, reward, and state.
+        reset: Not Implemented Yet!
     '''
     def __init__(self, **kwargs):
         '''
-        Initializes an Reinforcement Learning Agent.
-        \nArguments:
-        \n    solver: the solver method. Default = 'lbfgs'
-        \n    alpha: learning rate. Default = 1e-5
-        \n    gamma: discount factor. Default = 1
-        \n    hidden_layer_sizes: tuple containintg hidden layer sizes
-        \n    random_state: random state. Default = 1
-        \n    default_actions: list of default actions
-        \n    state_action_list: list from a previous training
+        Initialize a Q-Learning agent with neural network Q-function approximator.
+
+        Arguments
+        ---------
+            solver: the solver method. (Default = 'lbfgs')
+            alpha: learning rate. (Default = 1e-5)
+            gamma: discount factor. (Default = 1)
+            hidden_layer_sizes: tuple containintg hidden layer sizes
+            random_state: random state. (Default = 1)
+            default_actions: list of default actions
+
+        Raises ValueError if default_actions is not provided.
         '''
         Agent.__init__(self, **kwargs)
         try:
@@ -109,14 +110,18 @@ class ANNAgent(Agent):
             self._default_actions = kwargs['default_actions']
         except KeyError:
             raise ValueError('default_actions should be specified for Neural Agent')
-        try:
-            self._state_action_list = kwargs['state_action_list']
-        except KeyError:
-            self._state_action_list = {}
         self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha, hidden_layer_sizes=self._hidden_layer_sizes,
                                  random_state=self._random_state, max_iter=2, warm_start=True)
 
     def _q(self, state, action):
+        '''
+        Return the Q-value of a state action pair.
+
+        Arguments
+        ---------
+            state: the state for which Q-value is returned.
+            action: the action for which Q-value is returned.
+        '''
         X = np.append(state.binary_representation().to_nparray(), action.binary_representation().to_nparray())
         X = X.reshape(1, -1)
         try:
@@ -128,9 +133,11 @@ class ANNAgent(Agent):
 
     def _max_q(self, state):
         '''
-        Returns MAX(Q) of a state.
-        \nArguments:
-        \n    state: the state for which MAX(Q) is returned.
+        Return MAX(Q) of a state.
+        
+        Arguments
+        ---------
+            state: the state for which MAX(Q) is returned.
         '''
         try:
             max_q = max(self._q(state, action) for action in self._default_actions)
@@ -140,11 +147,14 @@ class ANNAgent(Agent):
 
     def learn(self, **kwargs):
         '''
-        Learns either based on state reward pair or history. Agent should be in 'training' mode. Otherwise, a ValueError exception is raised.
-        \nArguments:
-        \n    history: a list consisting of state, action, reward of an episode. If both history and state reward provided, only history is used.
-        \n    state: state resulted from the previous action on the previous state.
-        \n    reward: the reward of the previous action.
+        Learn either based on state reward pair or history.
+        
+        Arguments:
+            history: a list consisting of state, action, reward of an episode. If both history and state reward provided, only history is used.
+            state: state resulted from the previous action on the previous state.
+            reward: the reward of the previous action.
+
+        Raises ValueError if the agent is not in 'training' mode.
         '''
         if not self._training_flag:
             raise ValueError('Not in training mode!')
@@ -213,9 +223,12 @@ class ANNAgent(Agent):
 
     def act(self, state, **kwargs):
         '''
-        Gets a state and returns the best action.
-        \nArguments:
-        \n    actions: a set of possible actions.
+        return the best action for a given state.
+
+        Arguments
+        ---------
+            state: the state for which an action is chosen.
+            actions: a set of possible actions. If not provided, default actions are used.
         '''
         self._previous_state = state.value
         try:  # possible actions

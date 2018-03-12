@@ -1,59 +1,45 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Feb  2 21:35:10 2018
+'''
+subject class
+=============
 
-@author: Sadjad Anzabi Zadeh
+This `subject` class is the super class of all subject classes. 
 
-This module contains classes of different types of subjects.
-
-Classes:
-    Subject (Super Class)
-    MNKBoard (Super Class): this is not a subject, but one of the super classes of MNKGame class.
-    MNKGame
-
-mnkboard(m=3, n=3, k=3, players=2)
-    set_piece(player, **kwargs)
-    get_board(format_='vector')
-    get_action_set(format_='vector')
-    reset()
-    printable()
-
-mnkgame(mnkboard)(m=3, n=3, k=3, players=2)
-    board_status
-    is_terminated
-    register(player_name): registers a player and gives back an ID
-    possible_actions(): returns a list of possible actions
-    take_effect(ID, action): returns reward
-    reset()
-    set_piece(player, *argv, **kwargs)
-
-"""
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
 
 import pickle
 
 
-def main():
-    pass
-
-
 class Subject:
     '''
-    Super class of all subject classes. This class provides basic methods including is_terminated, register, take_effect, reset, load, save, and printable.
-    Register, load and save are implemented.
+    Super class of all subject classes.
+    
+    Attributes
+    ----------
+        state: the state of the subject as a ValueSet.
+        is_terminated: whether the subject is finished or not.
+        possible_actions: a list of possible actions.
+
+    Methods
+    -------
+        register: register a new agent and return its ID or return ID of an existing agent.
+        take_effect: get an action and change the state accordingly.
+        reset: reset the state and is_terminated.
+        load: load a subject from a file.
+        save: save the subject to a file.
+        printable: return a readable format of subject's state
     '''
     def __init__(self):
         self._agent_list = {}
 
     @property
     def state(self):
-        '''
-        Returns the state.
-        '''
         raise NotImplementedError
 
     @property
     def is_terminated(self):
-        pass
+        raise NotImplementedError
 
     @property
     def possible_actions(self):
@@ -73,16 +59,20 @@ class Subject:
             return _id
 
     def take_effect(self, _id, action):
-        pass
+        raise NotImplementedError
 
     def reset(self):
-        pass
+        raise NotImplementedError
 
     def load(self, **kwargs):
         '''
-        Loads an agent.
-        \nArguments:
-        \n    filename: the name of the file to be loaded.
+        Load a subject from a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+
+        Raises ValueError if the filename is not specified.
         '''
         try:  # filename
             filename = kwargs['filename']
@@ -93,9 +83,13 @@ class Subject:
 
     def save(self, **kwargs):
         '''
-        Saves an agent.
-        \nArguments:
-        \n    filename: the name of the file to be saved.
+        Save the subject to a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be saved.
+
+        Raises ValueError if the filename is not specified.
         '''
         try:  # filename
             filename = kwargs['filename']
@@ -106,7 +100,3 @@ class Subject:
 
     def printable(self):
         pass
-
-
-if __name__ == '__main__':
-    main()

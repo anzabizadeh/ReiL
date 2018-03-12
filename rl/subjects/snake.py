@@ -1,33 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Feb  2 21:35:10 2018
+'''
+Snake class
+===========
 
-@author: Sadjad Anzabi Zadeh
+This `subject` class emulates a single player snake game. 
 
-This module contains classes of different types of subjects.
-
-Classes:
-    Subject (Super Class)
-    MNKBoard (Super Class): this is not a subject, but one of the super classes of MNKGame class.
-    MNKGame
-
-mnkboard(m=3, n=3, k=3, players=2)
-    set_piece(player, **kwargs)
-    get_board(format_='vector')
-    get_action_set(format_='vector')
-    reset()
-    printable()
-
-mnkgame(mnkboard)(m=3, n=3, k=3, players=2)
-    board_status
-    is_terminated
-    register(player_name): registers a player and gives back an ID
-    possible_actions(): returns a list of possible actions
-    take_effect(ID, action): returns reward
-    reset()
-    set_piece(player, *argv, **kwargs)
-
-"""
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
 
 import curses
 from curses import KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_UP
@@ -44,7 +23,28 @@ def main():
 
 
 class Snake(MNKBoard, Subject):
+    '''
+    Create a single player snake game.
+
+    Attributes
+    ----------
+        is_terminated: whether the game finished or not.
+        possible_actions: a list of possible actions.
+
+    Methods
+    -------
+        take_effect: set a piece of the specified player on the specified square of the board.
+        reset: clear the board.
+    '''
     def __init__(self, **kwargs):
+        '''
+        Initialize an instance of snake game.
+
+        Arguments
+        ---------
+            m: number of rows (default=10)
+            n: number of columns (default=10)
+        '''
         try:
             self._m = kwargs['m']
         except KeyError:
@@ -59,16 +59,23 @@ class Snake(MNKBoard, Subject):
 
     @property
     def is_terminated(self):
+        '''Return True if the game is finished.'''
         return (self._snake[0] in self._snake[1:])
     
     @property
     def possible_actions(self):
-        '''
-        Returns a list of indexes of empty squares.
-        '''  
+        '''Return the moves as ValueSet (left, none, right).'''
         return ValueSet('left', 'none', 'right')
 
     def take_effect(self, _id, action):
+        '''
+        Move the snake on the board.
+
+        Arguments
+        ---------
+            id_: ID of the player. (Not used in the code)
+            action: one of three possible actions: left, none, right.
+        ''' 
         self._win.border(0)
         self._win.addstr(0, 2, 'Score : ' + str(self._score) + ' ')                # Printing 'Score' and
         self._win.addstr(0, 27, ' SNAKE ')                                   # 'SNAKE' strings
@@ -130,7 +137,8 @@ class Snake(MNKBoard, Subject):
         return self._score
 
     def reset(self):
-        MNKGame.reset(self)
+        '''Clear the board, reset the snake and the fruit and update board_status.'''
+        MNKBoard.reset(self)
         curses.initscr()
         self._win = curses.newwin(20, 60, 0, 0)
         self._win.keypad(1)
@@ -150,10 +158,6 @@ class Snake(MNKBoard, Subject):
             self.set_piece(1, row=location[0], column=location[1])
         self.set_piece(2, row=self._food[0], column=self._food[1])
 
-    def printable(self):
-        pass
-
-         
 
 if __name__ == '__main__':
     main()

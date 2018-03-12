@@ -1,41 +1,36 @@
 # -*- coding: utf-8 -*-
-"""
-The :mod:`agents` provides the super class and some classes for reinforcement learning.
+'''
+UserAgent class
+===============
 
-Classes
--------
-    - `Agent`: the super class of all agent classes
-    - `UserAgent`: an agent that shows asks for user's choice of action
-    - `RandomAgent`: an agent that randomly chooses an action
-    - `RLAgent`: the Q-learning agent
-    - `NeuralAgent`: the agent with neural network as a  (Not Implemented Yet)
+An agent that prints the state and asks the user for action.
 
-@author: Sadjad Anzabi Zadeh
------------------------------------
-
-Classes:
-    Agent (Super Class)
-"""
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
 
 # KNOWN ISSUES:
-# UserAgent should be revised.
+# NOTE TO MYSELF: This implementation is not good! It should get either the state or the printable.
 
 
+from ..valueset.valueset import ValueSet
 from .agent import Agent
-
-
-def main():
-    pass
 
 
 class UserAgent(Agent):
     '''
-    This class is used to get the action from the user.
-    '''
+    An agent that acts based on user input.
+
+    Methods
+    -------
+        act: return user's chosen action.
+    ''' 
     def act(self, state, **kwargs):
-        # NOTE TO MYSELF: This implementation is not good! It should get either the state or the printable.
         '''
-        Displays current state and asks user for input. The result is a string.
+        Displays current state and asks user for input. The result is a ValueSet.
+        Arguments
+        ---------
+            state: the state for which the action should be returned.
+            printable: user friendly format of the state. If not supplied, the state is printed as a list.
         '''
         try:
             s = '\n'+kwargs['printable']+'\n'
@@ -44,8 +39,4 @@ class UserAgent(Agent):
         action = None
         while action is None:
             action = input('Choose action for this state: {}'.format(s))
-        return action
-
-
-if __name__ == '__main__':
-    main()
+        return ValueSet(action)

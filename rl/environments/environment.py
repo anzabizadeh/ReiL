@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Feb 16 09:23:38 2018
+'''
+environment class
+=============
 
-@author: Sadjad Anzabi Zadeh
+This `environment` class provides a learning environment for any reinforcement learning agent on any subject. 
 
-This module contains classes that provides tools to load/save objects and environments,
-add/remove agents/subjects, assign agents to subjects and run models.
-
-Classes:
-    Environment
-"""
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
 
 import pickle
 
@@ -65,18 +62,27 @@ def main():
 
 class Environment:
     '''
-    Provides a learning environment including agents and subjects.
+    Provide a learning environment for agents and subjects.
     Agents act on subjects and receive the reward of their action and the new state of subjects.
     Then agents learn based on this information to act better.
     '''
     def __init__(self, **kwargs):
         '''
-        \nArguments:
-        \n    filename: if given, Environment attempts to open a saved environment by openning the file. This argument cannot be used along other arguments.
-        \n    episodes: number of episodes of run. Default is 1.
-        \n    termination: 'any' means an episode terminates if any of the subjects terminates. 'all' runs until all episodes terminate. Default is 'any'.
-        \n    reset: 'any' means that only the subject that is terminated should be reset. 'all' resets all subjects. Default is 'any'.
-        \n    learning_method: 'every step' learns after every move, 'history' learns after each episode. Default is 'every step'
+        Create a new environment.
+
+        Arguments
+        ---------
+            filename: if given, Environment attempts to open a saved environment by openning the file. This argument cannot be used along other arguments.
+            episodes: number of episodes of run. (Default = 1)
+            termination: when to terminate one episode. (Default = 'any')
+                'any': terminate if any of the subjects is terminated.
+                'all': terminate if all the subjects are terminated.
+            reset: how to reset subjects after each episode. (Default = 'any')
+                'any': reset only the subject that is terminated.
+                'all': reset all subjects.
+            learning_method: how to learn from each episode. (Default = 'every step')
+                'every step': learn after every move.
+                'history': learn after each episode.
         '''
         if 'filename' in kwargs:
             self.load(filename=kwargs['filename'])
@@ -112,10 +118,14 @@ class Environment:
 
     def load(self, **kwargs):
         '''
-        Loads an object of an environment.
-        \nArguments:
-        \n    object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. Default is 'all'.
-        \n    filename: the name of the file to be loaded.
+        Load an object or an environment from a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+            object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. (Default = 'all')
+
+        Raises ValueError if the filename is not specified.
         '''
         try:  # object_name
             object_name = kwargs['object_name']
@@ -144,10 +154,14 @@ class Environment:
 
     def save(self, **kwargs):
         '''
-        Saves an object (agent or subject) or the environment.
-        \nArguments:
-        \n    object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. Default is 'all'.
-        \n    filename: the name of the file to save.
+        Save an object or the environment to a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+            object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. (Default = 'all')
+
+        Raises ValueError if the filename is not specified.
         '''
         try:  # object_name
             object_name = kwargs['object_name']
@@ -168,18 +182,24 @@ class Environment:
 
     def add_agent(self, name_agent_pair):
         '''
-        Adds agents to the environment.
-        \nArguments:
-        \n    name_agent_pair: a dictionary consist of agent name and agent object. Names should be unique, otherwise overwritten.
+        Add agents to the environment.
+
+        Arguments
+        ---------
+            name_agent_pair: a dictionary consist of agent name and agent object. Names should be unique, otherwise overwritten.
         '''
         for name, agent in name_agent_pair.items():
             self._agent[name] = agent
 
     def remove_agent(self, agent_names):
         '''
-        Removes agents from the environment.
-        \nArguments:
-        \n    agent_names: a list of agent names to be deleted. If not found, KeyError exception is raised.
+        Remove agents from the environment.
+
+        Arguments
+        ---------
+            agent_names: a list of agent names to be deleted.
+            
+        Raises KeyError if the agent is not found.
         '''
         for name in agent_names:
             try:
@@ -189,18 +209,24 @@ class Environment:
 
     def add_subject(self, name_subject_pair):
         '''
-        Adds subjects to the environment.
-        \nArguments:
-        \n    name_subject_pair: a dictionary consist of subject name and subject object. Names should be unique, otherwise overwritten.
+        Add subjects to the environment.
+
+        Arguments
+        ---------
+            name_subject_pair: a dictionary consist of subject name and subject object. Names should be unique, otherwise overwritten.
         '''
         for name, subject in name_subject_pair.items():
             self._subject[name] = subject
 
     def remove_subject(self, subject_names):
         '''
-        Removes subjects from the environment.
-        \nArguments:
-        \n    subject_names: a list of subject names to be deleted. If not found, KeyError exception is raised.
+        Remove subjects from the environment.
+
+        Arguments
+        ---------
+            subject_names: a list of subject names to be deleted.
+            
+        Raises KeyError if the subject is not found.
         '''
         for name in subject_names:
             try:
@@ -210,9 +236,14 @@ class Environment:
 
     def assign(self, agent_subject_names):
         '''
-        Assigns agents to subjects. An agent can be assigned to act on multiple subjects and a subject can be affected by multiple agents. 
-        \nArguments:
-        \n    agent_subject_names: a list of agent subject tuples. If any agent or subject not found, ValueError exception is raised.
+        Assign agents to subjects.
+        
+        Arguments
+        ---------
+            agent_subject_names: a list of agent subject tuples.
+
+        Raises ValueError if an agent or subject is not found.
+        Note: An agent can be assigned to act on multiple subjects and a subject can be affected by multiple agents. 
         '''
         for agent_name, subject_name in agent_subject_names:
             if agent_name not in self._agent:
@@ -224,15 +255,29 @@ class Environment:
 
     def elapse(self, **kwargs):
         '''
-        Moves forward in time for a number of episodes. At each episode agents are called sequentially to act on their respective subject(s).
+        Move forward in time for a number of episodes.
+        
+        At each episode, agents are called sequentially to act on their respective subject(s).
         An episode ends if one (all) subject(s) terminates.
-        \nArguments:
-        \n    episodes: number of episodes of run.
-        \n    termination: 'any' means an episode terminates if any of the subjects terminates. 'all' runs until all episodes terminate.
-        \n    reset: 'any' means that only the subject that is terminated should be reset. 'all' resets all subjects.
-        \n    learning_method: 'every step' learns after every move, 'history' learns after each episode. 'none' initiates 'testing' state of agents.
-        \n    reporting: 'all' prints every move, 'none' reports nothing, 'important' reports important parts only.
-        \n    tally: 'yes' counts the number of wins of each agent. 'no' doesn't tally. Default is 'no'.
+        Arguments
+        ---------
+            episodes: number of episodes of run.
+            termination: when to terminate one episode. (Default = 'any')
+                'any': terminate if any of the subjects is terminated.
+                'all': terminate if all the subjects are terminated.
+            reset: how to reset subjects after each episode. (Default = 'any')
+                'any': reset only the subject that is terminated.
+                'all': reset all subjects.
+            learning_method: how to learn from each episode. (Default = 'every step')
+                'every step': learn after every move.
+                'history': learn after each episode.
+            reporting: what to report. (Default = 'none')
+                'all': prints every move.
+                'none' reports nothing.
+                'important' reports important parts only.
+            tally: count wins of each agent or not. (Default = 'no')
+                'yes': counts the number of wins of each agent.
+                'no': doesn't tally.
         '''
         # one episode is one full game till the end
         try:  # episodes
