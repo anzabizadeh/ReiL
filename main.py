@@ -5,11 +5,13 @@ Created on Mon Feb 19 15:47:46 2018
 @author: Sadjad
 """
 
-from agents import RLAgent, RandomAgent, UserAgent
-from subjects import MNKGame
 import pickle
 import time
-from environments import Environment
+
+from rl.agents import QAgent, RandomAgent, UserAgent
+from rl.environments import Environment
+from rl.subjects import MNKGame
+
 
 def main():
     env = Environment()
@@ -17,9 +19,9 @@ def main():
         env.load(filename='mnk333env-agentbyagent-testbyrandom')
     except FileNotFoundError:
         agents = {'a1':
-                  RLAgent(gamma=1, alpha=0.5, epsilon=0.05, Rplus=1, Ne=2),
+                  QAgent(gamma=1, alpha=0.5, epsilon=0.05, Rplus=1, Ne=2),
                   'a2':
-                  RLAgent(gamma=1, alpha=0.5, epsilon=0.05, Rplus=1, Ne=2)}
+                  QAgent(gamma=1, alpha=0.5, epsilon=0.05, Rplus=1, Ne=2)}
         subjects = {'board a': MNKGame(m=3, n=3, k=3)}
         assignment = [('a1', 'board a'), ('a2', 'board a')]
         env.add_agent(name_agent_pair=agents)

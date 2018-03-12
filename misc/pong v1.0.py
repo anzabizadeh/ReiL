@@ -18,14 +18,14 @@ import pygame
 from pygame.locals import *
 from sys import exit
 import random
-from agents import RLAgent
+from rl.agents import QAgent
 
 # pygame.init()
 try:
-    myAgent = RLAgent()
+    myAgent = QAgent()
     myAgent.load(filename='pong')
 except FileNotFoundError:
-    myAgent = RLAgent(gamma=.99, alpha=0.5, epsilon=0.1, Rplus=0, Ne=0,
+    myAgent = QAgent(gamma=.99, alpha=0.5, epsilon=0.1, Rplus=0, Ne=0,
                     default_actions=['None', 'Down', 'Up'])
 myAgent.status = 'training'
 visual = True

@@ -1,22 +1,42 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar  6 23:39:00 2018
+'''
+ValueSet class
+==============
 
-@author: Sadjad Anzabi Zadeh
+A data type used for state and action variables.
 
-This module contains a class that implements values.
-
-"""
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
 
 import numpy as np
 
 
 def main():
-    s = ValueSet(1, 15, 10, 3)
+    # create an empty ValueSet and print it with different formats:
+    e = ValueSet()
+    print(e.value, e.to_list(), e.to_nparray())
+    # create a ValueSet with data and print binary representation and normalized versions:
+    s = ValueSet(1, 7, 10, 3)
     print(s.binary_representation().value)
     print(s.normalizer(0, 1).value, s.to_nparray())
 
 class ValueSet():
+    '''
+    Provide a data type for state and action in reinforcement learning.
+
+    Attributes
+    ----------
+        value: the value stored as a tuple
+        min: minimum value in the stored tuple
+        max: maximum value in the stored tuple
+
+    Methods
+    -------
+        to_list: return the value as a list
+        to_nparray: return the value as a numpy array
+        binary_representation: return the value as a zero-one vector
+        normalizer: normalize the value
+    '''
     def __init__(self, *args):
         self.value = args
         if not self.value:
@@ -32,6 +52,14 @@ class ValueSet():
 
     @value.setter
     def value(self, value):
+        '''
+        Set the value.
+
+        During assignment, a couple of flags are set:
+            _scalable = True, if the data is scalable (list or tuple of int or float).
+            _enumerable = True, if the data is enumerable (list or tuple of anything other than float).
+            _one_type = True, if all elements of the data is of the same type.
+        '''
         self._scalable = True
         self._enumerable = True
         self._one_type = True
@@ -63,6 +91,11 @@ class ValueSet():
 
     @property
     def max(self):
+        '''
+        Return the max
+        
+        returns the max if _one_type is True, None otherwise.
+        '''
         if self._one_type:
             return self._max
         else:
@@ -70,6 +103,13 @@ class ValueSet():
 
     @max.setter
     def max(self, value):
+        '''
+        Set the max
+        
+        sets the max if _one_type is True.
+        raises TypeError if data is mixed.
+        raises ValueError if the given value is less than the max(value).
+        '''
         if not self._one_type:
             raise TypeError('Mixed data doesn\'t have min!')
         if self._max is None:
@@ -81,6 +121,11 @@ class ValueSet():
 
     @property
     def min(self):
+        '''
+        Return the min
+        
+        returns the min if _one_type is True, None otherwise.
+        '''
         if self._one_type:
             return self._min
         else:
@@ -88,6 +133,13 @@ class ValueSet():
 
     @min.setter
     def min(self, value):
+        '''
+        Set the min
+        
+        sets the min if _one_type is True.
+        raises TypeError if data is mixed.
+        raises ValueError if the given value is greater than the min(value).
+        '''
         if not self._one_type:
             raise TypeError('Mixed data doesn\'t have min!')
         if self._min is None:
@@ -98,12 +150,22 @@ class ValueSet():
         self._min = value
 
     def to_list(self):
+        ''' return the value as list.'''
         return list(self._value)
 
     def to_nparray(self):
+        ''' return the value as numpy array.'''
         return np.array(list(self._value))
 
     def binary_representation(self):
+        '''
+        Convert the value to a zero-one sequence.
+
+        This is useful if you want to use a state or an action as an input to a neural network.
+        Raises TypeError if data is not enumerable or of mixed type.
+
+        Note: The result is returned as a new ValueSet. Use .value, .to_list, or .to_nparray to use it.
+        '''
         if not self._enumerable:
             raise TypeError('The type of data doesn\'t allow binary representation!')
         if not self._one_type:
@@ -115,6 +177,14 @@ class ValueSet():
         return ValueSet(*bin_rep)
 
     def normalizer(self, lower_bound=0, upper_bound=1):
+        '''
+        normalize the value.
+
+        Raises TypeError if data is not scalable.
+        Raises ValueError if lower_bound is greater than upper_bound.
+
+        Note: The result is returned as a new ValueSet. Use .value, .to_list, or .to_nparray to use it.
+        '''
         if not self._scalable:
             raise TypeError('The type of data doesn\'t allow scaling!')
         if lower_bound >= upper_bound:
@@ -129,9 +199,9 @@ class ValueSet():
         except AttributeError:
             return False
         
-
     def __hash__(self):
         return self.value.__hash__()
+
 
 if __name__ == '__main__':
     main()
