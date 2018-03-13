@@ -69,6 +69,8 @@ class Environment(RLBase):
         remove: remove objects (agents/ subjects) from the environment.
         assign: assign agents to subjects
         elapse: move forward in time and interact agents and subjects
+        load: load an object (agent/ subject) or an environment
+        save: save an object (agent/ subject) or the current environment
 
     Agents act on subjects and receive the reward of their action and the new state of subjects.
     Then agents learn based on this information to act better.
@@ -322,6 +324,59 @@ class Environment(RLBase):
         if tally:
             return win_count
 
+    def load(self, **kwargs):
+        '''
+        Load an object or an environment from a file.
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+            object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. (Default = 'all')
+        Raises ValueError if the filename is not specified.
+        '''
+        try:  # object_name
+            object_name = kwargs['object_name']
+        except KeyError:
+            object_name = 'all'
+        try:  # filename
+            filename = kwargs['filename']
+        except KeyError:
+            raise ValueError('name of the input file not specified.')
+
+        if object_name == 'all':
+            RLBase.load(self, filename=filename)
+        elif object_name in self._agent:
+            self._agent[object_name].load(filename=filename)
+            for agent in self._agent:
+                self._agent[agent].reset()
+        elif object_name in self._subject:
+            self._subject[object_name].load(filename=filename)
+            for subject in self._subject:
+                self._subject[subject].reset()
+
+    def save(self, **kwargs):
+        '''
+        Save an object or the environment to a file.
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+            object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. (Default = 'all')
+        Raises ValueError if the filename is not specified.
+        '''
+        try:  # object_name
+            object_name = kwargs['object_name']
+        except KeyError:
+            object_name = 'all'
+        try:  # filename
+            filename = kwargs['filename']
+        except KeyError:
+            raise ValueError('name of the output file not specified.')
+
+        if object_name == 'all':
+            RLBase.save(self, filename=filename)
+        elif object_name in self._agent:
+            self._agent[object_name].save(filename=filename)
+        elif object_name in self._subject:
+            self._subject[object_name].save(filename=filename)
 
 if __name__ == '__main__':
     main()
