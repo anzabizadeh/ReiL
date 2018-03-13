@@ -58,8 +58,14 @@ class MNKGame(MNKBoard, Subject):
             players: number of players (default=2)
         '''
         MNKBoard.__init__(self, **kwargs)
-        Subject.__init__(self)
-        self._board_status = None
+        Subject.__init__(self, **kwargs)
+        Subject.set_defaults(self, board_status=None)
+        Subject.set_params(self, **kwargs)
+
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
+            self._board_status = None
 
     @property
     def is_terminated(self):

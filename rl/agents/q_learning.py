@@ -44,22 +44,15 @@ class QAgent(Agent):
             state_action_list: state action list from a previous training. (Default = {}})
         '''
         Agent.__init__(self, **kwargs)
-        self.__defaults = {'gamma': 1,
-                           'alpha': 1,
-                           'epsilon': 0,
-                           'r_plus': 0,
-                           'n_e': 0,
-                           'default_actions': ValueSet(),
-                           'state_action_list': {}}
-        self._gamma = self.__defaults['gamma']
-        self._alpha = self.__defaults['alpha']
-        self._epsilon = self.__defaults['epsilon']
-        self._default_actions = self.__defaults['default_actions']
-        self._state_action_list = self.__defaults['state_action_list']
-        self._r_plus = self.__defaults['r_plus']
-        self._n_e = self.__defaults['n_e']
-        
-        Agent.setparam(self, **kwargs)
+        Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, r_plus=0, n_e=0,
+                           default_actions=ValueSet(), state_action_list={})
+        Agent.set_params(self, **kwargs)
+
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
+            self._gamma, self._alpha, self._epsilon, self._r_plus, self._n_e = 1, 1, 0, 0, 0
+            self._default_actions, self._state_action_list = ValueSet(), {}
 
     def _q(self, state, action):
         '''

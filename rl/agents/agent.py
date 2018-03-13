@@ -10,6 +10,7 @@ This `agent` class is the super class of all agent classes.
 
 from ..base import RLBase
 
+
 def main():
     pass
 
@@ -30,8 +31,7 @@ class Agent(RLBase):
     '''
     def __init__(self, **kwargs):
         RLBase.__init__(self, **kwargs)
-        self._training_flag = True
-        self.__defaults = {}
+        RLBase.set_defaults(self, training_flag=True)
         RLBase.set_params(self, **kwargs)
 
     @property

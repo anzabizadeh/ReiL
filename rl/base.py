@@ -21,11 +21,12 @@ class RLBase():
     Methods
     -------
         set_params: set parameters.
+        set_defaults: set default values for parameters.
         load: load an object from a file.
         save: save the object to a file.
     '''
-    def __init___(self):
-        self.__defaults = {}
+    def __init__(self, **kwargs):
+        self._defaults = {}
 
     def set_params(self, **params):
         '''
@@ -35,8 +36,25 @@ class RLBase():
         ---------
             params: a dictionary containing parameter names and their values.
         '''
-        self.__dict__.update(('_'+key, params.get(key, self.__defaults[key]))
-                              for key in self.__defaults if key in params)
+        self.__dict__.update(('_'+key, params.get(key, self._defaults[key]))
+                              for key in self._defaults if key in params)
+
+    def set_defaults(self, **params):
+        '''
+        set parameters default values.
+
+        Arguments
+        ---------
+            params: a dictionary containing parameter names and their default values.
+
+        Note: this method overwrites all variable names.
+        '''
+        if not hasattr(self, '_defaults'):
+            self._defaults = {}
+        for key, value in params.items():
+            self._defaults[key] = value
+            if not hasattr(self, '_'+key):
+                self.__dict__['_'+key] = value
 
     def load(self, **kwargs):
         '''

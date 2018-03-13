@@ -8,7 +8,7 @@ This `environment` class provides a learning environment for any reinforcement l
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-import pickle
+from ..base import RLBase
 
 
 def main():
@@ -54,13 +54,22 @@ def main():
         pass
 
     env.save(object_name='all', filename=filename)
-    with open('results.pkl', 'wb+') as f:
-        pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
 
 
-class Environment:
+class Environment(RLBase):
     '''
     Provide a learning environment for agents and subjects.
+
+    Attributes
+    ----------
+
+    Methods
+    -------
+        add: add a set of objects (agents/ subjects) to the environment.
+        remove: remove objects (agents/ subjects) from the environment.
+        assign: assign agents to subjects
+        elapse: move forward in time and interact agents and subjects
+
     Agents act on subjects and receive the reward of their action and the new state of subjects.
     Then agents learn based on this information to act better.
     '''
@@ -86,33 +95,18 @@ class Environment:
             self.load(filename=kwargs['filename'])
             return
 
-        self._agent = {}
-        self._subject = {}
-        self._assignment_list = {}
-        # one episode is one full game till the end
-        try:  # episodes
-            self._default_episodes = kwargs['episodes']
-        except KeyError:
-            self._default_episodes = 1
-        # termination: 'any' (terminate by any subject being terminated)
-        #              'all' (terminate only if all subjects are terminated)
-        try:  # termination
-            self._termination = kwargs['termination']
-        except KeyError:
-            self._termination = 'any'
-        # reset: 'any' (reset only subjects that are terminated)
-        #        'all' (reset all subjects at each episode)
-        try:  # reset
-            self._reset = kwargs['reset']
-        except KeyError:
-            self._reset = 'all'
+        RLBase.__init__(self, **kwargs)
+        RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
+                           default_episodes=1, termination='any', reset='all',
+                           learning_method='every step')
+        RLBase.set_params(self, **kwargs)
 
-        # learning_method: 'every step' (learns after every move)
-        #                  'history' (learns after each episode)
-        try:  # learning_method
-            self._learning_method = kwargs['learning_method']
-        except KeyError:
-            self._learning_method = 'every step'
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
+            self._agent, self._subject, self._assignment_list = {}, {}, {}
+            self._default_episodes = 1
+            self._termination, self._reset, self._learning_method = 'any', 'all', 'every step'
 
     def add(self, **kwargs):
         '''

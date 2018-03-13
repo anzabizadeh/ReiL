@@ -86,36 +86,24 @@ class ANNAgent(Agent):
         Raises ValueError if default_actions is not provided.
         '''
         Agent.__init__(self, **kwargs)
-        try:
-            self._solver = kwargs['solver']
-        except KeyError:
-            self._solver = 'lbfgs'
-        try:
-            self._alpha = kwargs['alpha']
-        except KeyError:
-            self._alpha = 1e-5
-        try:
-            self._gamma = kwargs['gamma']
-        except KeyError:
-            self._gamma = 1
-        try:
-            self._epsilon = kwargs['epsilon']
-        except KeyError:
-            self._epsilon = 0
-        try:
-            self._hidden_layer_sizes = kwargs['hidden_layer_sizes']
-        except KeyError:
-            self._hidden_layer_sizes = (10)
-        try:
-            self._random_state = kwargs['random_state']
-        except KeyError:
-            self._random_state = 1
+        Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0,
+                           solver='lbfgs', hidden_layer_sizes=(10,), max_iter=1, random_state=None)
+        Agent.set_params(self, **kwargs)
+
         try:
             self._default_actions = kwargs['default_actions']
         except KeyError:
             raise ValueError('default_actions should be specified for Neural Agent')
-        self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha, hidden_layer_sizes=self._hidden_layer_sizes,
-                                 random_state=self._random_state, max_iter=2, warm_start=True)
+
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
+            self._gamma, self._alpha, self._epsilon = 1, 1e-5, 0
+            self._solver, self._hidden_layer_sizes, self._max_iter, self._random_state='lbfgs', (10,), 1, None
+
+        self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha,
+                                 hidden_layer_sizes=self._hidden_layer_sizes,
+                                 random_state=self._random_state, max_iter=self._max_iter, warm_start=True)
 
     def _q(self, state, action):
         '''

@@ -40,18 +40,14 @@ class TD0Agent(Agent):
             state_action_list: state action list from a previous training. (Default = {}})
         '''
         Agent.__init__(self, **kwargs)
-        self.__defaults = {'gamma': 1,
-                           'alpha': 1,
-                           'epsilon': 0,
-                           'default_actions': ValueSet(),
-                           'state_action_list': {}}
-        self._gamma = 1
-        self._alpha = 0.2
-        self._epsilon = 0.0
-        self._default_actions = ValueSet()
-        self._state_action_list = {}
-        
-        Agent.setparam(self, **kwargs)
+        Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, default_actions=ValueSet(), state_action_list={})
+        Agent.set_params(self, **kwargs)
+
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
+            self._gamma, self._alpha, self._epsilon = 1, 0.2, 0.0
+            self._default_actions, self._state_action_list = ValueSet(), {}
 
     def _q(self, state, action):
         '''
