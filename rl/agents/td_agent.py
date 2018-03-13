@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 '''
-QAgent class
+TD0Agent class
 =================
 
-A Q-learning agent
+A basic temporal difference agent
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
@@ -14,32 +14,28 @@ from ..valueset.valueset import ValueSet
 from .agent import Agent
 
 
-class QAgent(Agent):
+class TD0Agent(Agent):
     '''
-    A Q-learning agent.
+    A basic temporal difference learning agent. (a.k.a. SARSA)
 
     Atributes
     ---------
-        previous_action: return the previous action
 
     Methods
     -------
-        state_q: return all Q-values of a state.
         act: return an action based on the given state.
         learn: learn using either history or action, reward, and state.
         reset: reset the agent.
     '''
     def __init__(self, **kwargs):
         '''
-        Initialize a Q-Learning agent.
+        Initialize a TD(0) learning agent.
 
         Arguments
         ---------
             gamma: discount factor. (Default = 1.0)
             alpha: learning rate. (Default = 0.2)
             epsilon: exploration rate. (Default = 0.0)
-            Rplus: optimistic estimate of the reward at each state. (Default = 0.0)
-            Ne: the least number of visits. (Default = 0.0)
             default_actions: list of default actions. (Default = empty ValueSet)
             state_action_list: state action list from a previous training. (Default = {}})
         '''
@@ -47,85 +43,29 @@ class QAgent(Agent):
         self.__defaults = {'gamma': 1,
                            'alpha': 1,
                            'epsilon': 0,
-                           'r_plus': 0,
-                           'n_e': 0,
                            'default_actions': ValueSet(),
                            'state_action_list': {}}
-        self._gamma = self.__defaults['gamma']
-        self._alpha = self.__defaults['alpha']
-        self._epsilon = self.__defaults['epsilon']
-        self._default_actions = self.__defaults['default_actions']
-        self._state_action_list = self.__defaults['state_action_list']
-        self._r_plus = self.__defaults['r_plus']
-        self._n_e = self.__defaults['n_e']
+        self._gamma = 1
+        self._alpha = 0.2
+        self._epsilon = 0.0
+        self._default_actions = ValueSet()
+        self._state_action_list = {}
         
         Agent.setparam(self, **kwargs)
 
     def _q(self, state, action):
         '''
-        Return the Q-value of a state action pair. In training mode, exploration using Ne and R+ are used, otherwise exact Q estimate is returned.
+        Return the Q-value of a state action pair.
 
         Arguments
         ---------
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned.
         '''
-        if self._training_flag:
-            try:
-                if self._state_action_list[(state, action)][1] > self._n_e:
-                    return self._state_action_list[(state, action)][0]
-                else:
-                    return self._r_plus
-            except KeyError:
-                return self._r_plus
-
         try:
-            return self._state_action_list[(state, action)][0]
+            return self._state_action_list[(state, action)]
         except KeyError:
             return 0
-
-    def state_q(self, state):
-        '''
-        Return the list of Q-values of a state.
-
-        Arguments
-        ---------
-            state: the state for which Q-value is returned.
-        '''
-        return list(self._q(sa[0], sa[1]) for sa in self._state_action_list
-                    if sa[0] == state)
-
-    def _max_q(self, state):
-        '''
-        Return MAX(Q) of a state.
-        
-        Arguments
-        ---------
-            state: the state for which MAX(Q) is returned.
-        '''
-        try:
-            max_q = max(self._q(sa[0], sa[1]) for sa in self._state_action_list
-                        if sa[0] == state)
-        except ValueError:
-            max_q = 0
-        return max_q
-
-    def _N(self, state, action):
-        '''
-        Return the number of times a state action pair is visited.
-        Arguments
-        ---------
-            state: the state for which N is returned.
-            action: the action for which N is returned.
-        '''
-        try:
-            return self._state_action_list[(state, action)][1]
-        except KeyError:
-            return 0
-
-    @property
-    def previous_action(self):
-        return self._previous_action
 
     def act(self, state, **kwargs):
         '''
@@ -135,7 +75,6 @@ class QAgent(Agent):
         ---------
             state: the state for which an action is chosen.
             actions: a set of possible actions. If not provided, default actions are used.
-            method: 'e-greedy' allows for exploration epsilon percent of times during training mode.
         '''
         self._previous_state = state
         try:  # possible actions
@@ -143,16 +82,7 @@ class QAgent(Agent):
         except KeyError:
             possible_actions = self._default_actions
 
-        try:  # method
-            method = kwargs['method'].lower()
-        except KeyError:
-            if self._epsilon > 0:
-                method = 'e-greedy'
-            else:
-                method = ''
-
-        if (self._training_flag) & \
-           (method == 'e-greedy') & (random() < self._epsilon):
+        if random() < self._epsilon:
             action = choice(possible_actions)
         else:
             action_q = ((action, self._q(state, action))
@@ -172,8 +102,6 @@ class QAgent(Agent):
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
-        if not self._training_flag:
-            raise ValueError('Not in training mode!')
         try:  # history
             history = kwargs['history']
             previous_state = history[0]
@@ -182,16 +110,18 @@ class QAgent(Agent):
                 reward = history[i+1]
                 try:
                     state = history[i+2]
+                    action = history[i+3]
                 except IndexError:
                     state = None
-                q_sa = self._q(previous_state, previous_action)
-                max_q = self._max_q(state)
+                    action = None
 
-                new_N = self._N(previous_state, previous_action) + 1
-                new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
+                q_sa = self._q(previous_state, previous_action)
+                q_sa2 = self._q(state, action)
+
+                new_q = q_sa + self._alpha*(reward + self._gamma*q_sa2 - q_sa)
 
                 self._state_action_list.update({
-                        (previous_state, previous_action): (new_q, new_N)})
+                        (previous_state, previous_action): new_q})
                 previous_state = state
 
             return
@@ -202,20 +132,22 @@ class QAgent(Agent):
             state = kwargs['state']
         except KeyError:
             state = None
+        try:
+            action = kwargs['action']
+        except KeyError:
+            state = None
         try:  # reward
             reward = kwargs['reward']
         except KeyError:
             reward = None
 
         q_sa = self._q(self._previous_state, self._previous_action)
-        max_q = self._max_q(state)
+        q_sa2 = self._q(state, action)
 
-        new_N = self._N(self._previous_state, self._previous_action) + 1
-        new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
+        new_q = q_sa + self._alpha*(reward + self._gamma*q_sa2 - q_sa)
 
         self._state_action_list.update({
-                (self._previous_state, self._previous_action):
-                (new_q, new_N)})
+                (previous_state, previous_action): new_q})
 
     def reset(self):
         '''
@@ -225,4 +157,3 @@ class QAgent(Agent):
         '''
         self._previous_state = None
         self._previous_action = None
-

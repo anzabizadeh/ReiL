@@ -8,24 +8,33 @@ Created on Mon Feb 19 15:47:46 2018
 import pickle
 import time
 
-from rl.agents import QAgent, RandomAgent, UserAgent
+from rl.agents import QAgent, RandomAgent, UserAgent, TD0Agent
 from rl.environments import Environment
 from rl.subjects import MNKGame
 
 
 def main():
-    env = Environment()
     try:
-        env.load(filename='mnk333env-agentbyagent-testbyrandom')
+        env = Environment(filename='mnk333env-agentbyagent-testbyrandom')
     except FileNotFoundError:
-        agents = {'a1':
-                  QAgent(gamma=1, alpha=0.5, epsilon=0.05, Rplus=1, Ne=2),
-                  'a2':
-                  QAgent(gamma=1, alpha=0.5, epsilon=0.05, Rplus=1, Ne=2)}
-        subjects = {'board a': MNKGame(m=3, n=3, k=3)}
-        assignment = [('a1', 'board a'), ('a2', 'board a')]
-        env.add_agent(name_agent_pair=agents)
-        env.add_subject(name_subject_pair=subjects)
+        env = Environment()
+        # initialize dictionaries
+        agents = {}
+        subjects = {}
+
+        # define agents
+        agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
+        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1, Rplus=1, Ne=2)
+        agents['Random'] = RandomAgent()
+
+        # define subjects
+        subjects['Board A'] = MNKGame(m=3, n=3, k=3)
+
+        # assign agents to subjects
+        assignment = [('TD', 'Board A'), ('Q', 'Board A')]
+
+        # update environment
+        env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
     test_agent = RandomAgent()
