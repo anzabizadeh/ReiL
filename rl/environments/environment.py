@@ -8,7 +8,7 @@ This `environment` class provides a learning environment for any reinforcement l
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-import pickle
+from ..base import RLBase
 
 
 def main():
@@ -26,10 +26,8 @@ def main():
         agents = {'RLS 1': RLS, 'RLS 2': RLS}
         subjects = {'board RLS': MNKGame()}
         assignment = [('RLS 1', 'board RLS'), ('RLS 2', 'board RLS')]
-        # add_agent method receives a dictionary of agents composed of name and object.
-        env.add_agent(name_agent_pair=agents)
-        # add_subject method receives a dictionary of subjects composed of name and object.
-        env.add_subject(name_subject_pair=subjects)
+        # add method receives a dictionary of agents/ subjects composed of name and object.
+        env.add(agents=agents, subjects=subjects)
         # assign method receives a list of agent subject tuples
         env.assign(assignment)
 
@@ -56,13 +54,24 @@ def main():
         pass
 
     env.save(object_name='all', filename=filename)
-    with open('results.pkl', 'wb+') as f:
-        pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
 
 
-class Environment:
+class Environment(RLBase):
     '''
     Provide a learning environment for agents and subjects.
+
+    Attributes
+    ----------
+
+    Methods
+    -------
+        add: add a set of objects (agents/ subjects) to the environment.
+        remove: remove objects (agents/ subjects) from the environment.
+        assign: assign agents to subjects
+        elapse: move forward in time and interact agents and subjects
+        load: load an object (agent/ subject) or an environment
+        save: save an object (agent/ subject) or the current environment
+
     Agents act on subjects and receive the reward of their action and the new state of subjects.
     Then agents learn based on this information to act better.
     '''
@@ -88,147 +97,58 @@ class Environment:
             self.load(filename=kwargs['filename'])
             return
 
-        self._agent = {}
-        self._subject = {}
-        self._assignment_list = {}
-        # one episode is one full game till the end
-        try:  # episodes
-            self._default_episodes = kwargs['episodes']
-        except KeyError:
+        RLBase.__init__(self, **kwargs)
+        RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
+                           default_episodes=1, termination='any', reset='all',
+                           learning_method='every step')
+        RLBase.set_params(self, **kwargs)
+
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
+            self._agent, self._subject, self._assignment_list = {}, {}, {}
             self._default_episodes = 1
-        # termination: 'any' (terminate by any subject being terminated)
-        #              'all' (terminate only if all subjects are terminated)
-        try:  # termination
-            self._termination = kwargs['termination']
-        except KeyError:
-            self._termination = 'any'
-        # reset: 'any' (reset only subjects that are terminated)
-        #        'all' (reset all subjects at each episode)
-        try:  # reset
-            self._reset = kwargs['reset']
-        except KeyError:
-            self._reset = 'all'
+            self._termination, self._reset, self._learning_method = 'any', 'all', 'every step'
 
-        # learning_method: 'every step' (learns after every move)
-        #                  'history' (learns after each episode)
-        try:  # learning_method
-            self._learning_method = kwargs['learning_method']
-        except KeyError:
-            self._learning_method = 'every step'
-
-    def load(self, **kwargs):
-        '''
-        Load an object or an environment from a file.
-
-        Arguments
-        ---------
-            filename: the name of the file to be loaded.
-            object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. (Default = 'all')
-
-        Raises ValueError if the filename is not specified.
-        '''
-        try:  # object_name
-            object_name = kwargs['object_name']
-        except KeyError:
-            object_name = 'all'
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the input file not specified.')
-
-        if object_name == 'all':
-            with open(filename + '.pkl', 'rb') as f:
-                self.__dict__ = pickle.load(f)
-            for agent in self._agent:
-                self._agent[agent].reset()
-            for subject in self._subject:
-                self._subject[subject].reset()
-        elif object_name in self._agent:
-            self._agent[object_name].save(filename)
-            for agent in self._agent:
-                self._agent[agent].reset()
-        elif object_name in self._subject:
-            self._subject[object_name].save(filename)
-            for subject in self._subject:
-                self._subject[subject].reset()
-
-    def save(self, **kwargs):
-        '''
-        Save an object or the environment to a file.
-
-        Arguments
-        ---------
-            filename: the name of the file to be loaded.
-            object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. (Default = 'all')
-
-        Raises ValueError if the filename is not specified.
-        '''
-        try:  # object_name
-            object_name = kwargs['object_name']
-        except KeyError:
-            object_name = 'all'
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
-
-        if object_name == 'all':
-            with open(filename + '.pkl', 'wb+') as f:
-                pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
-        elif object_name in self._agent:
-            self._agent[object_name].save(filename)
-        elif object_name in self._subject:
-            self._subject[object_name].save(filename)
-
-    def add_agent(self, name_agent_pair):
+    def add(self, **kwargs):
         '''
         Add agents to the environment.
 
         Arguments
         ---------
-            name_agent_pair: a dictionary consist of agent name and agent object. Names should be unique, otherwise overwritten.
+            agents: a dictionary consist of agent name and agent object. Names should be unique, otherwise overwritten.
+            subjects: a dictionary consist of subject name and subject object. Names should be unique, otherwise overwritten.
         '''
-        for name, agent in name_agent_pair.items():
-            self._agent[name] = agent
+        try:
+            for name, agent in kwargs['agents'].items():
+                self._agent[name] = agent
+        except IndexError:
+            pass
 
-    def remove_agent(self, agent_names):
+        try:
+            for name, subject in kwargs['subjects'].items():
+                self._subject[name] = subject
+        except IndexError:
+            pass
+
+    def remove(self, **kwargs):
         '''
         Remove agents from the environment.
 
         Arguments
         ---------
-            agent_names: a list of agent names to be deleted.
-            
+            agents: a list of agent names to be deleted.
+            subjects: a list of subject names to be deleted.
+
         Raises KeyError if the agent is not found.
         '''
-        for name in agent_names:
+        for name in kwargs['agents']:
             try:
                 del self._agent[name]
             except KeyError:
                 raise KeyError('Agent '+name+' not found')
 
-    def add_subject(self, name_subject_pair):
-        '''
-        Add subjects to the environment.
-
-        Arguments
-        ---------
-            name_subject_pair: a dictionary consist of subject name and subject object. Names should be unique, otherwise overwritten.
-        '''
-        for name, subject in name_subject_pair.items():
-            self._subject[name] = subject
-
-    def remove_subject(self, subject_names):
-        '''
-        Remove subjects from the environment.
-
-        Arguments
-        ---------
-            subject_names: a list of subject names to be deleted.
-            
-        Raises KeyError if the subject is not found.
-        '''
-        for name in subject_names:
+        for name in kwargs['subjects']:
             try:
                 del self._subject[name]
             except KeyError:
@@ -404,6 +324,59 @@ class Environment:
         if tally:
             return win_count
 
+    def load(self, **kwargs):
+        '''
+        Load an object or an environment from a file.
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+            object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. (Default = 'all')
+        Raises ValueError if the filename is not specified.
+        '''
+        try:  # object_name
+            object_name = kwargs['object_name']
+        except KeyError:
+            object_name = 'all'
+        try:  # filename
+            filename = kwargs['filename']
+        except KeyError:
+            raise ValueError('name of the input file not specified.')
+
+        if object_name == 'all':
+            RLBase.load(self, filename=filename)
+        elif object_name in self._agent:
+            self._agent[object_name].load(filename=filename)
+            for agent in self._agent:
+                self._agent[agent].reset()
+        elif object_name in self._subject:
+            self._subject[object_name].load(filename=filename)
+            for subject in self._subject:
+                self._subject[subject].reset()
+
+    def save(self, **kwargs):
+        '''
+        Save an object or the environment to a file.
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+            object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. (Default = 'all')
+        Raises ValueError if the filename is not specified.
+        '''
+        try:  # object_name
+            object_name = kwargs['object_name']
+        except KeyError:
+            object_name = 'all'
+        try:  # filename
+            filename = kwargs['filename']
+        except KeyError:
+            raise ValueError('name of the output file not specified.')
+
+        if object_name == 'all':
+            RLBase.save(self, filename=filename)
+        elif object_name in self._agent:
+            self._agent[object_name].save(filename=filename)
+        elif object_name in self._subject:
+            self._subject[object_name].save(filename=filename)
 
 if __name__ == '__main__':
     main()

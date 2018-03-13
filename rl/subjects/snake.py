@@ -45,13 +45,14 @@ class Snake(MNKBoard, Subject):
             m: number of rows (default=10)
             n: number of columns (default=10)
         '''
-        try:
-            self._m = kwargs['m']
-        except KeyError:
+        Subject.__init__(self, **kwargs)
+        Subject.set_defaults(self, m=10, n=10)
+        Subject.set_params(self, **kwargs)
+
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
             self._m = 10
-        try:
-            self._n = kwargs['n']
-        except KeyError:
             self._n = 10
 
         MNKBoard.__init__(self, m=self._m, n=self._n, players=2)  # player 1 is the snake, player 2 is the fruit!
@@ -132,7 +133,7 @@ class Snake(MNKBoard, Subject):
         else:
             last = self._snake.pop()                                          # [1] If it does not eat the food, length decreases
             self._win.addch(last[0], last[1], ' ')
-            self.clear_piece(row=last[0], column=last[1])
+            self.clear_square(row=last[0], column=last[1])
         self._win.addch(self._snake[0][0], self._snake[0][1], '#')
         return self._score
 

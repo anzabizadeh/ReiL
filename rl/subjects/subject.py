@@ -8,10 +8,10 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-import pickle
+from ..base import RLBase
 
 
-class Subject:
+class Subject(RLBase):
     '''
     Super class of all subject classes.
     
@@ -26,12 +26,17 @@ class Subject:
         register: register a new agent and return its ID or return ID of an existing agent.
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
-        load: load a subject from a file.
-        save: save the subject to a file.
         printable: return a readable format of subject's state
     '''
-    def __init__(self):
-        self._agent_list = {}
+    def __init__(self, **kwargs):
+        RLBase.__init__(self, **kwargs)
+        RLBase.set_defaults(self, agent_list={})
+        RLBase.set_params(self, **kwargs)
+
+        # The following code is just to suppress debugger's undefined variable errors!
+        # These can safely be deleted, since all the attributes are defined using set_params!
+        if False:
+            self._agent_list = {}
 
     @property
     def state(self):
@@ -63,40 +68,6 @@ class Subject:
 
     def reset(self):
         raise NotImplementedError
-
-    def load(self, **kwargs):
-        '''
-        Load a subject from a file.
-
-        Arguments
-        ---------
-            filename: the name of the file to be loaded.
-
-        Raises ValueError if the filename is not specified.
-        '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
-        with open(filename + '.pkl', 'rb') as f:
-            self.__dict__ = pickle.load(f)
-
-    def save(self, **kwargs):
-        '''
-        Save the subject to a file.
-
-        Arguments
-        ---------
-            filename: the name of the file to be saved.
-
-        Raises ValueError if the filename is not specified.
-        '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
-        with open(filename + '.pkl', 'wb+') as f:
-            pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
 
     def printable(self):
         pass
