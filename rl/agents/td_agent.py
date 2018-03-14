@@ -10,7 +10,7 @@ A basic temporal difference agent
 
 from random import choice, random
 
-from ..valueset.valueset import ValueSet
+from ..valueset import ValueSet
 from .agent import Agent
 
 

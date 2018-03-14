@@ -8,52 +8,10 @@ This `environment` class provides a learning environment for any reinforcement l
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+import signal
+import sys
+
 from ..base import RLBase
-
-
-def main():
-    from ..agents import QAgent, RandomAgent
-    from ..subjects import MNKGame
-    # An environment hosts agents and subjects and regulates their interactions
-    filename='several agents'
-    RND = RandomAgent()
-    try:
-        # You can load an environment from file either by class's constructor or using load() method
-        env = Environment(filename=filename)
-    except (ModuleNotFoundError, FileNotFoundError):
-        env = Environment()
-        RLS = QAgent(gamma=1, alpha=0.5, epsilon=0.1, Rplus=0.2, Ne=1)
-        agents = {'RLS 1': RLS, 'RLS 2': RLS}
-        subjects = {'board RLS': MNKGame()}
-        assignment = [('RLS 1', 'board RLS'), ('RLS 2', 'board RLS')]
-        # add method receives a dictionary of agents/ subjects composed of name and object.
-        env.add(agents=agents, subjects=subjects)
-        # assign method receives a list of agent subject tuples
-        env.assign(assignment)
-
-    runs = 100
-    training_episodes = 100
-    test_episodes = 100
-    results = {'RLS 1': [], 'RLS 2': []}
-    try:
-        for i in range(runs):
-            env.elapse(episodes=training_episodes, reset='all',
-                       termination='all', learning_method='history',
-                       reporting='none', tally='no')
-            agent_temp = env._agent['RLS 2']
-            env._agent['RLS 2'] = RND
-            # env._agent['a1'].status = 'testing'
-            tally = env.elapse(episodes=test_episodes, reset='all',
-                               termination='all', learning_method='none',
-                               reporting='none', tally='yes')
-            for key in results:
-                results[key].append(tally[key])
-            print('run {: }: RLS loss: {: }'.format(i, tally['RLS 2']))
-            env._agent['RLS 2'] = agent_temp
-    except KeyboardInterrupt:
-        pass
-
-    env.save(object_name='all', filename=filename)
 
 
 class Environment(RLBase):
@@ -99,15 +57,18 @@ class Environment(RLBase):
 
         RLBase.__init__(self, **kwargs)
         RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
-                           default_episodes=1, termination='any', reset='all',
-                           learning_method='every step')
+                           episodes=1, termination='any', reset='all',
+                           learning_method='every step',
+                           allow_user_to_halt=True, save_on_exit=True)
         RLBase.set_params(self, **kwargs)
+        
+        # signal.signal(signal.SIGINT, self.__signal_handler)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
             self._agent, self._subject, self._assignment_list = {}, {}, {}
-            self._default_episodes = 1
+            self._episodes = 1
             self._termination, self._reset, self._learning_method = 'any', 'all', 'every step'
 
     def add(self, **kwargs):
@@ -203,7 +164,7 @@ class Environment(RLBase):
         try:  # episodes
             episodes = kwargs['episodes']
         except KeyError:
-            episodes = self._default_episodes
+            episodes = self._episodes
         # termination: 'any' (terminate by any subject being terminated)
         #              'all' (terminate only if all subjects are terminated)
         try:  # termination
@@ -377,6 +338,3 @@ class Environment(RLBase):
             self._agent[object_name].save(filename=filename)
         elif object_name in self._subject:
             self._subject[object_name].save(filename=filename)
-
-if __name__ == '__main__':
-    main()

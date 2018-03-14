@@ -11,7 +11,7 @@ It serves as a super class for MNKGame.
 
 import pickle
 
-from rl.valueset.valueset import ValueSet
+from rl.valueset import ValueSet
 
 
 def main():

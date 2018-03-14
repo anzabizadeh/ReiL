@@ -5,87 +5,68 @@ Created on Mon Feb 19 15:47:46 2018
 @author: Sadjad
 """
 
-import pickle
-import time
+import matplotlib.pyplot as plt
 
-from rl.agents import QAgent, RandomAgent, UserAgent, TD0Agent
+from rl.agents import QAgent, RandomAgent, TD0Agent, ANNAgent
 from rl.environments import Environment
 from rl.subjects import MNKGame
 
 
 def main():
+    # load the environment or create a new one
+    filename = 'mnk333_ANN_new'
     try:
-        env = Environment(filename='mnk333env-agentbyagent-testbyrandom')
+        env = Environment(filename=filename)
     except FileNotFoundError:
         env = Environment()
         # initialize dictionaries
         agents = {}
         subjects = {}
 
-        # define agents
-        agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
-        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1, Rplus=1, Ne=2)
-        agents['Random'] = RandomAgent()
-
         # define subjects
         subjects['Board A'] = MNKGame(m=3, n=3, k=3)
+        # subjects['Board B'] = MNKGame(m=3, n=3, k=3)
+
+        # define agents
+        # agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
+        # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1,
+                                 hidden_layer_sizes=(9, 9, 3), default_actions=subjects['Board A'].possible_actions)
+        agents['Random 1'] = RandomAgent()
+        # agents['Random 2'] = agents['Random 1']
 
         # assign agents to subjects
-        assignment = [('TD', 'Board A'), ('Q', 'Board A')]
+        assignment = [('ANN', 'Board A'), ('Random 1', 'Board A')]
 
         # update environment
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    test_agent = RandomAgent()
-#    print(len(env._agent['a1']._state_action_list),
-#          len(env._agent['a2']._state_action_list))
-    runs = 5
-    training_episodes = 500
-    test_episodes = 100
-    results = {'a1': [], 'a2': []}
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    li, = ax.plot([], [])
-    ax.relim()
-    ax.autoscale_view(True, True, True)
-    fig.canvas.draw()
-    plt.show(block=False)
-    try:
-        for _ in range(runs):
-            fig.canvas.draw()
-            plt.draw_all()
-            env.elapse(episodes=training_episodes, reset='all',
-                       termination='any', learning_method='history',
-                       reporting='none', tally='no')
-            training_agent = env._agent['a2']
-            env._agent['a2'] = test_agent
-            tally = env.elapse(episodes=test_episodes, reset='all',
-                               termination='any', learning_method='history',
-                               reporting='none', tally='yes')
-            results['a1'].append(tally['a1'])
-            results['a2'].append(tally['a2'])
-#            print('run {: }: no lose rate: {: f} win: {: } draw: {: } lose: {: }'
-#                  .format(i, 1 - tally['a2']/test_episodes,
-#                          tally['a1'],
-#                          test_episodes - tally['a1'] - tally['a2'],
-#                          tally['a2']))
-            env._agent['a2'] = training_agent
-            li.set_ydata(results['a1'])
-            li.set_xdata(results['a1'])
-            ax.relim()
-            ax.autoscale_view(True, True, True)
-            fig.canvas.draw()
-            fig.canvas.flush_events()
-            time.sleep(0.01)
-    except KeyboardInterrupt:
-        pass
+    # set experiment variables
+    runs = 50
+    training_episodes = 1000
+    results = {'ANN win': [], 'ANN draw': []}
+    for i in range(runs):
+        # run and collect statistics
+        tally = env.elapse(episodes=training_episodes, reset='all',
+                            termination='all', learning_method='history',
+                            reporting='none', tally='yes')
+        results['ANN win'].append(tally['ANN']/training_episodes)
+        results['ANN draw'].append((training_episodes-tally['Random 1']-tally['ANN'])/training_episodes)
+
+        # print result of each run
+        print('run {: }: ANN win: {: 2.2f} draw: {: 2.2f} no lose: {: 2.2f}'
+                .format(i, results['ANN win'][-1], results['ANN draw'][-1],
+                        results['ANN win'][-1] + results['ANN draw'][-1]))
+
+        # save occasionally in case you don't lose data if you get bored of running the code!
+        env.save(filename=filename)
+
+    x = list(range(len(results['ANN win'])))
+    plt.plot(x, results['ANN win'], 'r', x, results['ANN draw'], 'b')
+    plt.axis([0, len(x), 0, 1])
+    plt.show()
 
 
-#    print('\n', len(env._agent['a1']._state_action_list),
-#          len(env._agent['a2']._state_action_list))
-
-    env.save(object_name='all', filename='mnk333env-agentbyagent-testbyrandom')
-#    env._agent['a2'] = UserAgent()
-#    env.elapse(episodes=5, reset='all', termination='any',
-#               learning_method='history', reporting='all')
+if __name__ == '__main__':
+    main()

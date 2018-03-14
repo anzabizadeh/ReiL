@@ -21,7 +21,7 @@ from rl.agents.agent import Agent
 
 
 def main():
-    from rl.valueset.valueset import ValueSet
+    from rl.valueset import ValueSet
     from random import randint
 
     print('This is a simple game. a random number is generated and the agent should move left or right to get to target.')
