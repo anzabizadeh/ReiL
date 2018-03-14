@@ -234,13 +234,14 @@ class Environment(RLBase):
                                 if tally & (reward>0):
                                     win_count[agent_name] += 1
                                 for affected_agent in self._agent.keys():
-                                    if learning_method == 'every step':
-                                        self._agent[affected_agent].learn(state=subject.state,
-                                            reward=reward if affected_agent == agent_name else -reward)
-                                    elif learning_method == 'history':
-                                        history[affected_agent].append(state)
-                                        history[affected_agent].append(action)
-                                        history[affected_agent].append(reward if affected_agent == agent_name else -reward)
+                                    if self._assignment_list[affected_agent][0] == subject_name:
+                                        if learning_method == 'every step':
+                                            self._agent[affected_agent].learn(state=subject.state,
+                                                reward=reward if affected_agent == agent_name else -reward)
+                                        elif learning_method == 'history':
+                                            history[affected_agent].append(state)
+                                            history[affected_agent].append(action)
+                                            history[affected_agent].append(reward if affected_agent == agent_name else -reward)
                             else:
                                 if learning_method == 'every step':
                                     agent.learn(state=subject.state, reward=reward)
@@ -270,8 +271,6 @@ class Environment(RLBase):
                 for agent_name, subject_name in self._assignment_list.items():
                     if self._subject[subject_name[0]].is_terminated:
                         self._agent[agent_name].reset()
-                for agent_name, subject_name in self._assignment_list.items():
-                    if self._subject[subject_name[0]].is_terminated:
                         self._subject[subject_name[0]].reset()
 
             if tally & (reporting != 'none'):
