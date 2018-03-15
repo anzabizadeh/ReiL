@@ -19,4 +19,5 @@ Classes
 
 from .subject import Subject
 from .mnkgame import MNKGame
+from .windy_gridworld import WindyGridworld
 # from .snake import Snake

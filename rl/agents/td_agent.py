@@ -131,7 +131,7 @@ class TD0Agent(Agent):
         try:
             action = kwargs['action']
         except KeyError:
-            state = None
+            action = None
         try:  # reward
             reward = kwargs['reward']
         except KeyError:
@@ -143,7 +143,7 @@ class TD0Agent(Agent):
         new_q = q_sa + self._alpha*(reward + self._gamma*q_sa2 - q_sa)
 
         self._state_action_list.update({
-                (previous_state, previous_action): new_q})
+                (self._previous_state, self._previous_action): new_q})
 
     def reset(self):
         '''

@@ -159,6 +159,9 @@ class Environment(RLBase):
             tally: count wins of each agent or not. (Default = 'no')
                 'yes': counts the number of wins of each agent.
                 'no': doesn't tally.
+            step_count: count average number of steps in each episode. (Default = 'no')
+                'yes': counts the average number of steps in each episode.
+                'no': doesn't count.
         '''
         # one episode is one full game till the end
         try:  # episodes
@@ -202,6 +205,14 @@ class Environment(RLBase):
         except KeyError:
             tally = False
 
+        try:  # tally
+            if kwargs['step_count'].lower() == 'yes':
+                step_count = True
+            else:
+                step_count = False
+        except KeyError:
+            step_count = False
+
         if learning_method == 'none':
             for agent in self._agent.values():
                 agent.status = 'testing'
@@ -209,15 +220,17 @@ class Environment(RLBase):
             for agent in self._agent.values():
                 agent.status = 'training'
 
+        steps = 0
         for episode in range(episodes):
             if reporting != 'none':
                 report_string = 'episode: {}'.format(episode+1)
-            if learning_method == 'history':
-                history = {}
-                for agent_name in self._agent:
-                    history[agent_name] = []
+            # if learning_method == 'history':
+            history = {}
+            for agent_name in self._agent:
+                history[agent_name] = []
             done = False
             while not done:
+                steps += 1
                 for agent_name, agent in self._agent.items():
                     if not done:
                         subject_name, _id = self._assignment_list[agent_name]
@@ -230,25 +243,28 @@ class Environment(RLBase):
                             reward = subject.take_effect(_id, action)
                             if reporting == 'all':
                                 report_string += '\n'+subject.printable()+'\n'
+
+                            history[agent_name].append(state)
+                            history[agent_name].append(action)
+                            history[agent_name].append(reward)
+                            # print('{: 4d} {: 4d}'.format(episode, steps), subject._player_location)
+                            # if ([*subject._player_location] == [*subject._goal]):
+                            #     pass
+                            # if reward>0:
+                            #     print('Done')
+
                             if subject.is_terminated:
                                 if tally & (reward>0):
                                     win_count[agent_name] += 1
                                 for affected_agent in self._agent.keys():
-                                    if self._assignment_list[affected_agent][0] == subject_name:
-                                        if learning_method == 'every step':
-                                            self._agent[affected_agent].learn(state=subject.state,
-                                                reward=reward if affected_agent == agent_name else -reward)
-                                        elif learning_method == 'history':
-                                            history[affected_agent].append(state)
-                                            history[affected_agent].append(action)
-                                            history[affected_agent].append(reward if affected_agent == agent_name else -reward)
-                            else:
-                                if learning_method == 'every step':
-                                    agent.learn(state=subject.state, reward=reward)
-                                elif learning_method == 'history':
-                                    history[agent_name].append(state)
-                                    history[agent_name].append(action)
-                                    history[agent_name].append(reward)
+                                    if (self._assignment_list[affected_agent][0] == subject_name) & \
+                                        (affected_agent != agent_name):
+                                        history[affected_agent][-1] = -reward
+                                        # if learning_method == 'every step':
+                                        #     self._agent[affected_agent].learn(state=subject.state,
+                                        #         reward=reward if affected_agent == agent_name else -reward)
+                                        # elif learning_method == 'history':
+
                     if termination == 'all':
                         done = True
                         for sub in self._subject.values():
@@ -257,6 +273,12 @@ class Environment(RLBase):
                         done = False
                         for sub in self._subject.values():
                             done = done | sub.is_terminated
+
+                if learning_method == 'every step':
+                    for agent_name, agent in self._agent.items():
+                        state = self._subject[self._assignment_list[agent_name][0]].state
+                        agent.learn(state=state, reward=history[agent_name][2])
+                        history[agent_name] = []
 
             if learning_method == 'history':
                 for agent_name, agent in self._agent.items():
@@ -283,6 +305,8 @@ class Environment(RLBase):
 
         if tally:
             return win_count
+        if step_count:
+            return steps/episodes
 
     def load(self, **kwargs):
         '''

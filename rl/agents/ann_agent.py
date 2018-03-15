@@ -82,23 +82,17 @@ class ANNAgent(Agent):
             hidden_layer_sizes: tuple containintg hidden layer sizes
             random_state: random state. (Default = 1)
             default_actions: list of default actions
-
-        Raises ValueError if default_actions is not provided.
         '''
         Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0,
+        Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0, default_actions={},
                            solver='lbfgs', hidden_layer_sizes=(10,), max_iter=1, random_state=None)
         Agent.set_params(self, **kwargs)
-
-        try:
-            self._default_actions = kwargs['default_actions']
-        except KeyError:
-            raise ValueError('default_actions should be specified for Neural Agent')
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
             self._gamma, self._alpha, self._epsilon = 1, 1e-5, 0
+            self._default_actions = {}
             self._solver, self._hidden_layer_sizes, self._max_iter, self._random_state='lbfgs', (10,), 1, None
 
         self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha,
