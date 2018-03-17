@@ -14,7 +14,7 @@ from rl.subjects import MNKGame, WindyGridworld
 
 def mnk():
     # load the environment or create a new one
-    filename = 'mnk333_ANN'
+    filename = 'mnk333_ANN___'
     try:
         env = Environment(filename=filename)
     except FileNotFoundError:
@@ -32,7 +32,7 @@ def mnk():
         agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
         agents['Opponent'] = QAgent()
         agents['Opponent'].load(filename='mnk333_opponent')
-
+        agents['Opponent'].report(items=['states action'])
         # assign agents to subjects
         assignment = [('ANN', 'Board A'), ('Opponent', 'Board A')]
 
@@ -130,4 +130,4 @@ def windy():
     plt.show()
 
 if __name__ == '__main__':
-    windy()
+    mnk()

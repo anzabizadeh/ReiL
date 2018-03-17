@@ -1,0 +1,265 @@
+# -*- coding: utf-8 -*-
+'''
+DataCollector class
+=================
+
+The base class for data collection in reinforcement learning
+
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
+
+import pickle
+
+
+def main():
+    class test():
+        def __init__(self):
+            self.a = 1
+    t = test()
+    dc = DataCollector()
+    dc.available_statistics = {'stat 1': [True, lambda x, y: x['a']-y['a'], 'a']}
+    dc.active_statistics = ['stat 1']
+    dc.start()
+    dc.collect(t)
+    t.a = 10
+    print(dc.retrieve()['stat 1'])
+    print(dc.report(t))
+    print(dc.report(t))
+    dc.stop(flush=True)
+
+
+class DataCollector():
+    '''
+    A class to collect data during reinforcement learning experiment.
+    
+    Attributes
+    ----------
+        is_active: whether the data collector is active.
+        available_statistics: a list of available statistics (set/get)
+        active_statistics: a list of active statistics (set/get)
+
+    Methods
+    -------
+        start: start data collection
+        stop: stop data collection
+        collect: collect data for all or the specified statistics
+        retrieve: return all or the specified recorded data
+        report: create a report on all or the specified statistics
+        load: load collected data from a file.
+        save: save the collected data to a file.
+    '''
+    def __init__(self, **kwargs):
+        self._available_statistics = {}  # {Statistic's Name: [Needs recording or not, functionRef, [variable list]}
+        self._active_statistics = {}
+        self._data = {}  # the things that should be stored.
+        self._is_active = False
+
+    @property
+    def is_active(self):
+        ''' Return the status of the data collector.'''
+        return self._is_active
+
+    @property
+    def available_statistics(self):
+        '''Return the dictionary of available statistics.'''
+        return self._available_statistics
+
+    @available_statistics.setter
+    def available_statistics(self, statistics):
+        '''
+        Set the dictionary of available statistics.
+            
+        Raises exceptions if data collector is not started or if the expected data is not provided.
+        '''
+        if self._is_active:
+            raise RuntimeError('Data collector should be stopped before assignment.')
+        for s, args in statistics.items():
+            if not isinstance(s, str):
+                raise TypeError('Statistic\'s name should be of type str ({}).'.format(s))
+            if not isinstance(args[0], bool):
+                raise TypeError('Statistic\'s first item should be of type bool ({}).'.format(args[0]))
+            if not callable(args[1]):
+                raise TypeError('Statistic\'s second item should be a function ({}).'.format(args[1]))
+            if len(args) < 3:
+                raise ValueError('A statistic should have at least one variable name.')
+            for i in range(2,len(args)):
+                if not isinstance(args[i], str):
+                    raise TypeError('Variable\'s name should be of type str ({}).'.format(args[i]))
+        self._available_statistics = statistics
+
+    @property
+    def active_statistics(self):
+        '''Return the list of active statistics.'''
+        return self._available_statistics
+
+    @active_statistics.setter
+    def active_statistics(self, statistics):
+        '''
+        Set the list of active statistics.
+            
+        Raises exceptions if data collector is not started or if the expected data is not provided.
+        '''
+        if self._is_active:
+            raise RuntimeError('Data collector should be stopped before assignment.')
+        if statistics == 'all':
+            self._active_statistics = self._available_statistics.keys()
+            return
+        for s in statistics:
+            if not isinstance(s, str):
+                raise TypeError('Statistic\'s name should be of type str ({}).'.format(s))
+            if not s in self._available_statistics:
+                raise ValueError('Requested statistic is not available ({}).'.format(s))
+        self._active_statistics = statistics
+
+    def start(self, flush=False):
+        '''
+        Start the data collector.
+
+        Arguments
+        ---------
+            flush: if True, previously collected data is flushed.
+
+        Raises error if available or active statistics are not set. 
+        '''
+        if not self._available_statistics:
+            raise ValueError('Data collector has not been set up. Use available_statistics to set up.')
+        if not self._active_statistics:
+            raise ValueError('No statistic is defined. Use active_statistics to determine what to collect.')
+        if flush:
+            self._data = {}
+        self._is_active = True
+
+    def stop(self, flush=False):
+        '''
+        Stop the data collector.
+
+        Arguments
+        ---------
+            flush: if True, the collected data is flushed.
+        '''
+        if flush:
+            self._data = {}
+        self._is_active = False
+
+    def collect(self, obj, statistics='all'):  # data should be a dictionary
+        '''
+        Collect data.
+
+        Arguments
+        ---------
+            obj: the object for which data should be collected.
+            statistics: a list of statistics for which the data should be collected. (Default='all')
+
+        Raises error if the data collector is not started or the expected attribute is not available in the object.
+
+        Note: collect only collects data for statistics whose flag is True, i.e. statistics that calculate a delta.
+        '''
+        if not self._is_active:
+            raise RuntimeError('Data collector is not active. Use start() method.')
+
+        stats = self._active_statistics if statistics == 'all' else statistics
+
+        for statistic in stats:
+            if self._available_statistics[statistic][0]:  # if it should be collected
+                try:
+                    self._data[statistic] = dict((variable, obj.__dict__[variable]) 
+                                                 for variable in self._available_statistics[statistic][2:])
+                except KeyError:
+                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(statistic))
+
+    def retrieve(self, statistics='all'):
+        '''
+        Retrieve the requested data.
+
+        Arguments
+        ---------
+            statistics: a list of statistics for which the data should be retrieved. (Default='all')
+
+        Raises error if the data collector is not started or the expected attribute is not available in the object.
+        '''
+        if not self._is_active:
+            raise RuntimeError('Data collector is not active. Use start() method.')
+
+        if statistics == 'all':
+            return self._data
+
+        data = {}
+        for stat in statistics:
+            try:
+                data[stat] = self._data[stat]
+            except KeyError:
+                pass
+
+        return data
+
+    def report(self, obj, statistics='all'):
+        '''
+        Report the requested statistics.
+
+        Arguments
+        ---------
+            obj: the object for which the report should be generated.
+            statistics: a list of statistics for which the data should be collected. (Default='all')
+
+        Raises error if the data collector is not started or the expected attribute is not available in the object.
+
+        Note: report uses the provided functions to calculate the results.
+        '''
+        if not self._is_active:
+            raise RuntimeError('Data collector is not active. Use start() method.')
+
+        stats = self._active_statistics if statistics == 'all' else statistics
+        old_data = self._data.copy()
+        self.collect(obj, stats)
+
+        results = {}
+        for statistic in stats:
+            if self._available_statistics[statistic][0]:  # if it should be collected
+                try:
+                    results[statistic] = self._available_statistics[statistic][1](self._data[statistic], old_data[statistic])
+                except KeyError:
+                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(statistic))
+            else:
+                results[statistic] = self._available_statistics[statistic][1](self._data[statistic])
+        
+        self._data = old_data
+
+        return results
+
+    def load(self, **kwargs):
+        '''
+        Load an object from a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+
+        Raises ValueError if the filename is not specified.
+        '''
+        try:  # filename
+            filename = kwargs['filename']
+        except KeyError:
+            raise ValueError('name of the output file not specified.')
+        with open(filename + '.pkl', 'rb') as f:
+            self.__dict__ = pickle.load(f)
+
+    def save(self, **kwargs):
+        '''
+        Save the object to a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be saved.
+
+        Raises ValueError if the filename is not specified.
+        '''
+        try:  # filename
+            filename = kwargs['filename']
+        except KeyError:
+            raise ValueError('name of the output file not specified.')
+        with open(filename + '.pkl', 'wb+') as f:
+            pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
+
+
+if __name__ == '__main__':
+    main()

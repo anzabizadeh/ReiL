@@ -20,14 +20,13 @@ class QAgent(Agent):
 
     Atributes
     ---------
-        previous_action: return the previous action
 
     Methods
     -------
-        state_q: return all Q-values of a state.
         act: return an action based on the given state.
         learn: learn using either history or action, reward, and state.
         reset: reset the agent.
+        report: report the requested data.
     '''
     def __init__(self, **kwargs):
         '''
@@ -77,17 +76,6 @@ class QAgent(Agent):
         except KeyError:
             return 0
 
-    def state_q(self, state):
-        '''
-        Return the list of Q-values of a state.
-
-        Arguments
-        ---------
-            state: the state for which Q-value is returned.
-        '''
-        return list(self._q(sa[0], sa[1]) for sa in self._state_action_list
-                    if sa[0] == state)
-
     def _max_q(self, state):
         '''
         Return MAX(Q) of a state.
@@ -115,10 +103,6 @@ class QAgent(Agent):
             return self._state_action_list[(state, action)][1]
         except KeyError:
             return 0
-
-    @property
-    def previous_action(self):
-        return self._previous_action
 
     def act(self, state, **kwargs):
         '''
@@ -219,3 +203,29 @@ class QAgent(Agent):
         self._previous_state = None
         self._previous_action = None
 
+    def report(self, **kwargs):
+        '''
+        generate and return the requested report.
+
+        Arguments
+        ---------
+            items: the list of items to report.
+        '''
+        rep = {}
+        for item in kwargs['items']:
+            if item.lower() == 'states q':
+                rep[item] = [*(self._max_q(sa[0]) for sa in self._state_action_list)]
+            if item.lower() == 'states action':
+                rep[item] = {}
+                all_states = set(sa[0] for sa in self._state_action_list)
+                for state in all_states:
+                    action_q = ((sa[1], self._q(sa[0], sa[1]))
+                                for sa in self._state_action_list if sa[0] == state)
+                    action = max(action_q, key=lambda x: x[1])
+                    rep[item][state] = action
+            if item.lower() == 'state-actions q':
+                rep[item] = [*(self._q(sa[0], sa[1]) for sa in self._state_action_list)]
+            if item.lower() == 'state-actions n':
+                rep[item] = [*(self._N(sa[0], sa[1]) for sa in self._state_action_list)]
+
+        return rep

@@ -10,6 +10,8 @@ The base class for reinforcement learning
 
 import pickle
 
+from .data_collector import DataCollector
+
 
 class RLBase():
     '''
@@ -24,9 +26,11 @@ class RLBase():
         set_defaults: set default values for parameters.
         load: load an object from a file.
         save: save the object to a file.
+        report: report the requested data.
     '''
     def __init__(self, **kwargs):
         self._defaults = {}
+        self.data_collector = DataCollector()
 
     def set_params(self, **params):
         '''
