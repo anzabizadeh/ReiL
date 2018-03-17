@@ -28,13 +28,13 @@ def mnk():
 
         # define agents
         # agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
-        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
+        # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
         agents['Opponent'] = QAgent()
         agents['Opponent'].load(filename='mnk333_opponent')
         # agents['Q'].report(items=['states action'])
         # assign agents to subjects
-        assignment = [('Q', 'Board A'), ('Opponent', 'Board A')]
+        assignment = [('ANN', 'Board A'), ('Opponent', 'Board A')]
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -47,13 +47,17 @@ def mnk():
     results = {'ANN win': [], 'ANN lose': []}
     for i in range(runs):
         # run and collect statistics
-        agents['Q'].data_collector.start()
-        agents['Q'].data_collector.collect()
+
+        if agents['ANN'].data_collector.is_active:
+            agents['ANN'].data_collector.collect()
 
         env.elapse(episodes=training_episodes, reset='all',
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
-        print(agents['Q'].data_collector.report())
+        if agents['ANN'].data_collector.is_active:
+            print(agents['ANN'].data_collector.report())
+        else:
+            agents['ANN'].data_collector.start()
 
         # tally = env.elapse(episodes=test_episodes, reset='all',
         #                     termination='all', learning_method='none',

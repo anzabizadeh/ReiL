@@ -8,7 +8,7 @@ The base class for data collection in reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-import pickle
+from pickle import load, dump, HIGHEST_PROTOCOL
 
 
 def main():
@@ -182,14 +182,22 @@ class DataCollector():
 
         for s in stats:
             # if self._available_statistics[statistic][0]:  # if it should be collected
-            try:
-                self._data[s] = dict((variable, self._object.__dict__[variable].copy()) 
-                                                for variable in self._available_statistics[s][2:])
-            except AttributeError:
-                self._data[s] = dict((variable, self._object.__dict__[variable]) 
-                                                for variable in self._available_statistics[s][2:])
-            except KeyError:
-                raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
+            self._data[s] = {}  # enabling '.' notation
+            for variable in self._available_statistics[s][2:]:
+                arguments = variable.split('.')
+                temp = self._object
+                for arg in arguments:
+                    temp = temp.__dict__[arg]
+                try:
+                    self._data[s][variable] = temp.copy()
+                    # self._data[s] = dict((variable, self._object.__dict__[variable].copy()) 
+                    #                                 for variable in self._available_statistics[s][2:])
+                except AttributeError:
+                    self._data[s][variable] = temp
+                    # self._data[s] = dict((variable, self._object.__dict__[variable]) 
+                    #                                 for variable in self._available_statistics[s][2:])
+                except KeyError:
+                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
 
     def retrieve(self, **kwargs):
         '''
@@ -282,7 +290,7 @@ class DataCollector():
         except KeyError:
             raise ValueError('name of the output file not specified.')
         with open(filename + '.pkl', 'rb') as f:
-            self.__dict__ = pickle.load(f)
+            self.__dict__ = load(f)
 
     def save(self, **kwargs):
         '''
@@ -299,7 +307,7 @@ class DataCollector():
         except KeyError:
             raise ValueError('name of the output file not specified.')
         with open(filename + '.pkl', 'wb+') as f:
-            pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
+            dump(self.__dict__, f, HIGHEST_PROTOCOL)
 
     def set_params(self, **params):
         '''

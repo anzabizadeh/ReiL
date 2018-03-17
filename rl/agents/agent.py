@@ -27,7 +27,6 @@ class Agent(RLBase):
         act: return an action based on the given state.
         learn: learn using either history or action, reward, and state.
         reset: reset the agent.
-        report: return a report as a string.
     '''
     def __init__(self, **kwargs):
         RLBase.__init__(self, **kwargs)
@@ -69,11 +68,3 @@ class Agent(RLBase):
     def reset(self):
         '''Reset the agent at the end of a learning episode.''' 
         pass
-
-    def report(self, **kwargs):
-        '''return a report as a string.''' 
-        raise NotImplementedError
-
-
-if __name__ == '__main__':
-    main()
