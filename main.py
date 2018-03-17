@@ -14,7 +14,7 @@ from rl.subjects import MNKGame, WindyGridworld
 
 def mnk():
     # load the environment or create a new one
-    filename = 'mnk333_ANN___'
+    filename = 'mnk333_with_report'
     try:
         env = Environment(filename=filename)
     except FileNotFoundError:
@@ -28,13 +28,13 @@ def mnk():
 
         # define agents
         # agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
-        # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
+        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
         agents['Opponent'] = QAgent()
         agents['Opponent'].load(filename='mnk333_opponent')
-        agents['Opponent'].report(items=['states action'])
+        # agents['Q'].report(items=['states action'])
         # assign agents to subjects
-        assignment = [('ANN', 'Board A'), ('Opponent', 'Board A')]
+        assignment = [('Q', 'Board A'), ('Opponent', 'Board A')]
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -42,29 +42,33 @@ def mnk():
 
     # set experiment variables
     runs = 50
-    training_episodes = 100
+    training_episodes = 10
     test_episodes = 10
     results = {'ANN win': [], 'ANN lose': []}
     for i in range(runs):
         # run and collect statistics
+        agents['Q'].data_collector.start()
+        agents['Q'].data_collector.collect()
+
         env.elapse(episodes=training_episodes, reset='all',
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
+        print(agents['Q'].data_collector.report())
 
-        tally = env.elapse(episodes=test_episodes, reset='all',
-                            termination='all', learning_method='none',
-                            reporting='none', tally='yes')
+        # tally = env.elapse(episodes=test_episodes, reset='all',
+        #                     termination='all', learning_method='none',
+        #                     reporting='none', tally='yes')
 
-        results['ANN win'].append(tally['ANN'])
-        results['ANN lose'].append(tally['Opponent'])
+        # results['ANN win'].append(tally['ANN'])
+        # results['ANN lose'].append(tally['Opponent'])
 
-        # print result of each run
-        print('run {: }: win: {: } draw:{: } lose:{: }'
-              .format(i, results['ANN win'][-1], test_episodes-results['ANN win'][-1]-results['ANN lose'][-1], results['ANN lose'][-1]))
+        # # print result of each run
+        # print('run {: }: win: {: } draw:{: } lose:{: }'
+        #       .format(i, results['ANN win'][-1], test_episodes-results['ANN win'][-1]-results['ANN lose'][-1], results['ANN lose'][-1]))
 
 
-        # save occasionally in case you don't lose data if you get bored of running the code!
-        env.save(filename=filename)
+        # # save occasionally in case you don't lose data if you get bored of running the code!
+        # env.save(filename=filename)
 
     x = list(range(len(results['ANN win'])))
     plt.plot(x, results['ANN win'], 'b', x, results['ANN lose'], 'r')

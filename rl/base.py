@@ -19,6 +19,7 @@ class RLBase():
     
     Attributes
     ----------
+        data_collector: a DataCollector object
 
     Methods
     -------
@@ -30,7 +31,7 @@ class RLBase():
     '''
     def __init__(self, **kwargs):
         self._defaults = {}
-        self.data_collector = DataCollector()
+        self.data_collector = DataCollector(object=self)
 
     def set_params(self, **params):
         '''

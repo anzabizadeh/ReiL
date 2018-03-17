@@ -46,6 +46,12 @@ class QAgent(Agent):
         Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, r_plus=0, n_e=0,
                            default_actions=ValueSet(), state_action_list={})
         Agent.set_params(self, **kwargs)
+        self.data_collector.available_statistics = {'states q': [False, self.__report, '_state_action_list'],
+                                                    'states action': [False, self.__report, '_state_action_list'],
+                                                    'state-actions q': [False, self.__report, '_state_action_list'],
+                                                    'state-actions n': [False, self.__report, '_state_action_list'],
+                                                    'diff-q': [True, self.__report, '_state_action_list']}
+        self.data_collector.active_statistics = ['states q', 'states action', 'state-actions q', 'state-actions n', 'diff-q']
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -203,29 +209,40 @@ class QAgent(Agent):
         self._previous_state = None
         self._previous_action = None
 
-    def report(self, **kwargs):
+    def __report(self, **kwargs):
         '''
         generate and return the requested report.
 
         Arguments
         ---------
-            items: the list of items to report.
+            statistic: the list of items to report.
         '''
-        rep = {}
-        for item in kwargs['items']:
-            if item.lower() == 'states q':
-                rep[item] = [*(self._max_q(sa[0]) for sa in self._state_action_list)]
-            if item.lower() == 'states action':
-                rep[item] = {}
-                all_states = set(sa[0] for sa in self._state_action_list)
-                for state in all_states:
-                    action_q = ((sa[1], self._q(sa[0], sa[1]))
-                                for sa in self._state_action_list if sa[0] == state)
-                    action = max(action_q, key=lambda x: x[1])
-                    rep[item][state] = action
-            if item.lower() == 'state-actions q':
-                rep[item] = [*(self._q(sa[0], sa[1]) for sa in self._state_action_list)]
-            if item.lower() == 'state-actions n':
-                rep[item] = [*(self._N(sa[0], sa[1]) for sa in self._state_action_list)]
+        try:
+            item = kwargs['statistic']
+        except KeyError:
+            return
+
+        if item.lower() == 'states q':
+            rep = dict((sa[0], self._max_q(sa[0])) for sa in kwargs['data']['_state_action_list'])
+        if item.lower() == 'states action':
+            rep = {}
+            all_states = set(sa[0] for sa in kwargs['data']['_state_action_list'])
+            for state in all_states:
+                action_q = ((sa[1], self._q(sa[0], sa[1]))
+                            for sa in kwargs['data']['_state_action_list'] if sa[0] == state)
+                action = max(action_q, key=lambda x: x[1])
+                rep[state] = action
+        if item.lower() == 'state-actions q':
+            rep = dict(((sa[0], sa[1]), self._q(sa[0], sa[1])) for sa in kwargs['data']['_state_action_list'])
+        if item.lower() == 'state-actions n':
+            rep = dict(((sa[0], sa[1]), self._N(sa[0], sa[1])) for sa in kwargs['data']['_state_action_list'])
+
+
+        if item.lower() == 'diff-q':
+            list_old = dict((sa[0], self._q(sa[0], sa[1])) for sa in kwargs['old']['_state_action_list'])
+            list_new = dict((sa[0], self._q(sa[0], sa[1])) for sa in kwargs['new']['_state_action_list'])
+            rep = 0
+            for item in set(list(list_old.keys())+list(list_new.keys())):
+                rep += abs(list_new.get(item, 0) - list_old.get(item, 0))
 
         return rep

@@ -16,15 +16,15 @@ def main():
         def __init__(self):
             self.a = 1
     t = test()
-    dc = DataCollector()
-    dc.available_statistics = {'stat 1': [True, lambda x, y: x['a']-y['a'], 'a']}
+    dc = DataCollector(object=t)
+    dc.available_statistics = {'stat 1': [True, lambda new, old, statistic: new['a']-old['a'], 'a']}
     dc.active_statistics = ['stat 1']
     dc.start()
-    dc.collect(t)
+    dc.collect()
     t.a = 10
-    print(dc.retrieve()['stat 1'])
-    print(dc.report(t))
-    print(dc.report(t))
+    print(dc.retrieve())
+    print(dc.report())
+    print(dc.report())
     dc.stop(flush=True)
 
 
@@ -47,12 +47,16 @@ class DataCollector():
         report: create a report on all or the specified statistics
         load: load collected data from a file.
         save: save the collected data to a file.
+        set_params: set parameters.
+        set_defaults: set default values for parameters.
     '''
     def __init__(self, **kwargs):
-        self._available_statistics = {}  # {Statistic's Name: [Needs recording or not, functionRef, [variable list]}
-        self._active_statistics = {}
-        self._data = {}  # the things that should be stored.
-        self._is_active = False
+        self.set_defaults(available_statistics={}, active_statistics={}, data={}, is_active=False, object=None)
+        self.set_params(**kwargs)
+
+        if False:
+            self._available_statistics, self._active_statistics, self._data = {}, {}, {}
+            self._is_active, self._object = False, None
 
     @property
     def is_active(self):
@@ -68,6 +72,14 @@ class DataCollector():
     def available_statistics(self, statistics):
         '''
         Set the dictionary of available statistics.
+
+        The dictionary should be in {statistic's name: delta flag, function, parameters}
+            statistic's name: the name of the statistic, e.g. 'time elapsed', 'diffQ'.
+            delta flag: True if old and new data are both required to calculate the statistic,
+                        False otherwise.
+            function: a reference to the function that calculates the statistic. Note that for
+                        statistics with deta flag=True, the function gets 3 arguments: old, new, statistic
+                        and for delta flag=False, 2 arguments will be passed: data and statistic
             
         Raises exceptions if data collector is not started or if the expected data is not provided.
         '''
@@ -141,33 +153,45 @@ class DataCollector():
             self._data = {}
         self._is_active = False
 
-    def collect(self, obj, statistics='all'):  # data should be a dictionary
+    def collect(self, **kwargs):  # data should be a dictionary
         '''
         Collect data.
 
         Arguments
         ---------
-            obj: the object for which data should be collected.
-            statistics: a list of statistics for which the data should be collected. (Default='all')
+            statistic: a list of statistics for which the data should be collected. (Default='all')
 
         Raises error if the data collector is not started or the expected attribute is not available in the object.
 
         Note: collect only collects data for statistics whose flag is True, i.e. statistics that calculate a delta.
         '''
+
         if not self._is_active:
             raise RuntimeError('Data collector is not active. Use start() method.')
 
-        stats = self._active_statistics if statistics == 'all' else statistics
-
-        for statistic in stats:
-            if self._available_statistics[statistic][0]:  # if it should be collected
+        if not kwargs:
+            stats = self._active_statistics
+        else:
+            try:
+                stats = kwargs['statistics']
+            except KeyError:
                 try:
-                    self._data[statistic] = dict((variable, obj.__dict__[variable]) 
-                                                 for variable in self._available_statistics[statistic][2:])
+                    stats = kwargs['statistic']
                 except KeyError:
-                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(statistic))
+                    raise KeyError('statistics are not specified.')
 
-    def retrieve(self, statistics='all'):
+        for s in stats:
+            # if self._available_statistics[statistic][0]:  # if it should be collected
+            try:
+                self._data[s] = dict((variable, self._object.__dict__[variable].copy()) 
+                                                for variable in self._available_statistics[s][2:])
+            except AttributeError:
+                self._data[s] = dict((variable, self._object.__dict__[variable]) 
+                                                for variable in self._available_statistics[s][2:])
+            except KeyError:
+                raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
+
+    def retrieve(self, **kwargs):
         '''
         Retrieve the requested data.
 
@@ -180,11 +204,19 @@ class DataCollector():
         if not self._is_active:
             raise RuntimeError('Data collector is not active. Use start() method.')
 
-        if statistics == 'all':
+        if not kwargs:
             return self._data
+        else:
+            try:
+                stats = kwargs['statistics']
+            except KeyError:
+                try:
+                    stats = kwargs['statistic']
+                except KeyError:
+                    raise KeyError('statistics are not specified.')
 
         data = {}
-        for stat in statistics:
+        for stat in stats:
             try:
                 data[stat] = self._data[stat]
             except KeyError:
@@ -192,14 +224,13 @@ class DataCollector():
 
         return data
 
-    def report(self, obj, statistics='all'):
+    def report(self, **kwargs):
         '''
         Report the requested statistics.
 
         Arguments
         ---------
-            obj: the object for which the report should be generated.
-            statistics: a list of statistics for which the data should be collected. (Default='all')
+            statistic: a list of statistics for which the data should be collected. (Default='all')
 
         Raises error if the data collector is not started or the expected attribute is not available in the object.
 
@@ -208,19 +239,29 @@ class DataCollector():
         if not self._is_active:
             raise RuntimeError('Data collector is not active. Use start() method.')
 
-        stats = self._active_statistics if statistics == 'all' else statistics
+        if not kwargs:
+            stats = self._active_statistics
+        else:
+            try:
+                stats = kwargs['statistics']
+            except KeyError:
+                try:
+                    stats = kwargs['statistic']
+                except KeyError:
+                    raise KeyError('statistics are not specified.')
+
         old_data = self._data.copy()
-        self.collect(obj, stats)
+        self.collect(statistics=stats)
 
         results = {}
-        for statistic in stats:
-            if self._available_statistics[statistic][0]:  # if it should be collected
+        for s in stats:
+            if self._available_statistics[s][0]:  # if it should be collected
                 try:
-                    results[statistic] = self._available_statistics[statistic][1](self._data[statistic], old_data[statistic])
+                    results[s] = self._available_statistics[s][1](new=self._data[s], old=old_data[s], statistic=s)
                 except KeyError:
-                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(statistic))
+                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
             else:
-                results[statistic] = self._available_statistics[statistic][1](self._data[statistic])
+                results[s] = self._available_statistics[s][1](data=self._data[s], statistic=s)
         
         self._data = old_data
 
@@ -259,6 +300,34 @@ class DataCollector():
             raise ValueError('name of the output file not specified.')
         with open(filename + '.pkl', 'wb+') as f:
             pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
+
+    def set_params(self, **params):
+        '''
+        set parameters to values.
+
+        Arguments
+        ---------
+            params: a dictionary containing parameter names and their values.
+        '''
+        self.__dict__.update(('_'+key, params.get(key, self._defaults[key]))
+                              for key in self._defaults if key in params)
+
+    def set_defaults(self, **params):
+        '''
+        set parameters default values.
+
+        Arguments
+        ---------
+            params: a dictionary containing parameter names and their default values.
+
+        Note: this method overwrites all variable names.
+        '''
+        if not hasattr(self, '_defaults'):
+            self._defaults = {}
+        for key, value in params.items():
+            self._defaults[key] = value
+            if not hasattr(self, '_'+key):
+                self.__dict__['_'+key] = value
 
 
 if __name__ == '__main__':
