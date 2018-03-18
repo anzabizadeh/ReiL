@@ -223,7 +223,10 @@ class QAgent(Agent):
             return
 
         if item.lower() == 'states q':
-            rep = dict((sa[0], self._max_q(sa[0])) for sa in kwargs['data']['_state_action_list'])
+            rep = dict((sa[0],) for sa in kwargs['data']['_state_action_list'])
+            for sa, qn in kwargs['data']['_state_action_list'].item():
+
+            rep = dict((sa[0], max(sa[0])) for sa in kwargs['data']['_state_action_list'])
         if item.lower() == 'states action':
             rep = {}
             all_states = set(sa[0] for sa in kwargs['data']['_state_action_list'])
@@ -239,10 +242,8 @@ class QAgent(Agent):
 
 
         if item.lower() == 'diff-q':
-            list_old = dict((sa[0], self._q(sa[0], sa[1])) for sa in kwargs['old']['_state_action_list'])
-            list_new = dict((sa[0], self._q(sa[0], sa[1])) for sa in kwargs['new']['_state_action_list'])
             rep = 0
-            for item in set(list(list_old.keys())+list(list_new.keys())):
-                rep += abs(list_new.get(item, 0) - list_old.get(item, 0))
+            for i in set(list(kwargs['new']['_state_action_list'].keys())+list(kwargs['old']['_state_action_list'].keys())):
+                rep += abs(kwargs['new']['_state_action_list'].get(i, (0, ))[0] - kwargs['old']['_state_action_list'].get(i, (0, ))[0])
 
         return rep
