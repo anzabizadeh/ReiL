@@ -82,21 +82,24 @@ def windy():
         agents = {}
         subjects = {}
 
+        active_agent_name = 'ANN'
         # define subjects
         # subjects['Board Q'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
         #                                     h_wind=[0]*7, v_wind=[0, 0, 0, 1, 1, 1, 2, 2, 1, 0])
-        subjects['Board TD'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
-                                            h_wind=[0]*7, v_wind=[0, 0, 0, 1, 1, 1, 2, 2, 1, 0])
+        # subjects['Board TD'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
+        #                                     h_wind=[0]*7, v_wind=[0, 0, 0, 1, 1, 1, 2, 2, 1, 0])
+        subjects['Board ANN'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
+                                               h_wind=[0]*7, v_wind=[0, 0, 0, 1, 1, 1, 2, 2, 1, 0])
 
         # define agents
-        agents['TD'] = TD0Agent(gamma=0.9, alpha=0.2, epsilon=0.1)
+        # agents['TD'] = TD0Agent(gamma=0.9, alpha=0.2, epsilon=0.1)
         # agents['Q'] = QAgent(gamma=0.9, alpha=0.2, epsilon=0.1)
-        # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
+        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
         # agents['Opponent'] = QAgent()
         # agents['Opponent'].load(filename='mnk333_opponent')
 
         # assign agents to subjects
-        assignment = [('TD', 'Board TD')] # ('Q', 'Board Q'), 
+        assignment = [('ANN', 'Board ANN')] # ('Q', 'Board Q'), ('TD', 'Board TD')
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -104,9 +107,9 @@ def windy():
 
     # set experiment variables
     runs = 100
-    training_episodes = 10
+    training_episodes = 1
     test_episodes = 1
-    results = {'Q': []}
+    results = {active_agent_name: []}
     steps1, steps2 = 0, 0
     for i in range(runs):
         # run and collect statistics
@@ -116,7 +119,7 @@ def windy():
         #     print('testing')
         # steps2 = env.elapse(episodes=test_episodes, reset='all',
         #                     termination='all', learning_method='none', step_count='yes')
-        results['Q'].append(steps1)
+        results[active_agent_name].append(steps1)
 
         # print result of each run
         print('run {: }: training steps: {: 2.2f} testing steps: {: 2.2f}'.format(i, steps1, steps2))
@@ -124,9 +127,9 @@ def windy():
         # save occasionally in case you don't lose data if you get bored of running the code!
     env.save(filename=filename)
 
-    x = list(range(len(results['Q'])))
-    plt.plot(x, results['Q'], 'b')
-    plt.axis([0, len(x), 0, max(results['Q'])])
+    x = list(range(len(results[active_agent_name])))
+    plt.plot(x, results[active_agent_name], 'b')
+    plt.axis([0, len(x), 0, max(results[active_agent_name])])
     plt.show()
 
 if __name__ == '__main__':
