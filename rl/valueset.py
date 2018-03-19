@@ -17,8 +17,10 @@ def main():
     print(e.value, e.to_list(), e.to_nparray())
     # create a ValueSet with data and print binary representation and normalized versions:
     s = ValueSet(1, 7, 10, 3)
-    print(s.binary_representation().value)
-    print(s.normalizer(0, 1).value, s.to_nparray())
+    print('{}'.format(s))
+    print([10, 3] in s)
+    print('{}'.format(s.binary_representation()))
+    print('{:2.2} {}'.format(s.normalizer(0, 1), s.to_nparray()))
     array = s.as_valueset_array()
     for a in array:
         print(a.value, a.max, a.min)
@@ -210,6 +212,55 @@ class ValueSet():
         except AttributeError:
             return False
         
+    def __ge__(self, other):
+        try:
+            return self._value >= other._value
+        except AttributeError:
+            return False
+
+    def __gt__(self, other):
+        try:
+            return self._value > other._value
+        except AttributeError:
+            return False
+
+    def __le__(self, other):
+        try:
+            return self._value <= other._value
+        except AttributeError:
+            return False
+
+    def __lt__(self, other):
+        try:
+            return self._value < other._value
+        except AttributeError:
+            return False
+
+    def __ne__(self, other):
+        try:
+            return self._value != other._value
+        except AttributeError:
+            return False
+
+    def __format__(self, formatstr):
+        try:
+            return '[' + ', '.join(format(i, formatstr) for i in self._value) + ']'
+        except AttributeError:
+            return False
+
+    def __len__(self):
+        return len(self._value)
+
+    def __contains__(self, x):
+        for i in range(len(self)):
+            try:
+                if (x in self.value[i]) | (x == self.value[i]):
+                    return True
+            except TypeError:
+                if x == self.value[i]:
+                    return True
+        return False
+
     def __hash__(self):
         return self.value.__hash__()
 

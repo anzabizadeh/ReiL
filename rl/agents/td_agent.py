@@ -43,6 +43,12 @@ class TD0Agent(Agent):
         Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, default_actions=ValueSet(), state_action_list={})
         Agent.set_params(self, **kwargs)
 
+        self.data_collector.available_statistics = {'states q': [False, self.__report, '_state_action_list'],
+                                                    'states action': [False, self.__report, '_state_action_list'],
+                                                    'state-actions q': [False, self.__report, '_state_action_list'],
+                                                    'diff-q': [True, self.__report, '_state_action_list']}
+        self.data_collector.active_statistics = ['states q', 'states action', 'state-actions q', 'diff-q']
+
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
@@ -59,7 +65,7 @@ class TD0Agent(Agent):
             action: the action for which Q-value is returned.
         '''
         try:
-            return self._state_action_list[(state, action)]
+            return self._state_action_list[state][action]
         except KeyError:
             return 0
 
@@ -116,10 +122,12 @@ class TD0Agent(Agent):
 
                 new_q = q_sa + self._alpha*(reward + self._gamma*q_sa2 - q_sa)
 
-                self._state_action_list.update({
-                        (previous_state, previous_action): new_q})
-                previous_state = state
+                try:
+                    self._state_action_list[previous_state].update({previous_action: new_q})
+                except KeyError:
+                    self._state_action_list.update({previous_state: {previous_action: new_q}})
 
+                previous_state = state
             return
         except KeyError:
             pass
@@ -142,8 +150,10 @@ class TD0Agent(Agent):
 
         new_q = q_sa + self._alpha*(reward + self._gamma*q_sa2 - q_sa)
 
-        self._state_action_list.update({
-                (self._previous_state, self._previous_action): new_q})
+        try:
+            self._state_action_list[self._previous_state].update({self._previous_action: new_q})
+        except KeyError:
+            self._state_action_list.update({self._previous_state: {self._previous_action: new_q}})
 
     def reset(self):
         '''
@@ -153,3 +163,48 @@ class TD0Agent(Agent):
         '''
         self._previous_state = None
         self._previous_action = None
+
+    def __report(self, **kwargs):
+        '''
+        generate and return the requested report.
+
+        Arguments
+        ---------
+            statistic: the list of items to report.
+        '''
+        try:
+            item = kwargs['statistic']
+        except KeyError:
+            return
+
+        if item.lower() == 'states q':
+            data = kwargs['data']['_state_action_list']
+            rep = {}
+            for state in data:
+                rep[state] = max(data[state][action] for action in data[state])
+
+        if item.lower() == 'states action':
+            data = kwargs['data']['_state_action_list']
+            rep = {}
+            all_states = list(s for s in data)
+            for state in all_states:
+                action_q = ((action, data[state][action]) for action in data[state])
+                action = max(action_q, key=lambda x: x[1])
+                rep[state] = action
+
+        if item.lower() == 'state-actions q':
+            data = kwargs['data']['_state_action_list']
+            rep = dict(((state, action), data[state][action])
+                        for state in data for action in data[state])
+
+        if item.lower() == 'diff-q':
+            new = kwargs['new']['_state_action_list']
+            old = kwargs['old']['_state_action_list']
+            rep = 0
+            state_list = set(list(new.keys()) + list(old.keys()))
+            for s in state_list:
+                action_list = set(list(new.get(s, {}).keys()) + list(old.get(s, {}).keys()))
+                for a in action_list:
+                    rep += abs(new.get(s, {}).get(a, 0) - old.get(s, {}).get(a, 0))
+
+        return rep

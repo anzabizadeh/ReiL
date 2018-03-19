@@ -87,6 +87,8 @@ class ANNAgent(Agent):
         Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0, default_actions={},
                            solver='lbfgs', hidden_layer_sizes=(10,), max_iter=1, random_state=None)
         Agent.set_params(self, **kwargs)
+        self.data_collector.available_statistics = {'diff-coef': [True, self.__report, '_clf.coefs_']}
+        self.data_collector.active_statistics = ['diff-coef']
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -98,6 +100,7 @@ class ANNAgent(Agent):
         self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha,
                                  hidden_layer_sizes=self._hidden_layer_sizes,
                                  random_state=self._random_state, max_iter=self._max_iter, warm_start=True)
+        # self._clf.coefs_
 
     def _q(self, state, action):
         '''
@@ -234,6 +237,26 @@ class ANNAgent(Agent):
         self._previous_action = action
         return action
 
+    def __report(self, **kwargs):
+        '''
+        generate and return the requested report.
+
+        Arguments
+        ---------
+            statistic: the list of items to report.
+        '''
+        try:
+            item = kwargs['statistic']
+        except KeyError:
+            return
+
+        if item.lower() == 'diff-coef':
+            import numpy as np
+            rep = 0
+            for i in range(np.size(kwargs['old']['_clf.coefs_'])):
+                rep += np.sum(np.subtract(kwargs['old']['_clf.coefs_'][i], kwargs['new']['_clf.coefs_'][i]))
+
+        return rep
 
 if __name__ == '__main__':
     main()
