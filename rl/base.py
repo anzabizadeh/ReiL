@@ -8,7 +8,9 @@ The base class for reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-import pickle
+from pickle import load, dump, HIGHEST_PROTOCOL
+
+from .data_collector import DataCollector
 
 
 class RLBase():
@@ -17,6 +19,7 @@ class RLBase():
     
     Attributes
     ----------
+        data_collector: a DataCollector object
 
     Methods
     -------
@@ -27,6 +30,7 @@ class RLBase():
     '''
     def __init__(self, **kwargs):
         self._defaults = {}
+        self.data_collector = DataCollector(object=self)
 
     def set_params(self, **params):
         '''
@@ -71,7 +75,7 @@ class RLBase():
         except KeyError:
             raise ValueError('name of the output file not specified.')
         with open(filename + '.pkl', 'rb') as f:
-            self.__dict__ = pickle.load(f)
+            self.__dict__ = load(f)
 
     def save(self, **kwargs):
         '''
@@ -88,4 +92,7 @@ class RLBase():
         except KeyError:
             raise ValueError('name of the output file not specified.')
         with open(filename + '.pkl', 'wb+') as f:
-            pickle.dump(self.__dict__, f, pickle.HIGHEST_PROTOCOL)
+            dump(self.__dict__, f, HIGHEST_PROTOCOL)
+
+    def __report(self, **kwargs):
+        return

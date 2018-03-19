@@ -20,4 +20,4 @@ submodules
 '''
 
 
-__all__ = ['environments', 'agents', 'subjects', 'valueset']
+__all__ = ['environments', 'agents', 'subjects', 'valueset', 'data_collector']

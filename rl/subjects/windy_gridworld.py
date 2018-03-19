@@ -22,6 +22,7 @@ def main():
     board = WindyGridworld(h_wind=[1, 1, 1, 1, 1], move_pattern='Q')
     _ = board.register('P1')
     for _ in range(10):
+        print(board.state)
         my_action = choice(board.possible_actions)
         board.take_effect(1, my_action)
         print(my_action.value)
@@ -56,6 +57,7 @@ class WindyGridworld(MNKBoard, Subject):
             h_wind: a list of size row that determines the strenghs of the wind. (default=0)
             v_wind: a list of size column that determines the strenghs of the wind. (default=0)
             move_pattern: whether to choose 'R'ook moves or 'Q'ueen moves. (default='R')
+            state_type: board (zero one list), tuple ()
         '''
         Subject.__init__(self, **kwargs)
         Subject.set_defaults(self, dim=(5, 5), start=(0, 0), goal=(4, 4), h_wind=[0]*5, v_wind=[0]*5, move_pattern='R')
@@ -80,6 +82,11 @@ class WindyGridworld(MNKBoard, Subject):
     def is_terminated(self):
         '''Return True if the player get to the goal.'''
         return [*self._player_location] == [*self._goal]
+
+    @property
+    def state(self):
+        '''Return the state of the board as a ValueSet.'''
+        return(ValueSet(*self._player_location))
 
     @property
     def possible_actions(self):
@@ -116,17 +123,16 @@ class WindyGridworld(MNKBoard, Subject):
 
         a = str(*action.value)
         if a in ['U', 'UR', 'UL']:
-            self._player_location[0] = max(row-1, 0)
+            self._player_location[0] = row - 1  # min(max(row-1+self._v_wind[column], 0), max_row)
         if a in ['D', 'DR', 'DL']:
-            self._player_location[0] = min(row+1, max_row)
+            self._player_location[0] = row + 1  # max(min(row+1+self._v_wind[column], max_row), 0)
         if a in ['L', 'UL', 'DL']:
-            self._player_location[1] = max(column-1, 0)
+            self._player_location[1] = column - 1  # min(max(column-1+self._h_wind[row], 0), max_column)
         if a in ['R', 'UR', 'DR']:
-            self._player_location[1] = min(column+1, max_column)
+            self._player_location[1] = column + 1  # max(min(column+1+self._h_wind[row], max_column), 0)
 
-        row, column = [*self._player_location]
-        self._player_location[0] = min(max(row+self._v_wind[column],0), max_row)
-        self._player_location[1] = min(max(column+self._h_wind[row],0), max_column)
+        self._player_location[0] = min(max(self._player_location[0]+self._v_wind[column], 0), max_row)
+        self._player_location[1] = min(max(self._player_location[1]+self._h_wind[row], 0), max_column)
 
         MNKBoard.set_piece(self, player=1, row=self._player_location[0], column=self._player_location[1])
         if self.is_terminated:
