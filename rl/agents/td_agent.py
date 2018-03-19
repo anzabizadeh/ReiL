@@ -65,7 +65,7 @@ class TD0Agent(Agent):
             action: the action for which Q-value is returned.
         '''
         try:
-            return self._state_action_list[(state, action)]
+            return self._state_action_list[state][action]
         except KeyError:
             return 0
 
@@ -122,10 +122,12 @@ class TD0Agent(Agent):
 
                 new_q = q_sa + self._alpha*(reward + self._gamma*q_sa2 - q_sa)
 
-                self._state_action_list.update({
-                        (previous_state, previous_action): new_q})
-                previous_state = state
+                try:
+                    self._state_action_list[previous_state].update({previous_action: new_q})
+                except KeyError:
+                    self._state_action_list.update({previous_state: {previous_action: new_q}})
 
+                previous_state = state
             return
         except KeyError:
             pass
@@ -148,8 +150,10 @@ class TD0Agent(Agent):
 
         new_q = q_sa + self._alpha*(reward + self._gamma*q_sa2 - q_sa)
 
-        self._state_action_list.update({
-                (self._previous_state, self._previous_action): new_q})
+        try:
+            self._state_action_list[self._previous_state].update({self._previous_action: new_q})
+        except KeyError:
+            self._state_action_list.update({self._previous_state: {self._previous_action: new_q}})
 
     def reset(self):
         '''
@@ -159,21 +163,6 @@ class TD0Agent(Agent):
         '''
         self._previous_state = None
         self._previous_action = None
-
-    def _max_q(self, state):
-        '''
-        Return MAX(Q) of a state.
-        
-        Arguments
-        ---------
-            state: the state for which MAX(Q) is returned.
-        '''
-        try:
-            max_q = max(self._q(sa[0], sa[1]) for sa in self._state_action_list
-                        if sa[0] == state)
-        except ValueError:
-            max_q = 0
-        return max_q
 
     def __report(self, **kwargs):
         '''
@@ -189,23 +178,33 @@ class TD0Agent(Agent):
             return
 
         if item.lower() == 'states q':
-            rep = dict((sa[0], self._max_q(sa[0])) for sa in kwargs['data']['_state_action_list'])
-        if item.lower() == 'states action':
+            data = kwargs['data']['_state_action_list']
             rep = {}
-            all_states = set(sa[0] for sa in kwargs['data']['_state_action_list'])
+            for state in data:
+                rep[state] = max(data[state][action] for action in data[state])
+
+        if item.lower() == 'states action':
+            data = kwargs['data']['_state_action_list']
+            rep = {}
+            all_states = list(s for s in data)
             for state in all_states:
-                action_q = ((sa[1], self._q(sa[0], sa[1]))
-                            for sa in kwargs['data']['_state_action_list'] if sa[0] == state)
+                action_q = ((action, data[state][action]) for action in data[state])
                 action = max(action_q, key=lambda x: x[1])
                 rep[state] = action
+
         if item.lower() == 'state-actions q':
-            rep = dict(((sa[0], sa[1]), self._q(sa[0], sa[1])) for sa in kwargs['data']['_state_action_list'])
+            data = kwargs['data']['_state_action_list']
+            rep = dict(((state, action), data[state][action])
+                        for state in data for action in data[state])
 
         if item.lower() == 'diff-q':
-            list_old = dict((sa[0], self._q(sa[0], sa[1])) for sa in kwargs['old']['_state_action_list'])
-            list_new = dict((sa[0], self._q(sa[0], sa[1])) for sa in kwargs['new']['_state_action_list'])
+            new = kwargs['new']['_state_action_list']
+            old = kwargs['old']['_state_action_list']
             rep = 0
-            for item in set(list(list_old.keys())+list(list_new.keys())):
-                rep += abs(list_new.get(item, 0) - list_old.get(item, 0))
+            state_list = set(list(new.keys()) + list(old.keys()))
+            for s in state_list:
+                action_list = set(list(new.get(s, {}).keys()) + list(old.get(s, {}).keys()))
+                for a in action_list:
+                    rep += abs(new.get(s, {}).get(a, 0) - old.get(s, {}).get(a, 0))
 
         return rep

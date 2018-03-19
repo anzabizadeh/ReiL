@@ -70,15 +70,13 @@ class QAgent(Agent):
         '''
         if self._training_flag:
             try:
-                if self._state_action_list[(state, action)][1] > self._n_e:
-                    return self._state_action_list[(state, action)][0]
-                else:
-                    return self._r_plus
+                return self._state_action_list[state][action][0] \
+                        if self._state_action_list[state][action][1] > self._n_e else self._r_plus
             except KeyError:
                 return self._r_plus
 
         try:
-            return self._state_action_list[(state, action)][0]
+            return self._state_action_list[state][action][0]
         except KeyError:
             return 0
 
@@ -91,8 +89,8 @@ class QAgent(Agent):
             state: the state for which MAX(Q) is returned.
         '''
         try:
-            max_q = max(self._q(sa[0], sa[1]) for sa in self._state_action_list
-                        if sa[0] == state)
+            max_q = max(self._q(s, a) for s in self._state_action_list for a in self._state_action_list[s]
+                        if s == state)
         except ValueError:
             max_q = 0
         return max_q
@@ -106,7 +104,7 @@ class QAgent(Agent):
             action: the action for which N is returned.
         '''
         try:
-            return self._state_action_list[(state, action)][1]
+            return self._state_action_list[state][action][1]
         except KeyError:
             return 0
 
@@ -173,8 +171,11 @@ class QAgent(Agent):
                 new_N = self._N(previous_state, previous_action) + 1
                 new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
 
-                self._state_action_list.update({
-                        (previous_state, previous_action): (new_q, new_N)})
+                try:
+                    self._state_action_list[previous_state].update({previous_action: (new_q, new_N)})
+                except KeyError:
+                    self._state_action_list.update({previous_state: {previous_action: (new_q, new_N)}})
+
                 previous_state = state
 
             return
@@ -196,9 +197,10 @@ class QAgent(Agent):
         new_N = self._N(self._previous_state, self._previous_action) + 1
         new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
 
-        self._state_action_list.update({
-                (self._previous_state, self._previous_action):
-                (new_q, new_N)})
+        try:
+            self._state_action_list[self._previous_state].update({self._previous_action: (new_q, new_N)})
+        except KeyError:
+            self._state_action_list.update({self._previous_state: {self._previous_action: (new_q, new_N)}})
 
     def reset(self):
         '''
@@ -223,27 +225,39 @@ class QAgent(Agent):
             return
 
         if item.lower() == 'states q':
-            rep = dict((sa[0],) for sa in kwargs['data']['_state_action_list'])
-            for sa, qn in kwargs['data']['_state_action_list'].item():
-
-            rep = dict((sa[0], max(sa[0])) for sa in kwargs['data']['_state_action_list'])
-        if item.lower() == 'states action':
+            data = kwargs['data']['_state_action_list']
             rep = {}
-            all_states = set(sa[0] for sa in kwargs['data']['_state_action_list'])
+            for state in data:
+                rep[state] = max(data[state][action][0] for action in data[state])
+
+        if item.lower() == 'states action':
+            data = kwargs['data']['_state_action_list']
+            rep = {}
+            all_states = list(s for s in data)
             for state in all_states:
-                action_q = ((sa[1], self._q(sa[0], sa[1]))
-                            for sa in kwargs['data']['_state_action_list'] if sa[0] == state)
+                action_q = ((action, data[state][action][0])
+                            for action in data[state])
                 action = max(action_q, key=lambda x: x[1])
                 rep[state] = action
-        if item.lower() == 'state-actions q':
-            rep = dict(((sa[0], sa[1]), self._q(sa[0], sa[1])) for sa in kwargs['data']['_state_action_list'])
-        if item.lower() == 'state-actions n':
-            rep = dict(((sa[0], sa[1]), self._N(sa[0], sa[1])) for sa in kwargs['data']['_state_action_list'])
 
+        if item.lower() == 'state-actions q':
+            data = kwargs['data']['_state_action_list']
+            rep = dict(((state, action), data[state][action][0])
+                        for state in data for action in data[state])
+
+        if item.lower() == 'state-actions n':
+            data = kwargs['data']['_state_action_list']
+            rep = dict(((state, action), data[state][action][1])
+                        for state in data for action in data[state])
 
         if item.lower() == 'diff-q':
+            new = kwargs['new']['_state_action_list']
+            old = kwargs['old']['_state_action_list']
             rep = 0
-            for i in set(list(kwargs['new']['_state_action_list'].keys())+list(kwargs['old']['_state_action_list'].keys())):
-                rep += abs(kwargs['new']['_state_action_list'].get(i, (0, ))[0] - kwargs['old']['_state_action_list'].get(i, (0, ))[0])
+            state_list = set(list(new.keys()) + list(old.keys()))
+            for s in state_list:
+                action_list = set(list(new.get(s, {}).keys()) + list(old.get(s, {}).keys()))
+                for a in action_list:
+                    rep += abs(new.get(s, {}).get(a, (0, ))[0] - old.get(s, {}).get(a, (0, ))[0])
 
         return rep

@@ -9,6 +9,7 @@ The base class for data collection in reinforcement learning
 '''
 
 from pickle import load, dump, HIGHEST_PROTOCOL
+from copy import deepcopy
 
 
 def main():
@@ -189,11 +190,11 @@ class DataCollector():
                 for arg in arguments:
                     temp = temp.__dict__[arg]
                 try:
-                    self._data[s][variable] = temp.copy()
+                    self._data[s][variable] = deepcopy(temp)
                     # self._data[s] = dict((variable, self._object.__dict__[variable].copy()) 
                     #                                 for variable in self._available_statistics[s][2:])
                 except AttributeError:
-                    self._data[s][variable] = temp
+                    self._data[s][variable] = deepcopy(temp)
                     # self._data[s] = dict((variable, self._object.__dict__[variable]) 
                     #                                 for variable in self._available_statistics[s][2:])
                 except KeyError:
@@ -258,7 +259,7 @@ class DataCollector():
                 except KeyError:
                     raise KeyError('statistics are not specified.')
 
-        old_data = self._data.copy()
+        old_data = deepcopy(self._data)
         self.collect(statistics=stats)
 
         results = {}

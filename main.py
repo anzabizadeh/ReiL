@@ -91,18 +91,18 @@ def windy():
         subjects = {}
 
         # define subjects and agents
-        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        subjects['Board Q'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
-                                            h_wind=[0]*7, v_wind=[0, 0, 0, -1, -1, -1, -2, -2, -1, 0])
-        # agents['TD'] = TD0Agent(gamma=0.9, alpha=0.2, epsilon=0.1)
-        # subjects['Board TD'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
+        # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        # subjects['Board Q'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
         #                                     h_wind=[0]*7, v_wind=[0, 0, 0, -1, -1, -1, -2, -2, -1, 0])
+        agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.2)
+        subjects['Board TD'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
+                                            h_wind=[0]*7, v_wind=[0, 0, 0, -1, -1, -1, -2, -2, -1, 0])
         # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
         # subjects['Board ANN'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
         #                                        h_wind=[0]*7, v_wind=[0, 0, 0, -1, -1, -1, -2, -2, -1, 0])
 
         # assign agents to subjects
-        assignment = [('Q', 'Board Q')]  # ('TD', 'Board TD'), ('Q', 'Board Q'), ('ANN', 'Board ANN')
+        assignment = [('TD', 'Board TD')]  # ('TD', 'Board TD'), ('Q', 'Board Q'), ('ANN', 'Board ANN')
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -112,35 +112,33 @@ def windy():
     runs = 100
     training_episodes = 5
     test_episodes = 1
-    results = {'Q': []}
+    results = {'TD': []}
     steps1, steps2 = 0, 0
-    agents['Q'].data_collector.start()
+    agents['TD'].data_collector.start()
     for i in range(runs):
         # run and collect statistics
-        agents['Q'].data_collector.collect(statistic=['diff-q'])
+        agents['TD'].data_collector.collect(statistic=['diff-q'])
         steps1 = env.elapse(episodes=training_episodes, reset='all', step_count='yes',
                             termination='all', learning_method='every step')
         # if steps1 < 200:
         #     print('testing')
         # steps2 = env.elapse(episodes=test_episodes, reset='all',
         #                     termination='all', learning_method='none', step_count='yes')
-        results['Q'].append(agents['Q'].data_collector.report(statistic=['diff-q'])['diff-q'])
+        results['TD'].append(agents['TD'].data_collector.report(statistic=['diff-q'])['diff-q'])
 
         # print result of each run
-        print('{}: {} {: 3.10f}'.format(i, steps1, results['Q'][-1]))
-
-        # print('run {: }: training steps: {: 2.2f} testing steps: {: 2.2f}'.format(i, steps1, steps2))
+        print('{}: {} {: 3.10f}'.format(i, steps1, results['TD'][-1]))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
     # env.save(filename=filename)
 
-    policy = agents['Q'].data_collector.report(statistic=['states action'])['states action']
-    for state in policy.keys():
+    policy = agents['TD'].data_collector.report(statistic=['states action'])['states action']
+    for state in sorted(policy.keys()):
         print(state.value, policy[state][0].value, policy[state][1])
 
-    x = list(range(len(results['Q'])))
-    plt.plot(x, results['Q'], 'b')
-    plt.axis([0, len(x), 0, max(results['Q'])])
+    x = list(range(len(results['TD'])))
+    plt.plot(x, results['TD'], 'b')
+    plt.axis([0, len(x), 0, max(results['TD'])])
     plt.show()
 
 if __name__ == '__main__':
