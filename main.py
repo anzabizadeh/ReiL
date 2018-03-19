@@ -90,7 +90,6 @@ def windy():
         agents = {}
         subjects = {}
 
-<<<<<<< HEAD
         active_agent_name = 'ANN'
         # define subjects
         # subjects['Board Q'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
@@ -109,21 +108,6 @@ def windy():
 
         # assign agents to subjects
         assignment = [('ANN', 'Board ANN')] # ('Q', 'Board Q'), ('TD', 'Board TD')
-=======
-        # define subjects and agents
-        # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        # subjects['Board Q'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
-        #                                     h_wind=[0]*7, v_wind=[0, 0, 0, -1, -1, -1, -2, -2, -1, 0])
-        agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.2)
-        subjects['Board TD'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
-                                            h_wind=[0]*7, v_wind=[0, 0, 0, -1, -1, -1, -2, -2, -1, 0])
-        # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
-        # subjects['Board ANN'] = WindyGridworld(dim=(7, 10), start=(3, 0), goal=(3, 7), move_pattern='R',
-        #                                        h_wind=[0]*7, v_wind=[0, 0, 0, -1, -1, -1, -2, -2, -1, 0])
-
-        # assign agents to subjects
-        assignment = [('TD', 'Board TD')]  # ('TD', 'Board TD'), ('Q', 'Board Q'), ('ANN', 'Board ANN')
->>>>>>> e697789e96a035ceb8822c367ad47388e0f1b742
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -131,15 +115,9 @@ def windy():
 
     # set experiment variables
     runs = 100
-<<<<<<< HEAD
     training_episodes = 1
     test_episodes = 1
     results = {active_agent_name: []}
-=======
-    training_episodes = 5
-    test_episodes = 1
-    results = {'TD': []}
->>>>>>> e697789e96a035ceb8822c367ad47388e0f1b742
     steps1, steps2 = 0, 0
     agents['TD'].data_collector.start()
     for i in range(runs):
@@ -151,11 +129,7 @@ def windy():
         #     print('testing')
         # steps2 = env.elapse(episodes=test_episodes, reset='all',
         #                     termination='all', learning_method='none', step_count='yes')
-<<<<<<< HEAD
         results[active_agent_name].append(steps1)
-=======
-        results['TD'].append(agents['TD'].data_collector.report(statistic=['diff-q'])['diff-q'])
->>>>>>> e697789e96a035ceb8822c367ad47388e0f1b742
 
         # print result of each run
         print('{}: {} {: 3.10f}'.format(i, steps1, results['TD'][-1]))
@@ -167,15 +141,9 @@ def windy():
     for state in sorted(policy.keys()):
         print(state.value, policy[state][0].value, policy[state][1])
 
-<<<<<<< HEAD
     x = list(range(len(results[active_agent_name])))
     plt.plot(x, results[active_agent_name], 'b')
     plt.axis([0, len(x), 0, max(results[active_agent_name])])
-=======
-    x = list(range(len(results['TD'])))
-    plt.plot(x, results['TD'], 'b')
-    plt.axis([0, len(x), 0, max(results['TD'])])
->>>>>>> e697789e96a035ceb8822c367ad47388e0f1b742
     plt.show()
 
 if __name__ == '__main__':
