@@ -71,9 +71,13 @@ class WindyGridworld(MNKBoard, Subject):
             self._h_wind, self._v_wind = [0]*5, [0]*5
 
         if self._move_pattern.upper() == 'Q':
-            self._default_moves = ValueSet('U', 'D', 'R', 'L', 'UR', 'UL', 'DR', 'DL').as_valueset_array()
+            moves = ['U', 'D', 'R', 'L', 'UR', 'UL', 'DR', 'DL']
         elif self._move_pattern.upper() == 'R':
-            self._default_moves = ValueSet('U', 'D', 'R', 'L').as_valueset_array()
+            moves = ['U', 'D', 'R', 'L']
+
+        vs = ValueSet(*moves)
+        vs.set_function(binary=lambda x:(moves.index(x), len(moves)))
+        self._default_moves = vs.as_valueset_array()
 
         MNKBoard.__init__(self, m=self._dim[0], n=self._dim[1], players=1)
         self.reset()
@@ -86,7 +90,9 @@ class WindyGridworld(MNKBoard, Subject):
     @property
     def state(self):
         '''Return the state of the board as a ValueSet.'''
-        return(ValueSet(*self._player_location))
+        s = ValueSet(self._player_location)
+        s.set_function(binary=lambda x: (x[0]*self._dim[1] + x[1], len(self._board)))
+        return s
 
     @property
     def possible_actions(self):

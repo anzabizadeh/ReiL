@@ -188,7 +188,7 @@ class DataCollector():
                 arguments = variable.split('.')
                 temp = self._object
                 for arg in arguments:
-                    temp = temp.__dict__[arg]
+                    temp = deepcopy(temp.__dict__[arg])
                 try:
                     self._data[s][variable] = deepcopy(temp)
                     # self._data[s] = dict((variable, self._object.__dict__[variable].copy()) 

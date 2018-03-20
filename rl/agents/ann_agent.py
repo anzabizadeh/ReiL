@@ -85,7 +85,7 @@ class ANNAgent(Agent):
         '''
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0, default_actions={},
-                           solver='lbfgs', hidden_layer_sizes=(10,), max_iter=1, random_state=None)
+                           solver='sgd', hidden_layer_sizes=(10,), max_iter=1, random_state=None)
         Agent.set_params(self, **kwargs)
         self.data_collector.available_statistics = {'diff-coef': [True, self.__report, '_clf.coefs_']}
         self.data_collector.active_statistics = ['diff-coef']
@@ -95,12 +95,11 @@ class ANNAgent(Agent):
         if False:
             self._gamma, self._alpha, self._epsilon = 1, 1e-5, 0
             self._default_actions = {}
-            self._solver, self._hidden_layer_sizes, self._max_iter, self._random_state='lbfgs', (10,), 1, None
+            self._solver, self._hidden_layer_sizes, self._max_iter, self._random_state='sgd', (10,), 1, None
 
         self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha,
                                  hidden_layer_sizes=self._hidden_layer_sizes,
                                  random_state=self._random_state, max_iter=self._max_iter, warm_start=True)
-        # self._clf.coefs_
 
     def _q(self, state, action):
         '''
@@ -189,16 +188,33 @@ class ANNAgent(Agent):
         except KeyError:
             pass
 
-        # try:  # state
-        #     state = tuple(kwargs['state'])
-        # except TypeError:
-        #     state = tuple([kwargs['state']])
-        # except KeyError:
-        #     state = None
-        # try:  # reward
-        #     reward = kwargs['reward']
-        # except KeyError:
-        #     reward = None
+        try:  # state
+            state = kwargs['state']
+        except KeyError:
+            state = None
+        try:  # reward
+            reward = kwargs['reward']
+        except KeyError:
+            reward = None
+
+        q_sa = self._q(self._previous_state, self._previous_action)
+        max_q = self._max_q(state)
+        new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
+
+        state_action = np.append(self._previous_state.binary_representation().to_nparray(), 
+                                    self._previous_action.binary_representation().to_nparray())
+        X = state_action.reshape(1, -1)
+        y = np.array([new_q])
+        self._previous_state = state
+
+        # try:
+            # print(self._clf.coefs_)
+        #     print(self._clf.predict(X), end=' -> ')
+        # except:
+        #     pass
+        self._clf.fit(X, y)
+        # print(self._clf.predict(X))
+        # print(np.sum(self._clf.coefs_[i] for i in range(len(self._clf.coefs_))))
 
         # q_sa = self._q(self._previous_state, self._previous_action)
         # max_q = self._max_q(state)
@@ -219,7 +235,7 @@ class ANNAgent(Agent):
             state: the state for which an action is chosen.
             actions: a set of possible actions. If not provided, default actions are used.
         '''
-        self._previous_state = state.value
+        self._previous_state = state
         try:  # possible actions
             possible_actions = kwargs['actions']
         except KeyError:
