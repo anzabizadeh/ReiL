@@ -66,7 +66,7 @@ class Snake(MNKBoard, Subject):
     @property
     def possible_actions(self):
         '''Return the moves as ValueSet (left, none, right).'''
-        return ValueSet('left', 'none', 'right')
+        return ValueSet(['left', 'none', 'right'])
 
     def take_effect(self, _id, action):
         '''

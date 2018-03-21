@@ -26,7 +26,7 @@ def main():
 
     print('This is a simple game. a random number is generated and the agent should move left or right to get to target.')
 
-    action_set = ValueSet(-1, 0, 1).as_valueset_array()
+    action_set = ValueSet([-1, 0, 1]).as_valueset_array()
     sample_agent = ANNAgent(epsilon=0.1, hidden_layer_sizes=(100,), default_actions=action_set)
     sample_agent.status = 'training'
     state = ValueSet()
