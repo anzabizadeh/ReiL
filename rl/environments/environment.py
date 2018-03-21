@@ -57,7 +57,7 @@ class Environment(RLBase):
 
         RLBase.__init__(self, **kwargs)
         RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
-                           episodes=1, termination='any', reset='all',
+                           episodes=1, max_steps=10000, termination='any', reset='all',
                            learning_method='every step',
                            allow_user_to_halt=True, save_on_exit=True)
         RLBase.set_params(self, **kwargs)
@@ -68,7 +68,7 @@ class Environment(RLBase):
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
             self._agent, self._subject, self._assignment_list = {}, {}, {}
-            self._episodes = 1
+            self._episodes, self._max_steps = 1, 10000
             self._termination, self._reset, self._learning_method = 'any', 'all', 'every step'
 
     def add(self, **kwargs):
@@ -143,6 +143,7 @@ class Environment(RLBase):
         Arguments
         ---------
             episodes: number of episodes of run.
+            max_steps: maximum number of steps in each episode (Default = 10,000)
             termination: when to terminate one episode. (Default = 'any')
                 'any': terminate if any of the subjects is terminated.
                 'all': terminate if all the subjects are terminated.
@@ -168,6 +169,10 @@ class Environment(RLBase):
             episodes = kwargs['episodes']
         except KeyError:
             episodes = self._episodes
+        try:
+            max_steps = kwargs['max_steps']
+        except KeyError:
+            max_steps = self._max_steps
         # termination: 'any' (terminate by any subject being terminated)
         #              'all' (terminate only if all subjects are terminated)
         try:  # termination
@@ -229,7 +234,10 @@ class Environment(RLBase):
             for agent_name in self._agent:
                 history[agent_name] = []
             done = False
+            stopping_criterion = max_steps * (episode+1)
             while not done:
+                if steps >= stopping_criterion:
+                    break
                 steps += 1
                 for agent_name, agent in self._agent.items():
                     if not done:
@@ -240,6 +248,7 @@ class Environment(RLBase):
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
                                                printable=subject.printable())
+                            print('step: {: 4} episode: {:2} state: {} action: {}'.format(steps, episode, state, action))
                             reward = subject.take_effect(_id, action)
                             if reporting == 'all':
                                 report_string += '\n'+subject.printable()+'\n'

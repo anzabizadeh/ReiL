@@ -102,7 +102,8 @@ def windy():
         # define agents
         # agents['TD'] = TD0Agent(gamma=0.9, alpha=0.2, epsilon=0.1)
         # agents['Q'] = QAgent(gamma=0.9, alpha=0.2, epsilon=0.1)
-        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
+        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(70, 10, 4),
+                                 default_actions=subjects['Board ANN'].possible_actions)
         # agents['Opponent'] = QAgent()
         # agents['Opponent'].load(filename='mnk333_opponent')
 
@@ -115,31 +116,36 @@ def windy():
 
     # set experiment variables
     runs = 100
-    training_episodes = 1
+    training_episodes = 5
+    max_steps = 10000
     test_episodes = 1
     results = {active_agent_name: []}
     steps1, steps2 = 0, 0
-    agents['TD'].data_collector.start()
     for i in range(runs):
         # run and collect statistics
-        agents['TD'].data_collector.collect(statistic=['diff-q'])
-        steps1 = env.elapse(episodes=training_episodes, reset='all', step_count='yes',
+        if agents[active_agent_name].data_collector.is_active:
+            agents[active_agent_name].data_collector.collect(statistic=['diff-coef'])
+
+        steps1 = env.elapse(episodes=training_episodes, max_steps=max_steps, reset='all', step_count='yes',
                             termination='all', learning_method='every step')
         # if steps1 < 200:
         #     print('testing')
-        # steps2 = env.elapse(episodes=test_episodes, reset='all',
+        # steps2 = env.elapse(episodes=test_episodes, max_steps=1000, reset='all',
         #                     termination='all', learning_method='none', step_count='yes')
-        results[active_agent_name].append(steps1)
+        if not agents[active_agent_name].data_collector.is_active:
+            agents[active_agent_name].data_collector.start()
+        else:
+            results[active_agent_name].append(agents[active_agent_name].data_collector.report(statistic=['diff-coef'])['diff-coef'])
 
-        # print result of each run
-        print('{}: {} {: 3.10f}'.format(i, steps1, results['TD'][-1]))
+            # print result of each run
+            print('{}: {} {: 3.10f}'.format(i, steps2, results[active_agent_name][-1]))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
     # env.save(filename=filename)
 
-    policy = agents['TD'].data_collector.report(statistic=['states action'])['states action']
-    for state in sorted(policy.keys()):
-        print(state.value, policy[state][0].value, policy[state][1])
+    # policy = agents[active_agent_name].data_collector.report(statistic=['states action'])['states action']
+    # for state in sorted(policy.keys()):
+    #     print(state.value, policy[state][0].value, policy[state][1])
 
     x = list(range(len(results[active_agent_name])))
     plt.plot(x, results[active_agent_name], 'b')

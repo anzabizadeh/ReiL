@@ -114,10 +114,7 @@ class MNKBoard:
     @property
     def state(self):
         ''' Return the state of the board as a ValueSet.'''
-        s = ValueSet(*self._board)
-        s.min = 0
-        s.max = self._players
-        return s
+        return ValueSet(self._board, min=0, max=self._players)
 
     def get_board(self, format_='vector'):
         '''
