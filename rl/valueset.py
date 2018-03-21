@@ -16,7 +16,7 @@ def main():
     e = ValueSet()
     print(e.value, e.to_list(), e.to_nparray())
     # create a ValueSet with data and print binary representation and normalized versions:
-    s = ValueSet(1, 7, 10, 3)
+    s = ValueSet([1, 7, 10, 3], min=0, max=15)
     print('{}'.format(s))
     print([10, 3] in s)
     print('{}'.format(s.binary_representation()))
@@ -42,16 +42,40 @@ class ValueSet():
         binary_representation: return the value as a zero-one vector
         normalizer: normalize the value
     '''
-    def __init__(self, *args):
-        self.value = args
-        if not self.value:
-            self._min = None
-            self._max = None
-        elif self._one_type:
-            self._min = min(self.value)
-            self._max = max(self.value)
-        self._normalizer_function = None
-        self._binary_function = None
+    def __init__(self, value=[], **kwargs):
+        '''
+        Initialize a ValueSet.
+
+        Arguments:
+            value: the value to be stored.
+            min: minimum possible value (if not supplied, min is calculated from the data).
+            max: maximum possible value (if not supplied, max is calculated from the data).
+            normalizer: the function with which the value should be normalized (Default=None).
+            binary: the function with which the value should be turned into a zero-one vector (Default=None).
+        '''
+        self.value = value
+        try:
+            self._min = kwargs['min']
+        except KeyError:
+            if not self.value:
+                self._min = None
+            else:
+                self._min = min(self.value)
+        try:
+            self._max = kwargs['max']
+        except KeyError:
+            if not self.value:
+                self._max = None
+            else:
+                self._max = max(self.value)
+        try:
+            self._normalizer_function = kwargs['normalizer']
+        except KeyError:
+            self._normalizer_function = None
+        try:
+            self._binary_function = kwargs['binary']
+        except KeyError:
+            self._binary_function = None
 
     @property
     def value(self):
@@ -205,7 +229,7 @@ class ValueSet():
             if self._binary_function is None:
                 raise RuntimeError('Failed to automatically convert to binary representation.\n Use set_function to provide custom function.')
 
-        return ValueSet(*bin_rep)
+        return ValueSet(bin_rep)
 
     def normalizer(self, lower_bound=0, upper_bound=1):
         '''
@@ -222,7 +246,7 @@ class ValueSet():
             raise ValueError('lower_bound should be less than upper_bound!')
         factor = (upper_bound - lower_bound)/(self.max - self.min)
         normal = ((factor * (v - self.min) + lower_bound) for v in self.value)
-        return ValueSet(*list(normal))
+        return ValueSet(list(normal))
 
     def set_function(self, normalizer=None, binary=None):
         '''
