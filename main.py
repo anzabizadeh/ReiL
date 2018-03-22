@@ -115,7 +115,7 @@ def windy():
         env.assign(assignment)
 
     # set experiment variables
-    runs = 100
+    runs = 1
     training_episodes = 5
     max_steps = 10000
     test_episodes = 1

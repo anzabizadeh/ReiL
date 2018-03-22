@@ -21,6 +21,19 @@ def main():
     print([10, 3] in s)
     print('{}'.format(s.binary_representation()))
     print('{:2.2} {}'.format(s.normalizer(0, 1), s.to_nparray()))
+    directions = ['U', 'D', 'L', 'R']
+    t = ValueSet(directions, binary=lambda x: (directions.index(x), len(directions)))
+    print('{}, {}'.format(t, t.binary_representation()))
+    def convert(x, directions = ['U', 'D', 'L', 'R']):
+        bin_rep = [0]*(len(directions)-1)
+        for value in x:
+            index = directions.index(value)
+            if index != 0:
+                bin_rep[index-1] = 1
+        return bin_rep
+
+    t = ValueSet(directions, binary=convert)
+    print('{}, {}'.format(t, t.binary_representation()))
     array = s.as_valueset_array()
     for a in array:
         print(a.value, a.max, a.min)
@@ -210,21 +223,28 @@ class ValueSet():
         if self._binary_function is not None:
             bin_rep = []
             for i in range(len(self.value)):
-                (index, length) = self._binary_function(self.value[i])
-                if length>len(bin_rep):
-                    bin_rep = bin_rep + [0]*(length-len(bin_rep))    
-                bin_rep[index] = 1
-            return ValueSet(*bin_rep)
+                temp = self._binary_function(self.value[i])
+                if (min(temp) == 0) & (max(temp) <= 1):  # whether the function returns the list or index, length pair
+                    bin_rep = bin_rep + temp
+                else:
+                    index, length = temp
+                    temp = [0]*(length-1)
+                    if index != 0:
+                        temp[index-1] = 1  # for n categories, we need n-1 bins.
+                    bin_rep = bin_rep + temp 
+            return ValueSet(bin_rep)
 
         if not self._enumerable:
             raise TypeError('The type of data doesn\'t allow binary representation!')
         if not self._one_type:
             raise TypeError('Mixed data doesn\'t allow binary representation!')
         try:
-            data_range = self.max - self.min + 1
+            data_range = self.max - self.min  # for n categories, we need n-1 bins.
             bin_rep = [0]*data_range*len(self.value)
             for i in range(len(self.value)):
-                bin_rep[(self.value[i]-self.min)+(i*data_range)] = 1
+                index = (self.value[i]-self.min) + (i*data_range) - 1
+                if index != 0:
+                    bin_rep[index] = 1
         except TypeError:
             if self._binary_function is None:
                 raise RuntimeError('Failed to automatically convert to binary representation.\n Use set_function to provide custom function.')

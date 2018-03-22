@@ -63,14 +63,49 @@
 # print(s.getvalue())
 
 
-import copy
+# import copy
 
-mylist = {'a1': {'a11': 10, 'a12': 20}, 'b1': {'a12': 30, 'z': 40}}
+# mylist = {'a1': {'a11': 10, 'a12': 20}, 'b1': {'a12': 30, 'z': 40}}
 
-mylist_copy = copy.deepcopy(mylist)
-print(mylist_copy)
-print(mylist)
+# mylist_copy = copy.deepcopy(mylist)
+# print(mylist_copy)
+# print(mylist)
 
-mylist['b1'].update({'z': 100000})
-print(mylist_copy)
-print(mylist)
+# mylist['b1'].update({'z': 100000})
+# print(mylist_copy)
+# print(mylist)
+
+#!/usr/bin/env python
+#
+# $Id$
+#
+# somebody should probably check the randrange()s...
+
+import curses
+
+from curses import wrapper
+
+def main(stdscr):
+    # Clear screen
+    stdscr.clear()
+
+    # This raises ZeroDivisionError when i == 10.
+    for i in range(0, 11):
+        v = i-10
+        stdscr.addstr(i, 0, '10 divided by {} is {}'.format(v, 10/v))
+
+    stdscr.refresh()
+    stdscr.getkey()
+
+wrapper(main)
+# stdscr = curses.initscr()
+# curses.noecho()
+# curses.cbreak()
+# stdscr.keypad(True)
+
+# begin_x = 20; begin_y = 7
+# height = 5; width = 40
+# win = curses.newwin(height, width, begin_y, begin_x)
+
+# curses.nocbreak(); stdscr.keypad(False); curses.echo()
+# curses.endwin()
