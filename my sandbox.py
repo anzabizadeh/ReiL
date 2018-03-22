@@ -1,3 +1,6 @@
+'''
+Learning signal (for intrrupt)
+'''
 # import signal
 # import sys
 # def signal_handler(signal, frame):
@@ -10,6 +13,10 @@
 #     i+=1
 #     print(i)
 
+
+'''
+Learning Profiling
+'''
 # import timeit
 
 # test1 = {'a1': {'a11': 10, 'a12': 20}, 'b1': {'a12': 1000, 'z': 5}}
@@ -63,49 +70,38 @@
 # print(s.getvalue())
 
 
-# import copy
 
-# mylist = {'a1': {'a11': 10, 'a12': 20}, 'b1': {'a12': 30, 'z': 40}}
+'''
+Learning Neural Networks!
+'''
+# import random as rand
+# import numpy as np
+# from sklearn import exceptions
+# from sklearn.neural_network import MLPRegressor
 
-# mylist_copy = copy.deepcopy(mylist)
-# print(mylist_copy)
-# print(mylist)
+# clf_warm = MLPRegressor(solver='lbfgs', alpha=0.1, hidden_layer_sizes=(10, 5), max_iter=2, warm_start=True)
+# # clf_cold = MLPRegressor(solver='lbfgs', alpha=0.1, hidden_layer_sizes=(10,), max_iter=1, warm_start=False)
 
-# mylist['b1'].update({'z': 100000})
-# print(mylist_copy)
-# print(mylist)
+# def f(x):
+#     value = list(i ** 2 for i in x)
+#     return np.sum(value, axis=1)
 
-#!/usr/bin/env python
-#
-# $Id$
-#
-# somebody should probably check the randrange()s...
+# print('training')
+# for _ in range(5000):
+#     X = np.array([[rand.randint(0, 10) for _ in range(3)] for _ in range(5)])
+#     Y = np.array(f(X))
+#     # clf_cold.fit(X, Y)
+#     clf_warm.fit(X, Y)
+#     # Y_cold = clf_cold.predict(X)
+#     # Y_warm = clf_warm.predict(X)
+#     # print((Y-Y_warm)/Y, end=', ')
 
-import curses
-
-from curses import wrapper
-
-def main(stdscr):
-    # Clear screen
-    stdscr.clear()
-
-    # This raises ZeroDivisionError when i == 10.
-    for i in range(0, 11):
-        v = i-10
-        stdscr.addstr(i, 0, '10 divided by {} is {}'.format(v, 10/v))
-
-    stdscr.refresh()
-    stdscr.getkey()
-
-wrapper(main)
-# stdscr = curses.initscr()
-# curses.noecho()
-# curses.cbreak()
-# stdscr.keypad(True)
-
-# begin_x = 20; begin_y = 7
-# height = 5; width = 40
-# win = curses.newwin(height, width, begin_y, begin_x)
-
-# curses.nocbreak(); stdscr.keypad(False); curses.echo()
-# curses.endwin()
+# print('\ntesting')
+# for _ in range(10):
+#     X = np.array([[rand.randint(0, 10) for _ in range(3)]])
+#     Y = np.array([f(X)])
+#     # clf_cold.fit(X, Y)
+#     # clf_warm.fit(X, Y)
+#     # Y_cold = clf_cold.predict(X)
+#     Y_warm = clf_warm.predict(X)
+#     print(Y, Y_warm, (Y-Y_warm)/Y)
