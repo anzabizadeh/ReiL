@@ -46,11 +46,11 @@ class QAgent(Agent):
         Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, r_plus=0, n_e=0,
                            default_actions=ValueSet(), state_action_list={})
         Agent.set_params(self, **kwargs)
-        self.data_collector.available_statistics = {'states q': [False, self.__report, '_state_action_list'],
-                                                    'states action': [False, self.__report, '_state_action_list'],
-                                                    'state-actions q': [False, self.__report, '_state_action_list'],
-                                                    'state-actions n': [False, self.__report, '_state_action_list'],
-                                                    'diff-q': [True, self.__report, '_state_action_list']}
+        self.data_collector.available_statistics = {'states q': [False, self._report, '_state_action_list'],
+                                                    'states action': [False, self._report, '_state_action_list'],
+                                                    'state-actions q': [False, self._report, '_state_action_list'],
+                                                    'state-actions n': [False, self._report, '_state_action_list'],
+                                                    'diff-q': [True, self._report, '_state_action_list']}
         self.data_collector.active_statistics = ['states q', 'states action', 'state-actions q', 'state-actions n', 'diff-q']
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -89,9 +89,8 @@ class QAgent(Agent):
             state: the state for which MAX(Q) is returned.
         '''
         try:
-            max_q = max(self._q(s, a) for s in self._state_action_list for a in self._state_action_list[s]
-                        if s == state)
-        except ValueError:
+            max_q = max(self._q(state, a) for a in self._state_action_list[state])
+        except (ValueError, KeyError):
             max_q = 0
         return max_q
 
@@ -211,7 +210,7 @@ class QAgent(Agent):
         self._previous_state = None
         self._previous_action = None
 
-    def __report(self, **kwargs):
+    def _report(self, **kwargs):
         '''
         generate and return the requested report.
 

@@ -87,7 +87,7 @@ class ANNAgent(Agent):
         Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0, default_actions={},
                            solver='sgd', hidden_layer_sizes=(10,), max_iter=1, random_state=None)
         Agent.set_params(self, **kwargs)
-        self.data_collector.available_statistics = {'diff-coef': [True, self.__report, '_clf.coefs_']}
+        self.data_collector.available_statistics = {'diff-coef': [True, self._report, '_clf.coefs_']}
         self.data_collector.active_statistics = ['diff-coef']
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -253,7 +253,7 @@ class ANNAgent(Agent):
         self._previous_action = action
         return action
 
-    def __report(self, **kwargs):
+    def _report(self, **kwargs):
         '''
         generate and return the requested report.
 

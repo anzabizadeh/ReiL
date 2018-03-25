@@ -7,7 +7,7 @@ Created on Mon Feb 19 15:47:46 2018
 
 import matplotlib.pyplot as plt
 
-from rl.agents import QAgent, TD0Agent, ANNAgent
+from rl.agents import QAgent, TD0Agent, ANNAgent, RandomAgent
 from rl.environments import Environment
 from rl.subjects import MNKGame, WindyGridworld
 
@@ -29,9 +29,11 @@ def mnk():
         # define agents
         # agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
         # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(20,))
+        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4))
         agents['Opponent'] = QAgent()
-        agents['Opponent'].load(filename='mnk333_opponent')
+        # test_agent = RandomAgent()
+        # agents['Opponent'] = QAgent()
+        # agents['Opponent'].load(filename='mnk333_opponent')
         # agents['Q'].report(items=['states action'])
         # assign agents to subjects
         assignment = [('ANN', 'Board A'), ('Opponent', 'Board A')]
@@ -41,42 +43,52 @@ def mnk():
         env.assign(assignment)
 
     # set experiment variables
-    runs = 50
-    training_episodes = 10
-    test_episodes = 10
-    results = {'ANN win': [], 'ANN lose': []}
+    runs = 100
+    training_episodes = 100
+    test_episodes = 0
+    results = {'ANN training win': [], 'ANN training draw': [], 'ANN training lose': [],
+               'ANN testing win': [], 'ANN testing draw': [], 'ANN testing lose': []}
     for i in range(runs):
         # run and collect statistics
 
-        if agents['ANN'].data_collector.is_active:
-            agents['ANN'].data_collector.collect()
+        # if agents['ANN'].data_collector.is_active:
+        #     agents['ANN'].data_collector.collect()
 
-        env.elapse(episodes=training_episodes, reset='all',
-                   termination='all', learning_method='history',
-                   reporting='none', tally='no')
-        if agents['ANN'].data_collector.is_active:
-            print(agents['ANN'].data_collector.report())
-        else:
-            agents['ANN'].data_collector.start()
+        tally1 = env.elapse(episodes=training_episodes, reset='all',
+                            termination='all', learning_method='history',
+                            reporting='none', tally='yes')
+        # if agents['ANN'].data_collector.is_active:
+        #     print(agents['ANN'].data_collector.report())
+        # else:
+        #     agents['ANN'].data_collector.start()
 
-        # tally = env.elapse(episodes=test_episodes, reset='all',
+        # switch agents for test
+        # temp = env._agent['Opponent']
+        # env._agent['Opponent'] = test_agent
+        # tally2 = env.elapse(episodes=test_episodes, reset='all',
         #                     termination='all', learning_method='none',
         #                     reporting='none', tally='yes')
+        # env._agent['Opponent'] = temp
 
-        # results['ANN win'].append(tally['ANN'])
-        # results['ANN lose'].append(tally['Opponent'])
+        results['ANN training win'].append(tally1['ANN'])
+        results['ANN training lose'].append(tally1['Opponent'])
+        results['ANN training draw'].append(training_episodes-tally1['ANN']-tally1['Opponent'])
+        results['ANN testing win'].append(0)  # tally2['ANN'])
+        results['ANN testing lose'].append(0)  # tally2['Opponent'])
+        results['ANN testing draw'].append(0)  # test_episodes-tally2['ANN']-tally2['Opponent'])
 
         # # print result of each run
-        # print('run {: }: win: {: } draw:{: } lose:{: }'
-        #       .format(i, results['ANN win'][-1], test_episodes-results['ANN win'][-1]-results['ANN lose'][-1], results['ANN lose'][-1]))
+        print('run {: }: TRAINING: win: {: } draw:{: } lose:{: } TESTING: win: {: } draw:{: } lose:{: }'
+              .format(i, results['ANN training win'][-1], results['ANN training draw'][-1], results['ANN training lose'][-1],
+                    results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
 
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
-        # env.save(filename=filename)
+        env.save(filename=filename)
 
-    x = list(range(len(results['ANN win'])))
-    plt.plot(x, results['ANN win'], 'b', x, results['ANN lose'], 'r')
-    plt.axis([0, len(x), 0, 1])
+    x = list(range(len(results['ANN training win'])))
+    plt.plot(x, results['ANN training win'], 'b', x, results['ANN training draw'], 'g', x, results['ANN training lose'], 'r')
+    plt.axis([0, len(x), 0, training_episodes])
     plt.show()
 
 def windy():
@@ -118,9 +130,10 @@ def windy():
     runs = 1
     training_episodes = 5
     max_steps = 10000
-    test_episodes = 1
+    # test_episodes = 1
     results = {active_agent_name: []}
-    steps1, steps2 = 0, 0
+    steps1 = 0
+    steps2 = 0
     for i in range(runs):
         # run and collect statistics
         if agents[active_agent_name].data_collector.is_active:
@@ -153,4 +166,4 @@ def windy():
     plt.show()
 
 if __name__ == '__main__':
-    windy()
+    mnk()

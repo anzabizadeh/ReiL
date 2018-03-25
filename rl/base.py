@@ -94,5 +94,5 @@ class RLBase():
         with open(filename + '.pkl', 'wb+') as f:
             dump(self.__dict__, f, HIGHEST_PROTOCOL)
 
-    def __report(self, **kwargs):
+    def _report(self, **kwargs):
         return

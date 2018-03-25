@@ -43,10 +43,10 @@ class TD0Agent(Agent):
         Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, default_actions=ValueSet(), state_action_list={})
         Agent.set_params(self, **kwargs)
 
-        self.data_collector.available_statistics = {'states q': [False, self.__report, '_state_action_list'],
-                                                    'states action': [False, self.__report, '_state_action_list'],
-                                                    'state-actions q': [False, self.__report, '_state_action_list'],
-                                                    'diff-q': [True, self.__report, '_state_action_list']}
+        self.data_collector.available_statistics = {'states q': [False, self._report, '_state_action_list'],
+                                                    'states action': [False, self._report, '_state_action_list'],
+                                                    'state-actions q': [False, self._report, '_state_action_list'],
+                                                    'diff-q': [True, self._report, '_state_action_list']}
         self.data_collector.active_statistics = ['states q', 'states action', 'state-actions q', 'diff-q']
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -164,7 +164,7 @@ class TD0Agent(Agent):
         self._previous_state = None
         self._previous_action = None
 
-    def __report(self, **kwargs):
+    def _report(self, **kwargs):
         '''
         generate and return the requested report.
 

@@ -248,7 +248,9 @@ class Environment(RLBase):
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
                                                printable=subject.printable())
-                            print('step: {: 4} episode: {:2} state: {} action: {}'.format(steps, episode, state, action))
+                            if reporting == 'all':
+                                print('step: {: 4} episode: {:2} state: {} action: {} by:{}'
+                                    .format(steps, episode, state, action, agent_name))
                             reward = subject.take_effect(_id, action)
                             if reporting == 'all':
                                 report_string += '\n'+subject.printable()+'\n'

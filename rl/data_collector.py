@@ -240,6 +240,9 @@ class DataCollector():
         Arguments
         ---------
             statistic: a list of statistics for which the data should be collected. (Default='all')
+            update_data: (Default=False)
+                True: update data after report
+                False: do not change old data
 
         Raises error if the data collector is not started or the expected attribute is not available in the object.
 
@@ -250,6 +253,7 @@ class DataCollector():
 
         if not kwargs:
             stats = self._active_statistics
+            update_data = False
         else:
             try:
                 stats = kwargs['statistics']
@@ -257,7 +261,11 @@ class DataCollector():
                 try:
                     stats = kwargs['statistic']
                 except KeyError:
-                    raise KeyError('statistics are not specified.')
+                    stats = self._active_statistics
+            try:
+                update_data = kwargs['update_data']
+            except KeyError:
+                update_data = False
 
         old_data = deepcopy(self._data)
         self.collect(statistics=stats)
@@ -272,7 +280,8 @@ class DataCollector():
             else:
                 results[s] = self._available_statistics[s][1](data=self._data[s], statistic=s)
         
-        self._data = old_data
+        if not update_data:
+            self._data = old_data
 
         return results
 
