@@ -48,7 +48,7 @@ def mnk():
 
     # set experiment variables
     runs = 100
-    training_episodes = 10
+    training_episodes = 100
     test_episodes = 0
     results = {'ANN training win': [], 'ANN training draw': [], 'ANN training lose': [],
                'ANN testing win': [], 'ANN testing draw': [], 'ANN testing lose': []}

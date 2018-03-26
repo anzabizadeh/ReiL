@@ -151,7 +151,7 @@ class PGAgent(Agent):
         y = np.array([], ndmin=2)
         try:  # history
             history = kwargs['history']
-            if history[-1]>0:
+            if history[-1]>=0:
                 previous_state = history[0]
                 for i in range(1, len(history), 3):
                     previous_action = history[i]
@@ -174,6 +174,32 @@ class PGAgent(Agent):
                 feed_dict = {self._inputs: X, self._labels: y}
                 train_step = self._sess.run(self._global_step)
                 self._sess.run(self._train_opt, feed_dict=feed_dict)
+            else:
+                # if my moves doesn't result in victory or draw, make all other moves more probable!
+                previous_state = history[0]
+                for i in range(1, len(history), 3):
+                    previous_action = history[i]
+                    # reward = history[i+1]
+                    try:
+                        state = history[i+2]
+                    except IndexError:
+                        state = None
+
+                    state_array = [previous_state.binary_representation().to_nparray()]*(len(self._default_actions)-1)
+                    action_array = list(range(len(self._default_actions)))
+                    action_array.remove(self._default_actions.index(previous_action))
+                    try:
+                        X = np.vstack((X, state_array))
+                        y = np.append(y, action_array)
+                    except ValueError:
+                        X = state_array
+                        y = action_array
+                    previous_state = state
+
+                feed_dict = {self._inputs: X, self._labels: y.reshape(-1, 1)}
+                train_step = self._sess.run(self._global_step)
+                self._sess.run(self._train_opt, feed_dict=feed_dict)
+
             return
         except KeyError:
             pass
@@ -187,24 +213,23 @@ class PGAgent(Agent):
         except KeyError:
             reward = None
 
-        
-        if reward>0:
-            state_array = previous_state.binary_representation().to_nparray()
-            action_array = previous_action.binary_representation().to_nparray()
+        if reward>=0:
+            state_array = self._previous_state.binary_representation().to_nparray()
+            action_array = self._previous_action.binary_representation().to_nparray()
             action_index = action_array.dot(1 << np.arange(action_array.size)[::-1])
             X = state_array.reshape(1, -1)
             y = np.array(action_index)
-            self._previous_state = state
-            # try:
-                # print(self._clf.coefs_)
-            #     print(self._clf.predict(X), end=' -> ')
-            # except:
-            #     pass
-            feed_dict = {self._inputs: X, self._labels: y}
-            train_step = self._sess.run(self._global_step)
-            self._sess.run(self._train_opt, feed_dict=feed_dict)
-            # print(self._clf.predict(X))
-            # print(np.sum(self._clf.coefs_[i] for i in range(len(self._clf.coefs_))))
+        else:
+            # if my moves doesn't result in victory or draw, make all other moves more probable!
+            state_array = [self._previous_state.binary_representation().to_nparray()]*(len(self._default_actions)-1)
+            action_array = list(range(len(self._default_actions)))
+            action_array.remove(self._default_actions.index(self._previous_action))
+            X = state_array
+            y = action_array
+
+        feed_dict = {self._inputs: X, self._labels: y}
+        train_step = self._sess.run(self._global_step)
+        self._sess.run(self._train_opt, feed_dict=feed_dict)
 
     def act(self, state, **kwargs):
         '''
@@ -225,7 +250,7 @@ class PGAgent(Agent):
         feed_dict = {self._inputs: X}
         action_index = np.argmax(self._sess.run(self._output, feed_dict=feed_dict))
         action = self._default_actions[action_index]
-        if (action not in self._default_actions) | \
+        if (action not in possible_actions) | \
             ((self._training_flag) & (random() < self._epsilon)):
             action = choice(possible_actions)
 
