@@ -99,7 +99,7 @@ class PGAgent(Agent):
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
             self._gamma, self._alpha, self._epsilon = 1, 1e-5, 0
-            self._default_actions = {}
+            self._default_actions = []
             self._solver, self._hidden_layer_sizes, self._max_iter, self._random_state='sgd', (10,), 1, None
 
 
