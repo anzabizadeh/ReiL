@@ -3,7 +3,7 @@
 ANNAgent class
 =================
 
-A Q-learning agent with Neural Network Q-function approximator
+A Policy Gradient agent with Neural Network action approximator
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
@@ -13,21 +13,21 @@ A Q-learning agent with Neural Network Q-function approximator
 # Implement NeuralAgent.
 
 import numpy as np
+import tensorflow as tf
 from random import choice, random
-from sklearn import exceptions
-from sklearn.neural_network import MLPRegressor
+import tensorflow as tf
 
 from rl.agents.agent import Agent
+from rl.valueset import ValueSet
 
 
 def main():
-    from rl.valueset import ValueSet
     from random import randint
 
     print('This is a simple game. a random number is generated and the agent should move left or right to get to target.')
 
     action_set = ValueSet([-1, 0, 1]).as_valueset_array()
-    sample_agent = ANNAgent(epsilon=0.1, hidden_layer_sizes=(100,), default_actions=action_set)
+    sample_agent = PGAgent(epsilon=0.1, hidden_layer_sizes=(100,), default_actions=action_set)
     sample_agent.status = 'training'
     state = ValueSet()
     state.min = 0
@@ -60,9 +60,9 @@ def main():
         print(sample_agent.act(state, method=''))
 
 
-class ANNAgent(Agent):
+class PGAgent(Agent):
     '''
-    A Q-learning agent with neural network Q-function approximator.
+    A policy gradient agent with neural network action approximator.
 
     Methods
     -------
@@ -72,7 +72,7 @@ class ANNAgent(Agent):
     '''
     def __init__(self, **kwargs):
         '''
-        Initialize a Q-Learning agent with neural network Q-function approximator.
+        Initialize a policy gradient-based agent.
 
         Arguments
         ---------
@@ -82,6 +82,7 @@ class ANNAgent(Agent):
             hidden_layer_sizes: tuple containintg hidden layer sizes
             random_state: random state. (Default = 1)
             default_actions: list of default actions
+            state_size: size of the state in its binary format (len(state.binary_representation()))
         '''
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0, default_actions={},
@@ -90,6 +91,10 @@ class ANNAgent(Agent):
         self.data_collector.available_statistics = {'diff-coef': [True, self._report, '_clf.coefs_']}
         self.data_collector.active_statistics = ['diff-coef']
 
+        self._input_length = kwargs['state_size']
+
+        self._generate_network()
+
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
@@ -97,41 +102,37 @@ class ANNAgent(Agent):
             self._default_actions = {}
             self._solver, self._hidden_layer_sizes, self._max_iter, self._random_state='sgd', (10,), 1, None
 
-        self._clf = MLPRegressor(solver=self._solver, alpha=self._alpha,
-                                 hidden_layer_sizes=self._hidden_layer_sizes,
-                                 random_state=self._random_state, max_iter=self._max_iter, warm_start=True)
 
-    def _q(self, state, action):
-        '''
-        Return the Q-value of a state action pair.
+    def _generate_network(self):
+        self._graph = tf.Graph()
+        with self._graph.as_default():
+            self._sess = tf.Session(graph=self._graph)
+            layer = [0]*(len(self._hidden_layer_sizes)+1)
+            self._inputs = tf.placeholder(tf.float32, [None, self._input_length], name='inputs')
+            layer[0] = self._inputs
+            for i, v in enumerate(self._hidden_layer_sizes):
+                layer[i+1] = tf.layers.dense(layer[i], v, activation=tf.nn.relu)
 
-        Arguments
-        ---------
-            state: the state for which Q-value is returned.
-            action: the action for which Q-value is returned.
-        '''
-        X = np.append(state.binary_representation().to_nparray(), action.binary_representation().to_nparray())
-        X = X.reshape(1, -1)
-        try:
-            result = self._clf.predict(X)
-            # print(result, end=' ')
-            return result
-        except exceptions.NotFittedError:
-            return 0
+            self._output = tf.layers.dense(layer[-1], len(self._default_actions))
 
-    def _max_q(self, state):
-        '''
-        Return MAX(Q) of a state.
-        
-        Arguments
-        ---------
-            state: the state for which MAX(Q) is returned.
-        '''
-        try:
-            max_q = max(self._q(state, action) for action in self._default_actions)
-        except ValueError:
-            max_q = 0
-        return max_q
+            self._labels = tf.placeholder(tf.int32, [None, 1], name='labels')
+            self._loss = tf.losses.sparse_softmax_cross_entropy(labels=self._labels, logits=self._output)
+            self._global_step = tf.Variable(0, trainable=False, name="step")
+            self._train_opt = tf.train.AdamOptimizer(learning_rate=self._alpha) \
+                .minimize(self._loss, global_step=self._global_step)
+
+            # log_writer = tf.summary.FileWriter("logs/" + str(time()))
+            # log_writer.add_graph(self._sess.graph)
+            # tf.summary.scalar("MSE_Loss", loss)
+
+            # merged = tf.summary.merge_all()
+
+            init = tf.global_variables_initializer()
+            self._sess.run(init)
+
+            # self._clf = MLPClassifier(solver=self._solver, alpha=self._alpha,
+            #                       hidden_layer_sizes=self._hidden_layer_sizes,
+            #                       random_state=self._random_state, max_iter=self._max_iter, warm_start=True)
 
     def learn(self, **kwargs):
         '''
@@ -150,40 +151,29 @@ class ANNAgent(Agent):
         y = np.array([], ndmin=2)
         try:  # history
             history = kwargs['history']
-            previous_state = history[0]
-            for i in range(1, len(history), 3):
-                previous_action = history[i]
-                reward = history[i+1]
-                q_sa = self._q(previous_state, previous_action)
-                try:
-                    state = history[i+2]
-                    max_q = self._max_q(state)
-                    new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
-                except IndexError:
-                    new_q = reward
-                    # new_q = q_sa + self._alpha*(reward-q_sa)
-                state_action = np.append(previous_state.binary_representation().to_nparray(), previous_action.binary_representation().to_nparray())
-                try:
-                    X = np.vstack((X, state_action))
-                    y = np.append(y, new_q)
-                except ValueError:
-                    X = state_action
-                    y = np.array([new_q])
-                previous_state = state
+            if history[-1]>0:
+                previous_state = history[0]
+                for i in range(1, len(history), 3):
+                    previous_action = history[i]
+                    # reward = history[i+1]
+                    try:
+                        state = history[i+2]
+                    except IndexError:
+                        state = None
 
-            # try:
-            #     old_q = self._clf.predict(X)
-            #     old_coef = self._clf.coefs_
-            #     self._clf.fit(X, y)
-            #     print('before training:')
-            #     print(old_coef)
-            #     print('after training:')
-            #     print(self._clf.coefs_)
-            #     # diff_q = old_q - self._clf.predict(X)
-            #     # print('{: 2.2f}'.format(sum(diff_q)), end='\t')
-            # except AttributeError:
-            self._clf.fit(X, y)
+                    state_array = previous_state.binary_representation().to_nparray()
+                    action_array = self._default_actions.index(previous_action)
+                    try:
+                        X = np.vstack((X, state_array))
+                        y = np.vstack((y, action_array))
+                    except ValueError:
+                        X = state_array
+                        y = action_array
+                    previous_state = state
 
+                feed_dict = {self._inputs: X, self._labels: y}
+                train_step = self._sess.run(self._global_step)
+                self._sess.run(self._train_opt, feed_dict=feed_dict)
             return
         except KeyError:
             pass
@@ -197,34 +187,24 @@ class ANNAgent(Agent):
         except KeyError:
             reward = None
 
-        q_sa = self._q(self._previous_state, self._previous_action)
-        max_q = self._max_q(state)
-        new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
-
-        state_action = np.append(self._previous_state.binary_representation().to_nparray(), 
-                                    self._previous_action.binary_representation().to_nparray())
-        X = state_action.reshape(1, -1)
-        y = np.array([new_q])
-        self._previous_state = state
-
-        # try:
-            # print(self._clf.coefs_)
-        #     print(self._clf.predict(X), end=' -> ')
-        # except:
-        #     pass
-        self._clf.fit(X, y)
-        # print(self._clf.predict(X))
-        # print(np.sum(self._clf.coefs_[i] for i in range(len(self._clf.coefs_))))
-
-        # q_sa = self._q(self._previous_state, self._previous_action)
-        # max_q = self._max_q(state)
-
-        # new_N = self._N(self._previous_state, self._previous_action) + 1
-        # new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
-
-        # self._state_action_list.update({
-        #         (self._previous_state, self._previous_action):
-        #         (new_q, new_N)})
+        
+        if reward>0:
+            state_array = previous_state.binary_representation().to_nparray()
+            action_array = previous_action.binary_representation().to_nparray()
+            action_index = action_array.dot(1 << np.arange(action_array.size)[::-1])
+            X = state_array.reshape(1, -1)
+            y = np.array(action_index)
+            self._previous_state = state
+            # try:
+                # print(self._clf.coefs_)
+            #     print(self._clf.predict(X), end=' -> ')
+            # except:
+            #     pass
+            feed_dict = {self._inputs: X, self._labels: y}
+            train_step = self._sess.run(self._global_step)
+            self._sess.run(self._train_opt, feed_dict=feed_dict)
+            # print(self._clf.predict(X))
+            # print(np.sum(self._clf.coefs_[i] for i in range(len(self._clf.coefs_))))
 
     def act(self, state, **kwargs):
         '''
@@ -241,15 +221,14 @@ class ANNAgent(Agent):
         except KeyError:
             possible_actions = self._default_actions
 
-
-        if (self._training_flag) & (random() < self._epsilon):
+        X = state.binary_representation().to_nparray().reshape(1, -1)
+        feed_dict = {self._inputs: X}
+        action_index = np.argmax(self._sess.run(self._output, feed_dict=feed_dict))
+        action = self._default_actions[action_index]
+        if (action not in self._default_actions) | \
+            ((self._training_flag) & (random() < self._epsilon)):
             action = choice(possible_actions)
-        else:
-            action_q = ((action, self._q(state, action))
-                        for action in possible_actions)
-            result = max(action_q, key=lambda x: x[1])
-            action = result[0]
-        # print(result)
+
         self._previous_action = action
         return action
 

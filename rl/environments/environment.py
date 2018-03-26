@@ -252,8 +252,8 @@ class Environment(RLBase):
                                 print('step: {: 4} episode: {:2} state: {} action: {} by:{}'
                                     .format(steps, episode, state, action, agent_name))
                             reward = subject.take_effect(_id, action)
-                            if reporting == 'all':
-                                report_string += '\n'+subject.printable()+'\n'
+                            # if reporting == 'all':
+                            #     report_string += '\n'+subject.printable()+'\n'
 
                             history[agent_name].append(state)
                             history[agent_name].append(action)
