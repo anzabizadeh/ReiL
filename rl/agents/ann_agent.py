@@ -76,7 +76,7 @@ class ANNAgent(Agent):
 
         Arguments
         ---------
-            solver: the solver method. (Default = 'lbfgs')
+            solver: the solver method. (Default = 'sgd')
             alpha: learning rate. (Default = 1e-5)
             gamma: discount factor. (Default = 1)
             hidden_layer_sizes: tuple containintg hidden layer sizes

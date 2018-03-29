@@ -7,7 +7,7 @@ Created on Mon Feb 19 15:47:46 2018
 
 import matplotlib.pyplot as plt
 
-from rl.agents import QAgent, TD0Agent, ANNAgent, RandomAgent
+from rl.agents import QAgent, TD0Agent, ANNAgent, RandomAgent, PGAgent
 from rl.environments import Environment
 from rl.subjects import MNKGame, WindyGridworld
 
@@ -25,18 +25,22 @@ def mnk():
 
         # define subjects
         subjects['Board A'] = MNKGame(m=3, n=3, k=3)
+        default_actions = subjects['Board A'].possible_actions
 
         # define agents
         # agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
         # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4))
-        agents['Opponent'] = QAgent()
+        # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4))
+        # agents['Opponent'] = QAgent()
+        agents['PG'] = PGAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4),
+                               default_actions=default_actions, state_size=len(subjects['Board A'].state.binary_representation()))
+        agents['Opponent'] = RandomAgent()
         # test_agent = RandomAgent()
         # agents['Opponent'] = QAgent()
         # agents['Opponent'].load(filename='mnk333_opponent')
         # agents['Q'].report(items=['states action'])
         # assign agents to subjects
-        assignment = [('ANN', 'Board A'), ('Opponent', 'Board A')]
+        assignment = [('PG', 'Board A'), ('Opponent', 'Board A')]
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -70,9 +74,9 @@ def mnk():
         #                     reporting='none', tally='yes')
         # env._agent['Opponent'] = temp
 
-        results['ANN training win'].append(tally1['ANN'])
+        results['ANN training win'].append(tally1['PG'])
         results['ANN training lose'].append(tally1['Opponent'])
-        results['ANN training draw'].append(training_episodes-tally1['ANN']-tally1['Opponent'])
+        results['ANN training draw'].append(training_episodes-tally1['PG']-tally1['Opponent'])
         results['ANN testing win'].append(0)  # tally2['ANN'])
         results['ANN testing lose'].append(0)  # tally2['Opponent'])
         results['ANN testing draw'].append(0)  # test_episodes-tally2['ANN']-tally2['Opponent'])
@@ -84,7 +88,7 @@ def mnk():
 
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
-        env.save(filename=filename)
+        # env.save(filename=filename)
 
     x = list(range(len(results['ANN training win'])))
     plt.plot(x, results['ANN training win'], 'b', x, results['ANN training draw'], 'g', x, results['ANN training lose'], 'r')

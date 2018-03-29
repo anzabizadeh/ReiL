@@ -1,4 +1,5 @@
 Git:
+list branches: git show-branch --list
 delete local (fully merged) branch: git branch -d branch_name
 delete local branch (force): git branch -D branch_name
 fetch with updating the list of branches: git fetch --all --prune

@@ -23,4 +23,5 @@ from .q_learning import QAgent
 from .random_agent import RandomAgent
 from .user_agent import UserAgent
 from .ann_agent import ANNAgent
+from .policy_gradient import PGAgent
 from .td_agent import TD0Agent
