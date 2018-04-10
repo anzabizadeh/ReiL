@@ -50,8 +50,9 @@ class QAgent(Agent):
                                                     'states action': [False, self._report, '_state_action_list'],
                                                     'state-actions q': [False, self._report, '_state_action_list'],
                                                     'state-actions n': [False, self._report, '_state_action_list'],
-                                                    'diff-q': [True, self._report, '_state_action_list']}
-        self.data_collector.active_statistics = ['states q', 'states action', 'state-actions q', 'state-actions n', 'diff-q']
+                                                    'diff-q': [True, self._report, '_state_action_list'],
+                                                    'total q': [False, self._report, '_state_action_list']}
+        self.data_collector.active_statistics = list(self.data_collector.available_statistics.keys())
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -259,4 +260,10 @@ class QAgent(Agent):
                 for a in action_list:
                     rep += abs(new.get(s, {}).get(a, (0, ))[0] - old.get(s, {}).get(a, (0, ))[0])
 
+        if item.lower() == 'total q':
+            data = kwargs['data']['_state_action_list']
+            rep = 0
+            for state in data:
+                rep += sum(data[state][action][0] for action in data[state])
+ 
         return rep

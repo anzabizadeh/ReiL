@@ -9,6 +9,7 @@ The base class for reinforcement learning
 '''
 
 from pickle import load, dump, HIGHEST_PROTOCOL
+from random import randrange
 
 from .data_collector import DataCollector
 
@@ -31,6 +32,8 @@ class RLBase():
     def __init__(self, **kwargs):
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
+        self.set_defaults(name=self.__repr__() + ' - {:0<7}'.format(str(randrange(1, 1000000))), version=0.1)
+        self.set_params(**kwargs)
 
     def set_params(self, **params):
         '''
@@ -96,3 +99,6 @@ class RLBase():
 
     def _report(self, **kwargs):
         return
+
+    def __repr__(self):
+        return 'RLBase'

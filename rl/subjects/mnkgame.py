@@ -57,7 +57,7 @@ class MNKGame(MNKBoard, Subject):
             k: winning criteria (default=3)
             players: number of players (default=2)
         '''
-        MNKBoard.__init__(self, **kwargs)
+        MNKBoard.__init__(self, **kwargs, can_recapture=False)
         Subject.__init__(self, **kwargs)
         Subject.set_defaults(self, board_status=None)
         Subject.set_params(self, **kwargs)

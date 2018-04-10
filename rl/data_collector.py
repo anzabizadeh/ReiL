@@ -347,6 +347,10 @@ class DataCollector():
             if not hasattr(self, '_'+key):
                 self.__dict__['_'+key] = value
 
+    def __repr__(self):
+        if len(self._available_statistics) == 0:
+            return 'data_collector with no statistics'
+        return 'data_collector with ' + '-'.join(self._available_statistics)
 
 if __name__ == '__main__':
     main()

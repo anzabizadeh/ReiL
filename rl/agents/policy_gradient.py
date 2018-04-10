@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-ANNAgent class
+PGAgent class
 =================
 
 A Policy Gradient agent with Neural Network action approximator
@@ -9,12 +9,9 @@ A Policy Gradient agent with Neural Network action approximator
 '''
 
 
-# KNOWN ISSUES:
-# Implement NeuralAgent.
+from random import choice, random
 
 import numpy as np
-import tensorflow as tf
-from random import choice, random
 import tensorflow as tf
 
 from rl.agents.agent import Agent

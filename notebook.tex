@@ -1,0 +1,824 @@
+
+% Default to the notebook output style
+
+    
+
+
+% Inherit from the specified cell style.
+
+
+
+
+    
+\documentclass[11pt]{article}
+
+    
+    
+    \usepackage[T1]{fontenc}
+    % Nicer default font (+ math font) than Computer Modern for most use cases
+    \usepackage{mathpazo}
+
+    % Basic figure setup, for now with no caption control since it's done
+    % automatically by Pandoc (which extracts ![](path) syntax from Markdown).
+    \usepackage{graphicx}
+    % We will generate all images so they have a width \maxwidth. This means
+    % that they will get their normal width if they fit onto the page, but
+    % are scaled down if they would overflow the margins.
+    \makeatletter
+    \def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth
+    \else\Gin@nat@width\fi}
+    \makeatother
+    \let\Oldincludegraphics\includegraphics
+    % Set max figure width to be 80% of text width, for now hardcoded.
+    \renewcommand{\includegraphics}[1]{\Oldincludegraphics[width=.8\maxwidth]{#1}}
+    % Ensure that by default, figures have no caption (until we provide a
+    % proper Figure object with a Caption API and a way to capture that
+    % in the conversion process - todo).
+    \usepackage{caption}
+    \DeclareCaptionLabelFormat{nolabel}{}
+    \captionsetup{labelformat=nolabel}
+
+    \usepackage{adjustbox} % Used to constrain images to a maximum size 
+    \usepackage{xcolor} % Allow colors to be defined
+    \usepackage{enumerate} % Needed for markdown enumerations to work
+    \usepackage{geometry} % Used to adjust the document margins
+    \usepackage{amsmath} % Equations
+    \usepackage{amssymb} % Equations
+    \usepackage{textcomp} % defines textquotesingle
+    % Hack from http://tex.stackexchange.com/a/47451/13684:
+    \AtBeginDocument{%
+        \def\PYZsq{\textquotesingle}% Upright quotes in Pygmentized code
+    }
+    \usepackage{upquote} % Upright quotes for verbatim code
+    \usepackage{eurosym} % defines \euro
+    \usepackage[mathletters]{ucs} % Extended unicode (utf-8) support
+    \usepackage[utf8x]{inputenc} % Allow utf-8 characters in the tex document
+    \usepackage{fancyvrb} % verbatim replacement that allows latex
+    \usepackage{grffile} % extends the file name processing of package graphics 
+                         % to support a larger range 
+    % The hyperref package gives us a pdf with properly built
+    % internal navigation ('pdf bookmarks' for the table of contents,
+    % internal cross-reference links, web links for URLs, etc.)
+    \usepackage{hyperref}
+    \usepackage{longtable} % longtable support required by pandoc >1.10
+    \usepackage{booktabs}  % table support for pandoc > 1.12.2
+    \usepackage[inline]{enumitem} % IRkernel/repr support (it uses the enumerate* environment)
+    \usepackage[normalem]{ulem} % ulem is needed to support strikethroughs (\sout)
+                                % normalem makes italics be italics, not underlines
+    
+
+    
+    
+    % Colors for the hyperref package
+    \definecolor{urlcolor}{rgb}{0,.145,.698}
+    \definecolor{linkcolor}{rgb}{.71,0.21,0.01}
+    \definecolor{citecolor}{rgb}{.12,.54,.11}
+
+    % ANSI colors
+    \definecolor{ansi-black}{HTML}{3E424D}
+    \definecolor{ansi-black-intense}{HTML}{282C36}
+    \definecolor{ansi-red}{HTML}{E75C58}
+    \definecolor{ansi-red-intense}{HTML}{B22B31}
+    \definecolor{ansi-green}{HTML}{00A250}
+    \definecolor{ansi-green-intense}{HTML}{007427}
+    \definecolor{ansi-yellow}{HTML}{DDB62B}
+    \definecolor{ansi-yellow-intense}{HTML}{B27D12}
+    \definecolor{ansi-blue}{HTML}{208FFB}
+    \definecolor{ansi-blue-intense}{HTML}{0065CA}
+    \definecolor{ansi-magenta}{HTML}{D160C4}
+    \definecolor{ansi-magenta-intense}{HTML}{A03196}
+    \definecolor{ansi-cyan}{HTML}{60C6C8}
+    \definecolor{ansi-cyan-intense}{HTML}{258F8F}
+    \definecolor{ansi-white}{HTML}{C5C1B4}
+    \definecolor{ansi-white-intense}{HTML}{A1A6B2}
+
+    % commands and environments needed by pandoc snippets
+    % extracted from the output of `pandoc -s`
+    \providecommand{\tightlist}{%
+      \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+    % Add ',fontsize=\small' for more characters per line
+    \newenvironment{Shaded}{}{}
+    \newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+    \newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{{#1}}}
+    \newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{{#1}}}}
+    \newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{{#1}}}
+    \newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+    \newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{{#1}}}
+    \newcommand{\RegionMarkerTok}[1]{{#1}}
+    \newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+    \newcommand{\NormalTok}[1]{{#1}}
+    
+    % Additional commands for more recent versions of Pandoc
+    \newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{{#1}}}
+    \newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{{#1}}}
+    \newcommand{\ImportTok}[1]{{#1}}
+    \newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{{#1}}}}
+    \newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{{#1}}}
+    \newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+    \newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{{#1}}}
+    \newcommand{\BuiltInTok}[1]{{#1}}
+    \newcommand{\ExtensionTok}[1]{{#1}}
+    \newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{{#1}}}
+    \newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{{#1}}}
+    \newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    
+    
+    % Define a nice break command that doesn't care if a line doesn't already
+    % exist.
+    \def\br{\hspace*{\fill} \\* }
+    % Math Jax compatability definitions
+    \def\gt{>}
+    \def\lt{<}
+    % Document parameters
+    \title{TicTacToe}
+    
+    
+    
+
+    % Pygments definitions
+    
+\makeatletter
+\def\PY@reset{\let\PY@it=\relax \let\PY@bf=\relax%
+    \let\PY@ul=\relax \let\PY@tc=\relax%
+    \let\PY@bc=\relax \let\PY@ff=\relax}
+\def\PY@tok#1{\csname PY@tok@#1\endcsname}
+\def\PY@toks#1+{\ifx\relax#1\empty\else%
+    \PY@tok{#1}\expandafter\PY@toks\fi}
+\def\PY@do#1{\PY@bc{\PY@tc{\PY@ul{%
+    \PY@it{\PY@bf{\PY@ff{#1}}}}}}}
+\def\PY#1#2{\PY@reset\PY@toks#1+\relax+\PY@do{#2}}
+
+\expandafter\def\csname PY@tok@w\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.73,0.73}{##1}}}
+\expandafter\def\csname PY@tok@c\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@cp\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.74,0.48,0.00}{##1}}}
+\expandafter\def\csname PY@tok@k\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@kp\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@kt\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.69,0.00,0.25}{##1}}}
+\expandafter\def\csname PY@tok@o\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@ow\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.67,0.13,1.00}{##1}}}
+\expandafter\def\csname PY@tok@nb\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@nf\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\expandafter\def\csname PY@tok@nc\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\expandafter\def\csname PY@tok@nn\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\expandafter\def\csname PY@tok@ne\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.82,0.25,0.23}{##1}}}
+\expandafter\def\csname PY@tok@nv\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@no\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.53,0.00,0.00}{##1}}}
+\expandafter\def\csname PY@tok@nl\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.63,0.63,0.00}{##1}}}
+\expandafter\def\csname PY@tok@ni\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.60,0.60,0.60}{##1}}}
+\expandafter\def\csname PY@tok@na\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.49,0.56,0.16}{##1}}}
+\expandafter\def\csname PY@tok@nt\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@nd\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.67,0.13,1.00}{##1}}}
+\expandafter\def\csname PY@tok@s\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@sd\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@si\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.73,0.40,0.53}{##1}}}
+\expandafter\def\csname PY@tok@se\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.73,0.40,0.13}{##1}}}
+\expandafter\def\csname PY@tok@sr\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.40,0.53}{##1}}}
+\expandafter\def\csname PY@tok@ss\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@sx\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@m\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@gh\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,0.50}{##1}}}
+\expandafter\def\csname PY@tok@gu\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.50,0.00,0.50}{##1}}}
+\expandafter\def\csname PY@tok@gd\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.63,0.00,0.00}{##1}}}
+\expandafter\def\csname PY@tok@gi\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.63,0.00}{##1}}}
+\expandafter\def\csname PY@tok@gr\endcsname{\def\PY@tc##1{\textcolor[rgb]{1.00,0.00,0.00}{##1}}}
+\expandafter\def\csname PY@tok@ge\endcsname{\let\PY@it=\textit}
+\expandafter\def\csname PY@tok@gs\endcsname{\let\PY@bf=\textbf}
+\expandafter\def\csname PY@tok@gp\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,0.50}{##1}}}
+\expandafter\def\csname PY@tok@go\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.53,0.53,0.53}{##1}}}
+\expandafter\def\csname PY@tok@gt\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.27,0.87}{##1}}}
+\expandafter\def\csname PY@tok@err\endcsname{\def\PY@bc##1{\setlength{\fboxsep}{0pt}\fcolorbox[rgb]{1.00,0.00,0.00}{1,1,1}{\strut ##1}}}
+\expandafter\def\csname PY@tok@kc\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@kd\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@kn\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@kr\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@bp\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@fm\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\expandafter\def\csname PY@tok@vc\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@vg\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@vi\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@vm\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@sa\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@sb\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@sc\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@dl\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@s2\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@sh\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@s1\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@mb\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@mf\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@mh\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@mi\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@il\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@mo\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@ch\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@cm\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@cpf\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@c1\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@cs\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+
+\def\PYZbs{\char`\\}
+\def\PYZus{\char`\_}
+\def\PYZob{\char`\{}
+\def\PYZcb{\char`\}}
+\def\PYZca{\char`\^}
+\def\PYZam{\char`\&}
+\def\PYZlt{\char`\<}
+\def\PYZgt{\char`\>}
+\def\PYZsh{\char`\#}
+\def\PYZpc{\char`\%}
+\def\PYZdl{\char`\$}
+\def\PYZhy{\char`\-}
+\def\PYZsq{\char`\'}
+\def\PYZdq{\char`\"}
+\def\PYZti{\char`\~}
+% for compatibility with earlier versions
+\def\PYZat{@}
+\def\PYZlb{[}
+\def\PYZrb{]}
+\makeatother
+
+
+    % Exact colors from NB
+    \definecolor{incolor}{rgb}{0.0, 0.0, 0.5}
+    \definecolor{outcolor}{rgb}{0.545, 0.0, 0.0}
+
+
+
+    
+    % Prevent overflowing lines due to hard-to-break entities
+    \sloppy 
+    % Setup hyperref package
+    \hypersetup{
+      breaklinks=true,  % so long urls are correctly broken across lines
+      colorlinks=true,
+      urlcolor=urlcolor,
+      linkcolor=linkcolor,
+      citecolor=citecolor,
+      }
+    % Slightly bigger margins than the latex defaults
+    
+    \geometry{verbose,tmargin=1in,bmargin=1in,lmargin=1in,rmargin=1in}
+    
+    
+
+    \begin{document}
+    
+    
+    \maketitle
+    
+    
+
+    
+    \begin{Verbatim}[commandchars=\\\{\}]
+{\color{incolor}In [{\color{incolor}9}]:} \PY{c+c1}{\PYZsh{} \PYZhy{}*\PYZhy{} coding: utf\PYZhy{}8 \PYZhy{}*\PYZhy{}}
+        \PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}}
+        \PY{l+s+sd}{Created on Mon Mar 31 14:16:10 2018}
+        
+        \PY{l+s+sd}{@author: Sadjad}
+        \PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}}
+        
+        \PY{k+kn}{import} \PY{n+nn}{matplotlib}\PY{n+nn}{.}\PY{n+nn}{pyplot} \PY{k}{as} \PY{n+nn}{plt}
+        
+        \PY{k+kn}{from} \PY{n+nn}{rl}\PY{n+nn}{.}\PY{n+nn}{agents} \PY{k}{import} \PY{n}{QAgent}\PY{p}{,} \PY{n}{RandomAgent}
+        \PY{k+kn}{from} \PY{n+nn}{rl}\PY{n+nn}{.}\PY{n+nn}{environments} \PY{k}{import} \PY{n}{Environment}
+        \PY{k+kn}{from} \PY{n+nn}{rl}\PY{n+nn}{.}\PY{n+nn}{subjects} \PY{k}{import} \PY{n}{MNKGame}
+\end{Verbatim}
+
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+{\color{incolor}In [{\color{incolor}10}]:} \PY{c+c1}{\PYZsh{} load the environment or create a new one}
+         \PY{n}{filename} \PY{o}{=} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{mnk333}\PY{l+s+s1}{\PYZsq{}}
+         \PY{k}{try}\PY{p}{:}
+             \PY{n}{env} \PY{o}{=} \PY{n}{Environment}\PY{p}{(}\PY{n}{filename}\PY{o}{=}\PY{n}{filename}\PY{p}{)}
+         \PY{k}{except} \PY{n+ne}{FileNotFoundError}\PY{p}{:}
+             \PY{n}{env} \PY{o}{=} \PY{n}{Environment}\PY{p}{(}\PY{p}{)}
+             \PY{c+c1}{\PYZsh{} initialize dictionaries}
+             \PY{n}{agents} \PY{o}{=} \PY{p}{\PYZob{}}\PY{p}{\PYZcb{}}
+             \PY{n}{subjects} \PY{o}{=} \PY{p}{\PYZob{}}\PY{p}{\PYZcb{}}
+         
+             \PY{c+c1}{\PYZsh{} define subjects}
+             \PY{n}{subjects}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Board A}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]} \PY{o}{=} \PY{n}{MNKGame}\PY{p}{(}\PY{n}{m}\PY{o}{=}\PY{l+m+mi}{3}\PY{p}{,} \PY{n}{n}\PY{o}{=}\PY{l+m+mi}{3}\PY{p}{,} \PY{n}{k}\PY{o}{=}\PY{l+m+mi}{3}\PY{p}{)}
+         
+             \PY{c+c1}{\PYZsh{} define agents}
+             \PY{n}{agents}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]} \PY{o}{=} \PY{n}{QAgent}\PY{p}{(}\PY{n}{gamma}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.2}\PY{p}{,} \PY{n}{epsilon}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{)}
+             \PY{n}{agents}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]} \PY{o}{=} \PY{n}{QAgent}\PY{p}{(}\PY{n}{gamma}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.2}\PY{p}{,} \PY{n}{epsilon}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{)}
+         
+             \PY{c+c1}{\PYZsh{} assign agents to subjects}
+             \PY{n}{assignment} \PY{o}{=} \PY{p}{[}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Board A}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}\PY{p}{,} \PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Board A}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}\PY{p}{]}
+         
+             \PY{c+c1}{\PYZsh{} update environment}
+             \PY{n}{env}\PY{o}{.}\PY{n}{add}\PY{p}{(}\PY{n}{agents}\PY{o}{=}\PY{n}{agents}\PY{p}{,} \PY{n}{subjects}\PY{o}{=}\PY{n}{subjects}\PY{p}{)}
+             \PY{n}{env}\PY{o}{.}\PY{n}{assign}\PY{p}{(}\PY{n}{assignment}\PY{p}{)}
+\end{Verbatim}
+
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+{\color{incolor}In [{\color{incolor}11}]:} \PY{c+c1}{\PYZsh{} set experiment variables}
+         \PY{n}{runs} \PY{o}{=} \PY{l+m+mi}{200}
+         \PY{n}{training\PYZus{}episodes} \PY{o}{=} \PY{l+m+mi}{5000}
+         \PY{n}{test\PYZus{}episodes} \PY{o}{=} \PY{l+m+mi}{100}
+         \PY{n}{test\PYZus{}agent} \PY{o}{=} \PY{n}{RandomAgent}\PY{p}{(}\PY{p}{)}
+         
+         \PY{n}{results} \PY{o}{=} \PY{p}{\PYZob{}}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{p}{[}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{p}{[}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{p}{[}\PY{p}{]}\PY{p}{,}
+                    \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{p}{[}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{p}{[}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{p}{[}\PY{p}{]}\PY{p}{\PYZcb{}}
+         \PY{n}{stats} \PY{o}{=} \PY{p}{[}\PY{p}{]}
+\end{Verbatim}
+
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+{\color{incolor}In [{\color{incolor}12}]:} \PY{n}{env}\PY{o}{.}\PY{n}{\PYZus{}agent}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{data\PYZus{}collector}\PY{o}{.}\PY{n}{start}\PY{p}{(}\PY{p}{)}
+         \PY{n}{env}\PY{o}{.}\PY{n}{\PYZus{}agent}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{data\PYZus{}collector}\PY{o}{.}\PY{n}{collect}\PY{p}{(}\PY{n}{statistic}\PY{o}{=}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{total q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{)}
+         
+         \PY{k}{for} \PY{n}{i} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{runs}\PY{p}{)}\PY{p}{:}
+             \PY{c+c1}{\PYZsh{} run and collect statistics}
+             \PY{n}{tally1} \PY{o}{=} \PY{n}{env}\PY{o}{.}\PY{n}{elapse}\PY{p}{(}\PY{n}{episodes}\PY{o}{=}\PY{n}{training\PYZus{}episodes}\PY{p}{,} \PY{n}{reset}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{all}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,}
+                                 \PY{n}{termination}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{all}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{learning\PYZus{}method}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{history}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,}
+                                 \PY{n}{reporting}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{none}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{tally}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{yes}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+             \PY{n}{stats}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{env}\PY{o}{.}\PY{n}{\PYZus{}agent}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{data\PYZus{}collector}\PY{o}{.}\PY{n}{report}\PY{p}{(}\PY{n}{statistic}\PY{o}{=}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{total q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{,} \PY{n}{update\PYZus{}data}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{total q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{)}
+             \PY{n+nb}{print}\PY{p}{(}\PY{p}{)}
+         
+             \PY{c+c1}{\PYZsh{} switch agents for test}
+             \PY{n}{temp} \PY{o}{=} \PY{n}{env}\PY{o}{.}\PY{n}{\PYZus{}agent}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}
+             \PY{n}{env}\PY{o}{.}\PY{n}{\PYZus{}agent}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]} \PY{o}{=} \PY{n}{test\PYZus{}agent}
+             \PY{n}{tally2} \PY{o}{=} \PY{n}{env}\PY{o}{.}\PY{n}{elapse}\PY{p}{(}\PY{n}{episodes}\PY{o}{=}\PY{n}{test\PYZus{}episodes}\PY{p}{,} \PY{n}{reset}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{all}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,}
+                                 \PY{n}{termination}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{all}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{learning\PYZus{}method}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{none}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,}
+                                 \PY{n}{reporting}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{none}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{tally}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{yes}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+             \PY{n}{env}\PY{o}{.}\PY{n}{\PYZus{}agent}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]} \PY{o}{=} \PY{n}{temp}
+         
+             \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{tally1}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{/}\PY{n}{training\PYZus{}episodes}\PY{p}{)}
+             \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{tally1}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{/}\PY{n}{training\PYZus{}episodes}\PY{p}{)}
+             \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{p}{(}\PY{n}{training\PYZus{}episodes}\PY{o}{\PYZhy{}}\PY{n}{tally1}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{\PYZhy{}}\PY{n}{tally1}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{)}\PY{o}{/}\PY{n}{training\PYZus{}episodes}\PY{p}{)}
+             \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{tally2}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{/}\PY{n}{test\PYZus{}episodes}\PY{p}{)}
+             \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{tally2}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{/}\PY{n}{test\PYZus{}episodes}\PY{p}{)}
+             \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{p}{(}\PY{n}{test\PYZus{}episodes}\PY{o}{\PYZhy{}}\PY{n}{tally2}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{o}{\PYZhy{}}\PY{n}{tally2}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Opponent}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{)}\PY{o}{/}\PY{n}{test\PYZus{}episodes}\PY{p}{)}
+         
+             \PY{c+c1}{\PYZsh{} print result of each run}
+             \PY{n+nb}{print}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{run }\PY{l+s+si}{\PYZob{}: \PYZcb{}}\PY{l+s+s1}{: }\PY{l+s+s1}{\PYZsq{}}\PY{o}{.}\PY{n}{format}\PY{p}{(}\PY{n}{i}\PY{p}{)}\PY{p}{,} \PY{n}{end}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ }\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+             \PY{n+nb}{print}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{TRAINING: win: }\PY{l+s+si}{\PYZob{}: \PYZcb{}}\PY{l+s+s1}{ draw:}\PY{l+s+si}{\PYZob{}: \PYZcb{}}\PY{l+s+s1}{ loss:}\PY{l+s+si}{\PYZob{}: \PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{o}{.}\PY{n}{format}\PY{p}{(}\PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{1}\PY{p}{]}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{1}\PY{p}{]}\PY{p}{,}
+                                                                    \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{1}\PY{p}{]}\PY{p}{)}\PY{p}{,} \PY{n}{end}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ }\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+             \PY{n+nb}{print}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{TESTING: win: }\PY{l+s+si}{\PYZob{}: \PYZcb{}}\PY{l+s+s1}{ draw:}\PY{l+s+si}{\PYZob{}: \PYZcb{}}\PY{l+s+s1}{ loss:}\PY{l+s+si}{\PYZob{}: \PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{o}{.}\PY{n}{format}\PY{p}{(}\PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{1}\PY{p}{]}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{1}\PY{p}{]}\PY{p}{,}
+                                                                   \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{1}\PY{p}{]}\PY{p}{)}\PY{p}{,} \PY{n}{end}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ }\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+             \PY{n+nb}{print}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q\PYZhy{}value: }\PY{l+s+si}{\PYZob{}: 3.4f\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{o}{.}\PY{n}{format}\PY{p}{(}\PY{n}{stats}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{1}\PY{p}{]}\PY{p}{)}\PY{p}{)}
+         
+             \PY{c+c1}{\PYZsh{} save occasionally in case you don\PYZsq{}t lose data if you get bored of running the code!}
+             \PY{n}{env}\PY{o}{.}\PY{n}{save}\PY{p}{(}\PY{n}{filename}\PY{o}{=}\PY{n}{filename}\PY{p}{)}
+\end{Verbatim}
+
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+
+run  0:  TRAINING: win:  0.2572 draw: 0.6396 loss: 0.1032 TESTING: win:  0.96 draw: 0.01 loss: 0.03 Q-value:  90.6860
+
+run  1:  TRAINING: win:  0.2136 draw: 0.7162 loss: 0.0702 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  141.5724
+
+run  2:  TRAINING: win:  0.2034 draw: 0.71 loss: 0.0866 TESTING: win:  0.95 draw: 0.05 loss: 0.0 Q-value:  165.0129
+
+run  3:  TRAINING: win:  0.2188 draw: 0.6848 loss: 0.0964 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  193.0555
+
+run  4:  TRAINING: win:  0.2208 draw: 0.6916 loss: 0.0876 TESTING: win:  0.92 draw: 0.08 loss: 0.0 Q-value:  229.5086
+
+run  5:  TRAINING: win:  0.1912 draw: 0.715 loss: 0.0938 TESTING: win:  0.95 draw: 0.03 loss: 0.02 Q-value:  245.3014
+
+run  6:  TRAINING: win:  0.2058 draw: 0.7118 loss: 0.0824 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  266.5501
+
+run  7:  TRAINING: win:  0.213 draw: 0.6996 loss: 0.0874 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  284.3270
+
+run  8:  TRAINING: win:  0.191 draw: 0.7118 loss: 0.0972 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  290.0113
+
+run  9:  TRAINING: win:  0.2004 draw: 0.7174 loss: 0.0822 TESTING: win:  0.88 draw: 0.12 loss: 0.0 Q-value:  305.0573
+
+run  10:  TRAINING: win:  0.1992 draw: 0.7154 loss: 0.0854 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  312.0695
+
+run  11:  TRAINING: win:  0.2 draw: 0.7148 loss: 0.0852 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  321.8674
+
+run  12:  TRAINING: win:  0.186 draw: 0.7122 loss: 0.1018 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  326.1340
+
+run  13:  TRAINING: win:  0.1872 draw: 0.7082 loss: 0.1046 TESTING: win:  0.9 draw: 0.09 loss: 0.01 Q-value:  335.6586
+
+run  14:  TRAINING: win:  0.1794 draw: 0.7166 loss: 0.104 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  335.0599
+
+run  15:  TRAINING: win:  0.1846 draw: 0.7314 loss: 0.084 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  339.9235
+
+run  16:  TRAINING: win:  0.1974 draw: 0.6962 loss: 0.1064 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  349.8721
+
+run  17:  TRAINING: win:  0.1904 draw: 0.722 loss: 0.0876 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  362.3941
+
+run  18:  TRAINING: win:  0.1906 draw: 0.7224 loss: 0.087 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  371.8364
+
+run  19:  TRAINING: win:  0.1856 draw: 0.7064 loss: 0.108 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  376.3825
+
+run  20:  TRAINING: win:  0.1802 draw: 0.712 loss: 0.1078 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  384.1012
+
+run  21:  TRAINING: win:  0.1936 draw: 0.7018 loss: 0.1046 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  389.6691
+
+run  22:  TRAINING: win:  0.1926 draw: 0.7092 loss: 0.0982 TESTING: win:  0.94 draw: 0.06 loss: 0.0 Q-value:  395.6143
+
+run  23:  TRAINING: win:  0.1956 draw: 0.7002 loss: 0.1042 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  405.4716
+
+run  24:  TRAINING: win:  0.1812 draw: 0.7056 loss: 0.1132 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  409.0531
+
+run  25:  TRAINING: win:  0.2026 draw: 0.7106 loss: 0.0868 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  418.8312
+
+run  26:  TRAINING: win:  0.1974 draw: 0.7046 loss: 0.098 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  424.3894
+
+run  27:  TRAINING: win:  0.1842 draw: 0.7002 loss: 0.1156 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  429.3518
+
+run  28:  TRAINING: win:  0.187 draw: 0.7088 loss: 0.1042 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  428.8128
+
+run  29:  TRAINING: win:  0.1874 draw: 0.7098 loss: 0.1028 TESTING: win:  0.94 draw: 0.05 loss: 0.01 Q-value:  428.6581
+
+run  30:  TRAINING: win:  0.1912 draw: 0.7054 loss: 0.1034 TESTING: win:  0.9 draw: 0.07 loss: 0.03 Q-value:  427.9891
+
+run  31:  TRAINING: win:  0.1978 draw: 0.703 loss: 0.0992 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  435.2698
+
+run  32:  TRAINING: win:  0.1924 draw: 0.7016 loss: 0.106 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  440.8218
+
+run  33:  TRAINING: win:  0.1908 draw: 0.7114 loss: 0.0978 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  441.2602
+
+run  34:  TRAINING: win:  0.1944 draw: 0.6908 loss: 0.1148 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  440.8365
+
+run  35:  TRAINING: win:  0.1852 draw: 0.7108 loss: 0.104 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  441.9731
+
+run  36:  TRAINING: win:  0.199 draw: 0.7078 loss: 0.0932 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  448.6285
+
+run  37:  TRAINING: win:  0.1904 draw: 0.6942 loss: 0.1154 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  445.1096
+
+run  38:  TRAINING: win:  0.1994 draw: 0.7052 loss: 0.0954 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  448.5470
+
+run  39:  TRAINING: win:  0.2042 draw: 0.7014 loss: 0.0944 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  445.7435
+
+run  40:  TRAINING: win:  0.1942 draw: 0.7036 loss: 0.1022 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  443.9101
+
+run  41:  TRAINING: win:  0.186 draw: 0.7128 loss: 0.1012 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  447.3652
+
+run  42:  TRAINING: win:  0.197 draw: 0.7116 loss: 0.0914 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  452.2718
+
+run  43:  TRAINING: win:  0.2012 draw: 0.7024 loss: 0.0964 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  453.1238
+
+run  44:  TRAINING: win:  0.206 draw: 0.6916 loss: 0.1024 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  455.4363
+
+run  45:  TRAINING: win:  0.1932 draw: 0.695 loss: 0.1118 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  454.2625
+
+run  46:  TRAINING: win:  0.1906 draw: 0.6962 loss: 0.1132 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  451.4563
+
+run  47:  TRAINING: win:  0.1808 draw: 0.705 loss: 0.1142 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  448.0639
+
+run  48:  TRAINING: win:  0.1922 draw: 0.7022 loss: 0.1056 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  452.4329
+
+run  49:  TRAINING: win:  0.1942 draw: 0.6964 loss: 0.1094 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  453.8943
+
+run  50:  TRAINING: win:  0.1866 draw: 0.6968 loss: 0.1166 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  454.5200
+
+run  51:  TRAINING: win:  0.1938 draw: 0.7002 loss: 0.106 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  453.5877
+
+run  52:  TRAINING: win:  0.2062 draw: 0.6886 loss: 0.1052 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  453.9901
+
+run  53:  TRAINING: win:  0.1948 draw: 0.7 loss: 0.1052 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  459.3686
+
+run  54:  TRAINING: win:  0.1966 draw: 0.6926 loss: 0.1108 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  459.0301
+
+run  55:  TRAINING: win:  0.1934 draw: 0.6958 loss: 0.1108 TESTING: win:  0.9 draw: 0.06 loss: 0.04 Q-value:  458.0927
+
+run  56:  TRAINING: win:  0.1892 draw: 0.6916 loss: 0.1192 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  456.9283
+
+run  57:  TRAINING: win:  0.1968 draw: 0.6968 loss: 0.1064 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  457.6565
+
+run  58:  TRAINING: win:  0.1968 draw: 0.6994 loss: 0.1038 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  457.5348
+
+run  59:  TRAINING: win:  0.2002 draw: 0.7008 loss: 0.099 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  465.2234
+
+run  60:  TRAINING: win:  0.1924 draw: 0.6976 loss: 0.11 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  460.8102
+
+run  61:  TRAINING: win:  0.1892 draw: 0.696 loss: 0.1148 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  457.4246
+
+run  62:  TRAINING: win:  0.1868 draw: 0.7044 loss: 0.1088 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  455.7957
+
+run  63:  TRAINING: win:  0.1834 draw: 0.6956 loss: 0.121 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  453.0355
+
+run  64:  TRAINING: win:  0.1888 draw: 0.7056 loss: 0.1056 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  454.1136
+
+run  65:  TRAINING: win:  0.1914 draw: 0.6992 loss: 0.1094 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  454.0539
+
+run  66:  TRAINING: win:  0.192 draw: 0.7056 loss: 0.1024 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  455.3292
+
+run  67:  TRAINING: win:  0.1816 draw: 0.7064 loss: 0.112 TESTING: win:  0.91 draw: 0.09 loss: 0.0 Q-value:  450.7981
+
+run  68:  TRAINING: win:  0.1858 draw: 0.7116 loss: 0.1026 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  453.0401
+
+run  69:  TRAINING: win:  0.196 draw: 0.6934 loss: 0.1106 TESTING: win:  0.94 draw: 0.04 loss: 0.02 Q-value:  448.3654
+
+run  70:  TRAINING: win:  0.1938 draw: 0.6898 loss: 0.1164 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  451.3441
+
+run  71:  TRAINING: win:  0.186 draw: 0.6916 loss: 0.1224 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  449.4699
+
+run  72:  TRAINING: win:  0.194 draw: 0.7024 loss: 0.1036 TESTING: win:  0.95 draw: 0.05 loss: 0.0 Q-value:  449.8951
+
+run  73:  TRAINING: win:  0.1824 draw: 0.7168 loss: 0.1008 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  449.1703
+
+run  74:  TRAINING: win:  0.1978 draw: 0.6972 loss: 0.105 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  454.7235
+
+run  75:  TRAINING: win:  0.1986 draw: 0.704 loss: 0.0974 TESTING: win:  0.97 draw: 0.02 loss: 0.01 Q-value:  456.4503
+
+run  76:  TRAINING: win:  0.191 draw: 0.6994 loss: 0.1096 TESTING: win:  0.93 draw: 0.07 loss: 0.0 Q-value:  452.7038
+
+run  77:  TRAINING: win:  0.1886 draw: 0.6982 loss: 0.1132 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  452.9366
+
+run  78:  TRAINING: win:  0.2018 draw: 0.6956 loss: 0.1026 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  454.2385
+
+run  79:  TRAINING: win:  0.1898 draw: 0.7034 loss: 0.1068 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  457.5397
+
+run  80:  TRAINING: win:  0.2008 draw: 0.6862 loss: 0.113 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  462.7665
+
+run  81:  TRAINING: win:  0.1982 draw: 0.7066 loss: 0.0952 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  460.4365
+
+run  82:  TRAINING: win:  0.1954 draw: 0.695 loss: 0.1096 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  459.2591
+
+run  83:  TRAINING: win:  0.174 draw: 0.7128 loss: 0.1132 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  457.7666
+
+run  84:  TRAINING: win:  0.1756 draw: 0.7154 loss: 0.109 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  457.7622
+
+run  85:  TRAINING: win:  0.1912 draw: 0.704 loss: 0.1048 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  460.0241
+
+run  86:  TRAINING: win:  0.1916 draw: 0.7012 loss: 0.1072 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  458.1132
+
+run  87:  TRAINING: win:  0.1966 draw: 0.7038 loss: 0.0996 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  459.9503
+
+run  88:  TRAINING: win:  0.1954 draw: 0.6894 loss: 0.1152 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  458.7513
+
+run  89:  TRAINING: win:  0.1946 draw: 0.6944 loss: 0.111 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  454.4347
+
+run  90:  TRAINING: win:  0.1882 draw: 0.7044 loss: 0.1074 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  449.9594
+
+run  91:  TRAINING: win:  0.1848 draw: 0.7004 loss: 0.1148 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  447.3438
+
+run  92:  TRAINING: win:  0.193 draw: 0.6962 loss: 0.1108 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  450.0806
+
+run  93:  TRAINING: win:  0.2014 draw: 0.6896 loss: 0.109 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  448.1355
+
+run  94:  TRAINING: win:  0.1848 draw: 0.7046 loss: 0.1106 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  447.3550
+
+run  95:  TRAINING: win:  0.1988 draw: 0.7004 loss: 0.1008 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  446.2135
+
+run  96:  TRAINING: win:  0.1948 draw: 0.6892 loss: 0.116 TESTING: win:  0.93 draw: 0.07 loss: 0.0 Q-value:  447.0678
+
+run  97:  TRAINING: win:  0.184 draw: 0.7012 loss: 0.1148 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  445.3476
+
+run  98:  TRAINING: win:  0.1876 draw: 0.6998 loss: 0.1126 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  443.4687
+
+run  99:  TRAINING: win:  0.1808 draw: 0.7086 loss: 0.1106 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  439.2449
+
+run  100:  TRAINING: win:  0.1894 draw: 0.6988 loss: 0.1118 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  439.8518
+
+run  101:  TRAINING: win:  0.1944 draw: 0.698 loss: 0.1076 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  439.3837
+
+run  102:  TRAINING: win:  0.197 draw: 0.705 loss: 0.098 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  438.2154
+
+run  103:  TRAINING: win:  0.1986 draw: 0.6902 loss: 0.1112 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  438.9275
+
+run  104:  TRAINING: win:  0.1896 draw: 0.7006 loss: 0.1098 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  433.2515
+
+run  105:  TRAINING: win:  0.185 draw: 0.7092 loss: 0.1058 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  437.7772
+
+run  106:  TRAINING: win:  0.1884 draw: 0.704 loss: 0.1076 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  434.4762
+
+run  107:  TRAINING: win:  0.1924 draw: 0.6948 loss: 0.1128 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  437.5477
+
+run  108:  TRAINING: win:  0.1834 draw: 0.7006 loss: 0.116 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  437.7469
+
+run  109:  TRAINING: win:  0.1874 draw: 0.6962 loss: 0.1164 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  433.8226
+
+run  110:  TRAINING: win:  0.1924 draw: 0.6884 loss: 0.1192 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  433.7586
+
+run  111:  TRAINING: win:  0.192 draw: 0.6872 loss: 0.1208 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  432.7021
+
+run  112:  TRAINING: win:  0.1958 draw: 0.711 loss: 0.0932 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  435.7357
+
+run  113:  TRAINING: win:  0.1888 draw: 0.704 loss: 0.1072 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  432.2281
+
+run  114:  TRAINING: win:  0.1922 draw: 0.6918 loss: 0.116 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  430.5803
+
+run  115:  TRAINING: win:  0.191 draw: 0.7058 loss: 0.1032 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  430.3549
+
+run  116:  TRAINING: win:  0.1934 draw: 0.7 loss: 0.1066 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  437.1866
+
+run  117:  TRAINING: win:  0.2004 draw: 0.7002 loss: 0.0994 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  437.9474
+
+run  118:  TRAINING: win:  0.1792 draw: 0.7002 loss: 0.1206 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  434.7876
+
+run  119:  TRAINING: win:  0.1914 draw: 0.7112 loss: 0.0974 TESTING: win:  0.9 draw: 0.1 loss: 0.0 Q-value:  433.2527
+
+run  120:  TRAINING: win:  0.1762 draw: 0.7128 loss: 0.111 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  435.6534
+
+run  121:  TRAINING: win:  0.1958 draw: 0.6936 loss: 0.1106 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  432.7269
+
+run  122:  TRAINING: win:  0.1882 draw: 0.6954 loss: 0.1164 TESTING: win:  0.93 draw: 0.07 loss: 0.0 Q-value:  434.4970
+
+run  123:  TRAINING: win:  0.1944 draw: 0.7016 loss: 0.104 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  432.6733
+
+run  124:  TRAINING: win:  0.1862 draw: 0.7164 loss: 0.0974 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  434.0626
+
+run  125:  TRAINING: win:  0.1866 draw: 0.7018 loss: 0.1116 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  427.0961
+
+run  126:  TRAINING: win:  0.1826 draw: 0.7018 loss: 0.1156 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  427.6233
+
+run  127:  TRAINING: win:  0.1842 draw: 0.7064 loss: 0.1094 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  427.9528
+
+run  128:  TRAINING: win:  0.1876 draw: 0.711 loss: 0.1014 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  426.2223
+
+run  129:  TRAINING: win:  0.1912 draw: 0.698 loss: 0.1108 TESTING: win:  0.93 draw: 0.07 loss: 0.0 Q-value:  428.7959
+
+run  130:  TRAINING: win:  0.1856 draw: 0.7052 loss: 0.1092 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  433.2805
+
+run  131:  TRAINING: win:  0.1972 draw: 0.709 loss: 0.0938 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  437.6085
+
+run  132:  TRAINING: win:  0.192 draw: 0.708 loss: 0.1 TESTING: win:  0.95 draw: 0.05 loss: 0.0 Q-value:  433.5020
+
+run  133:  TRAINING: win:  0.1856 draw: 0.6964 loss: 0.118 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  430.8626
+
+run  134:  TRAINING: win:  0.19 draw: 0.6958 loss: 0.1142 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  432.9212
+
+run  135:  TRAINING: win:  0.2028 draw: 0.6866 loss: 0.1106 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  435.5030
+
+run  136:  TRAINING: win:  0.2018 draw: 0.6928 loss: 0.1054 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  436.4800
+
+run  137:  TRAINING: win:  0.1986 draw: 0.702 loss: 0.0994 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  430.4000
+
+run  138:  TRAINING: win:  0.1876 draw: 0.7048 loss: 0.1076 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  428.8826
+
+run  139:  TRAINING: win:  0.194 draw: 0.7052 loss: 0.1008 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  430.8746
+
+run  140:  TRAINING: win:  0.1914 draw: 0.6892 loss: 0.1194 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  432.5602
+
+run  141:  TRAINING: win:  0.2082 draw: 0.684 loss: 0.1078 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  431.9013
+
+run  142:  TRAINING: win:  0.2052 draw: 0.6882 loss: 0.1066 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  427.4176
+
+run  143:  TRAINING: win:  0.1876 draw: 0.7098 loss: 0.1026 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  426.5971
+
+run  144:  TRAINING: win:  0.1862 draw: 0.6998 loss: 0.114 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  425.9950
+
+run  145:  TRAINING: win:  0.1868 draw: 0.6998 loss: 0.1134 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  429.4338
+
+run  146:  TRAINING: win:  0.1796 draw: 0.6954 loss: 0.125 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  425.4464
+
+run  147:  TRAINING: win:  0.201 draw: 0.6872 loss: 0.1118 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  426.4387
+
+run  148:  TRAINING: win:  0.1868 draw: 0.6952 loss: 0.118 TESTING: win:  0.93 draw: 0.07 loss: 0.0 Q-value:  423.9818
+
+run  149:  TRAINING: win:  0.191 draw: 0.703 loss: 0.106 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  420.1085
+
+run  150:  TRAINING: win:  0.198 draw: 0.6886 loss: 0.1134 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  421.1242
+
+run  151:  TRAINING: win:  0.1952 draw: 0.702 loss: 0.1028 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  420.7519
+
+run  152:  TRAINING: win:  0.19 draw: 0.6988 loss: 0.1112 TESTING: win:  0.94 draw: 0.06 loss: 0.0 Q-value:  422.1188
+
+run  153:  TRAINING: win:  0.198 draw: 0.7032 loss: 0.0988 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  428.2320
+
+run  154:  TRAINING: win:  0.1766 draw: 0.6944 loss: 0.129 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  427.4890
+
+run  155:  TRAINING: win:  0.191 draw: 0.7024 loss: 0.1066 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  428.5885
+
+run  156:  TRAINING: win:  0.2 draw: 0.6912 loss: 0.1088 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  426.8899
+
+run  157:  TRAINING: win:  0.1974 draw: 0.7026 loss: 0.1 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  427.1715
+
+run  158:  TRAINING: win:  0.1894 draw: 0.709 loss: 0.1016 TESTING: win:  0.92 draw: 0.08 loss: 0.0 Q-value:  424.7250
+
+run  159:  TRAINING: win:  0.1986 draw: 0.6914 loss: 0.11 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  426.7983
+
+run  160:  TRAINING: win:  0.1902 draw: 0.6998 loss: 0.11 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  425.2218
+
+run  161:  TRAINING: win:  0.1924 draw: 0.6916 loss: 0.116 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  423.6896
+
+run  162:  TRAINING: win:  0.191 draw: 0.7036 loss: 0.1054 TESTING: win:  0.95 draw: 0.05 loss: 0.0 Q-value:  424.0698
+
+run  163:  TRAINING: win:  0.19 draw: 0.699 loss: 0.111 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  428.7747
+
+run  164:  TRAINING: win:  0.1898 draw: 0.6972 loss: 0.113 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  422.7563
+
+run  165:  TRAINING: win:  0.1948 draw: 0.697 loss: 0.1082 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  424.3016
+
+run  166:  TRAINING: win:  0.1914 draw: 0.6874 loss: 0.1212 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  427.9835
+
+run  167:  TRAINING: win:  0.194 draw: 0.6884 loss: 0.1176 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  423.7538
+
+run  168:  TRAINING: win:  0.1878 draw: 0.7078 loss: 0.1044 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  419.6461
+
+run  169:  TRAINING: win:  0.1808 draw: 0.7102 loss: 0.109 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  423.3020
+
+run  170:  TRAINING: win:  0.1998 draw: 0.6966 loss: 0.1036 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  426.4945
+
+run  171:  TRAINING: win:  0.1862 draw: 0.705 loss: 0.1088 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  426.1468
+
+run  172:  TRAINING: win:  0.1954 draw: 0.6982 loss: 0.1064 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  430.4823
+
+run  173:  TRAINING: win:  0.1992 draw: 0.694 loss: 0.1068 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  429.7450
+
+run  174:  TRAINING: win:  0.207 draw: 0.7052 loss: 0.0878 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  432.8443
+
+run  175:  TRAINING: win:  0.1862 draw: 0.717 loss: 0.0968 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  427.2872
+
+run  176:  TRAINING: win:  0.1876 draw: 0.71 loss: 0.1024 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  426.1679
+
+run  177:  TRAINING: win:  0.1862 draw: 0.7062 loss: 0.1076 TESTING: win:  0.96 draw: 0.04 loss: 0.0 Q-value:  426.5191
+
+run  178:  TRAINING: win:  0.1928 draw: 0.6984 loss: 0.1088 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  430.4305
+
+run  179:  TRAINING: win:  0.1862 draw: 0.698 loss: 0.1158 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  430.7576
+
+run  180:  TRAINING: win:  0.2052 draw: 0.686 loss: 0.1088 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  428.7426
+
+run  181:  TRAINING: win:  0.1936 draw: 0.7012 loss: 0.1052 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  429.3037
+
+run  182:  TRAINING: win:  0.1944 draw: 0.709 loss: 0.0966 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  431.3923
+
+run  183:  TRAINING: win:  0.196 draw: 0.6964 loss: 0.1076 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  431.2240
+
+run  184:  TRAINING: win:  0.1908 draw: 0.6924 loss: 0.1168 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  431.8898
+
+run  185:  TRAINING: win:  0.189 draw: 0.7016 loss: 0.1094 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  432.9973
+
+run  186:  TRAINING: win:  0.1902 draw: 0.7102 loss: 0.0996 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  431.4559
+
+run  187:  TRAINING: win:  0.195 draw: 0.6982 loss: 0.1068 TESTING: win:  0.94 draw: 0.06 loss: 0.0 Q-value:  432.7158
+
+run  188:  TRAINING: win:  0.2002 draw: 0.6968 loss: 0.103 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  437.1037
+
+run  189:  TRAINING: win:  0.1958 draw: 0.7002 loss: 0.104 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  436.5301
+
+run  190:  TRAINING: win:  0.1992 draw: 0.6916 loss: 0.1092 TESTING: win:  0.95 draw: 0.05 loss: 0.0 Q-value:  433.4446
+
+run  191:  TRAINING: win:  0.1966 draw: 0.6924 loss: 0.111 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  435.1639
+
+run  192:  TRAINING: win:  0.1998 draw: 0.6958 loss: 0.1044 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  431.8258
+
+run  193:  TRAINING: win:  0.1932 draw: 0.6948 loss: 0.112 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  430.2833
+
+run  194:  TRAINING: win:  0.1892 draw: 0.7048 loss: 0.106 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  427.6892
+
+run  195:  TRAINING: win:  0.2006 draw: 0.6902 loss: 0.1092 TESTING: win:  0.97 draw: 0.03 loss: 0.0 Q-value:  430.5997
+
+run  196:  TRAINING: win:  0.192 draw: 0.7014 loss: 0.1066 TESTING: win:  0.95 draw: 0.05 loss: 0.0 Q-value:  428.5166
+
+run  197:  TRAINING: win:  0.2026 draw: 0.69 loss: 0.1074 TESTING: win:  0.98 draw: 0.02 loss: 0.0 Q-value:  433.7413
+
+run  198:  TRAINING: win:  0.1978 draw: 0.6978 loss: 0.1044 TESTING: win:  1.0 draw: 0.0 loss: 0.0 Q-value:  434.7375
+
+run  199:  TRAINING: win:  0.1834 draw: 0.7058 loss: 0.1108 TESTING: win:  0.99 draw: 0.01 loss: 0.0 Q-value:  434.8841
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+{\color{incolor}In [{\color{incolor}13}]:} \PY{c+c1}{\PYZsh{} show statistics}
+         \PY{n}{x} \PY{o}{=} \PY{n+nb}{list}\PY{p}{(}\PY{n+nb}{range}\PY{p}{(}\PY{n+nb}{len}\PY{p}{(}\PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{)}\PY{p}{)}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{20}\PY{p}{,} \PY{l+m+mi}{20}\PY{p}{)}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{subplot}\PY{p}{(}\PY{l+m+mi}{221}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Win rate in training}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{x}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{b}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{training win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{x}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{g}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{training draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{x}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q training loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{r}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{training loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{axis}\PY{p}{(}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{,} \PY{n+nb}{len}\PY{p}{(}\PY{n}{x}\PY{p}{)}\PY{p}{,} \PY{l+m+mi}{0}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{]}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{run (1 run=}\PY{l+s+si}{\PYZob{}\PYZcb{}}\PY{l+s+s1}{ episodes)}\PY{l+s+s1}{\PYZsq{}}\PY{o}{.}\PY{n}{format}\PY{p}{(}\PY{n}{training\PYZus{}episodes}\PY{p}{)}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+         
+         \PY{n}{plt}\PY{o}{.}\PY{n}{subplot}\PY{p}{(}\PY{l+m+mi}{222}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Win rate against random player}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{x}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{b}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{test win}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{x}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{g}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{test draw}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{x}\PY{p}{,} \PY{n}{results}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q test loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{r}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{test loss}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{axis}\PY{p}{(}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{,} \PY{n+nb}{len}\PY{p}{(}\PY{n}{x}\PY{p}{)}\PY{p}{,} \PY{l+m+mi}{0}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{]}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{run (1 run=}\PY{l+s+si}{\PYZob{}\PYZcb{}}\PY{l+s+s1}{ episodes)}\PY{l+s+s1}{\PYZsq{}}\PY{o}{.}\PY{n}{format}\PY{p}{(}\PY{n}{test\PYZus{}episodes}\PY{p}{)}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+         
+         \PY{n}{plt}\PY{o}{.}\PY{n}{subplot}\PY{p}{(}\PY{l+m+mi}{223}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Total Q value}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{x}\PY{p}{,} \PY{n}{stats}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Total Q}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+         \PY{n}{plt}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+         
+         \PY{n}{plt}\PY{o}{.}\PY{n}{show}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{output_4_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+
+    % Add a bibliography block to the postdoc
+    
+    
+    
+    \end{document}
