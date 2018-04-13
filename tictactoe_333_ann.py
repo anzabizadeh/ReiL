@@ -77,8 +77,7 @@ def mnk():
             # print result of each run
             print('run {}: scenario {}: win: {: } draw:{: } lose:{: } '
                 .format(run, i, results[i]['ANN win'], results[i]['ANN draw'], results[i]['ANN lose']), end=' ')
-        env._agent['ANN'].save(filename='test')
-        env._agent['ANN'].load(filename='test')
+        env.save()
         print()
 
     x = list(range(len(results[0]['ANN win'])))

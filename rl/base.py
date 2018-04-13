@@ -32,8 +32,10 @@ class RLBase():
     def __init__(self, **kwargs):
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
-        self.set_defaults(name=self.__repr__() + ' - {:0<7}'.format(str(randrange(1, 1000000))), version=0.1)
+        self.set_defaults(name=self.__repr__() + ' - {:0<7}'.format(str(randrange(1, 1000000))), version=0.1, path='./')
         self.set_params(**kwargs)
+
+        if False: self._name, self._version, self._path = [], [], []
 
     def set_params(self, **params):
         '''
@@ -70,6 +72,7 @@ class RLBase():
         Arguments
         ---------
             filename: the name of the file to be loaded.
+            path: the path of the file to be loaded. (Default='./')
 
         Raises ValueError if the filename is not specified.
         '''
@@ -77,8 +80,15 @@ class RLBase():
             filename = kwargs['filename']
         except KeyError:
             raise ValueError('name of the output file not specified.')
-        with open(filename + '.pkl', 'rb') as f:
-            self.__dict__ = load(f)
+        try:  # path
+            path = kwargs['path']
+        except KeyError:
+            path = self._path
+
+        with open(path + filename + '.pkl', 'rb') as f:
+            data = load(f)
+            for key, value in data.items():
+                self.__dict__[key] = value
 
     def save(self, **kwargs):
         '''
@@ -87,6 +97,8 @@ class RLBase():
         Arguments
         ---------
             filename: the name of the file to be saved.
+            path: the path of the file to be loaded. (Default='./')
+            data: what to save (Default: saves everything)
 
         Raises ValueError if the filename is not specified.
         '''
@@ -94,8 +106,18 @@ class RLBase():
             filename = kwargs['filename']
         except KeyError:
             raise ValueError('name of the output file not specified.')
-        with open(filename + '.pkl', 'wb+') as f:
-            dump(self.__dict__, f, HIGHEST_PROTOCOL)
+        path = kwargs.get('path', self._path)
+        try:  # data
+            data = {}
+            for d in kwargs['data']:
+                data[d] = self.__dict__[d]
+            for key in ('_name, _version, _path'):  # these should be saved automatically
+                data[key] = self.__dict__[key]
+        except KeyError:
+            data = self.__dict__
+
+        with open(path + filename + '.pkl', 'wb+') as f:
+            dump(data, f, HIGHEST_PROTOCOL)
 
     def _report(self, **kwargs):
         return

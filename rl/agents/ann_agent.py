@@ -318,10 +318,10 @@ class ANNAgent(Agent):
         #     if not isinstance(v, (tf.Tensor, tf.SparseTensor, tf.Variable, tf.Graph)):
         #         pickle_data[k] = v
 
-        with open(filename + '.pkl', 'wb+') as f:
+        with open(path + filename + '.pkl', 'wb+') as f:
             dump(pickle_data, f, HIGHEST_PROTOCOL)
 
-        self._tf['saver'].save(self._tf['session'], './tf/'+filename)
+        self._tf['saver'].save(self._tf['session'], path + '/tf' + filename)
 
     def _report(self, **kwargs):
         '''

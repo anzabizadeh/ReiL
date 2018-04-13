@@ -8,8 +8,10 @@ This `environment` class provides a learning environment for any reinforcement l
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from pickle import load, dump, HIGHEST_PROTOCOL
 import signal
 import sys
+import pathlib
 
 from ..base import RLBase
 
@@ -364,11 +366,23 @@ class Environment(RLBase):
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
-            raise ValueError('name of the output file not specified.')
+            filename = '/' + self._name
 
         if object_name == 'all':
-            RLBase.save(self, filename=filename)
+            env_data = {'agents': list(self._agent.keys()), 'subjects': list(self._subject.keys()),
+                        '_episodes': self._episodes, '_max_steps': self._max_steps,
+                        '_termination': self._termination, '_reset': self._reset, '_learning_method': self._learning_method}
+
+            pathlib.Path(filename).mkdir(parents=True, exist_ok=True) 
+            with open(filename+'/environment.pkl', 'wb+') as f:
+                dump(env_data, f, HIGHEST_PROTOCOL)
+            for name, agent in self._agent.items():
+                pathlib.Path(filename+'/'+name).mkdir(parents=True, exist_ok=True) 
+                agent.save(filename=filename+'/'+name)
+            for name, subject in self._subject.items():
+                pathlib.Path(filename+'/'+name).mkdir(parents=True, exist_ok=True) 
+                subject.save(filename=filename+'/'+name)
         elif object_name in self._agent:
-            self._agent[object_name].save(filename=filename)
+            self._agent[object_name].save(filename=filename+'/'+object_name)
         elif object_name in self._subject:
-            self._subject[object_name].save(filename=filename)
+            self._subject[object_name].save(filename=filename+'/'+object_name)
