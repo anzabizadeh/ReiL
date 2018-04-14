@@ -159,6 +159,8 @@ class Snake(MNKBoard, Subject):
             self.set_piece(1, row=location[0], column=location[1])
         self.set_piece(2, row=self._food[0], column=self._food[1])
 
+    def __repr__(self):
+        return 'Snake'
 
 if __name__ == '__main__':
     main()

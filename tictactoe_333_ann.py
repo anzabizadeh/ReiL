@@ -61,6 +61,8 @@ def mnk():
     # env._agent['ANN'].data_collector.start()
     # env._agent['ANN'].data_collector.collect(statistic=['report'])
 
+    environments[0].save()
+    environments[0].load(filename=environments[0]._name)
     for run in range(runs):
         # run and collect statistics
         tally = [{}]*number_of_scenarios

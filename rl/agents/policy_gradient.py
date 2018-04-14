@@ -275,5 +275,8 @@ class PGAgent(Agent):
 
         return rep
 
+    def __repr__(self):
+        return 'PGAgent'
+
 if __name__ == '__main__':
     main()

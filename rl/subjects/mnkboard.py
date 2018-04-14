@@ -195,6 +195,8 @@ class MNKBoard:
                 i = i + 1
         return matrix
 
+    def __repr__(self):
+        return 'MNKBoard'
 
 if __name__ == '__main__':
     main()

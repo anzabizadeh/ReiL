@@ -68,3 +68,6 @@ class Agent(RLBase):
     def reset(self):
         '''Reset the agent at the end of a learning episode.''' 
         pass
+
+    def __repr__(self):
+        return 'Agent'

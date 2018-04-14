@@ -10,6 +10,7 @@ The base class for reinforcement learning
 
 from pickle import load, dump, HIGHEST_PROTOCOL
 from random import randrange
+import pathlib
 
 from .data_collector import DataCollector
 
@@ -32,7 +33,7 @@ class RLBase():
     def __init__(self, **kwargs):
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
-        self.set_defaults(name=self.__repr__() + ' - {:0<7}'.format(str(randrange(1, 1000000))), version=0.1, path='./')
+        self.set_defaults(name=self.__repr__() + ' - {:0<7}'.format(str(randrange(1, 1000000))), version=0.1, path='.')
         self.set_params(**kwargs)
 
         if False: self._name, self._version, self._path = [], [], []
@@ -72,7 +73,7 @@ class RLBase():
         Arguments
         ---------
             filename: the name of the file to be loaded.
-            path: the path of the file to be loaded. (Default='./')
+            path: the path of the file to be loaded. (Default='.')
 
         Raises ValueError if the filename is not specified.
         '''
@@ -80,12 +81,9 @@ class RLBase():
             filename = kwargs['filename']
         except KeyError:
             raise ValueError('name of the output file not specified.')
-        try:  # path
-            path = kwargs['path']
-        except KeyError:
-            path = self._path
+        path = kwargs.get('path', self._path)
 
-        with open(path + filename + '.pkl', 'rb') as f:
+        with open(path + '/' + filename + '.pkl', 'rb') as f:
             data = load(f)
             for key, value in data.items():
                 self.__dict__[key] = value
@@ -96,28 +94,27 @@ class RLBase():
 
         Arguments
         ---------
-            filename: the name of the file to be saved.
-            path: the path of the file to be loaded. (Default='./')
+            filename: the name of the object (Default=self._name)
+            path: the path of the file to be loaded. (Default='.')
             data: what to save (Default: saves everything)
-
-        Raises ValueError if the filename is not specified.
         '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
+
+        filename = kwargs.get('filename', self._name)
         path = kwargs.get('path', self._path)
         try:  # data
             data = {}
             for d in kwargs['data']:
                 data[d] = self.__dict__[d]
-            for key in ('_name, _version, _path'):  # these should be saved automatically
+            for key in ('_name', '_version', '_path'):  # these should be saved automatically
                 data[key] = self.__dict__[key]
         except KeyError:
             data = self.__dict__
 
-        with open(path + filename + '.pkl', 'wb+') as f:
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True) 
+        with open(path + '/' + filename + '.pkl', 'wb+') as f:
             dump(data, f, HIGHEST_PROTOCOL)
+
+        return path, filename
 
     def _report(self, **kwargs):
         return

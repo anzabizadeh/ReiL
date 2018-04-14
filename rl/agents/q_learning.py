@@ -267,3 +267,6 @@ class QAgent(Agent):
                 rep += sum(data[state][action][0] for action in data[state])
  
         return rep
+
+    def __repr__(self):
+        return 'QAgent'

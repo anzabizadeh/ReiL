@@ -231,6 +231,8 @@ class MNKGame(MNKBoard, Subject):
 
         return None
 
+    def __repr__(self):
+        return 'MNKGame'
 
 if __name__ == '__main__':
     main()

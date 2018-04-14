@@ -85,13 +85,11 @@ class ANNAgent(Agent):
         '''
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, alpha=0.1, epsilon=0, default_actions={},
-                           learning_rate=1e-5, hidden_layer_sizes=(10,),
+                           learning_rate=1e-5, hidden_layer_sizes=(), input_length = 1,
                            training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), current_run=0, batch_size=10)
         Agent.set_params(self, **kwargs)
         self.data_collector.available_statistics = {'report': [True, self._report, '_dummy']}
         self.data_collector.active_statistics = ['report']
-
-        self._input_length = kwargs['state_size']
 
         self._tf = {}
         self._generate_network()
@@ -104,7 +102,7 @@ class ANNAgent(Agent):
         if False:
             self._gamma, self._alpha, self._epsilon = 1, 0.1, 0
             self._default_actions = {}
-            self._learning_rate, self._hidden_layer_sizes=1e-5, (10,)
+            self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (), 1
             self._batch_size, self._current_run, self._training_x, self._training_y = 10, 0, np.array([], ndmin=2), np.array([], ndmin=2)
 
     def _generate_network(self):
@@ -172,20 +170,16 @@ class ANNAgent(Agent):
 
     def learn(self, **kwargs):
         '''
-        Learn either based on state reward pair or history.
+        Learn based on history.
         
         Arguments:
             history: a list consisting of state, action, reward of an episode. If both history and state reward provided, only history is used.
-            state: state resulted from the previous action on the previous state.
-            reward: the reward of the previous action.
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
         if not self._training_flag:
             raise ValueError('Not in training mode!')
-        # X = np.array([], ndmin=2)
-        # y = np.array([], ndmin=2)
-        try:  # history
+        try:
             history = kwargs['history']
             previous_state = history[0]
             for i in range(1, len(history), 3):
@@ -198,7 +192,7 @@ class ANNAgent(Agent):
                     new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
                 except IndexError:
                     new_q = reward
-                    # new_q = q_sa + self._alpha*(reward-q_sa)
+
                 state_action = np.append(previous_state.binary_representation().to_nparray(), previous_action.binary_representation().to_nparray())
                 try:
                     self._training_x = np.vstack((self._training_x, state_action))
@@ -222,31 +216,6 @@ class ANNAgent(Agent):
             return
         except KeyError:
             raise RuntimeError('ANNAgent only works using \'history\'')
-
-        # try:  # state
-        #     state = kwargs['state']
-        # except KeyError:
-        #     state = None
-        # try:  # reward
-        #     reward = kwargs['reward']
-        # except KeyError:
-        #     reward = None
-
-        # q_sa = self._q(self._previous_state, self._previous_action)
-        # max_q = self._max_q(state)
-        # new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
-
-        # state_action = np.append(self._previous_state.binary_representation().to_nparray(), 
-        #                             self._previous_action.binary_representation().to_nparray())
-        # X = state_action.reshape(1, -1)
-        # y = np.array([new_q])
-        # self._previous_state = state
-
-        # feed_dict = {self._inputs: X, self._labels: y}
-        # self._train_step = self._sess.run(self._global_step)
-        # self._sess.run(self._train_opt, feed_dict=feed_dict)
-        # summary = self._sess.run(self._merged, feed_dict=feed_dict)
-        # self._log_writer.add_summary(summary, self._train_step)
 
     def act(self, state, **kwargs):
         '''
@@ -285,18 +254,10 @@ class ANNAgent(Agent):
 
         Raises ValueError if the filename is not specified.
         '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
-
-        with open(filename + '.pkl', 'rb') as f:
-            self.__dict__ = load(f)
-
+        Agent.load(self, **kwargs)
         self._tf = {}
         self._generate_network()
-        self._tf['saver'].restore(self._tf['session'], './tf/'+filename)
-
+        self._tf['saver'].restore(self._tf['session'], kwargs.get('path', self._path) + '/tf/' + kwargs['filename'])
 
     def save(self, **kwargs):
         '''
@@ -308,20 +269,11 @@ class ANNAgent(Agent):
 
         Raises ValueError if the filename is not specified.
         '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
         
-        pickle_data = dict((key, value) for key, value in self.__dict__.items() if key not in ['_tf', 'data_collector'])
-        # for k, v in self.__dict__.items():
-        #     if not isinstance(v, (tf.Tensor, tf.SparseTensor, tf.Variable, tf.Graph)):
-        #         pickle_data[k] = v
-
-        with open(path + filename + '.pkl', 'wb+') as f:
-            dump(pickle_data, f, HIGHEST_PROTOCOL)
-
-        self._tf['saver'].save(self._tf['session'], path + '/tf' + filename)
+        pickle_data = tuple(key for key in self.__dict__ if key not in ['_tf', 'data_collector'])
+        path, filename = Agent.save(self, **kwargs, data=pickle_data)
+        self._tf['saver'].save(self._tf['session'], kwargs.get('path', self._path) + '/tf/' + kwargs['filename'])
+        return path, filename
 
     def _report(self, **kwargs):
         '''

@@ -71,3 +71,6 @@ class Subject(RLBase):
 
     def printable(self):
         pass
+
+    def __repr__(self):
+        return 'Subject'

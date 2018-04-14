@@ -40,3 +40,6 @@ class UserAgent(Agent):
         while action is None:
             action = input('Choose action for this state: {}'.format(s))
         return ValueSet(action)
+
+    def __repr__(self):
+        return 'UserAgent'
