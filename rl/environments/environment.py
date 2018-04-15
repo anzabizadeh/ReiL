@@ -43,6 +43,7 @@ class Environment(RLBase):
         Arguments
         ---------
             filename: if given, Environment attempts to open a saved environment by openning the file. This argument cannot be used along other arguments.
+            name: the name of the environment
             episodes: number of episodes of run. (Default = 1)
             termination: when to terminate one episode. (Default = 'any')
                 'any': terminate if any of the subjects is terminated.
@@ -349,20 +350,22 @@ class Environment(RLBase):
             self._agent = self._subject = {}
             for name, obj_type in self._env_data['agents']:
                 self._agent[name] = obj_type()
-                self._agent[name].load(path=path+'/'+filename, filename=name)
+                self._agent[name].load(path=path+'/'+filename+'.data', filename=name)
 
             for name, obj_type in self._env_data['agents']:
                 self._subject[name] = obj_type()
-                self._subject[name].load(path=path+'/'+filename, filename=name)
+                self._subject[name].load(path=path+'/'+filename+'.data', filename=name)
 
-        elif object_name in self._agent:
-            self._agent[object_name].load(filename=filename)
-            for agent in self._agent:
-                self._agent[agent].reset()
-        elif object_name in self._subject:
-            self._subject[object_name].load(filename=filename)
-            for subject in self._subject:
-                self._subject[subject].reset()
+            del self._env_data
+
+        else:
+            for obj in object_name:
+                if obj in self._agent:
+                    self._agent[obj].load(path=path+'/'+filename+'.data', filename=obj)
+                    self._agent[obj].reset()
+                elif obj in self._subject:
+                    self._subject[obj].load(path=path+'/'+filename+'.data', filename=obj)
+                    self._subject[obj].reset()
 
     def save(self, **kwargs):
         '''
@@ -382,21 +385,22 @@ class Environment(RLBase):
             self._env_data = {'agents': [], 'subjects': []}
             
             for name, agent in self._agent.items():
-                _, fn = agent.save(path=path+'/'+filename, filename=name)
+                _, fn = agent.save(path=path+'/'+filename+'.data', filename=name)
                 self._env_data['agents'].append((fn, type(agent)))
 
             for name, subject in self._subject.items():
-                _, fn = subject.save(path=path+'/'+filename, filename=name)
+                _, fn = subject.save(path=path+'/'+filename+'.data', filename=name)
                 self._env_data['subjects'].append((fn, type(subject)))
 
             RLBase.save(self, filename=filename, path=path,
                 data=['_env_data', '_episodes', '_max_steps', '_termination', '_reset', '_learning_method'])
+            del self._env_data
         else:
             for obj in object_name:
                 if obj in self._agent:
-                    self._agent[obj].save(path=path+'/'+filename, filename=obj)
+                    self._agent[obj].save(path=path+'/'+filename+'.data', filename=obj)
                 elif obj in self._subject:
-                    self._subject[obj].save(path=path+'/'+filename, filename=obj)
+                    self._subject[obj].save(path=path+'/'+filename+'.data', filename=obj)
 
     def __repr__(self):
         return 'Environment'

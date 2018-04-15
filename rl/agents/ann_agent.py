@@ -9,56 +9,14 @@ A Q-learning agent with Neural Network Q-function approximator
 '''
 
 
-from pickle import load, dump, HIGHEST_PROTOCOL
+from pickle import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
 
 import numpy as np
 import tensorflow as tf
 
-from rl.agents.agent import Agent
-
-
-def main():
-    from rl.valueset import ValueSet
-    from random import randint
-
-    print('This is a simple game. a random number is generated and the agent should move left or right to get to target.')
-
-    action_set = ValueSet([-1, 0, 1]).as_valueset_array()
-    sample_agent = ANNAgent(epsilon=0.1, hidden_layer_sizes=(100,), default_actions=action_set, state_size=3)
-    sample_agent.save(filename='test')
-    sample_agent.load(filename='test')
-    sample_agent.status = 'training'
-    state = ValueSet()
-    state.min = 0
-    state.max = 100
-    action = ValueSet()
-    action.min = -1
-    action.max = 1
-    target = ValueSet(randint(1, 100))
-    print('target=', target.to_list())
-    for i in range(30):
-        state.value = randint(1, target.to_list()[0])
-        print('game ', i, ' state= ', state.to_list())
-        max_iteration = 50
-        while state != target:
-            history = []
-            itr = 0
-            while itr <= max_iteration:
-                itr += 1
-                history.append(state)
-                action.value = sample_agent.act(state).value
-                history.append(action)
-                print(state.to_list()[0], ' -> ', action.to_list()[0], end=', ')
-                state.value = min(max(state.value[0] + action.value[0], 0), target.value[0])
-                reward = state.to_list()[0]-target.to_list()[0]
-                history.append(reward)
-        # sample_agent.learn(state=state, reward=1)
-            sample_agent.learn(history=history)
-    
-    for state in range(1, target):
-        print(sample_agent.act(state, method=''))
+from .agent import Agent
 
 
 class ANNAgent(Agent):
@@ -257,7 +215,7 @@ class ANNAgent(Agent):
         Agent.load(self, **kwargs)
         self._tf = {}
         self._generate_network()
-        self._tf['saver'].restore(self._tf['session'], kwargs.get('path', self._path) + '/tf/' + kwargs['filename'])
+        self._tf['saver'].restore(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
 
     def save(self, **kwargs):
         '''
@@ -272,7 +230,7 @@ class ANNAgent(Agent):
         
         pickle_data = tuple(key for key in self.__dict__ if key not in ['_tf', 'data_collector'])
         path, filename = Agent.save(self, **kwargs, data=pickle_data)
-        self._tf['saver'].save(self._tf['session'], kwargs.get('path', self._path) + '/tf/' + kwargs['filename'])
+        self._tf['saver'].save(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
         return path, filename
 
     def _report(self, **kwargs):
@@ -301,9 +259,7 @@ class ANNAgent(Agent):
 
     def __del__(self):
         self._tf['log_writer'].close()
+        self._tf['session'].close()
 
     def __repr__(self):
         return 'ANNAgent'
-
-if __name__ == '__main__':
-    main()
