@@ -50,6 +50,7 @@ class MNKBoard:
             n: number of columns (default=3)
             k: winning criteria (default=3)
             players: number of players (default=2)
+            can_recapture: whether a piece can be put on an occupied square
         '''
         try:  # m
             self._m = kwargs['m']
@@ -67,6 +68,10 @@ class MNKBoard:
             self._players = kwargs['players']
         except KeyError:
             self._players = 2
+        try:  # players
+            self._can_recapture = kwargs['can_recapture']
+        except KeyError:
+            self._can_recapture = True
 
         self._board = [0]*(self._m*self._n)
 
@@ -83,13 +88,22 @@ class MNKBoard:
 
         Raises ValueError if the player or the location is out of range or niether index nor row-column is provided.
         '''
+        try:
+            can_recapture = kwargs['can_recapture']
+        except KeyError:
+            can_recapture = self._can_recapture
+
         if (player <= 0) | (player > self._players):
             raise ValueError('player not found.')
         if not kwargs:
             raise ValueError('No row-column pair or index found.')
         try:
+            if (self._board[kwargs['index']] != 0) & (not can_recapture):
+                raise ValueError('The square is already occupied.')
             self._board[kwargs['index']] = player
         except KeyError:
+            if (self._board[kwargs['row']*self._n + kwargs['column']] != 0) & (not can_recapture):
+                raise ValueError('The square is already occupied.')
             self._board[kwargs['row']*self._n + kwargs['column']] = player
 
     def clear_square(self, **kwargs):
@@ -181,6 +195,8 @@ class MNKBoard:
                 i = i + 1
         return matrix
 
+    def __repr__(self):
+        return 'MNKBoard'
 
 if __name__ == '__main__':
     main()

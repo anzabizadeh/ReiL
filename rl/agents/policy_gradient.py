@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-ANNAgent class
+PGAgent class
 =================
 
 A Policy Gradient agent with Neural Network action approximator
@@ -9,12 +9,9 @@ A Policy Gradient agent with Neural Network action approximator
 '''
 
 
-# KNOWN ISSUES:
-# Implement NeuralAgent.
+from random import choice, random
 
 import numpy as np
-import tensorflow as tf
-from random import choice, random
 import tensorflow as tf
 
 from rl.agents.agent import Agent
@@ -71,6 +68,7 @@ class PGAgent(Agent):
         reset: Not Implemented Yet!
     '''
     def __init__(self, **kwargs):
+        raise NotImplementedError
         '''
         Initialize a policy gradient-based agent.
 
@@ -277,6 +275,41 @@ class PGAgent(Agent):
                 rep += np.sum(np.subtract(kwargs['old']['_clf.coefs_'][i], kwargs['new']['_clf.coefs_'][i]))
 
         return rep
+
+    def load(self, **kwargs):
+        '''
+        Load an object from a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+
+        Raises ValueError if the filename is not specified.
+        '''
+        Agent.load(self, **kwargs)
+        self._tf = {}
+        self._generate_network()
+        self._tf['saver'].restore(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+
+    def save(self, **kwargs):
+        '''
+        Save the object to a file.
+
+        Arguments
+        ---------
+            filename: the name of the file to be saved.
+
+        Raises ValueError if the filename is not specified.
+        '''
+        
+        pickle_data = tuple(key for key in self.__dict__ if key not in ['_tf', 'data_collector'])
+        path, filename = Agent.save(self, **kwargs, data=pickle_data)
+        self._tf['saver'].save(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+        return path, filename
+
+
+    def __repr__(self):
+        return 'PGAgent'
 
 if __name__ == '__main__':
     main()

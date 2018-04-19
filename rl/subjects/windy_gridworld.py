@@ -147,6 +147,8 @@ class WindyGridworld(MNKBoard, Subject):
         self._player_location = [*self._start]
         MNKBoard.set_piece(self, player=1, row=self._player_location[0], column=self._player_location[1])
 
+    def __repr__(self):
+        return 'WindyGridworld'
 
 if __name__ == '__main__':
     main()

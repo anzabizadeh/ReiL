@@ -208,3 +208,6 @@ class TD0Agent(Agent):
                     rep += abs(new.get(s, {}).get(a, 0) - old.get(s, {}).get(a, 0))
 
         return rep
+
+    def __repr__(self):
+        return 'TDAgent'

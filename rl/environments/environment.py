@@ -8,11 +8,14 @@ This `environment` class provides a learning environment for any reinforcement l
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from pickle import load, dump, HIGHEST_PROTOCOL
 import signal
-import sys
+import sys, inspect
+import pathlib
 
 from ..base import RLBase
-
+import rl.agents as agents 
+import rl.subjects as subjects
 
 class Environment(RLBase):
     '''
@@ -40,6 +43,8 @@ class Environment(RLBase):
         Arguments
         ---------
             filename: if given, Environment attempts to open a saved environment by openning the file. This argument cannot be used along other arguments.
+            path: path of the file to be loaded (should be used with filename)
+            name: the name of the environment
             episodes: number of episodes of run. (Default = 1)
             termination: when to terminate one episode. (Default = 'any')
                 'any': terminate if any of the subjects is terminated.
@@ -51,11 +56,11 @@ class Environment(RLBase):
                 'every step': learn after every move.
                 'history': learn after each episode.
         '''
+        RLBase.__init__(self, **kwargs)
         if 'filename' in kwargs:
-            self.load(filename=kwargs['filename'])
+            self.load(path=kwargs.get('path','.'), filename=kwargs['filename'])
             return
 
-        RLBase.__init__(self, **kwargs)
         RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
                            episodes=1, max_steps=10000, termination='any', reset='all',
                            learning_method='every step',
@@ -328,47 +333,76 @@ class Environment(RLBase):
             object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. (Default = 'all')
         Raises ValueError if the filename is not specified.
         '''
-        try:  # object_name
-            object_name = kwargs['object_name']
-        except KeyError:
-            object_name = 'all'
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the input file not specified.')
+        object_name = kwargs.get('object_name', 'all')
+        filename = kwargs.get('filename', self._name)
+        path = kwargs.get('path', self._path)
+        # try:  # object_name
+        #     object_name = kwargs['object_name']
+        # except KeyError:
+        #     object_name = 'all'
+        # try:  # filename
+        #     filename = kwargs['filename']
+        # except KeyError:
+        #     raise ValueError('name of the input file not specified.')
 
         if object_name == 'all':
             RLBase.load(self, filename=filename)
-        elif object_name in self._agent:
-            self._agent[object_name].load(filename=filename)
-            for agent in self._agent:
-                self._agent[agent].reset()
-        elif object_name in self._subject:
-            self._subject[object_name].load(filename=filename)
-            for subject in self._subject:
-                self._subject[subject].reset()
+            # clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+            self._agent = {}
+            self._subject = {}
+            for name, obj_type in self._env_data['agents']:
+                self._agent[name] = obj_type()
+                self._agent[name].load(path=path+'/'+filename+'.data', filename=name)
+
+            for name, obj_type in self._env_data['subjects']:
+                self._subject[name] = obj_type()
+                self._subject[name].load(path=path+'/'+filename+'.data', filename=name)
+
+            del self._env_data
+
+        else:
+            for obj in object_name:
+                if obj in self._agent:
+                    self._agent[obj].load(path=path+'/'+filename+'.data', filename=obj)
+                    self._agent[obj].reset()
+                elif obj in self._subject:
+                    self._subject[obj].load(path=path+'/'+filename+'.data', filename=obj)
+                    self._subject[obj].reset()
 
     def save(self, **kwargs):
         '''
         Save an object or the environment to a file.
         Arguments
         ---------
-            filename: the name of the file to be loaded.
+            filename: the name of the file to be saved.
+            path: the path of the file to be saved. (Default='./')
             object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. (Default = 'all')
         Raises ValueError if the filename is not specified.
         '''
-        try:  # object_name
-            object_name = kwargs['object_name']
-        except KeyError:
-            object_name = 'all'
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
+        object_name = kwargs.get('object_name', 'all')
+        filename = kwargs.get('filename', self._name)
+        path = kwargs.get('path', self._path)
 
         if object_name == 'all':
-            RLBase.save(self, filename=filename)
-        elif object_name in self._agent:
-            self._agent[object_name].save(filename=filename)
-        elif object_name in self._subject:
-            self._subject[object_name].save(filename=filename)
+            self._env_data = {'agents': [], 'subjects': []}
+            
+            for name, agent in self._agent.items():
+                _, fn = agent.save(path=path+'/'+filename+'.data', filename=name)
+                self._env_data['agents'].append((fn, type(agent)))
+
+            for name, subject in self._subject.items():
+                _, fn = subject.save(path=path+'/'+filename+'.data', filename=name)
+                self._env_data['subjects'].append((fn, type(subject)))
+
+            RLBase.save(self, filename=filename, path=path,
+                data=['_env_data', '_episodes', '_max_steps', '_termination', '_reset', '_learning_method', '_assignment_list'])
+            del self._env_data
+        else:
+            for obj in object_name:
+                if obj in self._agent:
+                    self._agent[obj].save(path=path+'/'+filename+'.data', filename=obj)
+                elif obj in self._subject:
+                    self._subject[obj].save(path=path+'/'+filename+'.data', filename=obj)
+
+    def __repr__(self):
+        return 'Environment'

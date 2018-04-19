@@ -35,3 +35,5 @@ class RandomAgent(Agent):
         except KeyError:
             return []
 
+    def __repr__(self):
+        return 'RandomAgent'
