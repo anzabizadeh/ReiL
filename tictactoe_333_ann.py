@@ -43,8 +43,8 @@ def mnk():
     # gma_1.0_alf_0.3_eps_0.0_slvr_sgd_lrn_0.001_hddn_(26, 5)_itr_1_btch_20
     # gma_1.0_alf_0.3_eps_0.0_slvr_sgd_lrn_0.001_hddn_(26, 10, 5)_itr_1_btch_10
 
-    scenario = [{'gamma': 1.0, 'alpha': 0.0, 'epsilon': 0.0, 'learning_rate': 1e-3,
-                 'batch_size': 25, 'hidden_layer_sizes': (26,), 'input_length': 26}]
+    # scenario = [{'gamma': 1.0, 'alpha': 0.0, 'epsilon': 0.0, 'learning_rate': 1e-3,
+    #              'batch_size': 25, 'hidden_layer_sizes': (26,), 'input_length': 26}]
     number_of_scenarios = len(scenario)
 
     # initialize dictionaries

@@ -23,6 +23,20 @@ class ANNAgent(Agent):
     '''
     A Q-learning agent with neural network Q-function approximator.
 
+    Constructor Arguments
+    ---------------------
+        alpha: learning rate for TD equation. (Default = 0.1)
+        gamma: discount factor in TD equation. (Default = 1)
+        epsilon: exploration probability. (Default = 0)
+        default_actions: list of default actions.
+        learning_rate: learning rate for ANN. (Default = 1e-3)
+        hidden_layer_sizes: tuple containing hidden layer sizes.
+        input_length: size of the input vector. (Default = 1)
+        batch_size: the learning method stores inputs for batch_size iterations and then runs one ANN training. (Default = 10)
+
+        Note: Although input_length has a default value, but it should be specified in object construction.
+        Note: This class doesn't have any data_collectors.
+
     Methods
     -------
         act: return an action based on the given state.
@@ -32,28 +46,17 @@ class ANNAgent(Agent):
     def __init__(self, **kwargs):
         '''
         Initialize a Q-Learning agent with neural network Q-function approximator.
-
-        Arguments
-        ---------
-            alpha: learning rate. (Default = 1e-5)
-            gamma: discount factor. (Default = 1)
-            hidden_layer_sizes: tuple containintg hidden layer sizes
-            random_state: random state. (Default = 1)
-            default_actions: list of default actions
         '''
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, alpha=0.1, epsilon=0, default_actions={},
-                           learning_rate=1e-5, hidden_layer_sizes=(), input_length = 1,
+                           learning_rate=1e-3, hidden_layer_sizes=(), input_length = 1,
                            training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), current_run=0, batch_size=10)
         Agent.set_params(self, **kwargs)
-        self.data_collector.available_statistics = {'report': [True, self._report, '_dummy']}
-        self.data_collector.active_statistics = ['report']
+        self.data_collector.available_statistics = {}
+        self.data_collector.active_statistics = []
 
         self._tf = {}
         self._generate_network()
-
-        # NOTE: here dummy is a dummy variable to pass to data_collector
-        self._dummy=0
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -64,6 +67,9 @@ class ANNAgent(Agent):
             self._batch_size, self._current_run, self._training_x, self._training_y = 10, 0, np.array([], ndmin=2), np.array([], ndmin=2)
 
     def _generate_network(self):
+        '''
+        Generate a tensorflow ANN network.
+        '''
         self._tf['graph'] = tf.Graph()
         with self._tf['graph'].as_default():
             self._tf['session'] = tf.Session(graph=self._tf['graph'])  # , config=tf.ConfigProto(log_device_placement=True))
@@ -131,7 +137,9 @@ class ANNAgent(Agent):
         Learn based on history.
         
         Arguments:
-            history: a list consisting of state, action, reward of an episode. If both history and state reward provided, only history is used.
+            history: a list consisting of state, action, reward of an episode.
+
+        Note: Learning actually occurs every batch_size iterations.
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
@@ -183,6 +191,8 @@ class ANNAgent(Agent):
         ---------
             state: the state for which an action is chosen.
             actions: a set of possible actions. If not provided, default actions are used.
+
+        Note: If in 'training', the action is chosen randomly with probability of epsilon. In in 'test', the action is greedy.
         '''
         self._previous_state = state
         try:  # possible actions
@@ -210,6 +220,8 @@ class ANNAgent(Agent):
         ---------
             filename: the name of the file to be loaded.
 
+        Note: tensorflow part is saved in filename.tf folder
+
         Raises ValueError if the filename is not specified.
         '''
         Agent.load(self, **kwargs)
@@ -224,6 +236,8 @@ class ANNAgent(Agent):
         Arguments
         ---------
             filename: the name of the file to be saved.
+
+        Note: tensorflow part should be in filename.tf folder
 
         Raises ValueError if the filename is not specified.
         '''
@@ -240,6 +254,8 @@ class ANNAgent(Agent):
         Arguments
         ---------
             statistic: the list of items to report.
+
+        Note: this function is not implemented yet!
         '''
         # try:
         #     item = kwargs['statistic']
@@ -252,10 +268,9 @@ class ANNAgent(Agent):
         #     for i in range(np.size(kwargs['old']['_clf.coefs_'])):
         #         rep += np.sum(np.subtract(kwargs['old']['_clf.coefs_'][i], kwargs['new']['_clf.coefs_'][i]))
 
-        summary = self._tf['session'].run(self._tf['merged'], feed_dict={})
-        self._tf['log_writer'].add_summary(summary, self._train_step)
-
-        return summary
+        # summary = self._tf['session'].run(self._tf['merged'], feed_dict={})
+        # self._tf['log_writer'].add_summary(summary, self._train_step)
+        raise NotImplementedError
 
     def __del__(self):
         self._tf['log_writer'].close()
