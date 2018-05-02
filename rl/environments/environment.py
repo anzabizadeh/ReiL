@@ -324,6 +324,70 @@ class Environment(RLBase):
         if step_count:
             return steps/episodes
 
+    def trajectory(self, **kwargs):
+        '''
+        Extract (state, action, reward) trajectory.
+        
+        At each episode, agents are called sequentially to act on their respective subject(s).
+        An episode ends if one (all) subject(s) terminates.
+        Arguments
+        ---------
+            max_steps: maximum number of steps in the episode (Default = 10,000)
+            termination: when to terminate one episode. (Default = 'any')
+                'any': terminate if any of the subjects is terminated.
+                'all': terminate if all the subjects are terminated.
+        '''
+        try:
+            max_steps = kwargs['max_steps']
+        except KeyError:
+            max_steps = self._max_steps
+        try:  # termination
+            termination = kwargs['termination'].lower()
+        except KeyError:
+            termination = self._termination
+
+        for agent in self._agent.values():
+            agent.status = 'testing'
+
+        history = {}
+        for agent_name in self._agent:
+            history[agent_name] = []
+        done = False
+        steps = 0
+        while not done:
+            if steps >= max_steps:
+                break
+            steps += 1
+            for agent_name, agent in self._agent.items():
+                if not done:
+                    subject_name, _id = self._assignment_list[agent_name]
+                    subject = self._subject[subject_name]
+                    if not subject.is_terminated:
+                        state = subject.state
+                        possible_actions = subject.possible_actions
+                        action = agent.act(state, actions=possible_actions,
+                                            printable=subject.printable())
+                        reward = subject.take_effect(_id, action)
+                        history[agent_name].append(state)
+                        history[agent_name].append(action)
+                        history[agent_name].append(reward)
+                        if subject.is_terminated:
+                            for affected_agent in self._agent.keys():
+                                if (self._assignment_list[affected_agent][0] == subject_name) & \
+                                    (affected_agent != agent_name):
+                                    history[affected_agent][-1] = -reward
+
+                if termination == 'all':
+                    done = True
+                    for sub in self._subject.values():
+                        done = done & sub.is_terminated
+                elif termination == 'any':
+                    done = False
+                    for sub in self._subject.values():
+                        done = done | sub.is_terminated
+
+        return history
+
     def load(self, **kwargs):
         '''
         Load an object or an environment from a file.
