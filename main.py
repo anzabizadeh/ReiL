@@ -9,13 +9,20 @@ import matplotlib.pyplot as plt
 
 from rl.agents import QAgent, TD0Agent, ANNAgent, RandomAgent, PGAgent
 from rl.environments import Environment
-from rl.subjects import MNKGame, WindyGridworld, CancerModel
 
-def cancer():
+def cancer(**kwargs):
+    from rl.subjects import CancerModel
+
+    # set experiment variables
+    runs = kwargs.get('runs', 100)
+    training_episodes = kwargs.get('training_episodes', 100)
+
     # load the environment or create a new one
-    filename = 'cancer_case_1'
+    filename = kwargs.get('filename', 'cancer_case')
     try:
         env = Environment(filename=filename)
+        agents = env._agent
+        subjects = env._subject
     except FileNotFoundError:
         env = Environment()
         # initialize dictionaries
@@ -34,9 +41,9 @@ def cancer():
             state_range=[0, 0.0063, 0.0125, 0.025, 0.01, 0.05, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9])
 
         # define agents
-        # agents['Doctor'] = QAgent(gamma=0.7, alpha=0.2, epsilon=0.4)
-        agents['Doctor'] = ANNAgent(gamma=0.7, alpha=0.2, epsilon=0.5, learning_rate=1e-3, batch_size=10,
-            default_actions=subjects['Patient'].possible_actions, input_length=40, hidden_layer_sizes=(10, 5))
+        agents['Doctor'] = QAgent(gamma=0.7, alpha=0.2, epsilon=0.4)
+        # agents['Doctor'] = ANNAgent(gamma=0.7, alpha=0.2, epsilon=0.5, learning_rate=1e-3, batch_size=10,
+        #     default_actions=subjects['Patient'].possible_actions, input_length=40, hidden_layer_sizes=(10, 5))
         # agents['Doctor'].report(items=['states action'])
         # assign agents to subjects
         assignment = [('Doctor', 'Patient')]
@@ -44,10 +51,6 @@ def cancer():
         # update environment
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
-
-    # set experiment variables
-    runs = 100
-    training_episodes = 100
 
     # env._agent['Doctor'].data_collector.start()
     # env._agent['Doctor'].data_collector.collect(statistic=['diff-agent'])
@@ -59,7 +62,7 @@ def cancer():
         # print(agents['Doctor'].data_collector.report(statistic=['diff-agent'], update_data=True))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
-        # env.save(filename=filename)
+        env.save(filename=filename)
 
     print(sum(len(a) for a in agents['Doctor']._state_action_list.values()))
     history = env.trajectory()
@@ -75,11 +78,21 @@ def cancer():
     plt.plot(x, rewards, 'r')
     plt.show()
 
-def mnk():
+def mnk(**kwargs):
+    from rl.subjects import MNKGame
+
+    # set experiment variables
+    runs = kwargs.get('runs', 100)
+    training_episodes = kwargs.get('training_episodes', 100)
+    test_episodes = kwargs.get('test_episodes', 0)
+
     # load the environment or create a new one
-    filename = 'mnk333_with_report'
+    filename = kwargs.get('filename', 'mnk333')
+
     try:
         env = Environment(filename=filename)
+        agents = env._agent
+        subjects = env._subject
     except FileNotFoundError:
         env = Environment()
         # initialize dictionaries
@@ -109,10 +122,6 @@ def mnk():
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    # set experiment variables
-    runs = 100
-    training_episodes = 100
-    test_episodes = 0
     results = {'ANN training win': [], 'ANN training draw': [], 'ANN training lose': [],
                'ANN testing win': [], 'ANN testing draw': [], 'ANN testing lose': []}
     for i in range(runs):
@@ -151,18 +160,29 @@ def mnk():
 
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
-        # env.save(filename=filename)
+        env.save(filename=filename)
 
     x = list(range(len(results['ANN training win'])))
     plt.plot(x, results['ANN training win'], 'b', x, results['ANN training draw'], 'g', x, results['ANN training lose'], 'r')
     plt.axis([0, len(x), 0, training_episodes])
     plt.show()
 
-def windy():
+def windy(**kwargs):
+    from rl.subjects import WindyGridworld
+
+    # set experiment variables
+    runs = kwargs.get('runs', 100)
+    training_episodes = kwargs.get('training_episodes', 100)
+    test_episodes = kwargs.get('test_episodes', 0)
+    max_steps = kwargs.get('max_steps', 10000)
+
     # load the environment or create a new one
-    filename = 'windy_2'
+    filename = kwargs.get('filename', 'windy')
+
     try:
         env = Environment(filename=filename)
+        agents = env._agent
+        subjects = env._subject
     except FileNotFoundError:
         env = Environment()
         # initialize dictionaries
@@ -193,11 +213,6 @@ def windy():
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    # set experiment variables
-    runs = 1
-    training_episodes = 5
-    max_steps = 10000
-    # test_episodes = 1
     results = {active_agent_name: []}
     steps1 = 0
     steps2 = 0
@@ -221,7 +236,7 @@ def windy():
             print('{}: {} {: 3.10f}'.format(i, steps2, results[active_agent_name][-1]))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
-    # env.save(filename=filename)
+    env.save(filename=filename)
 
     # policy = agents[active_agent_name].data_collector.report(statistic=['states action'])['states action']
     # for state in sorted(policy.keys()):
@@ -233,4 +248,9 @@ def windy():
     plt.show()
 
 if __name__ == '__main__':
-    mnk()
+    model = 'cancer'
+    filename = 'test'
+    runs = 1
+    training_episodes = 10
+    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer}
+    function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)

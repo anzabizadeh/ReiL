@@ -8,7 +8,8 @@ The base class for reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from pickle import load, dump, HIGHEST_PROTOCOL
+from dill import load, dump, HIGHEST_PROTOCOL
+# from pickle import load, dump, HIGHEST_PROTOCOL
 from random import randrange
 import pathlib
 
