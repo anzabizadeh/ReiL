@@ -155,7 +155,7 @@ class ANNAgent(Agent):
                 try:
                     state = history[i+2]
                     max_q = self._max_q(state)
-                    new_q = q_sa + self._alpha*(reward+self._gamma*max_q-q_sa)
+                    new_q = reward+self._gamma*max_q
                 except IndexError:
                     new_q = reward
 
