@@ -88,6 +88,7 @@ class RLBase():
             data = load(f)
             for key, value in data.items():
                 self.__dict__[key] = value
+            self.data_collector._object = self
 
     def save(self, **kwargs):
         '''

@@ -52,14 +52,14 @@ def cancer(**kwargs):
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    # env._agent['Doctor'].data_collector.start()
-    # env._agent['Doctor'].data_collector.collect(statistic=['diff-agent'])
+    env._agent['Doctor'].data_collector.start()
+    env._agent['Doctor'].data_collector.collect(statistic=['diff-q'])
 
     for i in range(runs):
         # run and collect statistics
         steps = env.elapse(episodes=training_episodes, max_steps=250, learning_method='history', step_count='yes')
         print(i, steps)
-        # print(agents['Doctor'].data_collector.report(statistic=['diff-agent'], update_data=True))
+        print(agents['Doctor'].data_collector.report(statistic=['diff-q'], update_data=True))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
