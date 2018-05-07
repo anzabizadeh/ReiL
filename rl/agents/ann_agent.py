@@ -151,7 +151,6 @@ class ANNAgent(Agent):
             for i in range(1, len(history), 3):
                 previous_action = history[i]
                 reward = history[i+1]
-                q_sa = self._q(previous_state, previous_action)
                 try:
                     state = history[i+2]
                     max_q = self._max_q(state)
