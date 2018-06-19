@@ -11,7 +11,7 @@ from rl.agents import QAgent, TD0Agent, ANNAgent, RandomAgent, PGAgent
 from rl.environments import Environment
 
 def cancer(**kwargs):
-    from rl.subjects import CancerModel
+    from rl.subjects import ConstrainedCancerModel
 
     # set experiment variables
     runs = kwargs.get('runs', 100)
@@ -30,15 +30,17 @@ def cancer(**kwargs):
         subjects = {}
 
         # define subjects
-        subjects['Patient'] = CancerModel(
+        state_range=[0, 0.0063, 0.0125, 0.025, 0.01, 0.05, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9]
+        subjects['Patient'] = ConstrainedCancerModel(
             drug={'initial_value': 0, 'decay_rate': 1,
                   'normal_cell_kill_rate': 0.1, 'tumor_cell_kill_rate': 0.3, 'immune_cell_kill_rate': 0.2},
             normal_cells={'initial_value': 0.40, 'growth_rate': 1, 'carrying_capacity': 1},
             tumor_cells={'initial_value': 1.00, 'growth_rate': 1.5, 'carrying_capacity': 1},
             immune_cells={'initial_value': 0, 'influx_rate': 0.33, 'threshold_rate': 0.3, 'response_rate': 0.01, 'death_rate': 0.2},
             competition_term={'normal_from_tumor': 1, 'tumor_from_normal': 1, 'tumor_from_immune': 0.5, 'immune_from_tumor': 1},
-            e=lambda x: x['tumor_cells'], termination_check= lambda x: x['tumor_cells']<=1e-5, u_max=10, u_steps=20,
-            state_range=[0, 0.0063, 0.0125, 0.025, 0.01, 0.05, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9])
+            state_function = lambda x: {'value': state_range.index(max(filter(lambda y: y <= x['tumor_cells'], state_range))), 'min': 0, 'max': len(state_range)},
+            reward_function = lambda new_x, old_x: 1-new_x['tumor_cells']/old_x['tumor_cells'],
+            termination_check= lambda x: x['tumor_cells']<=1e-5, u_max=10, u_steps=20)
 
         # define agents
         agents['Doctor'] = QAgent(gamma=0.7, alpha=0.2, epsilon=0.4)
@@ -250,7 +252,7 @@ def windy(**kwargs):
 if __name__ == '__main__':
     model = 'cancer'
     filename = 'test'
-    runs = 1
+    runs = 100
     training_episodes = 10
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)

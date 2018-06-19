@@ -39,28 +39,34 @@ class CancerModel(Subject):
             tumor_cells={'initial_value': 0, 'growth_rate': 0, 'carrying_capacity': 0},
             immune_cells={'initial_value': 0, 'influx_rate': 0, 'threshold_rate': 1, 'response_rate': 0, 'death_rate': 0},
             competition_term={'normal_from_tumor':0, 'tumor_from_normal': 0, 'tumor_from_immune': 0, 'immune_from_tumor': 0},
-            x={'drug': 0, 'normal_cells': 0, 'tumor_cells': 0, 'immune_cells': 0},
-            e=lambda x: 0, state_range=[0], termination_check= lambda x: x['tumor_cells']==0,
+            x={'drug': 0, 'normal_cells': 0, 'tumor_cells': 0, 'immune_cells': 0, 'day': 1},
+            state_function=lambda x: {'value': 0, 'min':0, 'max':0}, reward_function=lambda new_x, old_x: 1-new_x['cancer']/old_x['cancer'],
+            termination_check= lambda x: x['tumor_cells']==0,
+            # e=lambda x: 0, state_range=[0],
             u_max=10, u_steps=20)
         Subject.set_params(self, **kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
-            self._agent_list, self._drug, self._normal_cells, self._tumor_cells = {}, {}, {}, {}
-            self._immune_cells, self._x, self._e, self._state_range, self._termination_check = {}, {}, lambda x: 0, [0], lambda x: x['tumor_cells']==0
+            self._agent_list, self._drug, self._normal_cells, self._tumor_cells, self._immune_cells = {}, {}, {}, {}, {}
+            self._state_function = lambda x: {'value': 0, 'min':0, 'max':0}
+            self._reward_function = lambda new_x, old_x: 1-new_x['cancer']/old_x['cancer']
+            self._termination_check = lambda x: x['tumor_cells']==0
+            # self._e, self._state_range,  = lambda x: 0, [0]
             self._competition_term, self._u_max, self._u_steps = {}, 10, 20
 
         self._x = {'drug': self._drug['initial_value'], 'normal_cells': self._normal_cells['initial_value'],
-                   'tumor_cells': self._tumor_cells['initial_value'], 'immune_cells': self._immune_cells['initial_value']}
+                   'tumor_cells': self._tumor_cells['initial_value'], 'immune_cells': self._immune_cells['initial_value'], 'day': 1}
 
     @property
     def state(self):
-        e = self._e(self._x)
-        for i, _ in enumerate(self._state_range):
-            if e <= self._state_range[i]:
-                return ValueSet(i, min=0, max=len(self._state_range))
-        return ValueSet(len(self._state_range), min=0, max=len(self._state_range))
+        return ValueSet(**self._state_function(self._x))
+        # e = self._e(self._x)
+        # for i, _ in enumerate(self._state_range):
+        #     if e <= self._state_range[i]:
+        #         return ValueSet(i, min=0, max=len(self._state_range))
+        # return ValueSet(len(self._state_range), min=0, max=len(self._state_range))
 
     @property
     def is_terminated(self):
@@ -86,6 +92,7 @@ class CancerModel(Subject):
             return 1
 
     def take_effect(self, _id, action):
+        self._x['day'] += 1
         self._drug['infusion_rate'] = action.value[0]
         x_dot = {}
         x_dot['normal_cells'] = self._x['normal_cells'] * (
@@ -104,13 +111,14 @@ class CancerModel(Subject):
                                     - self._immune_cells['death_rate']
                                     - self._competition_term['immune_from_tumor'] * self._x['tumor_cells']
                                     - self._drug['immune_cell_kill_rate'] * (1-exp(-self._x['drug']))) + self._immune_cells['influx_rate']
-        
+
         x_dot['drug'] = self._x['drug'] * (-self._drug['decay_rate']) + self._drug['infusion_rate']
         new_x = {}
-        for i in self._x:
+        for i in x_dot:
             new_x[i] = max(self._x[i] + x_dot[i], 0)  # I manually enforced >=0 constraint, but it shouldn't be!
+        new_x['day'] = self._x['day']
 
-        r = 1 - self._e(new_x)/self._e(self._x)
+        r = self._reward_function(new_x, self._x)
         self._x = new_x
 
         return r
@@ -118,9 +126,11 @@ class CancerModel(Subject):
     def reset(self):
         self._x = {'drug': self._drug['initial_value'], 'normal_cells': self._normal_cells['initial_value'],
                    'tumor_cells': self._tumor_cells['initial_value'], 'immune_cells': self._immune_cells['initial_value']}
+        self._x['day'] = 1
 
     def __repr__(self):
         try:
-            return 'CancerModel: [N: {}, T: {}, N: {}, C: {}]'.format(self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'])
+            return 'CancerModel: [day: {}, N: {}, T: {}, N: {}, C: {}]'.format(
+                self._x['day'], self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'])
         except:
             return 'CancerModel'
