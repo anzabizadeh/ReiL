@@ -120,4 +120,7 @@ class CancerModel(Subject):
                    'tumor_cells': self._tumor_cells['initial_value'], 'immune_cells': self._immune_cells['initial_value']}
 
     def __repr__(self):
-        return 'CancerModel'
+        try:
+            return 'CancerModel: [N: {}, T: {}, N: {}, C: {}]'.format(self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'])
+        except:
+            return 'CancerModel'
