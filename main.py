@@ -6,6 +6,7 @@ Created on Mon Feb 19 15:47:46 2018
 """
 
 import matplotlib.pyplot as plt
+from random import randint, random
 
 from rl.agents import QAgent, TD0Agent, ANNAgent, RandomAgent, PGAgent
 from rl.environments import Environment
@@ -30,7 +31,22 @@ def cancer(**kwargs):
         subjects = {}
 
         # define subjects
-        state_range=[0, 0.0063, 0.0125, 0.025, 0.01, 0.05, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9]
+        # state_range = [0, 0.0063, 0.0125, 0.025, 0.01, 0.05, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9]
+        state_range = [0, 0.0076, 0.016, 0.0252, 0.0352, 0.046, 0.0576, 0.07, 0.0832, 0.0972, 0.112, 0.1276, 0.144, 0.1612, 0.1792, 0.198,  \
+             0.2176, 0.238, 0.2592, 0.2812, 0.304, 0.3276, 0.352, 0.3772, 0.4032, 0.43, 0.4576, 0.486, 0.5152, 0.5452, 0.576, 0.6076, 0.64, \
+             0.6732, 0.7072, 0.742, 0.7776, 0.814, 0.8512, 0.8892]
+
+        class drug_cap:
+            def __init__(self):
+                self._cap = randint(0, 10)
+            
+            def __call__(self, x):
+                if random()<0.01:
+                    self._cap = randint(0, 10)
+                    # print('Changed cap to {} on day {}'.format(self._cap, x['day']))
+                return self._cap
+
+        # state_range = list(x/1000 for x in range(0,9000))
         subjects['Patient'] = ConstrainedCancerModel(
             drug={'initial_value': 0, 'decay_rate': 1,
                   'normal_cell_kill_rate': 0.1, 'tumor_cell_kill_rate': 0.3, 'immune_cell_kill_rate': 0.2},
@@ -38,9 +54,11 @@ def cancer(**kwargs):
             tumor_cells={'initial_value': 1.00, 'growth_rate': 1.5, 'carrying_capacity': 1},
             immune_cells={'initial_value': 0, 'influx_rate': 0.33, 'threshold_rate': 0.3, 'response_rate': 0.01, 'death_rate': 0.2},
             competition_term={'normal_from_tumor': 1, 'tumor_from_normal': 1, 'tumor_from_immune': 0.5, 'immune_from_tumor': 1},
-            state_function = lambda x: {'value': state_range.index(max(filter(lambda y: y <= x['tumor_cells'], state_range))), 'min': 0, 'max': len(state_range)},
-            reward_function = lambda new_x, old_x: 1-new_x['tumor_cells']/old_x['tumor_cells'],
-            termination_check= lambda x: x['tumor_cells']<=1e-5, u_max=10, u_steps=20)
+            state_function = lambda x: {'value': (state_range.index(max(filter(lambda y: y <= x['tumor_cells'], state_range))), x['drug_cap']), 'min': (0, 0), 'max': (len(state_range), 10)},
+            # state_function = lambda x: {'value': (round(x['normal_cells'], 3), round(x['tumor_cells'], 3), round(x['drug'], 3)), 'min':(0, 0, 0), 'max': {2, 2, 10}},
+            reward_function = lambda new_x, old_x: -new_x['tumor_cells']-0.01*new_x['drug'],
+            termination_check= lambda x: x['tumor_cells']<=1e-5, u_max=10, u_steps=20,
+            drug_cap=drug_cap())
 
         # define agents
         agents['Doctor'] = QAgent(gamma=0.7, alpha=0.2, epsilon=0.4)
@@ -54,23 +72,25 @@ def cancer(**kwargs):
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    env._agent['Doctor'].data_collector.start()
-    env._agent['Doctor'].data_collector.collect(statistic=['diff-q'])
+    # env._agent['Doctor'].data_collector.start()
+    # env._agent['Doctor'].data_collector.collect(statistic=['diff-q'])
 
     for i in range(runs):
         # run and collect statistics
         steps = env.elapse(episodes=training_episodes, max_steps=250, learning_method='history', step_count='yes')
         print(i, steps)
-        print(agents['Doctor'].data_collector.report(statistic=['diff-q'], update_data=True))
+        # print(agents['Doctor'].data_collector.report(statistic=['diff-q'], update_data=True))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
+        print(sum(len(a) for a in agents['Doctor']._state_action_list.values()))
 
-    print(sum(len(a) for a in agents['Doctor']._state_action_list.values()))
+    env._subject['Patient'].set_params(drug_cap=lambda x: 10)
     history = env.trajectory()
     states = list(s.value[0] for i, s in enumerate(history['Doctor']) if (i % 3)==0)
     actions = list(a.value[0] for i, a in enumerate(history['Doctor']) if (i % 3)==1)
     rewards = list(r for i, r in enumerate(history['Doctor']) if (i % 3)==2)
+    print('Total reward: {}, total drug: {}'.format(sum(rewards), sum(actions)))
     x = list(range(len(states)))
     plt.subplot(1, 3, 1)
     plt.plot(x, states, 'b')
@@ -253,6 +273,6 @@ if __name__ == '__main__':
     model = 'cancer'
     filename = 'test'
     runs = 100
-    training_episodes = 10
+    training_episodes = 100
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)

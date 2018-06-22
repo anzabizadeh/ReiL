@@ -92,9 +92,9 @@ class CancerModel(Subject):
             return 1
 
     def take_effect(self, _id, action):
-        self._x['day'] += 1
         self._drug['infusion_rate'] = action.value[0]
         x_dot = {}
+        x_dot['day'] = 1
         x_dot['normal_cells'] = self._x['normal_cells'] * (
                                     self._normal_cells['growth_rate'] * (1 - self._normal_cells['carrying_capacity']*self._x['normal_cells'])
                                     - self._competition_term['normal_from_tumor'] * self._x['tumor_cells']
@@ -114,9 +114,11 @@ class CancerModel(Subject):
 
         x_dot['drug'] = self._x['drug'] * (-self._drug['decay_rate']) + self._drug['infusion_rate']
         new_x = {}
-        for i in x_dot:
-            new_x[i] = max(self._x[i] + x_dot[i], 0)  # I manually enforced >=0 constraint, but it shouldn't be!
-        new_x['day'] = self._x['day']
+        for i in self._x:
+            try:
+                new_x[i] = max(self._x[i] + x_dot[i], 0)  # I manually enforced >=0 constraint, but it shouldn't be!
+            except:
+                new_x[i] = self._x[i]
 
         r = self._reward_function(new_x, self._x)
         self._x = new_x
@@ -125,8 +127,7 @@ class CancerModel(Subject):
 
     def reset(self):
         self._x = {'drug': self._drug['initial_value'], 'normal_cells': self._normal_cells['initial_value'],
-                   'tumor_cells': self._tumor_cells['initial_value'], 'immune_cells': self._immune_cells['initial_value']}
-        self._x['day'] = 1
+                   'tumor_cells': self._tumor_cells['initial_value'], 'immune_cells': self._immune_cells['initial_value'], 'day': 1}
 
     def __repr__(self):
         try:

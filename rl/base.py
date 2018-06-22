@@ -85,7 +85,10 @@ class RLBase():
         path = kwargs.get('path', self._path)
 
         with open(path + '/' + filename + '.pkl', 'rb') as f:
-            data = load(f)
+            try:
+                data = load(f)
+            except EOFError:
+                raise RuntimeError('Corrupted data file: '+filename)
             for key, value in data.items():
                 self.__dict__[key] = value
             self.data_collector._object = self
