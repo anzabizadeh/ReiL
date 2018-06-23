@@ -37,12 +37,15 @@ def cancer(**kwargs):
              0.6732, 0.7072, 0.742, 0.7776, 0.814, 0.8512, 0.8892]
 
         class drug_cap:
-            def __init__(self):
-                self._cap = randint(0, 10)
+            def __init__(self, minimum=0, maximum=10, probability=0.01):
+                self._prob = probability
+                self._min = minimum
+                self._max = maximum
+                self._cap = randint(self._min, self._max)
             
             def __call__(self, x):
-                if random()<0.01:
-                    self._cap = randint(0, 10)
+                if random()<self._prob:
+                    self._cap = randint(self._min, self._max)
                     # print('Changed cap to {} on day {}'.format(self._cap, x['day']))
                 return self._cap
 
@@ -58,7 +61,7 @@ def cancer(**kwargs):
             # state_function = lambda x: {'value': (round(x['normal_cells'], 3), round(x['tumor_cells'], 3), round(x['drug'], 3)), 'min':(0, 0, 0), 'max': {2, 2, 10}},
             reward_function = lambda new_x, old_x: -new_x['tumor_cells']-0.01*new_x['drug'],
             termination_check= lambda x: x['tumor_cells']<=1e-5, u_max=10, u_steps=20,
-            drug_cap=drug_cap())
+            drug_cap=drug_cap(probability=0.05))
 
         # define agents
         agents['Doctor'] = QAgent(gamma=0.7, alpha=0.2, epsilon=0.4)
@@ -72,14 +75,14 @@ def cancer(**kwargs):
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    # env._agent['Doctor'].data_collector.start()
-    # env._agent['Doctor'].data_collector.collect(statistic=['diff-q'])
+    env._agent['Doctor'].data_collector.start()
+    env._agent['Doctor'].data_collector.collect(statistic=['diff-q'])
 
     for i in range(runs):
         # run and collect statistics
         steps = env.elapse(episodes=training_episodes, max_steps=250, learning_method='history', step_count='yes')
         print(i, steps)
-        # print(agents['Doctor'].data_collector.report(statistic=['diff-q'], update_data=True))
+        print(agents['Doctor'].data_collector.report(statistic=['diff-q'], update_data=True))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
@@ -272,7 +275,7 @@ def windy(**kwargs):
 if __name__ == '__main__':
     model = 'cancer'
     filename = 'test'
-    runs = 100
-    training_episodes = 100
+    runs = 1
+    training_episodes = 1
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
