@@ -20,6 +20,7 @@ Classes
 from .subject import Subject
 from .mnkgame import MNKGame
 from .windy_gridworld import WindyGridworld
+from .risk import Risk
 from .cancer_model import CancerModel
 from .constrained_cancer_model import ConstrainedCancerModel
 # from .snake import Snake
