@@ -339,6 +339,8 @@ class ValueSet():
     def __hash__(self):
         return self.value.__hash__()
 
+    def __repr__(self):
+        return ''.join(['[', str(self.value), '], min=', str(self._min), ', max=', str(self._max)])
 
 if __name__ == '__main__':
     main()

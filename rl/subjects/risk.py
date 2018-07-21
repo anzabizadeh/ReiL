@@ -19,9 +19,10 @@ def main():
     player = {}
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')
-    board.take_effect(player['P1'], ValueSet(2))
-    board.take_effect(player['P2'], ValueSet(1))
-    print(board._pieces)
+    while not board.is_terminated:
+        board.take_effect(player['P1'], ValueSet(2))
+        board.take_effect(player['P2'], ValueSet(1))
+        print(board._pieces)
 
 
 class Risk(Subject):
@@ -67,16 +68,22 @@ class Risk(Subject):
     @property
     def is_terminated(self):
         '''Return True if no moves is left.'''
-        return (self._pieces[0] == 0) | (self._pieces[1] == 0)
+        return (self._pieces[0] <= 1) | (self._pieces[1] <= 0)
 
     @property
     def possible_actions(self):
         '''Return a list of indexes of empty squares.'''
         max_move = min(self._pieces[self._turn], [3, 2][self._turn])
+        if self._turn == 1:
+            max_move = min(self._temp, max_move)
         try:
-            return ValueSet(list(range(max_move) + 1), min=1, max=[3, 2][self._turn]).as_valueset_array()
+            return ValueSet(list(range(1, max_move + 1)), min=1, max=[3, 2][self._turn]).as_valueset_array()
         except TypeError:
             return ValueSet(0, min=0, max=[3, 2][self._turn]).as_valueset_array()
+
+    @property
+    def state(self):
+        return ValueSet(self._pieces, min=[0, 0], max=self._initial_pieces)
 
     def register(self, player_name):
         '''
@@ -104,20 +111,27 @@ class Risk(Subject):
             self._turn = 1
             return 0
         else:
+            # reward = 0
             p1 = list(randrange(6) for _ in range(self._temp))
             p2 = list(randrange(6) for _ in range(action.value[0]))
             for _ in range(min(self._temp, action.value[0])):
                 if max(p1)<=max(p2):
                     self._pieces[0] -= 1
+                    # reward += 1
                 else:
                     self._pieces[1] -= 1
+                    # reward -= 1
                 p1.remove(max(p1))
                 p2.remove(max(p2))
-            
-            if self._pieces[0] == 0:  # player 1 wins, so player 2 loses
+
+            self._turn = 0
+            # return reward
+            if self._pieces[0] <= 0:  # player 1 wins, so player 2 loses
+                return 1
+            elif self._pieces[1] <= 0:
                 return -1
             else:
-                return 1
+                return 0
 
     def reset(self):
         '''Clear the board and update board_status.'''

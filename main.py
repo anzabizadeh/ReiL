@@ -8,7 +8,7 @@ Created on Mon Feb 19 15:47:46 2018
 import matplotlib.pyplot as plt
 from random import randint, random
 
-from rl.agents import QAgent, TD0Agent, ANNAgent, RandomAgent, PGAgent
+from rl.agents import QAgent # , TD0Agent, ANNAgent, RandomAgent, PGAgent
 from rl.environments import Environment
 
 def cancer(**kwargs):
@@ -272,10 +272,111 @@ def windy(**kwargs):
     plt.axis([0, len(x), 0, max(results[active_agent_name])])
     plt.show()
 
+def risk(**kwargs):
+    from rl.subjects import Risk
+
+    # set experiment variables
+    runs = kwargs.get('runs', 1000)
+    training_episodes = kwargs.get('training_episodes', 100)
+    test_episodes = kwargs.get('test_episodes', 100)
+
+    # load the environment or create a new one
+    filename = kwargs.get('filename', 'risk')
+
+    try:
+        env = Environment(filename=filename)
+        agents = env._agent
+        subjects = env._subject
+    except FileNotFoundError:
+        env = Environment()
+        # initialize dictionaries
+        agents = {}
+        subjects = {}
+
+        # define subjects
+        subjects['Board A'] = Risk(pieces=[15, 15])
+        # default_actions = subjects['Board A'].possible_actions
+
+        # define agents
+        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        agents['Opponent'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        # agents['Opponent'].load(filename='mnk333_opponent')
+
+        # assign agents to subjects
+        assignment = [('Q', 'Board A'), ('Opponent', 'Board A')]
+
+        # update environment
+        env.add(agents=agents, subjects=subjects)
+        env.assign(assignment)
+
+    results = {'ANN training win': [], 'ANN training draw': [], 'ANN training lose': [],
+               'ANN testing win': [], 'ANN testing draw': [], 'ANN testing lose': []}
+    agents['Q'].data_collector.start()
+    agents['Opponent'].data_collector.start()
+    for i in range(runs):
+        # run and collect statistics
+
+        # if agents['ANN'].data_collector.is_active:
+        #     agents['ANN'].data_collector.collect()
+
+        tally1 = env.elapse(episodes=training_episodes, reset='all',
+                            termination='all', learning_method='history',
+                            reporting='none', tally='yes')
+        # if agents['ANN'].data_collector.is_active:
+        #     print(agents['ANN'].data_collector.report())
+        # else:
+        #     agents['ANN'].data_collector.start()
+
+        # switch agents for test
+        # temp = env._agent['Opponent']
+        # env._agent['Opponent'] = test_agent
+        # tally2 = env.elapse(episodes=test_episodes, reset='all',
+        #                     termination='all', learning_method='none',
+        #                     reporting='none', tally='yes')
+        # env._agent['Opponent'] = temp
+
+        results['ANN training win'].append(tally1['Q'])
+        results['ANN training lose'].append(tally1['Opponent'])
+        results['ANN training draw'].append(training_episodes-tally1['Q']-tally1['Opponent'])
+        results['ANN testing win'].append(0)  # tally2['ANN'])
+        results['ANN testing lose'].append(0)  # tally2['Opponent'])
+        results['ANN testing draw'].append(0)  # test_episodes-tally2['ANN']-tally2['Opponent'])
+
+        # # print result of each run
+        print('run {: }: TRAINING: win: {: } draw:{: } lose:{: } TESTING: win: {: } draw:{: } lose:{: }'
+              .format(i, results['ANN training win'][-1], results['ANN training draw'][-1], results['ANN training lose'][-1],
+                    results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
+
+
+        # # save occasionally in case you don't lose data if you get bored of running the code!
+        env.save(filename=filename)
+
+    print('State-actions q:')
+    print('Q:')
+    sa = agents['Q'].data_collector.report(statistic=['state-actions q'])['state-actions q']
+    for s in sorted(sa, reverse=True):
+        print(s[0].value, s[1].value, sa[s])
+    print('Opponent:')
+    sa = agents['Opponent'].data_collector.report(statistic=['state-actions q'])['state-actions q']
+    for s in sorted(sa, reverse=True):
+        print(s[0].value, s[1].value, sa[s])
+
+
+    print('States action:')
+    print('Q:')
+    sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
+    for s in sorted(sa, reverse=True):
+        print(s.value, sa[s][0].value, sa[s][1])
+    print('Opponent:')
+    sa = agents['Opponent'].data_collector.report(statistic=['states action'])['states action']
+    for s in sorted(sa, reverse=True):
+        print(s.value, sa[s][0].value, sa[s][1])
+
+
 if __name__ == '__main__':
-    model = 'cancer'
-    filename = 'test'
+    model = 'risk'
+    filename = 'risk_test'
     runs = 1
-    training_episodes = 1
-    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer}
+    training_episodes = 5
+    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
