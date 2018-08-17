@@ -376,7 +376,7 @@ def risk(**kwargs):
 if __name__ == '__main__':
     model = 'risk'
     filename = 'risk_test'
-    runs = 1
-    training_episodes = 5
+    runs = 1000
+    training_episodes = 10000
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
