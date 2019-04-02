@@ -372,11 +372,95 @@ def risk(**kwargs):
     for s in sorted(sa, reverse=True):
         print(s.value, sa[s][0].value, sa[s][1])
 
+def warfarin(**kwargs):
+    from rl.subjects.warfarin_model import WarfarinModel
+
+    # set experiment variables
+    runs = kwargs.get('runs', 1000)
+    training_episodes = kwargs.get('training_episodes', 100)
+    test_episodes = kwargs.get('test_episodes', 100)
+
+    # load the environment or create a new one
+    filename = kwargs.get('filename', 'warfarin')
+
+    try:
+        env = Environment(filename=filename)
+        agents = env._agent
+        subjects = env._subject
+    except FileNotFoundError:
+        env = Environment()
+        # initialize dictionaries
+        agents = {}
+        subjects = {}
+
+        # define subjects
+        subjects['W'] = WarfarinModel()
+        # default_actions = subjects['Board A'].possible_actions
+
+        # define agents
+        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+
+        # assign agents to subjects
+        assignment = [('Q', 'W')]
+
+        # update environment
+        env.add(agents=agents, subjects=subjects)
+        env.assign(assignment)
+
+    results = {'ANN training win': [], 'ANN training draw': [], 'ANN training lose': [],
+               'ANN testing win': [], 'ANN testing draw': [], 'ANN testing lose': []}
+    agents['Q'].data_collector.start()
+    for i in range(runs):
+        # run and collect statistics
+
+        # if agents['ANN'].data_collector.is_active:
+        #     agents['ANN'].data_collector.collect()
+
+        tally1 = env.elapse(episodes=training_episodes, reset='all',
+                            termination='all', learning_method='history',
+                            reporting='none', tally='yes')
+        # if agents['ANN'].data_collector.is_active:
+        #     print(agents['ANN'].data_collector.report())
+        # else:
+        #     agents['ANN'].data_collector.start()
+
+        # switch agents for test
+        # temp = env._agent['Opponent']
+        # env._agent['Opponent'] = test_agent
+        # tally2 = env.elapse(episodes=test_episodes, reset='all',
+        #                     termination='all', learning_method='none',
+        #                     reporting='none', tally='yes')
+        # env._agent['Opponent'] = temp
+
+        results['ANN training win'].append(tally1['Q'])
+
+        # # print result of each run
+        print('run {: }: TRAINING: win: {: }'
+              .format(i, results['ANN training win'][-1]))
+
+
+        # # save occasionally in case you don't lose data if you get bored of running the code!
+        env.save(filename=filename)
+
+    print('State-actions q:')
+    print('Q:')
+    sa = agents['Q'].data_collector.report(statistic=['state-actions q'])['state-actions q']
+    for s in sorted(sa, reverse=True):
+        print(s[0].value, s[1].value, sa[s])
+
+
+    print('States action:')
+    print('Q:')
+    sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
+    for s in sorted(sa, reverse=True):
+        print(s.value, sa[s][0].value, sa[s][1])
+
+
 
 if __name__ == '__main__':
-    model = 'risk'
-    filename = 'risk_test'
+    model = 'warfarin'
+    filename = 'warfarin_test'
     runs = 1000
     training_episodes = 10000
-    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk}
+    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)

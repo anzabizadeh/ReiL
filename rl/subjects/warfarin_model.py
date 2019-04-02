@@ -10,6 +10,11 @@ This `warfarin_model` class implements a two compartment PK/PD model for warfari
 
 from math import exp
 
+import rpy2
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+from rpy2.robjects.vectors import StrVector
+
 from ..valueset import ValueSet
 from .subject import Subject
 
@@ -17,7 +22,7 @@ from .subject import Subject
 class WarfarinModel(Subject):
     '''
     Two compartment PK/PD model for wafarin.
-    
+
     Attributes
     ----------
         state: the state of the subject as a ValueSet.
@@ -30,36 +35,62 @@ class WarfarinModel(Subject):
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
     '''
+
     def __init__(self, **kwargs):
         Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self,
-            Cs_super=0, AGE=60, CYP2C9='*1/*1', VKORC1='A/A', SS=1, maxTime=24, rseed=12345,
-            day=0, state={}, 
-            max_dose=15, dose_steps=0.5,
-            state_function=lambda x: {'value': 0, 'min':0, 'max':0}, reward_function=lambda new_x, old_x: 1-new_x['cancer']/old_x['cancer'],
-            termination_check= lambda x: x['tumor_cells']==0,
-            )
+        Subject.set_defaults(self, model_filename='./rl/subjects/warfarin.pkpd',
+                             Cs_super=0, age=60, CYP2C9='*1/*1', VKORC1='A/A', SS=1, maxTime=24, rseed=12345,
+                             day=0, max_day=90, INR_previous=None, INR_current=None,
+                             d_previous=None, d_current=1,
+                             max_dose=15, dose_steps=0.5, TTR_range=(2, 3)
+                             )
         Subject.set_params(self, **kwargs)
+
+        try:
+            with open(self._model_filename, mode='r') as file:
+                warfarin_code = file.read()
+        except FileNotFoundError:
+            raise FileNotFoundError('The PK/PD Model Not Found')
+        utils = importr('utils')
+        utils.chooseCRANmirror(ind=1)
+        utils.install_packages(StrVector(['deSolve']))
+        robjects.r(warfarin_code)
+        self._hamberg_2007 = robjects.r['hamberg_2007']
+
+        if False:
+            self._model_filename='./rl/subjects/warfarin.pkpd'
+            self._Cs_super=0
+            self._age=60
+            self._CYP2C9='*1/*1'
+            self._VKORC1='A/A'
+            self._SS=1
+            self._maxTime=24
+            self._rseed=12345
+            self._day=0
+            self._max_day=90
+            self._max_dose=15
+            self._dose_steps=0.5
+            self._INR_previous=None
+            self._INR_current=None
+            self._d_previous=None
+            self._d_current=1
+            self._TTR_range = (2, 3)
 
     @property
     def state(self):
-        return ValueSet(**self._state_function(self._x))
-        # e = self._e(self._x)
-        # for i, _ in enumerate(self._state_range):
-        #     if e <= self._state_range[i]:
-        #         return ValueSet(i, min=0, max=len(self._state_range))
-        # return ValueSet(len(self._state_range), min=0, max=len(self._state_range))
+        return ValueSet((self._age, self._CYP2C9, self._VKORC1, self._INR_previous, self._INR_current, self._d_previous, self._d_current), min=None, max=None)
+
 
     @property
-    def is_terminated(self):
-        return self._termination_check(self._x)
+    def is_terminated(self):  # ready
+        return self._day == self._max_day
 
     @property
-    def possible_actions(self):
-        return ValueSet([self._max_dose*x/self._dose_steps for x in range(0, self._dose_steps+1)], min=0, max=self._max_dose, 
+    def possible_actions(self):  # ready
+        return ValueSet([x*self._dose_steps for x in range(int(self._max_dose/self._dose_steps)+1)], min=0, max=self._max_dose,
                         binary=lambda x: (int(x * self._dose_steps // self._max_dose), self._dose_steps+1)).as_valueset_array()
 
-    def register(self, agent_name):
+    def register(self, agent_name):  # should work
         '''
         Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
         \nArguments:
@@ -74,46 +105,35 @@ class WarfarinModel(Subject):
             return 1
 
     def take_effect(self, _id, action):
-        self._drug['infusion_rate'] = action.value[0]
-        x_dot = {}
-        x_dot['day'] = 1
-        x_dot['normal_cells'] = self._x['normal_cells'] * (
-                                    self._normal_cells['growth_rate'] * (1 - self._normal_cells['carrying_capacity']*self._x['normal_cells'])
-                                    - self._competition_term['normal_from_tumor'] * self._x['tumor_cells']
-                                    - self._drug['normal_cell_kill_rate'] * (1-exp(-self._x['drug'])))
+        result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
+                          self._hamberg_2007(action.value[0], self._Cs_super, self._age, self._CYP2C9, self._VKORC1, self._SS, self._maxTime, self._rseed)))
+        self._INR_previous = self._INR_current
+        self._d_previous = self._d_current
+        self._day += self._d_previous
 
-        x_dot['tumor_cells'] = self._x['tumor_cells'] * (
-                                    self._tumor_cells['growth_rate'] * (1 - self._tumor_cells['carrying_capacity']*self._x['tumor_cells'])
-                                    - self._competition_term['tumor_from_immune'] * self._x['immune_cells']
-                                    - self._competition_term['tumor_from_normal'] * self._x['normal_cells']
-                                    - self._drug['tumor_cell_kill_rate'] * (1-exp(-self._x['drug'])))
+        self._Cs_super = result['Cs'][-1]
+        self._INR_current = result['INR'][-1]
+        self._d_current = 1
+        try:
+            TTR = sum((self._TTR_range[0] <= (self._INR_current-self._INR_previous)/self._d_previous*j <= self._TTR_range[1]
+                for j in range(self._d_previous)))
+        except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
+            TTR = 0
 
-        x_dot['immune_cells'] = self._x['immune_cells'] * (
-                                    self._immune_cells['response_rate']*self._x['tumor_cells']/(self._immune_cells['threshold_rate']+self._x['tumor_cells'])
-                                    - self._immune_cells['death_rate']
-                                    - self._competition_term['immune_from_tumor'] * self._x['tumor_cells']
-                                    - self._drug['immune_cell_kill_rate'] * (1-exp(-self._x['drug']))) + self._immune_cells['influx_rate']
-
-        x_dot['drug'] = self._x['drug'] * (-self._drug['decay_rate']) + self._drug['infusion_rate']
-        new_x = {}
-        for i in self._x:
-            try:
-                new_x[i] = max(self._x[i] + x_dot[i], 0)  # I manually enforced >=0 constraint, but it shouldn't be!
-            except:
-                new_x[i] = self._x[i]
-
-        r = self._reward_function(new_x, self._x)
-        self._x = new_x
-
-        return r
+        return TTR*self._d_previous
 
     def reset(self):
-        self._x = {'drug': self._drug['initial_value'], 'normal_cells': self._normal_cells['initial_value'],
-                   'tumor_cells': self._tumor_cells['initial_value'], 'immune_cells': self._immune_cells['initial_value'], 'day': 1}
+        self._Cs_super=0
+        self._day=0
+        self._INR_previous=None
+        self._INR_current=None
+        self._d_previous=None
+        self._d_current=1
 
     def __repr__(self):
         try:
-            return 'CancerModel: [day: {}, N: {}, T: {}, N: {}, C: {}]'.format(
+            return 'WarfarinModel: [day: {}, N: {}, T: {}, N: {}, C: {}]'.format(
                 self._x['day'], self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'])
         except:
-            return 'CancerModel'
+            return 'WarfarinModel'
+
