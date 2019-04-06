@@ -394,7 +394,7 @@ def warfarin(**kwargs):
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel()
+        subjects['W'] = WarfarinModel(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(1, 2), d_max=1)
         # default_actions = subjects['Board A'].possible_actions
 
         # define agents
@@ -442,11 +442,11 @@ def warfarin(**kwargs):
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
 
-    print('State-actions q:')
-    print('Q:')
-    sa = agents['Q'].data_collector.report(statistic=['state-actions q'])['state-actions q']
-    for s in sorted(sa, reverse=True):
-        print(s[0].value, s[1].value, sa[s])
+    # print('State-actions q:')
+    # print('Q:')
+    # sa = agents['Q'].data_collector.report(statistic=['state-actions q'])['state-actions q']
+    # for s in sorted(sa, reverse=True):
+    #     print(s[0].value, s[1].value, sa[s])
 
 
     print('States action:')
@@ -459,8 +459,13 @@ def warfarin(**kwargs):
 
 if __name__ == '__main__':
     model = 'warfarin'
-    filename = 'warfarin_test'
-    runs = 1000
-    training_episodes = 10000
+    filename = 'warfarin_patient_19'
+    runs = 100
+    training_episodes = 1000
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
+
+
+# include Cs and previous dose in our state
+# start from everyday measurement with no penalization
+

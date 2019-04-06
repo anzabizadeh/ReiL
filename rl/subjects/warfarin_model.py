@@ -38,12 +38,14 @@ class WarfarinModel(Subject):
 
     def __init__(self, **kwargs):
         Subject.__init__(self, **kwargs)
+
         Subject.set_defaults(self, model_filename='./rl/subjects/warfarin.pkpd',
                              Cs_super=0, age=60, CYP2C9='*1/*1', VKORC1='A/A', SS=1, maxTime=24, rseed=12345,
-                             day=0, max_day=90, INR_previous=None, INR_current=None,
-                             d_previous=None, d_current=1,
-                             max_dose=15, dose_steps=0.5, TTR_range=(2, 3)
+                             day=1, max_day=90, INR_previous=0, INR_current=0,
+                             d_previous=0, d_current=1, d_max=30,
+                             current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3)
                              )
+
         Subject.set_params(self, **kwargs)
 
         try:
@@ -57,38 +59,59 @@ class WarfarinModel(Subject):
         robjects.r(warfarin_code)
         self._hamberg_2007 = robjects.r['hamberg_2007']
 
+        result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
+                          self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime, self._rseed)))
+        self._Cs_super = result['Cs'][-1]
+        self._INR_current = result['INR'][-1]
+
         if False:
-            self._model_filename='./rl/subjects/warfarin.pkpd'
-            self._Cs_super=0
-            self._age=60
-            self._CYP2C9='*1/*1'
-            self._VKORC1='A/A'
-            self._SS=1
-            self._maxTime=24
-            self._rseed=12345
-            self._day=0
-            self._max_day=90
-            self._max_dose=15
-            self._dose_steps=0.5
-            self._INR_previous=None
-            self._INR_current=None
-            self._d_previous=None
-            self._d_current=1
+            self._model_filename = './rl/subjects/warfarin.pkpd'
+            self._Cs_super = 0
+            self._age = 60
+            self._CYP2C9 = '*1/*1'
+            self._VKORC1 = 'A/A'
+            self._SS = 1
+            self._maxTime = 24
+            self._rseed = 12345
+            self._day = 1
+            self._max_day = 90
+            self._current_dose = 0
+            self._max_dose = 15
+            self._dose_steps = 0.5
+
+            result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
+                              self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime, self._rseed)))
+            self._INR_previous = 0
+            self._Cs_super = result['Cs'][-1]
+            self._INR_current = result['INR'][-1]
+
+            self._d_previous = 0
+            self._d_current = 1
+            self._d_max = 30
             self._TTR_range = (2, 3)
 
     @property
     def state(self):
-        return ValueSet((self._age, self._CYP2C9, self._VKORC1, self._INR_previous, self._INR_current, self._d_previous, self._d_current), min=None, max=None)
-
+        return ValueSet((self._age, self._CYP2C9, self._VKORC1,
+                         round(self._Cs_super, 1), self._current_dose,
+                         round(self._INR_previous, 1), round(
+                             self._INR_current, 1),
+                         self._d_previous, self._d_current),
+                        min=None, max=None)
 
     @property
     def is_terminated(self):  # ready
-        return self._day == self._max_day
+        return self._day >= self._max_day
 
     @property
-    def possible_actions(self):  # ready
-        return ValueSet([x*self._dose_steps for x in range(int(self._max_dose/self._dose_steps)+1)], min=0, max=self._max_dose,
-                        binary=lambda x: (int(x * self._dose_steps // self._max_dose), self._dose_steps+1)).as_valueset_array()
+    # binary should be implemented!!!  action[0]=dose, action[1]=interval
+    def possible_actions(self):
+        return ValueSet([(x*self._dose_steps, d)
+                         for x in range(int(self._max_dose/self._dose_steps)+1)
+                         for d in range(1, min(self._d_max, self._max_day-self._day)+1)],
+                        min=(0, 1), max=(self._max_dose, 30)).as_valueset_array()
+
+        # binary=lambda (x, d): (int(x * self._dose_steps // self._max_dose), self._dose_steps+1)).as_valueset_array()
 
     def register(self, agent_name):  # should work
         '''
@@ -105,35 +128,48 @@ class WarfarinModel(Subject):
             return 1
 
     def take_effect(self, _id, action):
-        result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
-                          self._hamberg_2007(action.value[0], self._Cs_super, self._age, self._CYP2C9, self._VKORC1, self._SS, self._maxTime, self._rseed)))
-        self._INR_previous = self._INR_current
+        self._current_dose = action.value[0]
         self._d_previous = self._d_current
-        self._day += self._d_previous
+        self._d_current = action.value[1]
+        self._day += self._d_current
+        Cs = self._Cs_super
+        for _ in range(self._d_current):
+            result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
+                              self._hamberg_2007(self._current_dose, Cs, self._age, self._CYP2C9, self._VKORC1, self._SS, self._maxTime, self._rseed)))
+            Cs = result['Cs'][-1]
 
+        self._INR_previous = self._INR_current
         self._Cs_super = result['Cs'][-1]
         self._INR_current = result['INR'][-1]
-        self._d_current = 1
+
         try:
-            TTR = sum((self._TTR_range[0] <= (self._INR_current-self._INR_previous)/self._d_previous*j <= self._TTR_range[1]
-                for j in range(self._d_previous)))
+            TTR = sum((self._TTR_range[0] <= self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j <= self._TTR_range[1]
+                       for j in range(self._d_previous)))
         except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
             TTR = 0
 
-        return TTR*self._d_previous
+        # if TTR == 0:
+        #     TTR = -0.01
+
+        return TTR*self._d_current
 
     def reset(self):
-        self._Cs_super=0
-        self._day=0
-        self._INR_previous=None
-        self._INR_current=None
-        self._d_previous=None
-        self._d_current=1
+        self._Cs_super = 0
+        self._day = 1
+        self._current_dose = 0
+
+        result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
+                          self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime, self._rseed)))
+        self._INR_previous = 0
+        self._Cs_super = result['Cs'][-1]
+        self._INR_current = result['INR'][-1]
+
+        self._d_previous = 0
+        self._d_current = 1
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: [day: {}, N: {}, T: {}, N: {}, C: {}]'.format(
-                self._x['day'], self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'])
+            return 'WarfarinModel: [{}, {}, {}, INR_prev: {}, INR: {}, d_prev: {}, d: {}]'.format(
+                self._age, self._CYP2C9, self._VKORC1, self._INR_previous, self._INR_current, self._d_previous, self._d_current)
         except:
             return 'WarfarinModel'
-

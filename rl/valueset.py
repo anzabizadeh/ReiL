@@ -203,12 +203,12 @@ class ValueSet():
 
     def as_valueset_array(self):
         ''' return the value as a list of ValueSets.'''
-        array = [ValueSet(v) for v in self._value]
-        for a in array:
-            a.max = self.max
-            a.min = self.min
-            a._normalizer_function = self._normalizer_function
-            a._binary_function = self._binary_function
+        array = [ValueSet(v, min=self.min, max=self.max, normalizer=self._normalizer_function, binary=self._binary_function) for v in self._value]
+        # for a in array:
+        #     a.max = self.max
+        #     a.min = self.min
+        #     a._normalizer_function = self._normalizer_function
+        #     a._binary_function = self._binary_function
         return array
 
     def binary_representation(self):

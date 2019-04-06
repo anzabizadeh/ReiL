@@ -80,7 +80,13 @@ hamberg_2007 <- function(dose, Cs_super, AGE, CYP2C9, VKORC1, SS, maxTime=24, rs
 	Q = 0.131    # (L/h)
 	parameters$Q = Q
 
-	C_s_error = exp(rnorm(1, 0, 0.09))
+	# C_s_error = exp(rnorm(1, 0, 0.09))
+	# Sadjad
+	if(SS == 0) {
+		C_s_error = exp(rnorm(1, 0, 0.09))
+	} else {
+		C_s_error = exp(rnorm(1, 0, 0.30))
+	}
     parameters$C_s_error = C_s_error
 
     lambda = 3.61
