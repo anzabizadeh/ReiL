@@ -28,10 +28,11 @@ class Environment(RLBase):
     -------
         add: add a set of objects (agents/ subjects) to the environment.
         remove: remove objects (agents/ subjects) from the environment.
-        assign: assign agents to subjects
-        elapse: move forward in time and interact agents and subjects
-        load: load an object (agent/ subject) or an environment
-        save: save an object (agent/ subject) or the current environment
+        assign: assign agents to subjects.
+        elapse: move forward in time and interact agents and subjects.
+        trajectory: extract (state, action, reward) trajectory.
+        load: load an object (agent/ subject) or an environment.
+        save: save an object (agent/ subject) or the current environment.
 
     Agents act on subjects and receive the reward of their action and the new state of subjects.
     Then agents learn based on this information to act better.

@@ -8,7 +8,7 @@ Created on Mon Feb 19 15:47:46 2018
 import matplotlib.pyplot as plt
 from random import randint, random
 
-from rl.agents import QAgent # , TD0Agent, ANNAgent, RandomAgent, PGAgent
+from rl.agents import QAgent, ANNAgent # , TD0Agent, RandomAgent, PGAgent
 from rl.environments import Environment
 
 def cancer(**kwargs):
@@ -395,13 +395,14 @@ def warfarin(**kwargs):
 
         # define subjects
         subjects['W'] = WarfarinModel(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(1, 2), d_max=1)
-        # default_actions = subjects['Board A'].possible_actions
 
         # define agents
-        agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        agents['ANN'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
+            default_actions=subjects['W'].possible_actions, input_length=105, hidden_layer_sizes=(10, 5))
 
         # assign agents to subjects
-        assignment = [('Q', 'W')]
+        assignment = [('ANN', 'W')]
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -409,7 +410,7 @@ def warfarin(**kwargs):
 
     results = {'ANN training win': [], 'ANN training draw': [], 'ANN training lose': [],
                'ANN testing win': [], 'ANN testing draw': [], 'ANN testing lose': []}
-    agents['Q'].data_collector.start()
+    # agents['ANN'].data_collector.start()
     for i in range(runs):
         # run and collect statistics
 
@@ -432,7 +433,7 @@ def warfarin(**kwargs):
         #                     reporting='none', tally='yes')
         # env._agent['Opponent'] = temp
 
-        results['ANN training win'].append(tally1['Q'])
+        results['ANN training win'].append(tally1['ANN'])
 
         # # print result of each run
         print('run {: }: TRAINING: win: {: }'
@@ -449,23 +450,44 @@ def warfarin(**kwargs):
     #     print(s[0].value, s[1].value, sa[s])
 
 
-    print('States action:')
-    print('Q:')
-    sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
-    for s in sorted(sa, reverse=True):
-        print(s.value, sa[s][0].value, sa[s][1])
+    # print('States action:')
+    # print('Q:')
+    # sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
+    # for s in sorted(sa, reverse=True):
+    #     print(s.value, sa[s][0].value, sa[s][1])
+    for t in env.trajectory().values():
+        for i, v in enumerate(t):
+            if (i+1) % 3 == 0:
+                print(v)
+            else:
+                print(v.value, end='\t')
 
+def warfarin_results(**kwargs):
+    # load the environment or create a new one
+    filename = kwargs.get('filename', 'warfarin')
+
+    env = Environment(filename=filename)
+    # agents = env._agent
+    subjects = env._subject
+
+    for age in [70, 75, 80, 85]:
+        for CYP2C9 in ['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']:
+            for VKORC1 in ['G/G', 'G/A', 'A/A']:
+                subjects['W'].set_params(age=age, CYP2C9=CYP2C9, VKORC1=VKORC1, patient_selection='')
+                subjects['W'].reset()
+                for t in env.trajectory().values():
+                    for i, v in enumerate(t):
+                        if (i+1) % 3 == 0:
+                            print(v)
+                        else:
+                            print(v.value, end='\t')
 
 
 if __name__ == '__main__':
-    model = 'warfarin'
-    filename = 'warfarin_patient_19'
-    runs = 100
-    training_episodes = 1000
-    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin}
+    # model = 'warfarin'
+    model = 'warfarin_results'
+    filename = 'warfarin_patient_random_ANN'
+    runs = 5
+    training_episodes = 100
+    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
-
-
-# include Cs and previous dose in our state
-# start from everyday measurement with no penalization
-
