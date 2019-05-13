@@ -394,36 +394,36 @@ def warfarin(**kwargs):
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(1, 2), d_max=1)
+        subjects['W'] = WarfarinModel(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(2, 3), d_max=1, patient_selection='')
 
         # define agents
-        # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        agents['ANN'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-            default_actions=subjects['W'].possible_actions, input_length=105, hidden_layer_sizes=(10, 5))
+        agents['protocol'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        # agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
+        #     default_actions=subjects['W'].possible_actions, input_length=105, hidden_layer_sizes=(10, 5))
 
         # assign agents to subjects
-        assignment = [('ANN', 'W')]
+        assignment = [('protocol', 'W')]
 
         # update environment
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    results = {'ANN training win': [], 'ANN training draw': [], 'ANN training lose': [],
-               'ANN testing win': [], 'ANN testing draw': [], 'ANN testing lose': []}
-    # agents['ANN'].data_collector.start()
+    results = {'protocol training win': [], 'protocol training draw': [], 'protocol training lose': [],
+               'protocol testing win': [], 'protocol testing draw': [], 'protocol testing lose': []}
+    # agents['protocol'].data_collector.start()
     for i in range(runs):
         # run and collect statistics
 
-        # if agents['ANN'].data_collector.is_active:
-        #     agents['ANN'].data_collector.collect()
+        # if agents['protocol'].data_collector.is_active:
+        #     agents['protocol'].data_collector.collect()
 
         tally1 = env.elapse(episodes=training_episodes, reset='all',
                             termination='all', learning_method='history',
                             reporting='none', tally='yes')
-        # if agents['ANN'].data_collector.is_active:
-        #     print(agents['ANN'].data_collector.report())
+        # if agents['protocol'].data_collector.is_active:
+        #     print(agents['protocol'].data_collector.report())
         # else:
-        #     agents['ANN'].data_collector.start()
+        #     agents['protocol'].data_collector.start()
 
         # switch agents for test
         # temp = env._agent['Opponent']
@@ -433,11 +433,11 @@ def warfarin(**kwargs):
         #                     reporting='none', tally='yes')
         # env._agent['Opponent'] = temp
 
-        results['ANN training win'].append(tally1['ANN'])
+        results['protocol training win'].append(tally1['protocol'])
 
         # # print result of each run
         print('run {: }: TRAINING: win: {: }'
-              .format(i, results['ANN training win'][-1]))
+              .format(i, results['protocol training win'][-1]))
 
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
@@ -470,9 +470,9 @@ def warfarin_results(**kwargs):
     # agents = env._agent
     subjects = env._subject
 
-    for age in [70, 75, 80, 85]:
-        for CYP2C9 in ['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']:
-            for VKORC1 in ['G/G', 'G/A', 'A/A']:
+    for age in [74]:  # 70, 75, 80, 85]:
+        for CYP2C9 in ['*2/*2']:  # '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']:
+            for VKORC1 in ['G/A']:  # 'G/G', 'G/A', 'A/A']:
                 subjects['W'].set_params(age=age, CYP2C9=CYP2C9, VKORC1=VKORC1, patient_selection='')
                 subjects['W'].reset()
                 for t in env.trajectory().values():
@@ -483,11 +483,18 @@ def warfarin_results(**kwargs):
                             print(v.value, end='\t')
 
 
+# if __name__ == '__main__':
+#     model = 'warfarin'
+#     # model = 'warfarin_results'
+#     filename = 'warfarin_patient_no_rseed'
+#     runs = 50
+#     training_episodes = 100
+#     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin, 'warfarin_results': warfarin_results}
+#     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
+
+
 if __name__ == '__main__':
-    # model = 'warfarin'
-    model = 'warfarin_results'
-    filename = 'warfarin_patient_random_ANN'
-    runs = 5
-    training_episodes = 100
-    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin, 'warfarin_results': warfarin_results}
-    function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
+    from rl.subjects.warfarin_model import WarfarinModel
+    W = WarfarinModel(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(2, 3), d_max=1, patient_selection='')
+    for i in range(90):
+        print(W.state, W.take_effect('', W.possible_actions[-1]))

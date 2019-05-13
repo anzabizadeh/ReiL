@@ -59,11 +59,12 @@ class WarfarinModel(Subject):
         utils = importr('utils')
         utils.chooseCRANmirror(ind=1)
         utils.install_packages(StrVector(['deSolve']))
+        robjects.r('set.seed({})'.format(self._rseed))
         robjects.r(warfarin_code)
         self._hamberg_2007 = robjects.r['hamberg_2007']
 
         result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
-                          self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime, self._rseed)))
+                          self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime)))
         self._Cs_super = result['Cs'][-1]
         self._INR_current = result['INR'][-1]
 
@@ -87,7 +88,7 @@ class WarfarinModel(Subject):
             self._CYP2C9_list=['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']
             self._VKORC1_list=['G/G', 'G/A', 'A/A']
             result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
-                              self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime, self._rseed)))
+                              self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime)))
             self._INR_previous = 0
             self._Cs_super = result['Cs'][-1]
             self._INR_current = result['INR'][-1]
@@ -97,7 +98,7 @@ class WarfarinModel(Subject):
             self._d_max = 30
             self._TTR_range = (2, 3)
 
-    @property
+    @property  # binary representation is not complete!
     def state(self):
         return ValueSet((self._age, self._CYP2C9, self._VKORC1,
                          round(self._Cs_super, 1), self._current_dose,
@@ -147,7 +148,7 @@ class WarfarinModel(Subject):
         Cs = self._Cs_super
         for _ in range(self._d_current):
             result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
-                              self._hamberg_2007(self._current_dose, Cs, self._age, self._CYP2C9, self._VKORC1, self._SS, self._maxTime, self._rseed)))
+                              self._hamberg_2007(self._current_dose, Cs, self._age, self._CYP2C9, self._VKORC1, self._SS, self._maxTime)))
             Cs = result['Cs'][-1]
 
         self._INR_previous = self._INR_current
@@ -176,7 +177,7 @@ class WarfarinModel(Subject):
             self._VKORC1 = choice(self._VKORC1_list)
 
         result = dict(zip(('INR', 'Cs', 'out', 'INRv', 'parameters'),
-                          self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime, self._rseed)))
+                          self._hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime)))
         self._INR_previous = 0
         self._Cs_super = result['Cs'][-1]
         self._INR_current = result['INR'][-1]
