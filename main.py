@@ -373,7 +373,7 @@ def risk(**kwargs):
         print(s.value, sa[s][0].value, sa[s][1])
 
 def warfarin(**kwargs):
-    from rl.subjects.warfarin_model import WarfarinModel
+    from rl.subjects.warfarin_model_v2 import WarfarinModel_v2
 
     # set experiment variables
     runs = kwargs.get('runs', 1000)
@@ -394,12 +394,18 @@ def warfarin(**kwargs):
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(2, 3), d_max=1, patient_selection='')
-
+        subjects['W'] = WarfarinModel_v2(age=74,
+                                         CYP2C9='*2/*2',
+                                         VKORC1='G/A',
+                                         TTR_range=(2, 3),
+                                         d_max=1,
+                                         max_day=10,
+                                         patient_selection='',
+                                         randomized=False)
         # define agents
-        agents['protocol'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        # agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-        #     default_actions=subjects['W'].possible_actions, input_length=105, hidden_layer_sizes=(10, 5))
+        # agents['protocol'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
+        agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
+            default_actions=subjects['W'].possible_actions, input_length=93, hidden_layer_sizes=(5,))
 
         # assign agents to subjects
         assignment = [('protocol', 'W')]
@@ -483,18 +489,19 @@ def warfarin_results(**kwargs):
                             print(v.value, end='\t')
 
 
-# if __name__ == '__main__':
-#     model = 'warfarin'
-#     # model = 'warfarin_results'
-#     filename = 'warfarin_patient_no_rseed'
-#     runs = 50
-#     training_episodes = 100
-#     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin, 'warfarin_results': warfarin_results}
-#     function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
-
-
 if __name__ == '__main__':
-    from rl.subjects.warfarin_model import WarfarinModel
-    W = WarfarinModel(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(2, 3), d_max=1, patient_selection='')
-    for i in range(90):
-        print(W.state, W.take_effect('', W.possible_actions[-1]))
+    model = 'warfarin'
+    # model = 'warfarin_results'
+    filename = 'warfarin_not_random_ANN'
+    for _ in range(100):
+        runs = 10
+        training_episodes = 50
+        function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin, 'warfarin_results': warfarin_results}
+        function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
+
+
+# if __name__ == '__main__':
+#     from rl.subjects.warfarin_model_v2 import WarfarinModel_v2
+#     W = WarfarinModel_v2(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(2, 3), d_max=1, patient_selection='')
+#     for i in range(90):
+#         print(W.state, W.take_effect('', W.possible_actions[-1]))

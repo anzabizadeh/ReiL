@@ -23,4 +23,6 @@ from .windy_gridworld import WindyGridworld
 from .risk import Risk
 from .cancer_model import CancerModel
 from .constrained_cancer_model import ConstrainedCancerModel
+from .warfarin_model_v2 import WarfarinModel_v2
+from .warfarin_model import WarfarinModel
 # from .snake import Snake

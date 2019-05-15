@@ -224,7 +224,7 @@ class ValueSet():
             bin_rep = []
             for i in range(len(self.value)):
                 temp = self._binary_function(self.value[i])
-                if (min(temp) == 0) & (max(temp) <= 1):  # whether the function returns the list or index, length pair
+                if (min(temp) >= 0) & (max(temp) <= 1):  # whether the function returns the list or index, length pair
                     bin_rep = bin_rep + temp
                 else:
                     index, length = temp
