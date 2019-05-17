@@ -8,17 +8,13 @@ This `warfarin_model` class implements a two compartment PK/PD model for warfari
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from collections import deque
 from math import exp
 from random import choice, shuffle
-import rpy2
-import rpy2.robjects as robjects
-from rpy2.robjects.packages import importr
-from rpy2.robjects.vectors import StrVector
-
-from .warfarin_pkpd_model import hamberg_2007
 
 from ..valueset import ValueSet
 from .subject import Subject
+from .warfarin_pkpd_model import hamberg_2007
 
 
 class WarfarinModel_v2(Subject):
@@ -41,9 +37,10 @@ class WarfarinModel_v2(Subject):
     def __init__(self, **kwargs):
         Subject.__init__(self, **kwargs)
 
-        Subject.set_defaults(self, model_filename='./rl/subjects/warfarin.pkpd', patient_selection='random',
+        Subject.set_defaults(self, patient_selection='random',
                              age_list=list(range(70, 86)),
-                             CYP2C9_list=['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
+                             CYP2C9_list=['*1/*1', '*1/*2',
+                                          '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
                              VKORC1_list=['G/G', 'G/A', 'A/A'],
                              Cs_super=0, age=60, CYP2C9='*1/*1', VKORC1='A/A', SS=0, maxTime=24,
                              day=1, max_day=90, INR_previous=0, INR_current=0,
@@ -55,9 +52,10 @@ class WarfarinModel_v2(Subject):
         Subject.set_params(self, **kwargs)
 
         self._maxTime = self._dose_history*24
-        result = hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, self._SS, self._maxTime, randomized=self._randomized)
+        result = hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9,
+                              self._VKORC1, self._SS, self._maxTime, randomized=self._randomized)
         self._Cs_super = None
-        self._Cs = [result['Cs']]
+        self._Cs = deque([result['Cs']])
         self._INR_current = result['INR']
 
         if False:
@@ -79,9 +77,11 @@ class WarfarinModel_v2(Subject):
 
             self._patient_selection = 'random'
             self._age_list = list(range(70, 86))
-            self._CYP2C9_list = ['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']
+            self._CYP2C9_list = ['*1/*1', '*1/*2',
+                                 '*1/*3', '*2/*2', '*2/*3', '*3/*3']
             self._VKORC1_list = ['G/G', 'G/A', 'A/A']
-            result = hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, 0, self._maxTime, randomized=self._randomized)
+            result = hamberg_2007(self._current_dose, self._Cs_super, self._age,
+                                  self._CYP2C9, self._VKORC1, 0, self._maxTime, randomized=self._randomized)
             self._INR_previous = 0
             self._Cs_super = result['Cs']
             self._INR_current = result['INR']
@@ -103,10 +103,11 @@ class WarfarinModel_v2(Subject):
                              self._INR_current, 1),
                          self._d_previous, self._d_current),
                         min=None, max=None,
-                        binary=lambda x: [1 if x==a else 0 for a in self._age_list] if x in self._age_list
-                            else [1 if x==a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
-                            else [1 if x==a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-                            else [0] if x is None else [x/30] # for Cs, current_dose, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+                        binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
+                        else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
+                        else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
+                        # for Cs, current_dose, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+                        else [0] if x is None else [x/30]
                         )
 
     @property
@@ -120,7 +121,7 @@ class WarfarinModel_v2(Subject):
                          for x in range(int(self._max_dose/self._dose_steps), -1, -1)
                          for d in range(1, min(self._d_max, self._max_day-self._day)+1)],
                         min=(0, 1), max=(self._max_dose, 30),
-                        binary=lambda x: [1 if x==a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
+                        binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
 
         # binary=lambda (x, d): (int(x * self._dose_steps // self._max_dose), self._dose_steps+1)).as_valueset_array()
 
@@ -145,10 +146,11 @@ class WarfarinModel_v2(Subject):
         self._day += self._d_current
 
         for _ in range(self._d_current):
-            while len(self._Cs)>self._dose_history:
+            while len(self._Cs) > self._dose_history:
                 self._Cs.pop()
             n = len(self._Cs)
-            l = (self._Cs[i][-int((self._dose_history - (n-i)/self._pill_per_day)*24+1)] for i in range(n))
+            l = (self._Cs[i][-int((self._dose_history - (n-i) /
+                                   self._pill_per_day)*24+1)] for i in range(n))
             Cs_super_previous = self._Cs_super
             self._Cs_super = sum(l)
             if Cs_super_previous == self._Cs_super:
@@ -156,24 +158,27 @@ class WarfarinModel_v2(Subject):
             else:
                 self._SS = 0
 
-            result = hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9, self._VKORC1, self._SS, self._maxTime, randomized=self._randomized)
+            result = hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9,
+                                  self._VKORC1, self._SS, self._maxTime, randomized=self._randomized)
             self._Cs.append(result['Cs'])
 
         self._INR_previous = self._INR_current
         # self._Cs_super = result['Cs']
-        self._INR_current = result['INR']
+        self._INR_current = result['INRv'][24]
 
         try:
-            TTR = sum((self._TTR_range[0] <= self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j <= self._TTR_range[1]
-                       for j in range(self._d_previous)))
+            # TTR = sum((self._TTR_range[0] <= self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j <= self._TTR_range[1]
+            #            for j in range(self._d_previous)))
+            INR_mid = (self._TTR_range[1] + self._TTR_range[0]) / 2
+            INR_range = self._TTR_range[1] - self._TTR_range[0]
+            reward = -sum(((INR_mid - self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j) ** 2
+                           for j in range(self._d_previous))) * 2 / INR_range  # negative squared distance as reward (used *2/range to normalize)
         except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
-            TTR = 0
+            # TTR = 0
+            reward = 0
 
-        # if TTR == 0:
-        #     TTR = -0.01
-
-        return TTR*self._d_current
-
+        # return TTR*self._d_current
+        return reward
 
     def reset(self):
         self._day = 1
