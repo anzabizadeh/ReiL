@@ -8,8 +8,10 @@ Created on Mon Feb 19 15:47:46 2018
 import matplotlib.pyplot as plt
 from random import randint, random
 
-from rl.agents import QAgent, ANNAgent, WarfarinQAgent # , TD0Agent, RandomAgent, PGAgent
+# , TD0Agent, RandomAgent, PGAgent
+from rl.agents import QAgent, ANNAgent, WarfarinQAgent
 from rl.environments import Environment
+
 
 def cancer(**kwargs):
     from rl.subjects import ConstrainedCancerModel
@@ -32,9 +34,9 @@ def cancer(**kwargs):
 
         # define subjects
         # state_range = [0, 0.0063, 0.0125, 0.025, 0.01, 0.05, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9]
-        state_range = [0, 0.0076, 0.016, 0.0252, 0.0352, 0.046, 0.0576, 0.07, 0.0832, 0.0972, 0.112, 0.1276, 0.144, 0.1612, 0.1792, 0.198,  \
-             0.2176, 0.238, 0.2592, 0.2812, 0.304, 0.3276, 0.352, 0.3772, 0.4032, 0.43, 0.4576, 0.486, 0.5152, 0.5452, 0.576, 0.6076, 0.64, \
-             0.6732, 0.7072, 0.742, 0.7776, 0.814, 0.8512, 0.8892]
+        state_range = [0, 0.0076, 0.016, 0.0252, 0.0352, 0.046, 0.0576, 0.07, 0.0832, 0.0972, 0.112, 0.1276, 0.144, 0.1612, 0.1792, 0.198,
+                       0.2176, 0.238, 0.2592, 0.2812, 0.304, 0.3276, 0.352, 0.3772, 0.4032, 0.43, 0.4576, 0.486, 0.5152, 0.5452, 0.576, 0.6076, 0.64,
+                       0.6732, 0.7072, 0.742, 0.7776, 0.814, 0.8512, 0.8892]
 
         class drug_cap:
             def __init__(self, minimum=0, maximum=10, probability=0.01):
@@ -42,9 +44,9 @@ def cancer(**kwargs):
                 self._min = minimum
                 self._max = maximum
                 self._cap = randint(self._min, self._max)
-            
+
             def __call__(self, x):
-                if random()<self._prob:
+                if random() < self._prob:
                     self._cap = randint(self._min, self._max)
                     # print('Changed cap to {} on day {}'.format(self._cap, x['day']))
                 return self._cap
@@ -53,14 +55,20 @@ def cancer(**kwargs):
         subjects['Patient'] = ConstrainedCancerModel(
             drug={'initial_value': 0, 'decay_rate': 1,
                   'normal_cell_kill_rate': 0.1, 'tumor_cell_kill_rate': 0.3, 'immune_cell_kill_rate': 0.2},
-            normal_cells={'initial_value': 0.40, 'growth_rate': 1, 'carrying_capacity': 1},
-            tumor_cells={'initial_value': 1.00, 'growth_rate': 1.5, 'carrying_capacity': 1},
-            immune_cells={'initial_value': 0, 'influx_rate': 0.33, 'threshold_rate': 0.3, 'response_rate': 0.01, 'death_rate': 0.2},
-            competition_term={'normal_from_tumor': 1, 'tumor_from_normal': 1, 'tumor_from_immune': 0.5, 'immune_from_tumor': 1},
-            state_function = lambda x: {'value': (state_range.index(max(filter(lambda y: y <= x['tumor_cells'], state_range))), x['drug_cap']), 'min': (0, 0), 'max': (len(state_range), 10)},
+            normal_cells={'initial_value': 0.40,
+                          'growth_rate': 1, 'carrying_capacity': 1},
+            tumor_cells={'initial_value': 1.00,
+                         'growth_rate': 1.5, 'carrying_capacity': 1},
+            immune_cells={'initial_value': 0, 'influx_rate': 0.33,
+                          'threshold_rate': 0.3, 'response_rate': 0.01, 'death_rate': 0.2},
+            competition_term={'normal_from_tumor': 1, 'tumor_from_normal': 1,
+                              'tumor_from_immune': 0.5, 'immune_from_tumor': 1},
+            state_function=lambda x: {'value': (state_range.index(max(filter(
+                lambda y: y <= x['tumor_cells'], state_range))), x['drug_cap']), 'min': (0, 0), 'max': (len(state_range), 10)},
             # state_function = lambda x: {'value': (round(x['normal_cells'], 3), round(x['tumor_cells'], 3), round(x['drug'], 3)), 'min':(0, 0, 0), 'max': {2, 2, 10}},
-            reward_function = lambda new_x, old_x: -new_x['tumor_cells']-0.01*new_x['drug'],
-            termination_check= lambda x: x['tumor_cells']<=1e-5, u_max=10, u_steps=20,
+            reward_function=lambda new_x, old_x: - \
+            new_x['tumor_cells']-0.01*new_x['drug'],
+            termination_check=lambda x: x['tumor_cells'] <= 1e-5, u_max=10, u_steps=20,
             drug_cap=drug_cap(probability=0.05))
 
         # define agents
@@ -80,19 +88,24 @@ def cancer(**kwargs):
 
     for i in range(runs):
         # run and collect statistics
-        steps = env.elapse(episodes=training_episodes, max_steps=250, learning_method='history', step_count='yes')
+        steps = env.elapse(episodes=training_episodes, max_steps=250,
+                           learning_method='history', step_count='yes')
         print(i, steps)
-        print(agents['Doctor'].data_collector.report(statistic=['diff-q'], update_data=True))
+        print(agents['Doctor'].data_collector.report(
+            statistic=['diff-q'], update_data=True))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
-        print(sum(len(a) for a in agents['Doctor']._state_action_list.values()))
+        print(sum(len(a)
+                  for a in agents['Doctor']._state_action_list.values()))
 
     env._subject['Patient'].set_params(drug_cap=lambda x: 10)
     history = env.trajectory()
-    states = list(s.value[0] for i, s in enumerate(history['Doctor']) if (i % 3)==0)
-    actions = list(a.value[0] for i, a in enumerate(history['Doctor']) if (i % 3)==1)
-    rewards = list(r for i, r in enumerate(history['Doctor']) if (i % 3)==2)
+    states = list(s.value[0] for i, s in enumerate(
+        history['Doctor']) if (i % 3) == 0)
+    actions = list(a.value[0] for i, a in enumerate(
+        history['Doctor']) if (i % 3) == 1)
+    rewards = list(r for i, r in enumerate(history['Doctor']) if (i % 3) == 2)
     print('Total reward: {}, total drug: {}'.format(sum(rewards), sum(actions)))
     x = list(range(len(states)))
     plt.subplot(1, 3, 1)
@@ -102,6 +115,7 @@ def cancer(**kwargs):
     plt.subplot(1, 3, 3)
     plt.plot(x, rewards, 'r')
     plt.show()
+
 
 def mnk(**kwargs):
     from rl.subjects import MNKGame
@@ -133,7 +147,7 @@ def mnk(**kwargs):
         # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
         # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4))
         # agents['Opponent'] = QAgent()
-        agents['PG'] = PGAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4),
+        agents['PG'] = PGAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26, 4),
                                default_actions=default_actions, state_size=len(subjects['Board A'].state.binary_representation()))
         agents['Opponent'] = RandomAgent()
         # test_agent = RandomAgent()
@@ -173,24 +187,27 @@ def mnk(**kwargs):
 
         results['ANN training win'].append(tally1['PG'])
         results['ANN training lose'].append(tally1['Opponent'])
-        results['ANN training draw'].append(training_episodes-tally1['PG']-tally1['Opponent'])
+        results['ANN training draw'].append(
+            training_episodes-tally1['PG']-tally1['Opponent'])
         results['ANN testing win'].append(0)  # tally2['ANN'])
         results['ANN testing lose'].append(0)  # tally2['Opponent'])
-        results['ANN testing draw'].append(0)  # test_episodes-tally2['ANN']-tally2['Opponent'])
+        # test_episodes-tally2['ANN']-tally2['Opponent'])
+        results['ANN testing draw'].append(0)
 
         # # print result of each run
         print('run {: }: TRAINING: win: {: } draw:{: } lose:{: } TESTING: win: {: } draw:{: } lose:{: }'
               .format(i, results['ANN training win'][-1], results['ANN training draw'][-1], results['ANN training lose'][-1],
-                    results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
-
+                      results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
 
     x = list(range(len(results['ANN training win'])))
-    plt.plot(x, results['ANN training win'], 'b', x, results['ANN training draw'], 'g', x, results['ANN training lose'], 'r')
+    plt.plot(x, results['ANN training win'], 'b', x,
+             results['ANN training draw'], 'g', x, results['ANN training lose'], 'r')
     plt.axis([0, len(x), 0, training_episodes])
     plt.show()
+
 
 def windy(**kwargs):
     from rl.subjects import WindyGridworld
@@ -232,7 +249,8 @@ def windy(**kwargs):
         # agents['Opponent'].load(filename='mnk333_opponent')
 
         # assign agents to subjects
-        assignment = [('ANN', 'Board ANN')] # ('Q', 'Board Q'), ('TD', 'Board TD')
+        # ('Q', 'Board Q'), ('TD', 'Board TD')
+        assignment = [('ANN', 'Board ANN')]
 
         # update environment
         env.add(agents=agents, subjects=subjects)
@@ -244,7 +262,8 @@ def windy(**kwargs):
     for i in range(runs):
         # run and collect statistics
         if agents[active_agent_name].data_collector.is_active:
-            agents[active_agent_name].data_collector.collect(statistic=['diff-coef'])
+            agents[active_agent_name].data_collector.collect(
+                statistic=['diff-coef'])
 
         steps1 = env.elapse(episodes=training_episodes, max_steps=max_steps, reset='all', step_count='yes',
                             termination='all', learning_method='every step')
@@ -255,10 +274,12 @@ def windy(**kwargs):
         if not agents[active_agent_name].data_collector.is_active:
             agents[active_agent_name].data_collector.start()
         else:
-            results[active_agent_name].append(agents[active_agent_name].data_collector.report(statistic=['diff-coef'])['diff-coef'])
+            results[active_agent_name].append(agents[active_agent_name].data_collector.report(
+                statistic=['diff-coef'])['diff-coef'])
 
             # print result of each run
-            print('{}: {} {: 3.10f}'.format(i, steps2, results[active_agent_name][-1]))
+            print('{}: {} {: 3.10f}'.format(
+                i, steps2, results[active_agent_name][-1]))
 
         # save occasionally in case you don't lose data if you get bored of running the code!
     env.save(filename=filename)
@@ -271,6 +292,7 @@ def windy(**kwargs):
     plt.plot(x, results[active_agent_name], 'b')
     plt.axis([0, len(x), 0, max(results[active_agent_name])])
     plt.show()
+
 
 def risk(**kwargs):
     from rl.subjects import Risk
@@ -337,40 +359,45 @@ def risk(**kwargs):
 
         results['ANN training win'].append(tally1['Q'])
         results['ANN training lose'].append(tally1['Opponent'])
-        results['ANN training draw'].append(training_episodes-tally1['Q']-tally1['Opponent'])
+        results['ANN training draw'].append(
+            training_episodes-tally1['Q']-tally1['Opponent'])
         results['ANN testing win'].append(0)  # tally2['ANN'])
         results['ANN testing lose'].append(0)  # tally2['Opponent'])
-        results['ANN testing draw'].append(0)  # test_episodes-tally2['ANN']-tally2['Opponent'])
+        # test_episodes-tally2['ANN']-tally2['Opponent'])
+        results['ANN testing draw'].append(0)
 
         # # print result of each run
         print('run {: }: TRAINING: win: {: } draw:{: } lose:{: } TESTING: win: {: } draw:{: } lose:{: }'
               .format(i, results['ANN training win'][-1], results['ANN training draw'][-1], results['ANN training lose'][-1],
-                    results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
-
+                      results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
 
     print('State-actions q:')
     print('Q:')
-    sa = agents['Q'].data_collector.report(statistic=['state-actions q'])['state-actions q']
+    sa = agents['Q'].data_collector.report(
+        statistic=['state-actions q'])['state-actions q']
     for s in sorted(sa, reverse=True):
         print(s[0].value, s[1].value, sa[s])
     print('Opponent:')
-    sa = agents['Opponent'].data_collector.report(statistic=['state-actions q'])['state-actions q']
+    sa = agents['Opponent'].data_collector.report(
+        statistic=['state-actions q'])['state-actions q']
     for s in sorted(sa, reverse=True):
         print(s[0].value, s[1].value, sa[s])
-
 
     print('States action:')
     print('Q:')
-    sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
+    sa = agents['Q'].data_collector.report(
+        statistic=['states action'])['states action']
     for s in sorted(sa, reverse=True):
         print(s.value, sa[s][0].value, sa[s][1])
     print('Opponent:')
-    sa = agents['Opponent'].data_collector.report(statistic=['states action'])['states action']
+    sa = agents['Opponent'].data_collector.report(
+        statistic=['states action'])['states action']
     for s in sorted(sa, reverse=True):
         print(s.value, sa[s][0].value, sa[s][1])
+
 
 def warfarin(**kwargs):
     from rl.subjects.warfarin_model_v2 import WarfarinModel_v2
@@ -404,11 +431,11 @@ def warfarin(**kwargs):
                                          randomized=True)
         # define agents
         # agents['protocol'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        # agents['protocol'] = WarfarinQAgent(gamma=1, alpha=0.2, epsilon=0.1,
-        #                                     default_actions=subjects['W'].possible_actions,
-        #                                     method='fixed policy first', fixed_policy_attempts=30)
-        agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-            default_actions=subjects['W'].possible_actions, input_length=93, hidden_layer_sizes=(5,))
+        agents['protocol'] = WarfarinQAgent(gamma=1, alpha=0.2, epsilon=0.1,
+                                            default_actions=subjects['W'].possible_actions,
+                                            method='fixed policy first', fixed_policy_attempts=30)
+        # agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
+        #                               default_actions=subjects['W'].possible_actions, input_length=93, hidden_layer_sizes=(5,))
 
         # assign agents to subjects
         assignment = [('protocol', 'W')]
@@ -448,7 +475,6 @@ def warfarin(**kwargs):
         print('run {: }: TRAINING: win: {: }'
               .format(i, results['protocol training win'][-1]))
 
-
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
 
@@ -457,7 +483,6 @@ def warfarin(**kwargs):
     # sa = agents['Q'].data_collector.report(statistic=['state-actions q'])['state-actions q']
     # for s in sorted(sa, reverse=True):
     #     print(s[0].value, s[1].value, sa[s])
-
 
     # print('States action:')
     # print('Q:')
@@ -471,6 +496,7 @@ def warfarin(**kwargs):
             else:
                 print(v.value, end='\t')
 
+
 def warfarin_results(**kwargs):
     # load the environment or create a new one
     filename = kwargs.get('filename', 'warfarin')
@@ -480,9 +506,11 @@ def warfarin_results(**kwargs):
     subjects = env._subject
 
     for age in [74]:  # 70, 75, 80, 85]:
-        for CYP2C9 in ['*2/*2']:  # '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']:
+        # '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']:
+        for CYP2C9 in ['*2/*2']:
             for VKORC1 in ['G/A']:  # 'G/G', 'G/A', 'A/A']:
-                subjects['W'].set_params(age=age, CYP2C9=CYP2C9, VKORC1=VKORC1, patient_selection='')
+                subjects['W'].set_params(
+                    age=age, CYP2C9=CYP2C9, VKORC1=VKORC1, patient_selection='')
                 subjects['W'].reset()
                 for t in env.trajectory().values():
                     for i, v in enumerate(t):
@@ -499,8 +527,10 @@ if __name__ == '__main__':
     for _ in range(100):
         runs = 10
         training_episodes = 100
-        function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk, 'warfarin': warfarin, 'warfarin_results': warfarin_results}
-        function[model.lower()](filename=filename, runs=runs, training_episodes=training_episodes)
+        function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
+                    'warfarin': warfarin, 'warfarin_results': warfarin_results}
+        function[model.lower()](filename=filename, runs=runs,
+                                training_episodes=training_episodes)
 
 
 # if __name__ == '__main__':

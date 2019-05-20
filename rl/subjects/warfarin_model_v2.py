@@ -46,7 +46,8 @@ class WarfarinModel_v2(Subject):
                              day=1, max_day=90, INR_previous=0, INR_current=0,
                              d_previous=0, d_current=1, d_max=30,
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
-                             dose_history=10, pill_per_day=1, randomized=True
+                             dose_history=10, pill_per_day=1, randomized=True,
+                             dose_list=[None]*10
                              )
 
         Subject.set_params(self, **kwargs)
@@ -57,6 +58,7 @@ class WarfarinModel_v2(Subject):
         self._Cs_super = None
         self._Cs = deque([result['Cs']])
         self._INR_current = result['INR']
+        self._dose_list=deque([0.0]*self._dose_history)
 
         if False:
             self._model_filename = './rl/subjects/warfarin.pkpd'
@@ -98,17 +100,28 @@ class WarfarinModel_v2(Subject):
         except TypeError:
             Cs = self._Cs_super
         return ValueSet((self._age, self._CYP2C9, self._VKORC1,
-                         Cs, self._current_dose,
-                         round(self._INR_previous, 1), round(
-                             self._INR_current, 1),
+                         Cs, tuple(self._dose_list), round(self._INR_current, 1),
                          self._d_previous, self._d_current),
                         min=None, max=None,
                         binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
                         else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
                         else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-                        # for Cs, current_dose, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+                        else list([1 if a==b else 0 for b in x for a in self.possible_actions]) if isinstance(x, list)
+                        # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
                         else [0] if x is None else [x/30]
                         )
+        # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
+        #                  Cs, self._current_dose,
+        #                  round(self._INR_previous, 1), round(
+        #                      self._INR_current, 1),
+        #                  self._d_previous, self._d_current),
+        #                 min=None, max=None,
+        #                 binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
+        #                 else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
+        #                 else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
+        #                 # for Cs, current_dose, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+        #                 else [0] if x is None else [x/30]
+        #                 )
 
     @property
     def is_terminated(self):  # ready
@@ -142,6 +155,8 @@ class WarfarinModel_v2(Subject):
     def take_effect(self, _id, action):
         self._current_dose = action.value[0]
         self._d_previous = self._d_current
+        self._dose_list.append(self._current_dose)
+        self._dose_list.popleft()
         self._d_current = action.value[1]
         self._day += self._d_current
 
@@ -184,6 +199,7 @@ class WarfarinModel_v2(Subject):
         self._day = 1
         self._current_dose = 0
         self._SS = 0
+        self._dose_list=deque([0.0]*self._dose_history)
 
         if self._patient_selection == 'random':
             self._age = choice(self._age_list)
