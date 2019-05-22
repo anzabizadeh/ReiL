@@ -106,7 +106,7 @@ class WarfarinModel_v2(Subject):
                         binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
                         else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
                         else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-                        else list([1 if a==b else 0 for b in x for a in self.possible_actions]) if isinstance(x, list)
+                        else list([1 if a.value==b else 0 for b in x for a in self.possible_actions]) if isinstance(x, tuple)
                         # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
                         else [0] if x is None else [x/30]
                         )
@@ -128,13 +128,18 @@ class WarfarinModel_v2(Subject):
         return self._day >= self._max_day
 
     @property
-    # binary should be implemented for day!!!  action[0]=dose, action[1]=interval
+    # only considers the dose
     def possible_actions(self):
-        return ValueSet([(x*self._dose_steps, d)
-                         for x in range(int(self._max_dose/self._dose_steps), -1, -1)
-                         for d in range(1, min(self._d_max, self._max_day-self._day)+1)],
-                        min=(0, 1), max=(self._max_dose, 30),
+        return ValueSet([x*self._dose_steps
+                         for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
+                        min=0, max=self._max_dose,
                         binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
+        # binary should be implemented for day!!!  action[0]=dose, action[1]=interval
+        # return ValueSet([(x*self._dose_steps, d)
+        #                  for x in range(int(self._max_dose/self._dose_steps), -1, -1)
+        #                  for d in range(1, min(self._d_max, self._max_day-self._day)+1)],
+        #                 min=(0, 1), max=(self._max_dose, 30),
+        #                 binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
 
         # binary=lambda (x, d): (int(x * self._dose_steps // self._max_dose), self._dose_steps+1)).as_valueset_array()
 
@@ -157,7 +162,7 @@ class WarfarinModel_v2(Subject):
         self._d_previous = self._d_current
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
-        self._d_current = action.value[1]
+        self._d_current = 1  # action.value[1]
         self._day += self._d_current
 
         for _ in range(self._d_current):
