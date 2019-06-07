@@ -434,10 +434,10 @@ def warfarin(**kwargs):
         # agents['protocol'] = WarfarinQAgent(gamma=1, alpha=0.2, epsilon=0.1,
         #                                     default_actions=subjects['W'].possible_actions,
         #                                     method='fixed policy first', fixed_policy_attempts=30)
-        # agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-        #                               default_actions=subjects['W'].possible_actions, input_length=93, hidden_layer_sizes=(5,))
-        agents['protocol'] = DQNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-                                      default_actions=subjects['W'].possible_actions, input_length=370, hidden_layer_sizes=(5,))
+        agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
+                                      default_actions=subjects['W'].possible_actions, input_length=70, hidden_layer_sizes=(5,))
+        # agents['protocol'] = DQNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
+        #                               default_actions=subjects['W'].possible_actions, input_length=370, hidden_layer_sizes=(5,))
 
         # assign agents to subjects
         assignment = [('protocol', 'W')]
@@ -527,8 +527,8 @@ if __name__ == '__main__':
     # model = 'warfarin_results'
     filename = 'warfarin_74_22_GA_10days_warfQ_fixed30'
     for _ in range(100):
-        runs = 1
-        training_episodes = 10
+        runs = 20
+        training_episodes = 50
         function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                     'warfarin': warfarin, 'warfarin_results': warfarin_results}
         function[model.lower()](filename=filename, runs=runs,

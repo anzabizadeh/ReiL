@@ -106,10 +106,22 @@ class WarfarinModel_v2(Subject):
                         binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
                         else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
                         else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-                        else list([1 if a.value==b else 0 for b in x for a in self.possible_actions]) if isinstance(x, tuple)
+                        else list([d/self._max_dose for d in x]) if isinstance(x, tuple)
                         # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
                         else [0] if x is None else [x/30]
                         )
+
+        # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
+        #                  Cs, tuple(self._dose_list), round(self._INR_current, 1),
+        #                  self._d_previous, self._d_current),
+        #                 min=None, max=None,
+        #                 binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
+        #                 else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
+        #                 else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
+        #                 else list([1 if a.value==b else 0 for b in x for a in self.possible_actions]) if isinstance(x, tuple)
+        #                 # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+        #                 else [0] if x is None else [x/30]
+        #                 )
         # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
         #                  Cs, self._current_dose,
         #                  round(self._INR_previous, 1), round(
