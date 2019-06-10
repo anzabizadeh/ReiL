@@ -400,7 +400,7 @@ def risk(**kwargs):
 
 
 def warfarin(**kwargs):
-    from rl.subjects.warfarin_model_v2 import WarfarinModel_v2
+    from rl.subjects.warfarin_model_v3 import WarfarinModel
 
     # set experiment variables
     runs = kwargs.get('runs', 1000)
@@ -421,21 +421,22 @@ def warfarin(**kwargs):
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel_v2(age=74,
-                                         CYP2C9='*2/*2',
-                                         VKORC1='G/A',
-                                         TTR_range=(2, 3),
-                                         d_max=1,
-                                         max_day=10,
-                                         patient_selection='',
-                                         randomized=True)
+        subjects['W'] = WarfarinModel(age=74,
+                                      CYP2C9='*2/*2',
+                                      VKORC1='G/A',
+                                      TTR_range=(2, 3),
+                                      d_max=1,
+                                      max_day=10,
+                                      patient_selection='',
+                                      dose_history=5,  # just to see what happens!
+                                      randomized=True)
         # define agents
         # agents['protocol'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
         # agents['protocol'] = WarfarinQAgent(gamma=1, alpha=0.2, epsilon=0.1,
         #                                     default_actions=subjects['W'].possible_actions,
         #                                     method='fixed policy first', fixed_policy_attempts=30)
-        agents['protocol'] = ANNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-                                      default_actions=subjects['W'].possible_actions, input_length=70, hidden_layer_sizes=(5,))
+        agents['protocol'] = ANNAgent(gamma=0.99, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
+                                      default_actions=subjects['W'].possible_actions, input_length=64, hidden_layer_sizes=(10, 10))
         # agents['protocol'] = DQNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
         #                               default_actions=subjects['W'].possible_actions, input_length=370, hidden_layer_sizes=(5,))
 
@@ -525,18 +526,12 @@ def warfarin_results(**kwargs):
 if __name__ == '__main__':
     model = 'warfarin'
     # model = 'warfarin_results'
-    filename = 'warfarin_74_22_GA_10days_warfQ_fixed30'
+    filename = 'WARF_74_22_GA_days10_hist05_DQN10x10'
     for _ in range(100):
-        runs = 20
-        training_episodes = 50
+        runs = 10
+        training_episodes = 100
         function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                     'warfarin': warfarin, 'warfarin_results': warfarin_results}
         function[model.lower()](filename=filename, runs=runs,
                                 training_episodes=training_episodes)
 
-
-# if __name__ == '__main__':
-#     from rl.subjects.warfarin_model_v2 import WarfarinModel_v2
-#     W = WarfarinModel_v2(age=74, CYP2C9='*2/*2', VKORC1='G/A', TTR_range=(2, 3), d_max=1, patient_selection='')
-#     for i in range(90):
-#         print(W.state, W.take_effect('', W.possible_actions[-1]))

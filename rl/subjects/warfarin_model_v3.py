@@ -1,8 +1,219 @@
+# -*- coding: utf-8 -*-
+'''
+warfarin_model class
+==================
+
+This `warfarin_model` class implements a two compartment PK/PD model for warfarin. 
+
+@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+'''
+
+from collections import deque
+from math import exp, log, sqrt
+from random import choice, normalvariate, sample, seed, shuffle
+
 import numpy as np
 import pandas as pd
-from math import exp, log, sqrt
-from random import seed, normalvariate, sample
 from scipy.stats import lognorm
+
+from ..valueset import ValueSet
+from .subject import Subject
+
+
+class WarfarinModel(Subject):
+    '''
+    A warfarin subject based on Hamberg's two compartment PK/PD model for wafarin.
+
+    Attributes
+    ----------
+        state: the state of the subject as a ValueSet.
+        is_terminated: whether the subject is finished or not.
+        possible_actions: a list of possible actions.
+
+    Methods
+    -------
+        register: register a new agent and return its ID or return ID of an existing agent.
+        take_effect: get an action and change the state accordingly.
+        reset: reset the state and is_terminated.
+    '''
+
+    def __init__(self, **kwargs):
+        Subject.__init__(self, **kwargs)
+
+        Subject.set_defaults(self, patient_selection='random',
+                             age_list=list(range(70, 86)),
+                             CYP2C9_list=['*1/*1', '*1/*2',
+                                          '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
+                             VKORC1_list=['G/G', 'G/A', 'A/A'],
+                             age=60, CYP2C9='*1/*1', VKORC1='A/A', SS=0, max_time=24*90,
+                             day=1, max_day=90, INR_previous=0, INR_current=0,
+                             d_previous=0, d_current=1, d_max=30,
+                             current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
+                             dose_history=5, pill_per_day=1, randomized=True,
+                             dose_list=[None]*5
+                             )
+
+        Subject.set_params(self, **kwargs)
+
+        self._max_time = self._max_day*24
+        self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
+                                randomized=self._randomized, max_time=self._max_time)
+
+        self._INR_current = self._patient.INR([0])[-1]
+        self._dose_list = deque([0.0]*self._dose_history)
+
+        if False:
+            self._model_filename = ''
+            self._Cs_super = 0
+            self._age = 0
+            self._CYP2C9 = ''
+            self._VKORC1 = ''
+            self._SS = 0
+            self._max_time = 0
+            self._rseed = 0
+            self._day = 0
+            self._max_day = 0
+            self._current_dose = 0
+            self._max_dose = 0
+            self._dose_steps = 0
+            self._dose_history = 0
+            self._pill_per_day = 0
+
+            self._patient_selection = ''
+            self._age_list = []
+            self._CYP2C9_list = []
+            self._VKORC1_list = []
+            self._INR_previous = 0
+            self._INR_current = 0
+
+            self._d_previous = 0
+            self._d_current = 0
+            self._d_max = 0
+            self._TTR_range = ()
+
+    @property  # binary representation is not complete!
+    def state(self):
+        return ValueSet((self._age, self._CYP2C9, self._VKORC1,
+                         tuple(self._dose_list), round(self._INR_current, 1),
+                         self._d_previous, self._d_current),
+                        min=None, max=None,
+                        binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
+                        else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
+                        else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
+                        else list([d/self._max_dose for d in x]) if isinstance(x, tuple)
+                        # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+                        else [0] if x is None else [x/30]
+                        )
+
+        # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
+        #                  Cs, tuple(self._dose_list), round(self._INR_current, 1),
+        #                  self._d_previous, self._d_current),
+        #                 min=None, max=None,
+        #                 binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
+        #                 else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
+        #                 else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
+        #                 else list([1 if a.value==b else 0 for b in x for a in self.possible_actions]) if isinstance(x, tuple)
+        #                 # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+        #                 else [0] if x is None else [x/30]
+        #                 )
+        # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
+        #                  Cs, self._current_dose,
+        #                  round(self._INR_previous, 1), round(
+        #                      self._INR_current, 1),
+        #                  self._d_previous, self._d_current),
+        #                 min=None, max=None,
+        #                 binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
+        #                 else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
+        #                 else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
+        #                 # for Cs, current_dose, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+        #                 else [0] if x is None else [x/30]
+        #                 )
+
+    @property
+    def is_terminated(self):  # ready
+        return self._day >= self._max_day
+
+    @property
+    # only considers the dose
+    def possible_actions(self):
+        return ValueSet([x*self._dose_steps
+                         for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
+                        min=0, max=self._max_dose,
+                        binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
+        # binary should be implemented for day!!!  action[0]=dose, action[1]=interval
+        # return ValueSet([(x*self._dose_steps, d)
+        #                  for x in range(int(self._max_dose/self._dose_steps), -1, -1)
+        #                  for d in range(1, min(self._d_max, self._max_day-self._day)+1)],
+        #                 min=(0, 1), max=(self._max_dose, 30),
+        #                 binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
+
+        # binary=lambda (x, d): (int(x * self._dose_steps // self._max_dose), self._dose_steps+1)).as_valueset_array()
+
+    def register(self, agent_name):  # should work
+        '''
+        Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
+        \nArguments:
+        \n    agent_name: the name of the agent to be registered.
+        '''
+        try:
+            return self._agent_list[agent_name]
+        except KeyError:
+            if len(self._agent_list) == 1:
+                raise ValueError('Only one drug is allowed.')
+            self._agent_list[agent_name] = 1
+            return 1
+
+    def take_effect(self, _id, action):
+        self._current_dose = action.value[0]
+        self._d_previous = self._d_current
+        self._dose_list.append(self._current_dose)
+        self._dose_list.popleft()
+
+        self._patient.dose = {self._day: self._current_dose}
+        self._d_current = 1  # action.value[1]
+        self._day += self._d_current
+
+        self._INR_previous = self._INR_current
+        self._INR_current = self._patient.INR(self._day)[-1]
+
+        try:
+            # TTR = sum((self._TTR_range[0] <= self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j <= self._TTR_range[1]
+            #            for j in range(self._d_previous)))
+            INR_mid = (self._TTR_range[1] + self._TTR_range[0]) / 2
+            INR_range = self._TTR_range[1] - self._TTR_range[0]
+            reward = -sum(((2 * (INR_mid - self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j)) ** 2
+                           for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
+        except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
+            # TTR = 0
+            reward = 0
+
+        # return TTR*self._d_current
+        return reward
+
+    def reset(self):
+        self._day = 1
+        self._current_dose = 0
+        self._dose_list = deque([0.0]*self._dose_history)
+
+        if self._patient_selection == 'random':
+            self._age = choice(self._age_list)
+            self._CYP2C9 = choice(self._CYP2C9_list)
+            self._VKORC1 = choice(self._VKORC1_list)
+
+        self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
+                                randomized=self._randomized, max_time=self._max_time)
+        self._INR_current = self._patient.INR([0])[-1]
+        self._INR_previous = 0
+
+        self._d_previous = 0
+        self._d_current = 1
+
+    def __repr__(self):
+        try:
+            return 'WarfarinModel: [age: {}, CYP2C9: {}, VKORC1: {}, INR_prev: {}, INR: {}, d_prev: {}, d: {}]'.format(
+                self._age, self._CYP2C9, self._VKORC1, self._INR_previous, self._INR_current, self._d_previous, self._d_current)
+        except:
+            return 'WarfarinModel'
 
 
 def rlnormRestricted(meanVal, stdev):
@@ -16,6 +227,18 @@ def rlnormRestricted(meanVal, stdev):
 
 
 class Patient:
+    '''
+    Two compartment PK/PD model for wafarin.
+
+    Attributes
+    ----------
+        dose: a dictionary containing with day as key and dose as value.
+
+    Methods
+    -------
+        INR: returns a list of INR values corresponding to the given list of days.
+    '''
+
     def __init__(self, age=50, CYP2C9='*3/*3', VKORC1='G/G', randomized=True, max_time=24,
                  dose_interval=24, dose={}, **kwargs):
         self._age = age
@@ -105,7 +328,7 @@ class Patient:
         self._multiplication_term = part_1 + part_2 + part_3
 
         self._data = pd.DataFrame(columns=['dose']+times)
-        self.dose = dose
+        self.dose = {0: 0.0}
 
     @property
     def dose(self):
@@ -115,20 +338,22 @@ class Patient:
     def dose(self, dose):
         for d, v in dose.items():
             self._data.loc[d] = np.insert(
-                self.Cs(dose=v, t0=d*self._dose_interval), 0, v)
+                self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
 
-    def Cs(self, dose, t0):
+    def _Cs(self, dose, t0):
         # NOTE: Here the error is one value, but it seemed to be Cij
-
-        if t0 == 0:  # non steady-state
-            C_s_error = exp(normalvariate(0, 0.30)
-                            ) if self._randomized else 1  # Sadjad
-        else:  # steady-state
-            C_s_error = exp(normalvariate(0, 0.09)) if self._randomized else 1
 
         C_s_pred = ((self._ka * self._F * dose / 2) /
                     self._V1) * self._multiplication_term
-        C_s = C_s_pred * C_s_error
+
+        if t0 == 0:  # non steady-state
+            C_s_error = [exp(normalvariate(0, 0.30)) for _ in range(len(C_s_pred))] if self._randomized \
+                else [1]*len(C_s_pred)  # Sadjad
+        else:  # steady-state
+            C_s_error = [exp(normalvariate(0, 0.09)) for _ in range(len(C_s_pred))] if self._randomized \
+                else [1]*len(C_s_pred)
+
+        C_s = [C_s_pred[i] * C_s_error[i] for i in range(len(C_s_pred))]
 
         return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1]
 
@@ -168,9 +393,11 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     max_day = 100
-    p = Patient(randomized=False, max_time=24*max_day + 1)
-    p.dose = {i: 7.5 for i in range(max_day)}
-    plt.plot(p.INR(list(i/24 for i in range(1, max_day*24 + 1))))
-    plt.plot(list(range(24, (max_day+1)*24, 240)),
-             p.INR(list(i for i in range(1, max_day+1, 10))))
+    p_count = range(100)
+    p = [Patient(randomized=True, max_time=24*max_day + 1) for _ in p_count]
+    for j in p_count:
+        p[j].dose = {i: 7.5 for i in range(max_day)}
+        # plt.plot(p.INR(list(i/24 for i in range(1, max_day*24 + 1))))
+        plt.plot(list(range(24, (max_day+1)*24, 240)),
+                 p[j].INR(list(i for i in range(1, max_day+1, 10))), 'x')
     plt.show()

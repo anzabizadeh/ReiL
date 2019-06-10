@@ -103,3 +103,6 @@ ENV/
 # PKPD model
 .pkpd
 warfarin_pkpd_model.py
+
+# TF logs
+/logs
