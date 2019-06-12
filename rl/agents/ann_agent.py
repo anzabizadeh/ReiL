@@ -43,14 +43,15 @@ class ANNAgent(Agent):
         learn: learn using either history or action, reward, and state.
         reset: Not Implemented Yet!
     '''
+
     def __init__(self, **kwargs):
         '''
         Initialize a Q-Learning agent with neural network Q-function approximator.
         '''
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, alpha=0.1, epsilon=0, default_actions={},
-                           learning_rate=1e-3, hidden_layer_sizes=(), input_length = 1,
-                           training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), current_run=0, batch_size=10)
+                           learning_rate=1e-3, hidden_layer_sizes=(), input_length=1,
+                           training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), buffer_size=50, batch_size=10)
         Agent.set_params(self, **kwargs)
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
@@ -64,7 +65,8 @@ class ANNAgent(Agent):
             self._gamma, self._alpha, self._epsilon = 1, 0.1, 0
             self._default_actions = {}
             self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (), 1
-            self._batch_size, self._current_run, self._training_x, self._training_y = 10, 0, np.array([], ndmin=2), np.array([], ndmin=2)
+            self._batch_size, self._current_run, self._training_x, self._training_y = 10, 0, np.array(
+                [], ndmin=2), np.array([], ndmin=2)
 
     def _generate_network(self):
         '''
@@ -72,23 +74,30 @@ class ANNAgent(Agent):
         '''
         self._tf['graph'] = tf.Graph()
         with self._tf['graph'].as_default():
-            self._tf['session'] = tf.Session(graph=self._tf['graph'])  # , config=tf.ConfigProto(log_device_placement=True))
-            self._tf['inputs'] = tf.placeholder(tf.float32, [None, self._input_length], name='inputs')
+            # , config=tf.ConfigProto(log_device_placement=True))
+            self._tf['session'] = tf.Session(graph=self._tf['graph'])
+            self._tf['inputs'] = tf.placeholder(
+                tf.float32, [None, self._input_length], name='inputs')
 
             layer = [self._tf['inputs']]
             for i, v in enumerate(self._hidden_layer_sizes):
-                layer.append(tf.layers.dense(layer[i], v, activation=tf.nn.relu, name='layer_{:0>2}'.format(i+1)))
+                layer.append(tf.layers.dense(
+                    layer[i], v, activation=tf.nn.relu, name='layer_{:0>2}'.format(i+1)))
 
             self._tf['output'] = tf.layers.dense(layer[-1], 1, name='output')
 
-            self._tf['labels'] = tf.placeholder(tf.int32, [None, 1], name='labels')
-            self._tf['loss'] = tf.losses.mean_squared_error(labels=self._tf['labels'], predictions=self._tf['output'])
-            self._tf['global_step'] = tf.Variable(0, trainable=False, name="step")
+            self._tf['labels'] = tf.placeholder(
+                tf.int32, [None, 1], name='labels')
+            self._tf['loss'] = tf.losses.mean_squared_error(
+                labels=self._tf['labels'], predictions=self._tf['output'])
+            self._tf['global_step'] = tf.Variable(
+                0, trainable=False, name="step")
             self._tf['train_opt'] = tf.train.AdamOptimizer(learning_rate=self._learning_rate) \
                 .minimize(self._tf['loss'], global_step=self._tf['global_step'], name='train_opt')
 
             hparam = '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', str(self._epsilon),
-                               'lrn', str(self._learning_rate), 'hddn', str(self._hidden_layer_sizes),
+                               'lrn', str(self._learning_rate), 'hddn', str(
+                                   self._hidden_layer_sizes),
                                'btch', str(self._batch_size)))
 
             self._tf['log_writer'] = tf.summary.FileWriter("logs/" + hparam)
@@ -112,22 +121,25 @@ class ANNAgent(Agent):
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned.
         '''
-        X = np.append(state.binary_representation().to_nparray(), action.binary_representation().to_nparray())
+        X = np.append(state.binary_representation().to_nparray(),
+                      action.binary_representation().to_nparray())
         X = X.reshape(1, -1)
         feed_dict = {self._tf['inputs']: X}
-        result = self._tf['session'].run(self._tf['output'], feed_dict=feed_dict)
+        result = self._tf['session'].run(
+            self._tf['output'], feed_dict=feed_dict)
         return result
 
     def _max_q(self, state):
         '''
         Return MAX(Q) of a state.
-        
+
         Arguments
         ---------
             state: the state for which MAX(Q) is returned.
         '''
         try:
-            max_q = max(self._q(state, action) for action in self._default_actions)
+            max_q = max(self._q(state, action)
+                        for action in self._default_actions)
         except ValueError:
             max_q = 0
         return max_q
@@ -135,7 +147,7 @@ class ANNAgent(Agent):
     def learn(self, **kwargs):
         '''
         Learn based on history.
-        
+
         Arguments:
             history: a list consisting of state, action, reward of an episode.
 
@@ -154,29 +166,46 @@ class ANNAgent(Agent):
                 try:
                     state = history[i+2]
                     max_q = self._max_q(state)
-                    new_q = reward+self._gamma*max_q
+                    new_q = reward + self._gamma*max_q
                 except IndexError:
                     new_q = reward
 
-                state_action = np.append(previous_state.binary_representation().to_nparray(), previous_action.binary_representation().to_nparray())
+                state_action = np.append(previous_state.binary_representation(
+                ).to_nparray(), previous_action.binary_representation().to_nparray())
                 try:
-                    self._training_x = np.vstack((self._training_x, state_action))
+                    self._training_x = np.vstack(
+                        (self._training_x, state_action))
                     self._training_y = np.vstack((self._training_y, new_q))
                 except ValueError:
                     self._training_x = state_action
                     self._training_y = np.array(new_q)
                 previous_state = state
 
-            self._current_run += 1
-            if self._current_run == self._batch_size:
-                feed_dict = {self._tf['inputs']: self._training_x, self._tf['labels']: self._training_y}
-                self._train_step = self._tf['session'].run(self._tf['global_step'])
-                self._tf['session'].run(self._tf['train_opt'], feed_dict=feed_dict)
-                summary = self._tf['session'].run(self._tf['merged'], feed_dict=feed_dict)
+            # self._current_run += len(state_action)
+            # if self._current_run == self._batch_size:
+            #     feed_dict = {self._tf['inputs']: self._training_x, self._tf['labels']: self._training_y}
+            #     self._train_step = self._tf['session'].run(self._tf['global_step'])
+            #     self._tf['session'].run(self._tf['train_opt'], feed_dict=feed_dict)
+            #     summary = self._tf['session'].run(self._tf['merged'], feed_dict=feed_dict)
+            #     self._tf['log_writer'].add_summary(summary, self._train_step)
+            #     self._training_x = np.array([], ndmin=2)
+            #     self._training_y = np.array([], ndmin=2)
+            #     self._current_run = 0
+
+            buffered_size = len(self._training_x)
+            if buffered_size >= self._buffer_size:
+                index = np.random.choice(buffered_size, self._batch_size)
+                feed_dict = {self._tf['inputs']: self._training_x[index],
+                             self._tf['labels']: self._training_y[index]}
+                self._train_step = self._tf['session'].run(
+                    self._tf['global_step'])
+                self._tf['session'].run(
+                    self._tf['train_opt'], feed_dict=feed_dict)
+                summary = self._tf['session'].run(
+                    self._tf['merged'], feed_dict=feed_dict)
                 self._tf['log_writer'].add_summary(summary, self._train_step)
-                self._training_x = np.array([], ndmin=2)
-                self._training_y = np.array([], ndmin=2)
-                self._current_run = 0
+                self._training_x = np.delete(self._training_x, range(buffered_size-self._buffer_size), axis=0)
+                self._training_y = np.delete(self._training_y, range(buffered_size-self._buffer_size), axis=0)
 
             return
         except KeyError:
@@ -198,7 +227,6 @@ class ANNAgent(Agent):
             possible_actions = kwargs['actions']
         except KeyError:
             possible_actions = self._default_actions
-
 
         if (self._training_flag) & (random() < self._epsilon):
             action = choice(possible_actions)
@@ -226,7 +254,8 @@ class ANNAgent(Agent):
         Agent.load(self, **kwargs)
         self._tf = {}
         self._generate_network()
-        self._tf['saver'].restore(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+        self._tf['saver'].restore(self._tf['session'], kwargs.get(
+            'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
 
     def save(self, **kwargs):
         '''
@@ -240,10 +269,12 @@ class ANNAgent(Agent):
 
         Raises ValueError if the filename is not specified.
         '''
-        
-        pickle_data = tuple(key for key in self.__dict__ if key not in ['_tf', 'data_collector'])
+
+        pickle_data = tuple(key for key in self.__dict__ if key not in [
+                            '_tf', 'data_collector'])
         path, filename = Agent.save(self, **kwargs, data=pickle_data)
-        self._tf['saver'].save(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+        self._tf['saver'].save(self._tf['session'], kwargs.get(
+            'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
         return path, filename
 
     def _report(self, **kwargs):

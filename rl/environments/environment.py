@@ -368,9 +368,11 @@ class Environment(RLBase):
                         possible_actions = subject.possible_actions
                         action = agent.act(state, actions=possible_actions,
                                             printable=subject.printable())
+                        q = agent._q(state, action)
                         reward = subject.take_effect(_id, action)
                         history[agent_name].append(state)
                         history[agent_name].append(action)
+                        history[agent_name].append(q)
                         history[agent_name].append(reward)
                         if subject.is_terminated:
                             for affected_agent in self._agent.keys():

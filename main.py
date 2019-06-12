@@ -145,11 +145,11 @@ def mnk(**kwargs):
         # define agents
         # agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
         # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        # agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4))
-        # agents['Opponent'] = QAgent()
-        agents['PG'] = PGAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26, 4),
-                               default_actions=default_actions, state_size=len(subjects['Board A'].state.binary_representation()))
-        agents['Opponent'] = RandomAgent()
+        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4))
+        agents['Opponent'] = QAgent()
+        # agents['PG'] = PGAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26, 4),
+        #                        default_actions=default_actions, state_size=len(subjects['Board A'].state.binary_representation()))
+        # agents['Opponent'] = RandomAgent()
         # test_agent = RandomAgent()
         # agents['Opponent'] = QAgent()
         # agents['Opponent'].load(filename='mnk333_opponent')
@@ -426,17 +426,17 @@ def warfarin(**kwargs):
                                       VKORC1='G/A',
                                       TTR_range=(2, 3),
                                       d_max=1,
-                                      max_day=10,
+                                      max_day=90,
                                       patient_selection='',
-                                      dose_history=5,  # just to see what happens!
+                                      dose_history=10,
                                       randomized=True)
         # define agents
-        # agents['protocol'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        # agents['protocol'] = WarfarinQAgent(gamma=1, alpha=0.2, epsilon=0.1,
+        # agents['protocol'] = QAgent(gamma=0.99, alpha=0.2, epsilon=0.1)
+        # agents['protocol'] = WarfarinQAgent(gamma=.99, alpha=0.2, epsilon=0.1,
         #                                     default_actions=subjects['W'].possible_actions,
         #                                     method='fixed policy first', fixed_policy_attempts=30)
-        agents['protocol'] = ANNAgent(gamma=0.99, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-                                      default_actions=subjects['W'].possible_actions, input_length=64, hidden_layer_sizes=(10, 10))
+        agents['protocol'] = ANNAgent(gamma=0.99, alpha=0.2, epsilon=1e-3, learning_rate=1e-2, buffer_size=5000, batch_size=1000, 
+                                      default_actions=subjects['W'].possible_actions, input_length=69, hidden_layer_sizes=(20, 20))
         # agents['protocol'] = DQNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
         #                               default_actions=subjects['W'].possible_actions, input_length=370, hidden_layer_sizes=(5,))
 
@@ -447,8 +447,6 @@ def warfarin(**kwargs):
         env.add(agents=agents, subjects=subjects)
         env.assign(assignment)
 
-    results = {'protocol training win': [], 'protocol training draw': [], 'protocol training lose': [],
-               'protocol testing win': [], 'protocol testing draw': [], 'protocol testing lose': []}
     # agents['protocol'].data_collector.start()
     for i in range(runs):
         # run and collect statistics
@@ -456,9 +454,9 @@ def warfarin(**kwargs):
         # if agents['protocol'].data_collector.is_active:
         #     agents['protocol'].data_collector.collect()
 
-        tally1 = env.elapse(episodes=training_episodes, reset='all',
-                            termination='all', learning_method='history',
-                            reporting='none', tally='yes')
+        env.elapse(episodes=training_episodes, reset='all',
+                    termination='all', learning_method='history',
+                    reporting='none', tally='no')
         # if agents['protocol'].data_collector.is_active:
         #     print(agents['protocol'].data_collector.report())
         # else:
@@ -472,11 +470,8 @@ def warfarin(**kwargs):
         #                     reporting='none', tally='yes')
         # env._agent['Opponent'] = temp
 
-        results['protocol training win'].append(tally1['protocol'])
-
         # # print result of each run
-        print('run {: }: TRAINING: win: {: }'
-              .format(i, results['protocol training win'][-1]))
+        print('run {: }'.format(i))
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
@@ -494,7 +489,7 @@ def warfarin(**kwargs):
     #     print(s.value, sa[s][0].value, sa[s][1])
     for t in env.trajectory().values():
         for i, v in enumerate(t):
-            if (i+1) % 3 == 0:
+            if (i+1) % 4 in [3, 0]:
                 print(v)
             else:
                 print(v.value, end='\t')
@@ -525,13 +520,12 @@ def warfarin_results(**kwargs):
 
 if __name__ == '__main__':
     model = 'warfarin'
-    # model = 'warfarin_results'
-    filename = 'WARF_74_22_GA_days10_hist05_DQN10x10'
-    for _ in range(100):
+    filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
+    # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
+    for _ in range(10):
         runs = 10
         training_episodes = 100
         function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                     'warfarin': warfarin, 'warfarin_results': warfarin_results}
         function[model.lower()](filename=filename, runs=runs,
                                 training_episodes=training_episodes)
-

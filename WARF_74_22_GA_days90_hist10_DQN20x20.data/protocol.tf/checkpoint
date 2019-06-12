@@ -1,0 +1,2 @@
+model_checkpoint_path: "protocol"
+all_model_checkpoint_paths: "protocol"
