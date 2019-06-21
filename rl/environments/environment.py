@@ -12,6 +12,7 @@ from pickle import load, dump, HIGHEST_PROTOCOL
 import signal
 import sys, inspect
 import pathlib
+import pandas as pd
 
 from ..base import RLBase
 import rl.agents as agents 
@@ -239,6 +240,7 @@ class Environment(RLBase):
             history = {}
             for agent_name in self._agent:
                 history[agent_name] = []
+                # history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
             done = False
             stopping_criterion = max_steps * (episode+1)
             while not done:
@@ -264,6 +266,7 @@ class Environment(RLBase):
                             history[agent_name].append(state)
                             history[agent_name].append(action)
                             history[agent_name].append(reward)
+                            # history[agent_name].append({'state': state, 'action': action, 'reward': reward})
                             # print('{: 4d} {: 4d}'.format(episode, steps), subject._player_location)
                             # if ([*subject._player_location] == [*subject._goal]):
                             #     pass
@@ -277,6 +280,7 @@ class Environment(RLBase):
                                     if (self._assignment_list[affected_agent][0] == subject_name) & \
                                         (affected_agent != agent_name):
                                         history[affected_agent][-1] = -reward
+                                        # history[affected_agent][-1]['reward'] = -reward
                                         # if learning_method == 'every step':
                                         #     self._agent[affected_agent].learn(state=subject.state,
                                         #         reward=reward if affected_agent == agent_name else -reward)
@@ -294,6 +298,8 @@ class Environment(RLBase):
                 if learning_method == 'every step':
                     for agent_name, agent in self._agent.items():
                         state = self._subject[self._assignment_list[agent_name][0]].state
+                        # agent.learn(state=state, reward=history[agent_name][-1]['reward'])
+                        # history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
                         agent.learn(state=state, reward=history[agent_name][2])
                         history[agent_name] = []
 
@@ -388,6 +394,9 @@ class Environment(RLBase):
                     done = False
                     for sub in self._subject.values():
                         done = done | sub.is_terminated
+
+        for sub in self._subject.values():
+            sub.reset()
 
         return history
 

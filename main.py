@@ -145,7 +145,8 @@ def mnk(**kwargs):
         # define agents
         # agents['TD'] = TD0Agent(gamma=1, alpha=0.2, epsilon=0.1)
         # agents['Q'] = QAgent(gamma=1, alpha=0.2, epsilon=0.1)
-        agents['ANN'] = ANNAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26,4))
+        agents['ANN'] = ANNAgent(
+            gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26, 4))
         agents['Opponent'] = QAgent()
         # agents['PG'] = PGAgent(gamma=1, alpha=0.2, epsilon=0.1, hidden_layer_sizes=(26, 4),
         #                        default_actions=default_actions, state_size=len(subjects['Board A'].state.binary_representation()))
@@ -408,7 +409,52 @@ def warfarin(**kwargs):
     test_episodes = kwargs.get('test_episodes', 100)
 
     # load the environment or create a new one
-    filename = kwargs.get('filename', 'warfarin')
+    try:
+        filename = kwargs['filename']
+    except KeyError:
+        age = kwargs.get('age', 74)
+        CYP2C9 = kwargs.get('CYP2C9', '*2/*2')
+        VKORC1 = kwargs.get('VKORC1', 'G/A')
+        max_day = kwargs.get('max_day', 90)
+        dose_history = kwargs.get('dose_history', 10)
+        patient_selection = kwargs.get('patient_selection', '')
+        randomized = kwargs.get('randomized', True)
+
+        gamma = kwargs.get('gamma', 0.99),
+        alpha = kwargs.get('alpha', 0.2),
+        epsilon = kwargs.get('epsilon', 0.1)
+
+        agent_type = kwargs.get('agent_type', 'Q')
+
+        if agent_type.lower() == 'warfarinq':
+            method = kwargs.get('method', 'fixed policy first')
+            if method == 'fixed policy first':
+                fixed_policy_attempts = kwargs.get('fixed_policy_attempts', 30)
+                text = '{:2}'.format(fixed_policy_attempts)
+
+        elif agent_type.lower() == 'ann':
+            learning_rate = kwargs.get('learning_rate', 1e-2)
+            buffer_size = kwargs.get('buffer_size', 5000)
+            batch_size = kwargs.get('batch_size', 1000)
+            input_length = kwargs.get('input_length', 79)
+            hidden_layer_sizes = kwargs.get('hidden_layer_sizes', (20, 20))
+            text = '_'.join((str(hidden_layer_sizes),
+                             'lr', str(learning_rate),
+                             'buff', str(buffer_size),
+                             'batch', str(batch_size)))
+        else:
+            text = ''
+
+        filename = '_'.join(('WARF',
+                             str(age) if patient_selection != 'random' else '00',
+                             {'*1/*1': '11', '*2/*2': '22', '*3/*3': '33'}[
+                                 CYP2C9] if patient_selection != 'random' else '00',
+                             {'A/A': 'AA', 'A/G': 'AG', 'G/A': 'AG', 'G/G': 'GG'}[
+                                 VKORC1] if patient_selection != 'random' else 'XX',
+                             'days{:2}'.format(max_day),
+                             'hist{:2}'.format(dose_history),
+                             'T' if randomized else 'F',
+                             agent_type, text))
 
     try:
         env = Environment(filename=filename)
@@ -421,22 +467,38 @@ def warfarin(**kwargs):
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel(age=74,
-                                      CYP2C9='*2/*2',
-                                      VKORC1='G/A',
+        subjects['W'] = WarfarinModel(age=age,
+                                      CYP2C9=CYP2C9,
+                                      VKORC1=VKORC1,
                                       TTR_range=(2, 3),
-                                      d_max=1,
-                                      max_day=90,
-                                      patient_selection='',
-                                      dose_history=10,
-                                      randomized=True)
+                                      d_max=kwargs.get('d_max', 1),
+                                      max_day=max_day,
+                                      patient_selection=patient_selection,
+                                      dose_history=dose_history,
+                                      randomized=randomized)
         # define agents
-        # agents['protocol'] = QAgent(gamma=0.99, alpha=0.2, epsilon=0.1)
-        # agents['protocol'] = WarfarinQAgent(gamma=.99, alpha=0.2, epsilon=0.1,
-        #                                     default_actions=subjects['W'].possible_actions,
-        #                                     method='fixed policy first', fixed_policy_attempts=30)
-        agents['protocol'] = ANNAgent(gamma=0.99, alpha=0.2, epsilon=1e-3, learning_rate=1e-2, buffer_size=5000, batch_size=1000, 
-                                      default_actions=subjects['W'].possible_actions, input_length=69, hidden_layer_sizes=(20, 20))
+        if agent_type.lower() == 'q':
+            agents['protocol'] = QAgent(gamma=gamma,
+                                        alpha=alpha,
+                                        epsilon=epsilon)
+
+        elif agent_type.lower() == 'warfarinq':
+            agents['protocol'] = WarfarinQAgent(gamma=gamma,
+                                                alpha=alpha,
+                                                epsilon=epsilon,
+                                                method=method,
+                                                fixed_policy_attempts=fixed_policy_attempts,
+                                                default_actions=subjects['W'].possible_actions)
+        elif agent_type.lower() == 'ann':
+            agents['protocol'] = ANNAgent(gamma=gamma,
+                                          alpha=alpha,
+                                          epsilon=epsilon,
+                                          learning_rate=learning_rate,
+                                          buffer_size=buffer_size,
+                                          batch_size=batch_size,
+                                          input_length=input_length,
+                                          hidden_layer_sizes=hidden_layer_sizes,
+                                          default_actions=subjects['W'].possible_actions)
         # agents['protocol'] = DQNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
         #                               default_actions=subjects['W'].possible_actions, input_length=370, hidden_layer_sizes=(5,))
 
@@ -455,8 +517,8 @@ def warfarin(**kwargs):
         #     agents['protocol'].data_collector.collect()
 
         env.elapse(episodes=training_episodes, reset='all',
-                    termination='all', learning_method='history',
-                    reporting='none', tally='no')
+                   termination='all', learning_method='history',
+                   reporting='none', tally='no')
         # if agents['protocol'].data_collector.is_active:
         #     print(agents['protocol'].data_collector.report())
         # else:
@@ -487,12 +549,12 @@ def warfarin(**kwargs):
     # sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
     # for s in sorted(sa, reverse=True):
     #     print(s.value, sa[s][0].value, sa[s][1])
-    for t in env.trajectory().values():
-        for i, v in enumerate(t):
-            if (i+1) % 4 in [3, 0]:
-                print(v)
-            else:
-                print(v.value, end='\t')
+        for t in env.trajectory().values():
+            for i, v in enumerate(t):
+                if (i+1) % 4 in [3, 0]:
+                    print(v)
+                else:
+                    print(v.value, end='\t')
 
 
 def warfarin_results(**kwargs):
@@ -520,12 +582,27 @@ def warfarin_results(**kwargs):
 
 if __name__ == '__main__':
     model = 'warfarin'
-    filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
+    # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    for _ in range(10):
-        runs = 10
-        training_episodes = 100
-        function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
-                    'warfarin': warfarin, 'warfarin_results': warfarin_results}
-        function[model.lower()](filename=filename, runs=runs,
-                                training_episodes=training_episodes)
+    runs = 100
+    training_episodes = 200
+    function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
+                'warfarin': warfarin, 'warfarin_results': warfarin_results}
+    function[model.lower()](runs=runs,
+                            training_episodes=training_episodes,
+                            patient_selection='random',
+                            randomized=True,
+                            # age=74,
+                            # CYP2C9='*2/*2',
+                            # VKORC1='G/A',
+                            max_day=20,
+                            dose_history=20,
+                            gamma=0.99,
+                            alpha=0.2,
+                            epsilon=0.1,
+                            agent_type='ANN',
+                            input_length=79,
+                            buffer_size=200,
+                            batch_size=20,
+                            hidden_layer_sizes=(10, 10)
+                            )

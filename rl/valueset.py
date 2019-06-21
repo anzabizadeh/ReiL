@@ -3,7 +3,7 @@
 ValueSet class
 ==============
 
-A data type used for state and action variables.
+The legacy data type used for state and action variables.
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
@@ -22,9 +22,11 @@ def main():
     print('{}'.format(s.binary_representation()))
     print('{:2.2} {}'.format(s.normalizer(0, 1), s.to_nparray()))
     directions = ['U', 'D', 'L', 'R']
-    t = ValueSet(directions, binary=lambda x: (directions.index(x), len(directions)))
+    t = ValueSet(directions, binary=lambda x: (
+        directions.index(x), len(directions)))
     print('{}, {}'.format(t, t.binary_representation()))
-    def convert(x, directions = ['U', 'D', 'L', 'R']):
+
+    def convert(x, directions=['U', 'D', 'L', 'R']):
         bin_rep = [0]*(len(directions)-1)
         for value in x:
             index = directions.index(value)
@@ -37,6 +39,7 @@ def main():
     array = s.as_valueset_array()
     for a in array:
         print(a.value, a.max, a.min)
+
 
 class ValueSet():
     '''
@@ -55,6 +58,7 @@ class ValueSet():
         binary_representation: return the value as a zero-one vector
         normalizer: normalize the value
     '''
+
     def __init__(self, value=[], **kwargs):
         '''
         Initialize a ValueSet.
@@ -67,28 +71,35 @@ class ValueSet():
             binary: the function with which the value should be turned into a zero-one vector (Default=None).
         '''
         self.value = value
-        try:
-            self._min = kwargs['min']
-        except KeyError:
-            if not self.value:
-                self._min = None
-            else:
-                self._min = min(self.value)
-        try:
-            self._max = kwargs['max']
-        except KeyError:
-            if not self.value:
-                self._max = None
-            else:
-                self._max = max(self.value)
-        try:
-            self._normalizer_function = kwargs['normalizer']
-        except KeyError:
-            self._normalizer_function = None
-        try:
-            self._binary_function = kwargs['binary']
-        except KeyError:
-            self._binary_function = None
+
+        self._min = kwargs.get(
+            'min', None if not self.value else min(self.value))
+        self._max = kwargs.get(
+            'max', None if not self.value else max(self.value))
+        self._normalizer_function = kwargs.get('normalizer', None)
+        self._binary_function = kwargs.get('binary', None)
+        # try:
+        #     self._min = kwargs['min']
+        # except KeyError:
+        #     if not self.value:
+        #         self._min = None
+        #     else:
+        #         self._min = min(self.value)
+        # try:
+        #     self._max = kwargs['max']
+        # except KeyError:
+        #     if not self.value:
+        #         self._max = None
+        #     else:
+        #         self._max = max(self.value)
+        # try:
+        #     self._normalizer_function = kwargs['normalizer']
+        # except KeyError:
+        #     self._normalizer_function = None
+        # try:
+        #     self._binary_function = kwargs['binary']
+        # except KeyError:
+        #     self._binary_function = None
 
     @property
     def value(self):
@@ -107,16 +118,28 @@ class ValueSet():
         self._scalable = True
         self._enumerable = True
         self._one_type = True
-        try:
-            _ = (e for e in value)
-            first_type = type(value[0])
-            v = value
-        except TypeError:
+
+        if hasattr(value, '__iter__') and not isinstance(value, str):
+            try:
+                first_type = type(value[0])
+                v = value
+            except IndexError:
+                first_type = type(value)
+                v = []
+        else:
             first_type = type(value)
             v = [value]
-        except IndexError:
-            first_type = type(value)
-            v = []
+
+        # try:
+        #     _ = (e for e in value)
+        #     first_type = type(value[0])
+        #     v = value
+        # except TypeError:
+        #     first_type = type(value)
+        #     v = [value]
+        # except IndexError:
+        #     first_type = type(value)
+        #     v = []
 
         for val in v:
             if not isinstance(val, first_type):
@@ -137,49 +160,44 @@ class ValueSet():
     def max(self):
         '''
         Return the max
-        
+
         returns the max if _one_type is True, None otherwise.
         '''
-        if self._one_type:
-            return self._max
-        else:
-            return None
+        return self._max if self._one_type else None
 
     @max.setter
     def max(self, value):
         '''
         Set the max
-        
+
         sets the max if _one_type is True.
         raises TypeError if data is mixed.
         raises ValueError if the given value is less than the max(value).
         '''
         if not self._one_type:
-            raise TypeError('Mixed data doesn\'t have min!')
+            raise TypeError('Mixed data doesn\'t have max!')
         if self._max is None:
             self._max = value
             return
         if value < max(self.value):
-            raise ValueError('The provided value is less than the biggest number I have.')
+            raise ValueError(
+                'The provided value is less than the biggest number I have.')
         self._max = value
 
     @property
     def min(self):
         '''
         Return the min
-        
+
         returns the min if _one_type is True, None otherwise.
         '''
-        if self._one_type:
-            return self._min
-        else:
-            return None
+        return self._min if self._one_type else None
 
     @min.setter
     def min(self, value):
         '''
         Set the min
-        
+
         sets the min if _one_type is True.
         raises TypeError if data is mixed.
         raises ValueError if the given value is greater than the min(value).
@@ -190,7 +208,8 @@ class ValueSet():
             self._min = value
             return
         if value > min(self.value):
-            raise ValueError('The provided value is greater than the smallest number I have.')
+            raise ValueError(
+                'The provided value is greater than the smallest number I have.')
         self._min = value
 
     def to_list(self):
@@ -203,7 +222,8 @@ class ValueSet():
 
     def as_valueset_array(self):
         ''' return the value as a list of ValueSets.'''
-        array = [ValueSet(v, min=self.min, max=self.max, normalizer=self._normalizer_function, binary=self._binary_function) for v in self._value]
+        array = [ValueSet(v, min=self.min, max=self.max, normalizer=self._normalizer_function,
+                          binary=self._binary_function) for v in self._value]
         # for a in array:
         #     a.max = self.max
         #     a.min = self.min
@@ -224,22 +244,26 @@ class ValueSet():
             bin_rep = []
             for i in range(len(self.value)):
                 temp = self._binary_function(self.value[i])
-                if (min(temp) >= 0) & (max(temp) <= 1):  # whether the function returns the list or index, length pair
+                # whether the function returns the list or index, length pair
+                if (min(temp) >= 0) & (max(temp) <= 1):
                     bin_rep = bin_rep + temp
                 else:
                     index, length = temp
                     temp = [0]*(length-1)
                     if index != 0:
-                        temp[index-1] = 1  # for n categories, we need n-1 bins.
-                    bin_rep = bin_rep + temp 
+                        # for n categories, we need n-1 bins.
+                        temp[index-1] = 1
+                    bin_rep = bin_rep + temp
             return ValueSet(bin_rep)
 
         if not self._enumerable:
-            raise TypeError('The type of data doesn\'t allow binary representation!')
+            raise TypeError(
+                'The type of data doesn\'t allow binary representation!')
         if not self._one_type:
             raise TypeError('Mixed data doesn\'t allow binary representation!')
         try:
-            data_range = self.max - self.min  # for n categories, we need n-1 bins.
+            # for n categories, we need n-1 bins.
+            data_range = self.max - self.min
             bin_rep = [0]*data_range*len(self.value)
             for i in range(len(self.value)):
                 index = (self.value[i]-self.min) + (i*data_range) - 1
@@ -247,7 +271,8 @@ class ValueSet():
                     bin_rep[index] = 1
         except TypeError:
             if self._binary_function is None:
-                raise RuntimeError('Failed to automatically convert to binary representation.\n Use set_function to provide custom function.')
+                raise RuntimeError(
+                    'Failed to automatically convert to binary representation.\n Use set_function to provide custom function.')
 
         return ValueSet(bin_rep)
 
@@ -279,14 +304,14 @@ class ValueSet():
         if normalizer is not None:
             self._normalizer_function = normalizer
         if binary is not None:
-            self._binary_function = binary 
+            self._binary_function = binary
 
     def __eq__(self, other):
         try:
             return self._value == other._value
         except AttributeError:
             return False
-        
+
     def __ge__(self, other):
         try:
             return self._value >= other._value
@@ -341,6 +366,3 @@ class ValueSet():
 
     def __repr__(self):
         return ''.join(['[', str(self.value), '], min=', str(self._min), ', max=', str(self._max)])
-
-if __name__ == '__main__':
-    main()

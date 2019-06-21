@@ -46,7 +46,7 @@ class WarfarinModel(Subject):
                                           '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
                              VKORC1_list=['G/G', 'G/A', 'A/A'],
                              age=60, CYP2C9='*1/*1', VKORC1='A/A', SS=0, max_time=24*90,
-                             day=1, max_day=90, INR_previous=0, INR_current=0,
+                             day=1, max_day=90, INR=[0], INR_current=0,
                              d_previous=0, d_current=1, d_max=30,
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
                              dose_history=5, pill_per_day=1, randomized=True,
@@ -59,7 +59,8 @@ class WarfarinModel(Subject):
         self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
                                 randomized=self._randomized, max_time=self._max_time)
 
-        self._INR_current = self._patient.INR([0])[-1]
+        self._INR = deque([0.0]*self._dose_history)
+        self._INR[-1] = self._patient.INR([0])[-1]
         self._dose_list = deque([0.0]*self._dose_history)
 
         if False:
@@ -83,8 +84,7 @@ class WarfarinModel(Subject):
             self._age_list = []
             self._CYP2C9_list = []
             self._VKORC1_list = []
-            self._INR_previous = 0
-            self._INR_current = 0
+            self._INR = []
 
             self._d_previous = 0
             self._d_current = 0
