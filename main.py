@@ -601,7 +601,7 @@ if __name__ == '__main__':
                             alpha=0.2,
                             epsilon=0.1,
                             agent_type='ANN',
-                            input_length=79,
+                            input_length=32,
                             buffer_size=200,
                             batch_size=20,
                             hidden_layer_sizes=(10, 10)

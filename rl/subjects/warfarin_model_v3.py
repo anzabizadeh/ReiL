@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import lognorm
 
-from ..valueset import ValueSet
+# from ..valueset import ValueSet
+from ..rldata import RLData
 from .subject import Subject
 
 
@@ -62,7 +63,9 @@ class WarfarinModel(Subject):
         self._INR = deque([0.0]*self._dose_history)
         self._INR[-1] = self._patient.INR([0])[-1]
         self._dose_list = deque([0.0]*self._dose_history)
-
+        self._possible_actions = RLData([x*self._dose_steps
+                         for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
+                        lower=0, upper=self._max_dose).as_rldata_array()
         if False:
             self._model_filename = ''
             self._Cs_super = 0
@@ -93,17 +96,26 @@ class WarfarinModel(Subject):
 
     @property  # binary representation is not complete!
     def state(self):
-        return ValueSet((self._age, self._CYP2C9, self._VKORC1,
-                         tuple(self._dose_list), round(self._INR_current, 1),
-                         self._d_previous, self._d_current),
-                        min=None, max=None,
-                        binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
-                        else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
-                        else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-                        else list([d/self._max_dose for d in x]) if isinstance(x, tuple)
-                        # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
-                        else [0] if x is None else [x/30]
-                        )
+        return RLData({'Age': self._age,
+                       'CYP2C9': self._CYP2C9,
+                       'VKORC1': self._VKORC1,
+                       'Doses': tuple(self._dose_list),
+                       'INRs': round(self._INR_current, 1)},
+                      lower={'Age': 65,
+                             'Doses': 0.0,
+                             'INRs': 0.0},
+                      upper={'Age': 85,
+                             'Doses': 15.0,
+                             'INRs': 10.0},
+                      categories={'CYP2C9': self._CYP2C9_list,
+                                  'VKORC1': self._VKORC1_list}
+                    #   binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
+                    #   else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
+                    #   else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
+                    #   else list([d/self._max_dose for d in x]) if isinstance(x, tuple)
+                    #   # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
+                    #   else [0] if x is None else [x/30]
+                      )
 
         # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
         #                  Cs, tuple(self._dose_list), round(self._INR_current, 1),
@@ -136,10 +148,8 @@ class WarfarinModel(Subject):
     @property
     # only considers the dose
     def possible_actions(self):
-        return ValueSet([x*self._dose_steps
-                         for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
-                        min=0, max=self._max_dose,
-                        binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
+        return self._possible_actions
+                        # binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_rldata_array()
         # binary should be implemented for day!!!  action[0]=dose, action[1]=interval
         # return ValueSet([(x*self._dose_steps, d)
         #                  for x in range(int(self._max_dose/self._dose_steps), -1, -1)

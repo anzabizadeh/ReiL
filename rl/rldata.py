@@ -82,6 +82,7 @@ class RLData:
             self._value.loc['is_numerical'] = dict((i, all(isinstance(v, Number) for v in val[0]) if hasattr(
                 val[0], '__iter__') and not isinstance(val[0], str) else isinstance(val[0], Number)) for i, val in self._value.iteritems())
             self._value.loc['normalizer'] = None
+            self._value.loc['categories'] = None
 
             for i, val in self._value.iteritems():
                 if self._value.loc['is_numerical', i]:
@@ -173,11 +174,11 @@ class RLData:
         '''
         try:
             for i, val in value.items():
-                if not self._value.loc['is_numerical', i]:
-                    self._value.loc['categories', i] = val
+                if not self._value.at['is_numerical', i]:
+                    self._value.at['categories', i] = val
         except AttributeError:
-            if not self._value.loc['is_numerical', 'value']:
-                self._value.loc['categories', 'value'] = value
+            if not self._value.at['is_numerical', 'value']:
+                self._value.at['categories', 'value'] = value
 
     @property
     def is_numerical(self):
@@ -215,11 +216,18 @@ class RLData:
 
     def as_rldata_array(self):
         ''' return the value as a list of RLData.'''
-        array = [RLData(value=self._value.loc['value', col],
-                        lower=self._value.loc['lower', col],
-                        upper=self._value.loc['upper', col],
-                        categories=self._value.loc['categories', col],
-                        is_numerical=self._value.loc['is_numerical', col]) for col in self._value.columns]
+        if self._value.shape[1] > 1:
+            array = [RLData(value=self._value.loc['value', col],
+                            lower=self._value.loc['lower', col],
+                            upper=self._value.loc['upper', col],
+                            categories=self._value.loc['categories', col],
+                            is_numerical=self._value.loc['is_numerical', col]) for col in self._value.columns]
+        else:
+            array = [RLData(value=v,
+                            lower=self._value.loc['lower', 'value'],
+                            upper=self._value.loc['upper', 'value'],
+                            categories=self._value.loc['categories', 'value'],
+                            is_numerical=self._value.loc['is_numerical', 'value']) for v in self._value.loc['value', 'value']]
 
         return array
 

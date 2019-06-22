@@ -121,8 +121,8 @@ class ANNAgent(Agent):
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned.
         '''
-        X = np.append(state.binary_representation().to_nparray(),
-                      action.binary_representation().to_nparray())
+        X = np.append(state.normalize().as_nparray(),
+                      action.normalize().as_nparray())
         X = X.reshape(1, -1)
         feed_dict = {self._tf['inputs']: X}
         result = self._tf['session'].run(
@@ -170,8 +170,8 @@ class ANNAgent(Agent):
                 except IndexError:
                     new_q = reward
 
-                state_action = np.append(previous_state.binary_representation(
-                ).to_nparray(), previous_action.binary_representation().to_nparray())
+                state_action = np.append(previous_state.normalize(
+                ).as_nparray(), previous_action.normalize().as_nparray())
                 try:
                     self._training_x = np.vstack(
                         (self._training_x, state_action))
