@@ -100,7 +100,7 @@ class WarfarinModel(Subject):
                        'CYP2C9': self._CYP2C9,
                        'VKORC1': self._VKORC1,
                        'Doses': tuple(self._dose_list),
-                       'INRs': round(self._INR_current, 1)},
+                       'INRs': tuple(self._INR)},
                       lower={'Age': 65,
                              'Doses': 0.0,
                              'INRs': 0.0},
@@ -183,15 +183,15 @@ class WarfarinModel(Subject):
         self._d_current = 1  # action.value[1]
         self._day += self._d_current
 
-        self._INR_previous = self._INR_current
-        self._INR_current = self._patient.INR(self._day)[-1]
+        self._INR.append(self._patient.INR(self._day)[-1])
+        self._INR.popleft()
 
         try:
             # TTR = sum((self._TTR_range[0] <= self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j <= self._TTR_range[1]
             #            for j in range(self._d_previous)))
             INR_mid = (self._TTR_range[1] + self._TTR_range[0]) / 2
             INR_range = self._TTR_range[1] - self._TTR_range[0]
-            reward = -sum(((2 * (INR_mid - self._INR_previous + (self._INR_current-self._INR_previous)/self._d_previous*j)) ** 2
+            reward = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
                            for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
         except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
             # TTR = 0
@@ -204,6 +204,7 @@ class WarfarinModel(Subject):
         self._day = 1
         self._current_dose = 0
         self._dose_list = deque([0.0]*self._dose_history)
+        self._INR = deque([0.0]*self._dose_history)
 
         if self._patient_selection == 'random':
             self._age = choice(self._age_list)
@@ -212,16 +213,16 @@ class WarfarinModel(Subject):
 
         self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
                                 randomized=self._randomized, max_time=self._max_time)
-        self._INR_current = self._patient.INR([0])[-1]
-        self._INR_previous = 0
+        self._INR = deque([0.0]*self._dose_history)
+        self._INR[-1] = self._patient.INR([0])[-1]
 
         self._d_previous = 0
         self._d_current = 1
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: [age: {}, CYP2C9: {}, VKORC1: {}, INR_prev: {}, INR: {}, d_prev: {}, d: {}]'.format(
-                self._age, self._CYP2C9, self._VKORC1, self._INR_previous, self._INR_current, self._d_previous, self._d_current)
+            return 'WarfarinModel: [age: {}, CYP2C9: {}, VKORC1: {}, INR: {}, d_prev: {}, d: {}]'.format(
+                self._age, self._CYP2C9, self._VKORC1, self._INR, self._d_previous, self._d_current)
         except:
             return 'WarfarinModel'
 
