@@ -204,8 +204,10 @@ class ANNAgent(Agent):
                 summary = self._tf['session'].run(
                     self._tf['merged'], feed_dict=feed_dict)
                 self._tf['log_writer'].add_summary(summary, self._train_step)
-                self._training_x = np.delete(self._training_x, range(buffered_size-self._buffer_size), axis=0)
-                self._training_y = np.delete(self._training_y, range(buffered_size-self._buffer_size), axis=0)
+                self._training_x = np.delete(self._training_x, range(
+                    buffered_size-self._buffer_size), axis=0)
+                self._training_y = np.delete(self._training_y, range(
+                    buffered_size-self._buffer_size), axis=0)
 
             return
         except KeyError:
@@ -287,19 +289,6 @@ class ANNAgent(Agent):
 
         Note: this function is not implemented yet!
         '''
-        # try:
-        #     item = kwargs['statistic']
-        # except KeyError:
-        #     return
-
-        # if item.lower() == 'diff-coef':
-        #     import numpy as np
-        #     rep = 0
-        #     for i in range(np.size(kwargs['old']['_clf.coefs_'])):
-        #         rep += np.sum(np.subtract(kwargs['old']['_clf.coefs_'][i], kwargs['new']['_clf.coefs_'][i]))
-
-        # summary = self._tf['session'].run(self._tf['merged'], feed_dict={})
-        # self._tf['log_writer'].add_summary(summary, self._train_step)
         raise NotImplementedError
 
     def __del__(self):
@@ -307,4 +296,10 @@ class ANNAgent(Agent):
         self._tf['session'].close()
 
     def __repr__(self):
-        return 'ANNAgent'
+        try:
+            return 'ANNAgent: ' + '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', str(self._epsilon),
+                                            'lrn', str(self._learning_rate), 'hddn', str(
+                self._hidden_layer_sizes),
+                'btch', str(self._batch_size)))
+        except AttributeError:
+            return 'ANNAgent: New'

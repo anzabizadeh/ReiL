@@ -94,7 +94,7 @@ class WarfarinModel(Subject):
             self._d_max = 0
             self._TTR_range = ()
 
-    @property  # binary representation is not complete!
+    @property
     def state(self):
         return RLData({'Age': self._age,
                        'CYP2C9': self._CYP2C9,
@@ -108,58 +108,18 @@ class WarfarinModel(Subject):
                              'Doses': 15.0,
                              'INRs': 10.0},
                       categories={'CYP2C9': self._CYP2C9_list,
-                                  'VKORC1': self._VKORC1_list}
-                    #   binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
-                    #   else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
-                    #   else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-                    #   else list([d/self._max_dose for d in x]) if isinstance(x, tuple)
-                    #   # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
-                    #   else [0] if x is None else [x/30]
-                      )
-
-        # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
-        #                  Cs, tuple(self._dose_list), round(self._INR_current, 1),
-        #                  self._d_previous, self._d_current),
-        #                 min=None, max=None,
-        #                 binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
-        #                 else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
-        #                 else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-        #                 else list([1 if a.value==b else 0 for b in x for a in self.possible_actions]) if isinstance(x, tuple)
-        #                 # for Cs, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
-        #                 else [0] if x is None else [x/30]
-        #                 )
-        # return ValueSet((self._age, self._CYP2C9, self._VKORC1,
-        #                  Cs, self._current_dose,
-        #                  round(self._INR_previous, 1), round(
-        #                      self._INR_current, 1),
-        #                  self._d_previous, self._d_current),
-        #                 min=None, max=None,
-        #                 binary=lambda x: [1 if x == a else 0 for a in self._age_list] if x in self._age_list
-        #                 else [1 if x == a else 0 for a in self._CYP2C9_list] if x in self._CYP2C9_list
-        #                 else [1 if x == a else 0 for a in self._VKORC1_list] if x in self._VKORC1_list
-        #                 # for Cs, current_dose, INR_previous, INR_current, d_previous, d_current I divide by 30 to normalize
-        #                 else [0] if x is None else [x/30]
-        #                 )
+                                  'VKORC1': self._VKORC1_list})
 
     @property
-    def is_terminated(self):  # ready
+    def is_terminated(self):
         return self._day >= self._max_day
 
     @property
     # only considers the dose
     def possible_actions(self):
         return self._possible_actions
-                        # binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_rldata_array()
-        # binary should be implemented for day!!!  action[0]=dose, action[1]=interval
-        # return ValueSet([(x*self._dose_steps, d)
-        #                  for x in range(int(self._max_dose/self._dose_steps), -1, -1)
-        #                  for d in range(1, min(self._d_max, self._max_day-self._day)+1)],
-        #                 min=(0, 1), max=(self._max_dose, 30),
-        #                 binary=lambda x: [1 if x == a else 0 for a in range(int(self._max_dose/self._dose_steps)+1)]).as_valueset_array()
 
-        # binary=lambda (x, d): (int(x * self._dose_steps // self._max_dose), self._dose_steps+1)).as_valueset_array()
-
-    def register(self, agent_name):  # should work
+    def register(self, agent_name):
         '''
         Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
         \nArguments:
@@ -352,8 +312,6 @@ class Patient:
                 self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
 
     def _Cs(self, dose, t0):
-        # NOTE: Here the error is one value, but it seemed to be Cij
-
         C_s_pred = ((self._ka * self._F * dose / 2) /
                     self._V1) * self._multiplication_term
 

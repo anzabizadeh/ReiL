@@ -10,13 +10,15 @@ This `environment` class provides a learning environment for any reinforcement l
 
 from pickle import load, dump, HIGHEST_PROTOCOL
 import signal
-import sys, inspect
+import sys
+import inspect
 import pathlib
 import pandas as pd
 
 from ..base import RLBase
-import rl.agents as agents 
+import rl.agents as agents
 import rl.subjects as subjects
+
 
 class Environment(RLBase):
     '''
@@ -38,6 +40,7 @@ class Environment(RLBase):
     Agents act on subjects and receive the reward of their action and the new state of subjects.
     Then agents learn based on this information to act better.
     '''
+
     def __init__(self, **kwargs):
         '''
         Create a new environment.
@@ -60,15 +63,16 @@ class Environment(RLBase):
         '''
         RLBase.__init__(self, **kwargs)
         if 'filename' in kwargs:
-            self.load(path=kwargs.get('path','.'), filename=kwargs['filename'])
+            self.load(path=kwargs.get('path', '.'),
+                      filename=kwargs['filename'])
             return
 
         RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
-                           episodes=1, max_steps=10000, termination='any', reset='all',
-                           learning_method='every step',
-                           allow_user_to_halt=True, save_on_exit=True)
+                            episodes=1, max_steps=10000, termination='any', reset='all',
+                            learning_method='every step',
+                            allow_user_to_halt=True, save_on_exit=True)
         RLBase.set_params(self, **kwargs)
-        
+
         # signal.signal(signal.SIGINT, self.__signal_handler)
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -125,7 +129,7 @@ class Environment(RLBase):
     def assign(self, agent_subject_names):
         '''
         Assign agents to subjects.
-        
+
         Arguments
         ---------
             agent_subject_names: a list of agent subject tuples.
@@ -144,7 +148,7 @@ class Environment(RLBase):
     def elapse(self, **kwargs):
         '''
         Move forward in time for a number of episodes.
-        
+
         At each episode, agents are called sequentially to act on their respective subject(s).
         An episode ends if one (all) subject(s) terminates.
         Arguments
@@ -171,59 +175,21 @@ class Environment(RLBase):
                 'yes': counts the average number of steps in each episode.
                 'no': doesn't count.
         '''
-        # one episode is one full game till the end
-        try:  # episodes
-            episodes = kwargs['episodes']
-        except KeyError:
-            episodes = self._episodes
-        try:
-            max_steps = kwargs['max_steps']
-        except KeyError:
-            max_steps = self._max_steps
-        # termination: 'any' (terminate by any subject being terminated)
-        #              'all' (terminate only if all subjects are terminated)
-        try:  # termination
-            termination = kwargs['termination'].lower()
-        except KeyError:
-            termination = self._termination
-        # reset: 'any' (reset only subjects that are terminated)
-        #        'all' (reset all subjects at each episode)
-        try:  # reset
-            reset = kwargs['reset']
-        except KeyError:
-            reset = self._reset
-        # learning_method: 'every step' (learns after every move)
-        #                  'history' (learns after each episode)
-        try:  # learning_method
-            learning_method = kwargs['learning_method'].lower()
-        except KeyError:
-            learning_method = self._learning_method
-        # reporting: 'all' (report every move)
-        #            'none' (report nothing)
-        #            'important' (report important parts only)
-        try:  # reporting
-            reporting = kwargs['reporting'].lower()
-        except KeyError:
-            reporting = 'none'
+        episodes = kwargs.get('episodes', self._episodes)
+        max_steps = kwargs.get('max_steps', self._max_steps)
+        termination = kwargs.get('termination', self._termination).lower()
+        reset = kwargs.get('reset', self._reset)
+        learning_method = kwargs.get(
+            'learning_method', self._learning_method).lower()
+        reporting = kwargs.get('reporting', 'none').lower()
 
-        try:  # tally
-            if kwargs['tally'].lower() == 'yes':
-                tally = True
-                win_count = {}
-                for agent in self._agent:
-                    win_count[agent] = 0
-            else:
-                tally = False
-        except KeyError:
-            tally = False
+        tally = kwargs.get('tally', 'no').lower() == 'yes'
+        if tally:
+            win_count = {}
+            for agent in self._agent:
+                win_count[agent] = 0
 
-        try:  # tally
-            if kwargs['step_count'].lower() == 'yes':
-                step_count = True
-            else:
-                step_count = False
-        except KeyError:
-            step_count = False
+        step_count = kwargs.get('step_count', 'no').lower() == 'yes'
 
         if learning_method == 'none':
             for agent in self._agent.values():
@@ -258,33 +224,20 @@ class Environment(RLBase):
                                                printable=subject.printable())
                             if reporting == 'all':
                                 print('step: {: 4} episode: {:2} state: {} action: {} by:{}'
-                                    .format(steps, episode, state, action, agent_name))
+                                      .format(steps, episode, state, action, agent_name))
                             reward = subject.take_effect(_id, action)
-                            # if reporting == 'all':
-                            #     report_string += '\n'+subject.printable()+'\n'
 
                             history[agent_name].append(state)
                             history[agent_name].append(action)
                             history[agent_name].append(reward)
-                            # history[agent_name].append({'state': state, 'action': action, 'reward': reward})
-                            # print('{: 4d} {: 4d}'.format(episode, steps), subject._player_location)
-                            # if ([*subject._player_location] == [*subject._goal]):
-                            #     pass
-                            # if reward>0:
-                            #     print('Done')
 
                             if subject.is_terminated:
-                                if tally & (reward>0):
+                                if tally & (reward > 0):
                                     win_count[agent_name] += 1
                                 for affected_agent in self._agent.keys():
                                     if (self._assignment_list[affected_agent][0] == subject_name) & \
-                                        (affected_agent != agent_name):
+                                            (affected_agent != agent_name):
                                         history[affected_agent][-1] = -reward
-                                        # history[affected_agent][-1]['reward'] = -reward
-                                        # if learning_method == 'every step':
-                                        #     self._agent[affected_agent].learn(state=subject.state,
-                                        #         reward=reward if affected_agent == agent_name else -reward)
-                                        # elif learning_method == 'history':
 
                     if termination == 'all':
                         done = True
@@ -334,7 +287,7 @@ class Environment(RLBase):
     def trajectory(self, **kwargs):
         '''
         Extract (state, action, reward) trajectory.
-        
+
         At each episode, agents are called sequentially to act on their respective subject(s).
         An episode ends if one (all) subject(s) terminates.
         Arguments
@@ -344,14 +297,8 @@ class Environment(RLBase):
                 'any': terminate if any of the subjects is terminated.
                 'all': terminate if all the subjects are terminated.
         '''
-        try:
-            max_steps = kwargs['max_steps']
-        except KeyError:
-            max_steps = self._max_steps
-        try:  # termination
-            termination = kwargs['termination'].lower()
-        except KeyError:
-            termination = self._termination
+        max_steps = kwargs.get('max_steps', self._max_steps)
+        termination = kwargs.get('termination', self._termination).lower()
 
         for agent in self._agent.values():
             agent.status = 'testing'
@@ -373,7 +320,7 @@ class Environment(RLBase):
                         state = subject.state
                         possible_actions = subject.possible_actions
                         action = agent.act(state, actions=possible_actions,
-                                            printable=subject.printable())
+                                           printable=subject.printable())
                         q = agent._q(state, action)
                         reward = subject.take_effect(_id, action)
                         history[agent_name].append(state)
@@ -383,7 +330,7 @@ class Environment(RLBase):
                         if subject.is_terminated:
                             for affected_agent in self._agent.keys():
                                 if (self._assignment_list[affected_agent][0] == subject_name) & \
-                                    (affected_agent != agent_name):
+                                        (affected_agent != agent_name):
                                     history[affected_agent][-1] = -reward
 
                 if termination == 'all':
@@ -412,37 +359,32 @@ class Environment(RLBase):
         object_name = kwargs.get('object_name', 'all')
         filename = kwargs.get('filename', self._name)
         path = kwargs.get('path', self._path)
-        # try:  # object_name
-        #     object_name = kwargs['object_name']
-        # except KeyError:
-        #     object_name = 'all'
-        # try:  # filename
-        #     filename = kwargs['filename']
-        # except KeyError:
-        #     raise ValueError('name of the input file not specified.')
 
         if object_name == 'all':
             RLBase.load(self, filename=filename)
-            # clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
             self._agent = {}
             self._subject = {}
             for name, obj_type in self._env_data['agents']:
                 self._agent[name] = obj_type()
-                self._agent[name].load(path=path+'/'+filename+'.data', filename=name)
+                self._agent[name].load(
+                    path=path+'/'+filename+'.data', filename=name)
 
             for name, obj_type in self._env_data['subjects']:
                 self._subject[name] = obj_type()
-                self._subject[name].load(path=path+'/'+filename+'.data', filename=name)
+                self._subject[name].load(
+                    path=path+'/'+filename+'.data', filename=name)
 
             del self._env_data
 
         else:
             for obj in object_name:
                 if obj in self._agent:
-                    self._agent[obj].load(path=path+'/'+filename+'.data', filename=obj)
+                    self._agent[obj].load(
+                        path=path+'/'+filename+'.data', filename=obj)
                     self._agent[obj].reset()
                 elif obj in self._subject:
-                    self._subject[obj].load(path=path+'/'+filename+'.data', filename=obj)
+                    self._subject[obj].load(
+                        path=path+'/'+filename+'.data', filename=obj)
                     self._subject[obj].reset()
 
     def save(self, **kwargs):
@@ -461,24 +403,34 @@ class Environment(RLBase):
 
         if object_name == 'all':
             self._env_data = {'agents': [], 'subjects': []}
-            
+
             for name, agent in self._agent.items():
-                _, fn = agent.save(path=path+'/'+filename+'.data', filename=name)
+                _, fn = agent.save(path=path+'/'+filename +
+                                   '.data', filename=name)
                 self._env_data['agents'].append((fn, type(agent)))
 
             for name, subject in self._subject.items():
-                _, fn = subject.save(path=path+'/'+filename+'.data', filename=name)
+                _, fn = subject.save(
+                    path=path+'/'+filename+'.data', filename=name)
                 self._env_data['subjects'].append((fn, type(subject)))
 
             RLBase.save(self, filename=filename, path=path,
-                data=['_env_data', '_episodes', '_max_steps', '_termination', '_reset', '_learning_method', '_assignment_list'])
+                        data=['_env_data', '_episodes', '_max_steps', '_termination', '_reset', '_learning_method', '_assignment_list'])
             del self._env_data
         else:
             for obj in object_name:
                 if obj in self._agent:
-                    self._agent[obj].save(path=path+'/'+filename+'.data', filename=obj)
+                    self._agent[obj].save(
+                        path=path+'/'+filename+'.data', filename=obj)
                 elif obj in self._subject:
-                    self._subject[obj].save(path=path+'/'+filename+'.data', filename=obj)
+                    self._subject[obj].save(
+                        path=path+'/'+filename+'.data', filename=obj)
 
     def __repr__(self):
-        return 'Environment'
+        try:
+            return 'Env: \n Agents:\n' + \
+                '\n\t'.join((a.__repr__() for a in self._agent.values())) + \
+                '\nSubjects:\n' + \
+                '\n\t'.join((s.__repr__() for s in self._subject.values()))
+        except AttributeError:
+            return 'Environment: New'

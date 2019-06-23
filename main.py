@@ -585,7 +585,7 @@ if __name__ == '__main__':
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
     runs = 100
-    training_episodes = 200
+    training_episodes = 50
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
@@ -595,14 +595,14 @@ if __name__ == '__main__':
                             # age=74,
                             # CYP2C9='*2/*2',
                             # VKORC1='G/A',
-                            max_day=5,  # 20,
-                            dose_history=5,  # 20,
-                            gamma=0.99,
+                            max_day=10,  # 20,
+                            dose_history=10,  # 20,
+                            gamma=0.95,
                             alpha=0.2,
                             epsilon=0.1,
                             agent_type='ANN',
-                            input_length=21,
-                            buffer_size=200,
+                            input_length=31,
+                            buffer_size=50,
                             batch_size=20,
                             hidden_layer_sizes=(10, 10)
                             )
