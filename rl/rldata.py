@@ -78,7 +78,8 @@ class RLData:
         else:
             try:
                 self._value = pd.DataFrame(index=v.keys(), columns=['value', 'lower', 'upper', 'categories', 'is_numerical', 'normalizer', 'modified'])
-                self._value.value.loc[list(v.keys())] = list(v.values())
+                for key, value in v.items():
+                    self._value.value.at[key] = value
             except AttributeError:
                 self._value = pd.DataFrame(index=['value'], columns=['value', 'lower', 'upper', 'categories', 'is_numerical', 'normalizer', 'modified'])
                 self._value.value = [v]
@@ -223,7 +224,7 @@ class RLData:
 
     def as_rldata_array(self):
         ''' return the value as a list of RLData.'''
-        if self._value.shape[1] > 1:
+        if self._value.shape[0] > 1:
             array = [RLData(value=self._value.at[row, 'value'],
                             lower=self._value.at[row, 'lower'],
                             upper=self._value.at[row, 'upper'],

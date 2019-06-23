@@ -585,7 +585,7 @@ if __name__ == '__main__':
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
     runs = 100
-    training_episodes = 50
+    training_episodes = 10
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
