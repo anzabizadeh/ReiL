@@ -28,6 +28,7 @@ class RLData:
             lazy_evaluation: whether to store normalized values or compute on-demand (Default: False)
         '''
 
+        self._lazy = True
         self._value = pd.DataFrame()
         self.value = value
 
@@ -58,6 +59,9 @@ class RLData:
 
         self._lazy = kwargs.get('lazy_evaluation', False)
 
+        if not self._lazy:
+            self._normalized = self._normalize()
+
     @property
     def value(self):
         return self._value.value
@@ -77,14 +81,12 @@ class RLData:
                 self._value.value.at['value'] = v
         else:
             try:
-                self._value = pd.DataFrame(index=v.keys(), columns=['value', 'lower', 'upper', 'categories', 'is_numerical', 'normalizer', 'modified'])
+                self._value = pd.DataFrame(index=v.keys(), columns=['value', 'lower', 'upper', 'categories', 'is_numerical', 'normalizer'])
                 for key, value in v.items():
                     self._value.value.at[key] = value
             except AttributeError:
-                self._value = pd.DataFrame(index=['value'], columns=['value', 'lower', 'upper', 'categories', 'is_numerical', 'normalizer', 'modified'])
+                self._value = pd.DataFrame(index=['value'], columns=['value', 'lower', 'upper', 'categories', 'is_numerical', 'normalizer'])
                 self._value.value = [v]
-
-        self._value.modified = True
 
         if not same_index:
             self._value.is_numerical = tuple(all(isinstance(v, Number) for v in val[0]) if hasattr(
@@ -98,6 +100,9 @@ class RLData:
                     self._value.at[i, 'upper'] = max(val[0]) if hasattr(val[0], '__iter__') and not isinstance(val[0], str) else val[0]
                 else:
                     self._value.at[i, 'categories'] = [val[0]]
+
+        if not self._lazy:
+            self._normalized = self._normalize()
 
     @property
     def lower(self):
@@ -135,6 +140,9 @@ class RLData:
 
                 self._value.lower = value
 
+        if not self._lazy:
+            self._normalized = self._normalize()
+
     @property
     def upper(self):
         '''
@@ -171,6 +179,9 @@ class RLData:
                         raise ValueError('The provided value is greater than the smallest number I have.')
                 self._value.upper = value
 
+        if not self._lazy:
+            self._normalized = self._normalize()
+
     @property
     def categories(self):
         return self._value.categories
@@ -188,6 +199,9 @@ class RLData:
             if not self._value.at['value', 'is_numerical']:
                 self._value.at['value', 'categories'] = value
 
+        if not self._lazy:
+            self._normalized = self._normalize()
+
     @property
     def is_numerical(self):
         return self._value.is_numerical
@@ -202,6 +216,9 @@ class RLData:
         except AttributeError:
             self._value.at['value', 'is_numerical'] = self._value.at['value', 'is_numerical'] and value
 
+        if not self._lazy:
+            self._normalized = self._normalize()
+
     @property
     def normalizer(self):
         return self._value.normalizer
@@ -213,6 +230,9 @@ class RLData:
                 self._value.at[i, 'normalizer'] = val
         except AttributeError:
             self._value.at['value', 'normalizer'] = value
+
+        if not self._lazy:
+            self._normalized = self._normalize()
 
     def as_list(self):
         ''' return the value as list.'''
@@ -229,22 +249,19 @@ class RLData:
                             lower=self._value.at[row, 'lower'],
                             upper=self._value.at[row, 'upper'],
                             categories=self._value.at[row, 'categories'],
-                            is_numerical=self._value.at[row, 'is_numerical']) for row in self._value.index]
+                            is_numerical=self._value.at[row, 'is_numerical'],
+                            lazy=self._lazy) for row in self._value.index]
         else:
             array = [RLData(value=v,
                             lower=self._value.at['value', 'lower'],
                             upper=self._value.at['value', 'upper'],
                             categories=self._value.at['value', 'categories'],
-                            is_numerical=self._value.at['value', 'is_numerical']) for v in self._value.at['value', 'value']]
+                            is_numerical=self._value.at['value', 'is_numerical'],
+                            lazy=self._lazy) for v in self._value.at['value', 'value']]
 
         return array
 
-    def normalize(self):
-        '''
-        Normalize values.
-
-        This function uses max and min for numericals and categories for categoricals to turn them into [0, 1] values.
-        '''
+    def _normalize(self):
         temp = np.array([])
         for i in self._value.index:
             if self._value.at[i, 'normalizer'] is not None:
@@ -264,8 +281,18 @@ class RLData:
                                    'lower': self._value.at[i, 'lower'],
                                    'upper': self._value.at[i, 'upper'],
                                    'categories': self._value.at[i, 'categories']}) for x in self._value.at[i, 'value']])
+        return temp
 
-        return RLData(temp, lower=0, upper=1)
+    def normalize(self):
+        '''
+        Normalize values.
+
+        This function uses max and min for numericals and categories for categoricals to turn them into [0, 1] values.
+        '''
+        if self._lazy:
+            return RLData(self._normalize(), lower=0, upper=1)
+        else:
+            return RLData(self._normalized, lower=0, upper=1)
 
     def __eq__(self, other):
         try:
@@ -333,15 +360,20 @@ class RLData:
 
 
 if __name__ == '__main__':
-    d = RLData([1, 2, 3], lower=1, max=10)
+    d = RLData([1, 2, 3], lower=1, upper=10)
     print(d._value)
+    print(d._normalized)
     d.value = 10
+    print(d._normalized)
+
     d = RLData({'a': [10, 20], 'b': [30, 10, 5, 40], 'c': 50, 'd': 'hello'},
                lower={'a': 1, 'b': 2, 'c': 3, 'd': 'a'})
     print(d._value)
+    print(d._normalized)
     d.upper = {'b': 100, 'c': 50, 'a': 20, 'd': 'zzzzzz'}
     d.lower = {'b': -10, 'c': 0, 'a': 1, 'd': '0'}
     print(d._value)
+    print(d._normalized)
     # d.is_numerical={'a': False}
     for temp in d.as_rldata_array():
         print(temp)
