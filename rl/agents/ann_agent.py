@@ -17,6 +17,7 @@ import numpy as np
 import tensorflow as tf
 
 from .agent import Agent
+from ..rldata import RLData
 
 
 class ANNAgent(Agent):
@@ -118,12 +119,30 @@ class ANNAgent(Agent):
 
         Arguments
         ---------
-            state: the state for which Q-value is returned.
+            state: the state for which Q-value is returned. (Can be a list of states)
             action: the action for which Q-value is returned.
         '''
-        X = np.append(state.normalize().as_nparray(),
-                      action.normalize().as_nparray())
-        X = X.reshape(1, -1)
+        if isinstance(state, RLData):
+            state = [state]
+        if isinstance(action, RLData):
+            action = [action]
+
+        len_state = len(state)
+        len_action = len(action)
+        if len_state == len_action:
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action[i].normalize().as_nparray()) for i in range(len_state)], axis=1)
+            X = X.reshape(len_state, -1)
+        elif len_action == 1:
+            action_np = action[0].normalize().as_nparray()
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action_np) for i in range(len_state)], axis=1)
+            X = X.reshape(len_state, -1)
+        elif len_state == 1:
+            state_np = state[0].normalize().as_nparray()
+            X = np.stack([np.append(state_np, action[i].normalize().as_nparray()) for i in range(len_action)], axis=1)
+            X = X.reshape(len_action, -1)
+        else:
+            raise ValueError('State and action should be of the same size or at least one should be of size one.')
+
         feed_dict = {self._tf['inputs']: X}
         result = self._tf['session'].run(
             self._tf['output'], feed_dict=feed_dict)
@@ -233,9 +252,11 @@ class ANNAgent(Agent):
         if (self._training_flag) & (random() < self._epsilon):
             action = choice(possible_actions)
         else:
-            action_q = ((action, self._q(state, action))
-                        for action in possible_actions)
-            result = max(action_q, key=lambda x: x[1])
+            q_values = self._q(state, possible_actions)
+            result = max(((possible_actions[i], q_values[i]) for i in range(len(possible_actions))), key=lambda x: x[1])
+            # action_q = ((action, self._q(state, action))
+            #             for action in possible_actions)
+            # result = max(action_q, key=lambda x: x[1])
             action = result[0]
         # print(result)
         self._previous_action = action
