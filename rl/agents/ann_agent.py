@@ -178,16 +178,27 @@ class ANNAgent(Agent):
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
-            previous_state = history[0]
-            for i in range(1, len(history), 3):
-                previous_action = history[i]
-                reward = history[i+1]
+            # previous_state = history[0]
+            previous_state = history.at[0, 'state']
+            for i in range(len(history.index)):
+                previous_action = history.at[i, 'action']
+                reward = history.at[i, 'reward']
                 try:
-                    state = history[i+2]
+                    state = history.at[i+1, 'state']
                     max_q = self._max_q(state)
                     new_q = reward + self._gamma*max_q
-                except IndexError:
+                except KeyError:
                     new_q = reward
+
+            # for i in range(1, len(history), 3):
+            #     previous_action = history[i]
+            #     reward = history[i+1]
+            #     try:
+            #         state = history[i+2]
+            #         max_q = self._max_q(state)
+            #         new_q = reward + self._gamma*max_q
+            #     except IndexError:
+            #         new_q = reward
 
                 state_action = np.append(previous_state.normalize(
                 ).as_nparray(), previous_action.normalize().as_nparray())

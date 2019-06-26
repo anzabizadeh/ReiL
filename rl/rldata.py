@@ -120,23 +120,25 @@ class RLData:
             for i, val in value.items():
                 if self._value.at[i, 'is_numerical']:
                     try:
-                        if min(self._value.at[i, 'value']) < val:
-                            raise ValueError(
-                                'The provided value is greater than the smallest number I have.')
+                        minimum = min(self._value.at[i, 'value'])
                     except TypeError:
-                        if self._value.at[i, 'value'] < val:
-                            raise ValueError(
-                                'The provided value is greater than the smallest number I have.')
+                        minimum = self._value.at[i, 'value']
+
+                    if minimum < val:
+                        raise ValueError(
+                            'The provided lower bound ({}) is greater than current smallest number ({}).'.format(val, minimum))
 
                     self._value.at[i, 'lower'] = val
         except AttributeError:
             if self._value.at['value', 'is_numerical']:
                 try:
-                    if min(self._value.at['value', 'value']) < value:
-                        raise ValueError('The provided value is greater than the smallest number I have.')
+                    minimum = min(self._value.at['value', 'value'])
                 except TypeError:
-                    if self._value.at['value', 'value'] < value:
-                        raise ValueError('The provided value is greater than the smallest number I have.')
+                    minimum = self._value.at['value', 'value']
+
+                if minimum < value:
+                    raise ValueError(
+                        'The provided lower bound ({}) is greater than current smallest number ({}).'.format(val, minimum))
 
                 self._value.lower = value
 
@@ -159,24 +161,26 @@ class RLData:
             for i, val in value.items():
                 if self._value.at[i, 'is_numerical']:
                     try:
-                        if max(self._value.at[i, 'value']) > val:
-                            raise ValueError(
-                                'The provided value is less than the biggest number I have.')
+                        maximum = max(self._value.at[i, 'value'])
                     except TypeError:
-                        if self._value.at[i, 'value'] > val:
+                        maximum = self._value.at[i, 'value']
+                        if maximum > val:
                             raise ValueError(
-                                'The provided value is less than the biggest number I have.')
+                                'The provided upper bound ({}) is less than current biggest number ({}).'.format(val, maximum))
 
                     self._value.at[i, 'upper'] = val
 
         except AttributeError:
             if self._value.at['value', 'is_numerical']:
                 try:
-                    if max(self._value.at['value', 'value']) > value:
-                        raise ValueError('The provided value is less than the biggest number I have.')
+                    maximum = max(self._value.at['value', 'value'])
                 except TypeError:
-                    if self._value.at['value', 'value'] > value:
-                        raise ValueError('The provided value is greater than the smallest number I have.')
+                    maximum = self._value.at['value', 'value']
+
+                if maximum > value:
+                    raise ValueError(
+                        'The provided upper bound ({}) is less than current biggest number ({}).'.format(val, maximum))
+
                 self._value.upper = value
 
         if not self._lazy:
@@ -264,23 +268,26 @@ class RLData:
     def _normalize(self):
         temp = np.array([])
         for i in self._value.index:
-            if self._value.at[i, 'normalizer'] is not None:
+            if self._value.at[i, 'normalizer'] is None:
+                func = lambda x: (x['value']-x['lower'])/(x['upper']-x['lower']) if x['is_numerical'] else list(int(x_i == x['value']) for x_i in x['categories'])
+            # elif self._value.at[i, 'is_numerical']:
+            else:
                 func = self._value.at[i, 'normalizer']
-            elif self._value.at[i, 'is_numerical']:
-                func = lambda x: (x['value']-x['lower'])/(x['upper']-x['lower'])
-            else:  # categorical
-                func = lambda x: list(int(x_i == x['value']) for x_i in x['categories'])
+            # else:  # categorical
+            #     func = lambda x: list(int(x_i == x['value']) for x_i in x['categories'])
 
             try:
                 temp = np.append(temp, [func({'value': self._value.at[i, 'value'],
                                    'lower': self._value.at[i, 'lower'],
                                    'upper': self._value.at[i, 'upper'],
-                                   'categories': self._value.at[i, 'categories']})])
+                                   'categories': self._value.at[i, 'categories'],
+                                   'is_numerical': self._value.at[i, 'is_numerical']})])
             except TypeError:
                 temp = np.append(temp, [func({'value': x,
                                    'lower': self._value.at[i, 'lower'],
                                    'upper': self._value.at[i, 'upper'],
-                                   'categories': self._value.at[i, 'categories']}) for x in self._value.at[i, 'value']])
+                                   'categories': self._value.at[i, 'categories'],
+                                   'is_numerical': self._value.at[i, 'is_numerical']}) for x in self._value.at[i, 'value']])
         return temp
 
     def normalize(self):

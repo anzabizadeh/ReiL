@@ -549,13 +549,10 @@ def warfarin(**kwargs):
     # sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
     # for s in sorted(sa, reverse=True):
     #     print(s.value, sa[s][0].value, sa[s][1])
-        for t in env.trajectory().values():
-            for i, v in enumerate(t):
-                if (i+1) % 4 in [3, 0]:
-                    print(v)
-                else:
-                    print(v.value, end='\t')
-
+        for row in env.trajectory()['protocol'].iterrows():
+            print('{}, {} \n {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].state.value.loc['INRs'], row[1].reward))
+        # for t in env.trajectory():
+        #     print(t)
 
 def warfarin_results(**kwargs):
     # load the environment or create a new one
@@ -584,8 +581,8 @@ if __name__ == '__main__':
     model = 'warfarin'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    runs = 100
-    training_episodes = 10
+    runs = 1
+    training_episodes = 100
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
@@ -595,14 +592,14 @@ if __name__ == '__main__':
                             # age=74,
                             # CYP2C9='*2/*2',
                             # VKORC1='G/A',
-                            max_day=10,  # 20,
+                            max_day=90,  # 20,
                             dose_history=10,  # 20,
                             gamma=0.95,
                             alpha=0.2,
                             epsilon=0.1,
                             agent_type='ANN',
                             input_length=31,
-                            buffer_size=50,
-                            batch_size=20,
+                            buffer_size=90*2,
+                            batch_size=50,
                             hidden_layer_sizes=(10, 10)
                             )

@@ -205,7 +205,7 @@ class Environment(RLBase):
             # if learning_method == 'history':
             history = {}
             for agent_name in self._agent:
-                history[agent_name] = []
+                history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
                 # history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
             done = False
             stopping_criterion = max_steps * (episode+1)
@@ -227,9 +227,11 @@ class Environment(RLBase):
                                       .format(steps, episode, state, action, agent_name))
                             reward = subject.take_effect(_id, action)
 
-                            history[agent_name].append(state)
-                            history[agent_name].append(action)
-                            history[agent_name].append(reward)
+                            history[agent_name].loc[len(history[agent_name].index)] = [state, action, reward]
+
+                            # history[agent_name].append(state)
+                            # history[agent_name].append(action)
+                            # history[agent_name].append(reward)
 
                             if subject.is_terminated:
                                 if tally & (reward > 0):
@@ -305,7 +307,7 @@ class Environment(RLBase):
 
         history = {}
         for agent_name in self._agent:
-            history[agent_name] = []
+            history[agent_name] = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
         done = False
         steps = 0
         while not done:
@@ -323,10 +325,12 @@ class Environment(RLBase):
                                            printable=subject.printable())
                         q = agent._q(state, action)
                         reward = subject.take_effect(_id, action)
-                        history[agent_name].append(state)
-                        history[agent_name].append(action)
-                        history[agent_name].append(q)
-                        history[agent_name].append(reward)
+                        # history[agent_name].append(state)
+                        # history[agent_name].append(action)
+                        # history[agent_name].append(q)
+                        # history[agent_name].append(reward)
+
+                        history[agent_name].loc[len(history[agent_name].index)] = [state, action, q, reward]
                         if subject.is_terminated:
                             for affected_agent in self._agent.keys():
                                 if (self._assignment_list[affected_agent][0] == subject_name) & \
