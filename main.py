@@ -432,7 +432,7 @@ def warfarin(**kwargs):
                 fixed_policy_attempts = kwargs.get('fixed_policy_attempts', 30)
                 text = '{:2}'.format(fixed_policy_attempts)
 
-        elif agent_type.lower() == 'ann':
+        elif agent_type.lower() in ['ann', 'dqn']:
             learning_rate = kwargs.get('learning_rate', 1e-2)
             buffer_size = kwargs.get('buffer_size', 5000)
             batch_size = kwargs.get('batch_size', 1000)
@@ -491,6 +491,16 @@ def warfarin(**kwargs):
                                                 default_actions=subjects['W'].possible_actions)
         elif agent_type.lower() == 'ann':
             agents['protocol'] = ANNAgent(gamma=gamma,
+                                          alpha=alpha,
+                                          epsilon=epsilon,
+                                          learning_rate=learning_rate,
+                                          buffer_size=buffer_size,
+                                          batch_size=batch_size,
+                                          input_length=input_length,
+                                          hidden_layer_sizes=hidden_layer_sizes,
+                                          default_actions=subjects['W'].possible_actions)
+        elif agent_type.lower() == 'dqn':
+            agents['protocol'] = DQNAgent(gamma=gamma,
                                           alpha=alpha,
                                           epsilon=epsilon,
                                           learning_rate=learning_rate,
@@ -581,7 +591,7 @@ if __name__ == '__main__':
     model = 'warfarin'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    runs = 1
+    runs = 10
     training_episodes = 100
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
@@ -597,7 +607,7 @@ if __name__ == '__main__':
                             gamma=0.95,
                             alpha=0.2,
                             epsilon=0.1,
-                            agent_type='ANN',
+                            agent_type='DQN',  # 'ANN',
                             input_length=31,
                             buffer_size=90*2,
                             batch_size=50,

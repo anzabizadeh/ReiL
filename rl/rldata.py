@@ -126,7 +126,7 @@ class RLData:
 
                     if minimum < val:
                         raise ValueError(
-                            'The provided lower bound ({}) is greater than current smallest number ({}).'.format(val, minimum))
+                            'The provided lower bound ({}) is greater than current smallest number ({}).\n{}'.format(val, minimum, self.__repr__()))
 
                     self._value.at[i, 'lower'] = val
         except AttributeError:
@@ -138,7 +138,7 @@ class RLData:
 
                 if minimum < value:
                     raise ValueError(
-                        'The provided lower bound ({}) is greater than current smallest number ({}).'.format(val, minimum))
+                        'The provided lower bound ({}) is greater than current smallest number ({}).\n{}'.format(value, minimum, self.__repr__()))
 
                 self._value.lower = value
 
@@ -166,7 +166,7 @@ class RLData:
                         maximum = self._value.at[i, 'value']
                         if maximum > val:
                             raise ValueError(
-                                'The provided upper bound ({}) is less than current biggest number ({}).'.format(val, maximum))
+                                'The provided upper bound ({}) is less than current biggest number ({}).\n{}'.format(val, maximum, self.__repr__()))
 
                     self._value.at[i, 'upper'] = val
 
@@ -179,7 +179,7 @@ class RLData:
 
                 if maximum > value:
                     raise ValueError(
-                        'The provided upper bound ({}) is less than current biggest number ({}).'.format(val, maximum))
+                        'The provided upper bound ({}) is less than current biggest number ({}).\n{}'.format(value, maximum, self.__repr__()))
 
                 self._value.upper = value
 

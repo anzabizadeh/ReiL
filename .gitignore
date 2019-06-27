@@ -106,3 +106,4 @@ warfarin_pkpd_model.py
 
 # TF logs
 /logs
+/log

@@ -19,6 +19,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 from .agent import Agent
+from ..rldata import RLData
 
 
 class DQNAgent(Agent):
@@ -53,7 +54,7 @@ class DQNAgent(Agent):
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, alpha=0.1, epsilon=0, default_actions={},
                            learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1,
-                           training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), current_run=0, batch_size=10)
+                           training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), buffer_size=50, batch_size=10)
         Agent.set_params(self, **kwargs)
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
@@ -66,7 +67,7 @@ class DQNAgent(Agent):
             self._gamma, self._alpha, self._epsilon = 1, 0.1, 0
             self._default_actions = {}
             self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (1,), 1
-            self._batch_size, self._current_run, self._training_x, self._training_y = 10, 0, np.array(
+            self._batch_size, self._buffer_size, self._training_x, self._training_y = 10, 0, np.array(
                 [], ndmin=2), np.array([], ndmin=2)
 
     def _generate_network(self):
@@ -80,52 +81,20 @@ class DQNAgent(Agent):
             self._hidden_layer_sizes[0], activation='relu', name='layer_01', input_shape=(self._input_length,)))
         for i, v in enumerate(self._hidden_layer_sizes[1:]):
             self._model.add(keras.layers.Dense(
-                v, activation='relu', name='layer_{:0>2}'.format(i+1)))
+                v, activation='relu', name='layer_{:0>2}'.format(i+2)))
 
         self._model.add(keras.layers.Dense(
             1, activation='relu', name='output'))
 
-        self._model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
+        self._model.compile(optimizer='adam', loss='mse')  # , metrics=['accuracy'])
 
-        self._tensorboard_path = 'log/' + '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', str(self._epsilon),
+        self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', str(self._epsilon),
                                                     'lrn', str(self._learning_rate), 'hddn', str(
                                                         self._hidden_layer_sizes),
                                                     'btch', str(self._batch_size)))
         self._tensorboard = keras.callbacks.TensorBoard(
             log_dir=self._tensorboard_path)
 
-        # self._tf['graph'] = tf.Graph()
-        # with self._tf['graph'].as_default():
-        #     self._tf['session'] = tf.Session(graph=self._tf['graph'])  # , config=tf.ConfigProto(log_device_placement=True))
-        #     self._tf['inputs'] = tf.placeholder(tf.float32, [None, self._input_length], name='inputs')
-
-        #     layer = [self._tf['inputs']]
-        #     for i, v in enumerate(self._hidden_layer_sizes):
-        #         layer.append(tf.layers.dense(layer[i], v, activation=tf.nn.relu, name='layer_{:0>2}'.format(i+1)))
-
-        #     self._tf['output'] = tf.layers.dense(layer[-1], 1, name='output')
-
-        #     self._tf['labels'] = tf.placeholder(tf.int32, [None, 1], name='labels')
-        #     self._tf['loss'] = tf.losses.mean_squared_error(labels=self._tf['labels'], predictions=self._tf['output'])
-        #     self._tf['global_step'] = tf.Variable(0, trainable=False, name="step")
-        #     self._tf['train_opt'] = tf.train.AdamOptimizer(learning_rate=self._learning_rate) \
-        #         .minimize(self._tf['loss'], global_step=self._tf['global_step'], name='train_opt')
-
-        #     hparam = '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', str(self._epsilon),
-        #                        'lrn', str(self._learning_rate), 'hddn', str(self._hidden_layer_sizes),
-        #                        'btch', str(self._batch_size)))
-
-        #     self._tf['log_writer'] = tf.summary.FileWriter("logs/" + hparam)
-        #     self._tf['log_writer'].add_graph(self._tf['session'].graph)
-        #     tf.summary.scalar("MSE_Loss", self._tf['loss'])
-
-        #     self._tf['merged'] = tf.summary.merge_all()
-
-        #     init_g = tf.global_variables_initializer()
-        #     init_l = tf.local_variables_initializer()
-        #     self._tf['session'].run(init_g)
-        #     self._tf['session'].run(init_l)
-        #     self._tf['saver'] = tf.train.Saver()
 
     def _q(self, state, action):
         '''
@@ -136,12 +105,28 @@ class DQNAgent(Agent):
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned.
         '''
-        X = np.append(state.binary_representation().to_nparray(),
-                      action.binary_representation().to_nparray())
-        X = X.reshape(1, -1)
-        result = self._model.predict(np.array(X))
-        # feed_dict = {self._tf['inputs']: X}
-        # result = self._tf['session'].run(self._tf['output'], feed_dict=feed_dict)
+        if isinstance(state, RLData):
+            state = [state]
+        if isinstance(action, RLData):
+            action = [action]
+
+        len_state = len(state)
+        len_action = len(action)
+        if len_state == len_action:
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action[i].normalize().as_nparray()) for i in range(len_state)], axis=1)
+            X = X.reshape(len_state, -1)
+        elif len_action == 1:
+            action_np = action[0].normalize().as_nparray()
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action_np) for i in range(len_state)], axis=1)
+            X = X.reshape(len_state, -1)
+        elif len_state == 1:
+            state_np = state[0].normalize().as_nparray()
+            X = np.stack([np.append(state_np, action[i].normalize().as_nparray()) for i in range(len_action)], axis=1)
+            X = X.reshape(len_action, -1)
+        else:
+            raise ValueError('State and action should be of the same size or at least one should be of size one.')
+
+        result = self._model.predict(X)
         return result
 
     def _max_q(self, state):
@@ -174,40 +159,38 @@ class DQNAgent(Agent):
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
-            previous_state = history[0]
-            for i in range(1, len(history), 3):
-                previous_action = history[i]
-                reward = history[i+1]
+            # previous_state = history[0]
+            previous_state = history.at[0, 'state']
+            for i in range(len(history.index)):
+                previous_action = history.at[i, 'action']
+                reward = history.at[i, 'reward']
                 try:
-                    state = history[i+2]
+                    state = history.at[i+1, 'state']
                     max_q = self._max_q(state)
-                    new_q = reward+self._gamma*max_q
-                except IndexError:
+                    new_q = reward + self._gamma*max_q
+                except KeyError:
                     new_q = reward
 
-                state_action = np.append(previous_state.binary_representation(
-                ).to_nparray(), previous_action.binary_representation().to_nparray())
+                state_action = np.append(previous_state.normalize().as_nparray(),
+                                         previous_action.normalize().as_nparray())
                 try:
-                    self._training_x = np.vstack(
-                        (self._training_x, state_action))
+                    self._training_x = np.vstack((self._training_x, state_action))
                     self._training_y = np.vstack((self._training_y, new_q))
                 except ValueError:
                     self._training_x = state_action
                     self._training_y = np.array(new_q)
                 previous_state = state
 
-            self._current_run += 1
-            if self._current_run == self._batch_size:
-                self._model.fit(self._training_x, self._training_y,
+            buffered_size = len(self._training_x)
+            if buffered_size >= self._buffer_size:
+                index = np.random.choice(buffered_size, self._batch_size)
+                self._model.fit(self._training_x[index], self._training_y[index],
                                 epochs=1, callbacks=[self._tensorboard])
-                # feed_dict = {self._tf['inputs']: self._training_x, self._tf['labels']: self._training_y}
-                # self._train_step = self._tf['session'].run(self._tf['global_step'])
-                # self._tf['session'].run(self._tf['train_opt'], feed_dict=feed_dict)
-                # summary = self._tf['session'].run(self._tf['merged'], feed_dict=feed_dict)
-                # self._tf['log_writer'].add_summary(summary, self._train_step)
-                self._training_x = np.array([], ndmin=2)
-                self._training_y = np.array([], ndmin=2)
-                self._current_run = 0
+
+                self._training_x = np.delete(self._training_x,
+                                             range(buffered_size-self._buffer_size), axis=0)
+                self._training_y = np.delete(self._training_y,
+                                             range(buffered_size-self._buffer_size), axis=0)
 
             return
         except KeyError:
@@ -233,11 +216,10 @@ class DQNAgent(Agent):
         if (self._training_flag) & (random() < self._epsilon):
             action = choice(possible_actions)
         else:
-            action_q = ((action, self._q(state, action))
-                        for action in possible_actions)
-            result = max(action_q, key=lambda x: x[1])
+            q_values = self._q(state, possible_actions)
+            result = max(((possible_actions[i], q_values[i]) for i in range(len(possible_actions))), key=lambda x: x[1])
             action = result[0]
-        # print(result)
+
         self._previous_action = action
         return action
 
@@ -259,9 +241,6 @@ class DQNAgent(Agent):
             'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
         self._tensorboard = keras.callbacks.TensorBoard(
             log_dir=self._tensorboard_path)
-        # self._tf = {}
-        # self._generate_network()
-        # self._tf['saver'].restore(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
 
     def save(self, **kwargs):
         '''
@@ -287,7 +266,6 @@ class DQNAgent(Agent):
                         '/' + kwargs['filename'] + '.tf/')
             self._model.save(kwargs.get('path', self._path) + '/' +
                              kwargs['filename'] + '.tf/' + kwargs['filename'])
-        # self._tf['saver'].save(self._tf['session'], kwargs.get('path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
         return path, filename
 
     def _report(self, **kwargs):
@@ -300,19 +278,6 @@ class DQNAgent(Agent):
 
         Note: this function is not implemented yet!
         '''
-        # try:
-        #     item = kwargs['statistic']
-        # except KeyError:
-        #     return
-
-        # if item.lower() == 'diff-coef':
-        #     import numpy as np
-        #     rep = 0
-        #     for i in range(np.size(kwargs['old']['_clf.coefs_'])):
-        #         rep += np.sum(np.subtract(kwargs['old']['_clf.coefs_'][i], kwargs['new']['_clf.coefs_'][i]))
-
-        # summary = self._tf['session'].run(self._tf['merged'], feed_dict={})
-        # self._tf['log_writer'].add_summary(summary, self._train_step)
         raise NotImplementedError
 
     # def __del__(self):

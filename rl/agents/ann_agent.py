@@ -66,7 +66,7 @@ class ANNAgent(Agent):
             self._gamma, self._alpha, self._epsilon = 1, 0.1, 0
             self._default_actions = {}
             self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (), 1
-            self._batch_size, self._current_run, self._training_x, self._training_y = 10, 0, np.array(
+            self._batch_size, self._buffer_size, self._training_x, self._training_y = 10, 0, np.array(
                 [], ndmin=2), np.array([], ndmin=2)
 
     def _generate_network(self):

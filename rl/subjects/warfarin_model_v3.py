@@ -56,16 +56,6 @@ class WarfarinModel(Subject):
 
         Subject.set_params(self, **kwargs)
 
-        self._max_time = self._max_day*24
-        self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
-                                randomized=self._randomized, max_time=self._max_time)
-
-        self._INR = deque([0.0]*self._dose_history)
-        self._INR[-1] = self._patient.INR([0])[-1]
-        self._dose_list = deque([0.0]*self._dose_history)
-        self._possible_actions = RLData([x*self._dose_steps
-                         for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
-                        lower=0, upper=self._max_dose).as_rldata_array()
         if False:
             self._model_filename = ''
             self._Cs_super = 0
@@ -94,6 +84,17 @@ class WarfarinModel(Subject):
             self._d_max = 0
             self._TTR_range = ()
 
+        self._max_time = self._max_day*24
+        self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
+                                randomized=self._randomized, max_time=self._max_time)
+
+        self._INR = deque([0.0]*self._dose_history)
+        self._INR[-1] = self._patient.INR([0])[-1]
+        self._dose_list = deque([0.0]*self._dose_history)
+        self._possible_actions = RLData([x*self._dose_steps
+                         for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
+                        lower=0, upper=self._max_dose).as_rldata_array()
+
     @property
     def state(self):
         return RLData({'Age': self._age,
@@ -104,9 +105,9 @@ class WarfarinModel(Subject):
                       lower={'Age': 65,
                              'Doses': 0.0,
                              'INRs': 0.0},
-                      upper={'Age': 85,
+                      upper={'Age': 100,
                              'Doses': 15.0,
-                             'INRs': 10.0},
+                             'INRs': 15.0},
                       categories={'CYP2C9': self._CYP2C9_list,
                                   'VKORC1': self._VKORC1_list})
 
@@ -365,7 +366,7 @@ if __name__ == "__main__":
     p_count = range(100)
     p = [Patient(randomized=True, max_time=24*max_day + 1) for _ in p_count]
     for j in p_count:
-        p[j].dose = {i: 7.5 for i in range(max_day)}
+        p[j].dose = {i: 15 for i in range(max_day)}
         # plt.plot(p.INR(list(i/24 for i in range(1, max_day*24 + 1))))
         plt.plot(list(range(24, (max_day+1)*24, 240)),
                  p[j].INR(list(i for i in range(1, max_day+1, 10))), 'x')
