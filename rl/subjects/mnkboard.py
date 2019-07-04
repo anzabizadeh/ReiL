@@ -11,8 +11,8 @@ It serves as a super class for MNKGame.
 
 import pickle
 
-from rl.valueset import ValueSet
-
+# from rl.valueset import ValueSet
+from rl.rldata import RLData
 
 def main():
     # create a board and set piece for each player and print the board
@@ -29,7 +29,7 @@ class MNKBoard:
 
     Attributes
     ----------
-        state: the state of the board as a ValueSet.
+        state: the state of the board as a RLData.
 
     Methods
     -------
@@ -127,8 +127,9 @@ class MNKBoard:
 
     @property
     def state(self):
-        ''' Return the state of the board as a ValueSet.'''
-        return ValueSet(self._board, min=0, max=self._players)
+        ''' Return the state of the board as an RLData.'''
+        return RLData(self._board, lower=0, upper=self._players)
+        # return ValueSet(self._board, min=0, max=self._players)
 
     def get_board(self, format_='vector'):
         '''

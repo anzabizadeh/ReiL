@@ -50,7 +50,7 @@ class WarfarinModel(Subject):
                              day=1, max_day=90, INR=[0], INR_current=0,
                              d_previous=0, d_current=1, d_max=30,
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
-                             dose_history=5, pill_per_day=1, randomized=True,
+                             dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
                              dose_list=[None]*5
                              )
 
@@ -65,12 +65,13 @@ class WarfarinModel(Subject):
             self._SS = 0
             self._max_time = 0
             self._rseed = 0
-            self._day = 0
+            self._day = 1
             self._max_day = 0
             self._current_dose = 0
             self._max_dose = 0
             self._dose_steps = 0
             self._dose_history = 0
+            self._INR_history = 0
             self._pill_per_day = 0
 
             self._patient_selection = ''
@@ -83,12 +84,13 @@ class WarfarinModel(Subject):
             self._d_current = 0
             self._d_max = 0
             self._TTR_range = ()
+            self._randomized = True
 
-        self._max_time = self._max_day*24
+        self._max_time = (self._max_day + 1)*24  # until the end of max_day
         self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
                                 randomized=self._randomized, max_time=self._max_time)
 
-        self._INR = deque([0.0]*self._dose_history)
+        self._INR = deque([0.0]*(self._INR_history + 1))
         self._INR[-1] = self._patient.INR([0])[-1]
         self._dose_list = deque([0.0]*self._dose_history)
         self._possible_actions = RLData([x*self._dose_steps
@@ -113,7 +115,7 @@ class WarfarinModel(Subject):
 
     @property
     def is_terminated(self):
-        return self._day >= self._max_day
+        return self._day > self._max_day
 
     @property
     # only considers the dose
@@ -165,7 +167,6 @@ class WarfarinModel(Subject):
         self._day = 1
         self._current_dose = 0
         self._dose_list = deque([0.0]*self._dose_history)
-        self._INR = deque([0.0]*self._dose_history)
 
         if self._patient_selection == 'random':
             self._age = choice(self._age_list)
@@ -174,7 +175,7 @@ class WarfarinModel(Subject):
 
         self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
                                 randomized=self._randomized, max_time=self._max_time)
-        self._INR = deque([0.0]*self._dose_history)
+        self._INR = deque([0.0]*(self._INR_history + 1))
         self._INR[-1] = self._patient.INR([0])[-1]
 
         self._d_previous = 0

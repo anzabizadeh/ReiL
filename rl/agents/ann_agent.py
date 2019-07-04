@@ -8,7 +8,6 @@ A Q-learning agent with Neural Network Q-function approximator
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-
 from pickle import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
@@ -96,10 +95,10 @@ class ANNAgent(Agent):
             self._tf['train_opt'] = tf.train.AdamOptimizer(learning_rate=self._learning_rate) \
                 .minimize(self._tf['loss'], global_step=self._tf['global_step'], name='train_opt')
 
-            hparam = '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', str(self._epsilon),
-                               'lrn', str(self._learning_rate), 'hddn', str(
-                                   self._hidden_layer_sizes),
-                               'btch', str(self._batch_size)))
+            hparam = '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
+                                                        'lrn', str(self._learning_rate), 'hddn', str(
+                                                            self._hidden_layer_sizes),
+                                                        'btch', str(self._batch_size)))
 
             self._tf['log_writer'] = tf.summary.FileWriter("logs/" + hparam)
             self._tf['log_writer'].add_graph(self._tf['session'].graph)
@@ -130,16 +129,13 @@ class ANNAgent(Agent):
         len_state = len(state)
         len_action = len(action)
         if len_state == len_action:
-            X = np.stack([np.append(state[i].normalize().as_nparray(), action[i].normalize().as_nparray()) for i in range(len_state)], axis=1)
-            X = X.reshape(len_state, -1)
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action[i].normalize().as_nparray()) for i in range(len_state)], axis=0)
         elif len_action == 1:
             action_np = action[0].normalize().as_nparray()
-            X = np.stack([np.append(state[i].normalize().as_nparray(), action_np) for i in range(len_state)], axis=1)
-            X = X.reshape(len_state, -1)
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action_np) for i in range(len_state)], axis=0)
         elif len_state == 1:
             state_np = state[0].normalize().as_nparray()
-            X = np.stack([np.append(state_np, action[i].normalize().as_nparray()) for i in range(len_action)], axis=1)
-            X = X.reshape(len_action, -1)
+            X = np.stack([np.append(state_np, action[i].normalize().as_nparray()) for i in range(len_action)], axis=0)
         else:
             raise ValueError('State and action should be of the same size or at least one should be of size one.')
 
@@ -157,8 +153,8 @@ class ANNAgent(Agent):
             state: the state for which MAX(Q) is returned.
         '''
         try:
-            max_q = max(self._q(state, action)
-                        for action in self._default_actions)
+            q_values = self._q(state, self._default_actions)
+            max_q = np.max(q_values)
         except ValueError:
             max_q = 0
         return max_q
@@ -178,7 +174,6 @@ class ANNAgent(Agent):
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
-            # previous_state = history[0]
             previous_state = history.at[0, 'state']
             for i in range(len(history.index)):
                 previous_action = history.at[i, 'action']
@@ -190,16 +185,6 @@ class ANNAgent(Agent):
                 except KeyError:
                     new_q = reward
 
-            # for i in range(1, len(history), 3):
-            #     previous_action = history[i]
-            #     reward = history[i+1]
-            #     try:
-            #         state = history[i+2]
-            #         max_q = self._max_q(state)
-            #         new_q = reward + self._gamma*max_q
-            #     except IndexError:
-            #         new_q = reward
-
                 state_action = np.append(previous_state.normalize(
                 ).as_nparray(), previous_action.normalize().as_nparray())
                 try:
@@ -210,17 +195,6 @@ class ANNAgent(Agent):
                     self._training_x = state_action
                     self._training_y = np.array(new_q)
                 previous_state = state
-
-            # self._current_run += len(state_action)
-            # if self._current_run == self._batch_size:
-            #     feed_dict = {self._tf['inputs']: self._training_x, self._tf['labels']: self._training_y}
-            #     self._train_step = self._tf['session'].run(self._tf['global_step'])
-            #     self._tf['session'].run(self._tf['train_opt'], feed_dict=feed_dict)
-            #     summary = self._tf['session'].run(self._tf['merged'], feed_dict=feed_dict)
-            #     self._tf['log_writer'].add_summary(summary, self._train_step)
-            #     self._training_x = np.array([], ndmin=2)
-            #     self._training_y = np.array([], ndmin=2)
-            #     self._current_run = 0
 
             buffered_size = len(self._training_x)
             if buffered_size >= self._buffer_size:
@@ -234,6 +208,9 @@ class ANNAgent(Agent):
                 summary = self._tf['session'].run(
                     self._tf['merged'], feed_dict=feed_dict)
                 self._tf['log_writer'].add_summary(summary, self._train_step)
+
+                # self._training_x = np.array([], ndmin=2)
+                # self._training_y = np.array([], ndmin=2)
                 self._training_x = np.delete(self._training_x, range(
                     buffered_size-self._buffer_size), axis=0)
                 self._training_y = np.delete(self._training_y, range(
@@ -255,20 +232,27 @@ class ANNAgent(Agent):
         Note: If in 'training', the action is chosen randomly with probability of epsilon. In in 'test', the action is greedy.
         '''
         self._previous_state = state
-        try:  # possible actions
-            possible_actions = kwargs['actions']
-        except KeyError:
-            possible_actions = self._default_actions
+        possible_actions = kwargs.get('actions', self._default_actions)
+        episode = kwargs.get('episode', 0)
+        try:
+            epsilon = self._epsilon(episode)
+        except TypeError:
+            epsilon = self._epsilon
 
-        if (self._training_flag) & (random() < self._epsilon):
-            action = choice(possible_actions)
+        if (self._training_flag) & (random() < epsilon):
+            result = possible_actions
         else:
             q_values = self._q(state, possible_actions)
-            result = max(((possible_actions[i], q_values[i]) for i in range(len(possible_actions))), key=lambda x: x[1])
+            max_q = np.max(q_values)
+            result = tuple(possible_actions[i] for i in np.nonzero(q_values==max_q)[0])
+            # result = tuple(possible_actions[i] for i in range(len(possible_actions)) if q_values[i]==max_q)
+
+        action = choice(result)
+            # result = max(((possible_actions[i], q_values[i]) for i in range(len(possible_actions))), key=lambda x: x[1])
             # action_q = ((action, self._q(state, action))
             #             for action in possible_actions)
             # result = max(action_q, key=lambda x: x[1])
-            action = result[0]
+            # action = result[0]
         # print(result)
         self._previous_action = action
         return action

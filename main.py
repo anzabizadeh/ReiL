@@ -408,53 +408,62 @@ def warfarin(**kwargs):
     training_episodes = kwargs.get('training_episodes', 100)
     test_episodes = kwargs.get('test_episodes', 100)
 
+    age = kwargs.get('age', 74)
+    CYP2C9 = kwargs.get('CYP2C9', '*2/*2')
+    VKORC1 = kwargs.get('VKORC1', 'G/A')
+    max_day = kwargs.get('max_day', 90)
+    dose_history = kwargs.get('dose_history', 10)
+    INR_history = kwargs.get('INR_history', 10)
+    patient_selection = kwargs.get('patient_selection', '')
+    randomized = kwargs.get('randomized', True)
+
+    gamma = kwargs.get('gamma', 0.99)
+    alpha = kwargs.get('alpha', 0.2)
+    epsilon = kwargs.get('epsilon', 0.1)
+
+    agent_type = kwargs.get('agent_type', 'Q')
+
+    if agent_type.lower() == 'warfarinq':
+        method = kwargs.get('method', 'fixed policy first')
+        if method == 'fixed policy first':
+            fixed_policy_attempts = kwargs.get('fixed_policy_attempts', 30)
+            text = '{:2}'.format(fixed_policy_attempts)
+
+    elif agent_type.lower() in ['ann', 'dqn']:
+        learning_rate = kwargs.get('learning_rate', 1e-2)
+        buffer_size = kwargs.get('buffer_size', 5000)
+        batch_size = kwargs.get('batch_size', 1000)
+        clear_buffer = kwargs.get('clear_buffer', False)
+        input_length = kwargs.get('input_length', 79)
+        hidden_layer_sizes = kwargs.get('hidden_layer_sizes', (20, 20))
+        validation_split = kwargs.get('validation_split', 0.3)
+        text = '_'.join((str(hidden_layer_sizes),
+                            'g', str(gamma),
+                            'a', str(alpha),
+                            'e', 'func' if callable(epsilon) else str(epsilon),
+                            'lr', str(learning_rate),
+                            'buff', str(buffer_size),
+                            'clr', 'T' if clear_buffer else 'F',
+                            'btch', str(batch_size),
+                            'vld', str(validation_split)))
+    else:
+        text = ''
+
     # load the environment or create a new one
     try:
         filename = kwargs['filename']
     except KeyError:
-        age = kwargs.get('age', 74)
-        CYP2C9 = kwargs.get('CYP2C9', '*2/*2')
-        VKORC1 = kwargs.get('VKORC1', 'G/A')
-        max_day = kwargs.get('max_day', 90)
-        dose_history = kwargs.get('dose_history', 10)
-        patient_selection = kwargs.get('patient_selection', '')
-        randomized = kwargs.get('randomized', True)
-
-        gamma = kwargs.get('gamma', 0.99),
-        alpha = kwargs.get('alpha', 0.2),
-        epsilon = kwargs.get('epsilon', 0.1)
-
-        agent_type = kwargs.get('agent_type', 'Q')
-
-        if agent_type.lower() == 'warfarinq':
-            method = kwargs.get('method', 'fixed policy first')
-            if method == 'fixed policy first':
-                fixed_policy_attempts = kwargs.get('fixed_policy_attempts', 30)
-                text = '{:2}'.format(fixed_policy_attempts)
-
-        elif agent_type.lower() in ['ann', 'dqn']:
-            learning_rate = kwargs.get('learning_rate', 1e-2)
-            buffer_size = kwargs.get('buffer_size', 5000)
-            batch_size = kwargs.get('batch_size', 1000)
-            input_length = kwargs.get('input_length', 79)
-            hidden_layer_sizes = kwargs.get('hidden_layer_sizes', (20, 20))
-            text = '_'.join((str(hidden_layer_sizes),
-                             'lr', str(learning_rate),
-                             'buff', str(buffer_size),
-                             'batch', str(batch_size)))
-        else:
-            text = ''
-
         filename = '_'.join(('WARF',
                              str(age) if patient_selection != 'random' else '00',
-                             {'*1/*1': '11', '*2/*2': '22', '*3/*3': '33'}[
+                             {'*1/*1': '11', '*1/*2': '12', '*1/*3': '13', '*2/*2': '22', '*2/*3': '23', '*3/*3': '33'}[
                                  CYP2C9] if patient_selection != 'random' else '00',
                              {'A/A': 'AA', 'A/G': 'AG', 'G/A': 'AG', 'G/G': 'GG'}[
                                  VKORC1] if patient_selection != 'random' else 'XX',
-                             'days{:2}'.format(max_day),
-                             'hist{:2}'.format(dose_history),
+                             'd_{:2}'.format(max_day),
+                             'dose_{:2}'.format(dose_history),
+                             'INR_{:2}'.format(INR_history),
                              'T' if randomized else 'F',
-                             agent_type, text))
+                             agent_type, text)).replace(' ', '')
 
     try:
         env = Environment(filename=filename)
@@ -475,6 +484,7 @@ def warfarin(**kwargs):
                                       max_day=max_day,
                                       patient_selection=patient_selection,
                                       dose_history=dose_history,
+                                      INR_history=INR_history,
                                       randomized=randomized)
         # define agents
         if agent_type.lower() == 'q':
@@ -505,12 +515,13 @@ def warfarin(**kwargs):
                                           epsilon=epsilon,
                                           learning_rate=learning_rate,
                                           buffer_size=buffer_size,
+                                          clear_buffer=clear_buffer,
                                           batch_size=batch_size,
                                           input_length=input_length,
+                                          validation_split=validation_split,
                                           hidden_layer_sizes=hidden_layer_sizes,
-                                          default_actions=subjects['W'].possible_actions)
-        # agents['protocol'] = DQNAgent(gamma=1.0, alpha=0.2, epsilon=0.5, learning_rate=1e-1, batch_size=50,
-        #                               default_actions=subjects['W'].possible_actions, input_length=370, hidden_layer_sizes=(5,))
+                                          default_actions=subjects['W'].possible_actions,
+                                          tensorboard_path=filename)
 
         # assign agents to subjects
         assignment = [('protocol', 'W')]
@@ -521,48 +532,18 @@ def warfarin(**kwargs):
 
     # agents['protocol'].data_collector.start()
     for i in range(runs):
-        # run and collect statistics
-
-        # if agents['protocol'].data_collector.is_active:
-        #     agents['protocol'].data_collector.collect()
-
+        print('run {: }'.format(i))
         env.elapse(episodes=training_episodes, reset='all',
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
-        # if agents['protocol'].data_collector.is_active:
-        #     print(agents['protocol'].data_collector.report())
-        # else:
-        #     agents['protocol'].data_collector.start()
-
-        # switch agents for test
-        # temp = env._agent['Opponent']
-        # env._agent['Opponent'] = test_agent
-        # tally2 = env.elapse(episodes=test_episodes, reset='all',
-        #                     termination='all', learning_method='none',
-        #                     reporting='none', tally='yes')
-        # env._agent['Opponent'] = temp
-
-        # # print result of each run
-        print('run {: }'.format(i))
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
 
-    # print('State-actions q:')
-    # print('Q:')
-    # sa = agents['Q'].data_collector.report(statistic=['state-actions q'])['state-actions q']
-    # for s in sorted(sa, reverse=True):
-    #     print(s[0].value, s[1].value, sa[s])
-
-    # print('States action:')
-    # print('Q:')
-    # sa = agents['Q'].data_collector.report(statistic=['states action'])['states action']
-    # for s in sorted(sa, reverse=True):
-    #     print(s.value, sa[s][0].value, sa[s][1])
         for row in env.trajectory()['protocol'].iterrows():
+            # print('{}, {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].reward))
             print('{}, {} \n {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].state.value.loc['INRs'], row[1].reward))
-        # for t in env.trajectory():
-        #     print(t)
+
 
 def warfarin_results(**kwargs):
     # load the environment or create a new one
@@ -591,25 +572,28 @@ if __name__ == '__main__':
     model = 'warfarin'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    runs = 10
-    training_episodes = 100
+    runs = 100
+    training_episodes = 50
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
                             training_episodes=training_episodes,
-                            patient_selection='random',
-                            randomized=True,
-                            # age=74,
-                            # CYP2C9='*2/*2',
-                            # VKORC1='G/A',
-                            max_day=90,  # 20,
-                            dose_history=10,  # 20,
+                            randomized=False,
+                            # patient_selection='random',
+                            age=70,
+                            CYP2C9='*1/*3',
+                            VKORC1='A/A',
+                            max_day=10,
+                            dose_history=10,
+                            INR_history=1,
                             gamma=0.95,
                             alpha=0.2,
-                            epsilon=0.1,
+                            epsilon=lambda x: 1/(1+x/100) if x>=20 else 1.0,
                             agent_type='DQN',  # 'ANN',
-                            input_length=31,
-                            buffer_size=90*2,
-                            batch_size=50,
-                            hidden_layer_sizes=(10, 10)
+                            input_length=23,
+                            buffer_size=100,
+                            batch_size=20,
+                            validation_split=0.3,
+                            hidden_layer_sizes=(10, 10),
+                            clear_buffer=False
                             )

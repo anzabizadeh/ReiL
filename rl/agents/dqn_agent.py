@@ -35,11 +35,13 @@ class DQNAgent(Agent):
         learning_rate: learning rate for ANN. (Default = 1e-3)
         hidden_layer_sizes: tuple containing hidden layer sizes.
         input_length: size of the input vector. (Default = 1)
-        batch_size: the learning method stores inputs for batch_size iterations and then runs one ANN training. (Default = 10)
+        buffer_size: DQN stores buffer_size observations and samples from it for training. (Default = 50)
+        batch_size: the number of samples to choose randomly from the buffer for training. (Default = 10)
+        validation_split: proportion of sampled observations set for validation. (Default = 0.3)
+        clear_buffer: whether to clear buffer after sampling (True: clear buffer, False: only discard old observations). (Default = False)
 
         Note: Although input_length has a default value, but it should be specified in object construction.
         Note: This class doesn't have any data_collectors.
-
     Methods
     -------
         act: return an action based on the given state.
@@ -54,7 +56,8 @@ class DQNAgent(Agent):
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, alpha=0.1, epsilon=0, default_actions={},
                            learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1,
-                           training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), buffer_size=50, batch_size=10)
+                           training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2),
+                           buffer_size=50, batch_size=10, validation_split=0.3, clear_buffer=False, tensorboard_path=None)
         Agent.set_params(self, **kwargs)
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
@@ -64,11 +67,12 @@ class DQNAgent(Agent):
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
-            self._gamma, self._alpha, self._epsilon = 1, 0.1, 0
+            self._gamma, self._alpha, self._epsilon = 1, 0.1, lambda x: 0
             self._default_actions = {}
             self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (1,), 1
-            self._batch_size, self._buffer_size, self._training_x, self._training_y = 10, 0, np.array(
-                [], ndmin=2), np.array([], ndmin=2)
+            self._batch_size, self._buffer_size, self._validation_split, self._clear_buffer = 10, 0, 0.3, False
+            self._training_x, self._training_y = np.array([], ndmin=2), np.array([], ndmin=2)
+            self._tensorboard_path = None
 
     def _generate_network(self):
         '''
@@ -84,14 +88,17 @@ class DQNAgent(Agent):
                 v, activation='relu', name='layer_{:0>2}'.format(i+2)))
 
         self._model.add(keras.layers.Dense(
-            1, activation='relu', name='output'))
+            1, activation='sigmoid', name='output'))
 
         self._model.compile(optimizer='adam', loss='mse')  # , metrics=['accuracy'])
 
-        self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', str(self._epsilon),
-                                                    'lrn', str(self._learning_rate), 'hddn', str(
-                                                        self._hidden_layer_sizes),
-                                                    'btch', str(self._batch_size)))
+        if self._tensorboard_path is None:
+            self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
+                                                        'lrn', str(self._learning_rate), 'hddn', str(
+                                                            self._hidden_layer_sizes),
+                                                        'btch', str(self._batch_size), 'vld', str(self._validation_split)))
+        else:
+            self._tensorboard_path = 'logs/' + self._tensorboard_path
         self._tensorboard = keras.callbacks.TensorBoard(
             log_dir=self._tensorboard_path)
 
@@ -113,16 +120,13 @@ class DQNAgent(Agent):
         len_state = len(state)
         len_action = len(action)
         if len_state == len_action:
-            X = np.stack([np.append(state[i].normalize().as_nparray(), action[i].normalize().as_nparray()) for i in range(len_state)], axis=1)
-            X = X.reshape(len_state, -1)
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action[i].normalize().as_nparray()) for i in range(len_state)], axis=0)
         elif len_action == 1:
             action_np = action[0].normalize().as_nparray()
-            X = np.stack([np.append(state[i].normalize().as_nparray(), action_np) for i in range(len_state)], axis=1)
-            X = X.reshape(len_state, -1)
+            X = np.stack([np.append(state[i].normalize().as_nparray(), action_np) for i in range(len_state)], axis=0)
         elif len_state == 1:
             state_np = state[0].normalize().as_nparray()
-            X = np.stack([np.append(state_np, action[i].normalize().as_nparray()) for i in range(len_action)], axis=1)
-            X = X.reshape(len_action, -1)
+            X = np.stack([np.append(state_np, action[i].normalize().as_nparray()) for i in range(len_action)], axis=0)
         else:
             raise ValueError('State and action should be of the same size or at least one should be of size one.')
 
@@ -138,8 +142,8 @@ class DQNAgent(Agent):
             state: the state for which MAX(Q) is returned.
         '''
         try:
-            max_q = max(self._q(state, action)
-                        for action in self._default_actions)
+            q_values = self._q(state, self._default_actions)
+            max_q = np.max(q_values)
         except ValueError:
             max_q = 0
         return max_q
@@ -159,7 +163,6 @@ class DQNAgent(Agent):
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
-            # previous_state = history[0]
             previous_state = history.at[0, 'state']
             for i in range(len(history.index)):
                 previous_action = history.at[i, 'action']
@@ -183,14 +186,18 @@ class DQNAgent(Agent):
 
             buffered_size = len(self._training_x)
             if buffered_size >= self._buffer_size:
-                index = np.random.choice(buffered_size, self._batch_size)
+                index = np.random.choice(buffered_size, self._batch_size, replace=False)
                 self._model.fit(self._training_x[index], self._training_y[index],
-                                epochs=1, callbacks=[self._tensorboard])
+                                epochs=3, callbacks=[self._tensorboard], validation_split=self._validation_split)
 
-                self._training_x = np.delete(self._training_x,
-                                             range(buffered_size-self._buffer_size), axis=0)
-                self._training_y = np.delete(self._training_y,
-                                             range(buffered_size-self._buffer_size), axis=0)
+                if self._clear_buffer:
+                    self._training_x = np.array([], ndmin=2)
+                    self._training_y = np.array([], ndmin=2)
+                else:
+                    self._training_x = np.delete(self._training_x,
+                                                range(buffered_size-self._buffer_size), axis=0)
+                    self._training_y = np.delete(self._training_y,
+                                                range(buffered_size-self._buffer_size), axis=0)
 
             return
         except KeyError:
@@ -208,17 +215,23 @@ class DQNAgent(Agent):
         Note: If in 'training', the action is chosen randomly with probability of epsilon. In in 'test', the action is greedy.
         '''
         self._previous_state = state
-        try:  # possible actions
-            possible_actions = kwargs['actions']
-        except KeyError:
-            possible_actions = self._default_actions
+        possible_actions = kwargs.get('actions', self._default_actions)
+        episode = kwargs.get('episode', 0)
+        try:
+            epsilon = self._epsilon(episode)
+        except TypeError:
+            epsilon = self._epsilon
 
-        if (self._training_flag) & (random() < self._epsilon):
-            action = choice(possible_actions)
+        if (self._training_flag) & (random() < epsilon):
+            result = possible_actions
         else:
             q_values = self._q(state, possible_actions)
-            result = max(((possible_actions[i], q_values[i]) for i in range(len(possible_actions))), key=lambda x: x[1])
-            action = result[0]
+            max_q = np.max(q_values)
+            result = tuple(possible_actions[i] for i in np.nonzero(q_values==max_q)[0])
+            # result = max(((possible_actions[i], q_values[i]) for i in range(len(possible_actions))), key=lambda x: x[1])
+            # action = result[0]
+
+        action = choice(result)
 
         self._previous_action = action
         return action

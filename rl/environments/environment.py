@@ -69,8 +69,8 @@ class Environment(RLBase):
 
         RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
                             episodes=1, max_steps=10000, termination='any', reset='all',
-                            learning_method='every step',
-                            allow_user_to_halt=True, save_on_exit=True)
+                            learning_method='every step', total_experienced_episodes=0)
+                            # allow_user_to_halt=True, save_on_exit=True)
         RLBase.set_params(self, **kwargs)
 
         # signal.signal(signal.SIGINT, self.__signal_handler)
@@ -79,7 +79,7 @@ class Environment(RLBase):
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
             self._agent, self._subject, self._assignment_list = {}, {}, {}
-            self._episodes, self._max_steps = 1, 10000
+            self._episodes, self._total_experienced_episodes, self._max_steps = 1, 0, 10000
             self._termination, self._reset, self._learning_method = 'any', 'all', 'every step'
 
     def add(self, **kwargs):
@@ -221,6 +221,7 @@ class Environment(RLBase):
                             state = subject.state
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
+                                               episode=self._total_experienced_episodes,
                                                printable=subject.printable())
                             if reporting == 'all':
                                 print('step: {: 4} episode: {:2} state: {} action: {} by:{}'
@@ -280,6 +281,8 @@ class Environment(RLBase):
 
             if reporting != 'none':
                 print(report_string)
+
+            self._total_experienced_episodes += 1
 
         if tally:
             return win_count
@@ -419,7 +422,9 @@ class Environment(RLBase):
                 self._env_data['subjects'].append((fn, type(subject)))
 
             RLBase.save(self, filename=filename, path=path,
-                        data=['_env_data', '_episodes', '_max_steps', '_termination', '_reset', '_learning_method', '_assignment_list'])
+                        data=['_env_data', '_episodes', '_max_steps', '_termination', '_reset', '_learning_method', '_assignment_list',
+                        '_total_experienced_episodes'])
+
             del self._env_data
         else:
             for obj in object_name:
