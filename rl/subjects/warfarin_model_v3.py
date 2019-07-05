@@ -214,7 +214,7 @@ class Patient:
     '''
 
     def __init__(self, age=50, CYP2C9='*3/*3', VKORC1='G/G', randomized=True, max_time=24,
-                 dose_interval=24, dose={}, **kwargs):
+                 dose_interval=24, dose={}, lazy=False, **kwargs):
         self._age = age
         self._CYP2C9 = CYP2C9
         self._VKORC1 = VKORC1
@@ -279,6 +279,7 @@ class Patient:
 
         self._max_time = max_time  # The last hour of experiment
         self._dose_interval = dose_interval
+        self._lazy = lazy
 
         # prepend time 0 to the list of times for deSolve initial conditions (remove when returning list of times)
         times = list(range(self._max_time+1))
@@ -319,10 +320,10 @@ class Patient:
                     self._V1) * self._multiplication_term
 
         if t0 == 0:  # non steady-state
-            C_s_error = [exp(normalvariate(0, 0.30)) for _ in range(len(C_s_pred))] if self._randomized \
+            C_s_error = [exp(normalvariate(0, 0.09)) for _ in range(len(C_s_pred))] if self._randomized \
                 else [1]*len(C_s_pred)  # Sadjad
         else:  # steady-state
-            C_s_error = [exp(normalvariate(0, 0.09)) for _ in range(len(C_s_pred))] if self._randomized \
+            C_s_error = [exp(normalvariate(0, 0.30)) for _ in range(len(C_s_pred))] if self._randomized \
                 else [1]*len(C_s_pred)
 
         C_s = [C_s_pred[i] * C_s_error[i] for i in range(len(C_s_pred))]
