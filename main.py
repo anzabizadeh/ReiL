@@ -439,7 +439,6 @@ def warfarin(**kwargs):
         validation_split = kwargs.get('validation_split', 0.3)
         text = '_'.join((str(hidden_layer_sizes),
                             'g', str(gamma),
-                            'a', str(alpha),
                             'e', 'func' if callable(epsilon) else str(epsilon),
                             'lr', str(learning_rate),
                             'buff', str(buffer_size),
@@ -501,7 +500,6 @@ def warfarin(**kwargs):
                                                 default_actions=subjects['W'].possible_actions)
         elif agent_type.lower() == 'ann':
             agents['protocol'] = ANNAgent(gamma=gamma,
-                                          alpha=alpha,
                                           epsilon=epsilon,
                                           learning_rate=learning_rate,
                                           buffer_size=buffer_size,
@@ -511,7 +509,6 @@ def warfarin(**kwargs):
                                           default_actions=subjects['W'].possible_actions)
         elif agent_type.lower() == 'dqn':
             agents['protocol'] = DQNAgent(gamma=gamma,
-                                          alpha=alpha,
                                           epsilon=epsilon,
                                           learning_rate=learning_rate,
                                           buffer_size=buffer_size,
@@ -572,27 +569,27 @@ if __name__ == '__main__':
     model = 'warfarin'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    runs = 100
-    training_episodes = 50
+    runs = 20
+    training_episodes = 100
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
                             training_episodes=training_episodes,
-                            randomized=False,
+                            randomized=True,
                             # patient_selection='random',
                             age=70,
                             CYP2C9='*1/*3',
                             VKORC1='A/A',
                             max_day=10,
-                            dose_history=10,
-                            INR_history=1,
+                            dose_history=9,
+                            INR_history=9,
                             gamma=0.95,
-                            alpha=0.2,
-                            epsilon=lambda x: 1/(1+x/100) if x>=20 else 1.0,
+                            epsilon=lambda x: 1/(1+x/5),  # if x>=20 else 1.0,
                             agent_type='DQN',  # 'ANN',
-                            input_length=23,
-                            buffer_size=100,
-                            batch_size=20,
+                            # alpha=0.2,
+                            input_length=30,
+                            buffer_size=900,
+                            batch_size=300,
                             validation_split=0.3,
                             hidden_layer_sizes=(10, 10),
                             clear_buffer=False

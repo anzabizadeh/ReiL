@@ -28,7 +28,6 @@ class DQNAgent(Agent):
 
     Constructor Arguments
     ---------------------
-        alpha: learning rate for TD equation. (Default = 0.1)
         gamma: discount factor in TD equation. (Default = 1)
         epsilon: exploration probability. (Default = 0)
         default_actions: list of default actions.
@@ -54,7 +53,7 @@ class DQNAgent(Agent):
         Initialize a Q-Learning agent with deep neural network Q-function approximator.
         '''
         Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, gamma=1, alpha=0.1, epsilon=0, default_actions={},
+        Agent.set_defaults(self, gamma=1, epsilon=0, default_actions={},
                            learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1,
                            training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2),
                            buffer_size=50, batch_size=10, validation_split=0.3, clear_buffer=False, tensorboard_path=None)
@@ -67,7 +66,7 @@ class DQNAgent(Agent):
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
-            self._gamma, self._alpha, self._epsilon = 1, 0.1, lambda x: 0
+            self._gamma, self._epsilon = 1, lambda x: 0
             self._default_actions = {}
             self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (1,), 1
             self._batch_size, self._buffer_size, self._validation_split, self._clear_buffer = 10, 0, 0.3, False
@@ -88,19 +87,19 @@ class DQNAgent(Agent):
                 v, activation='relu', name='layer_{:0>2}'.format(i+2)))
 
         self._model.add(keras.layers.Dense(
-            1, activation='sigmoid', name='output'))
+            1, name='output'))  # activation='sigmoid', 
 
         self._model.compile(optimizer='adam', loss='mse')  # , metrics=['accuracy'])
 
         if self._tensorboard_path is None:
-            self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
+            self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
                                                         'lrn', str(self._learning_rate), 'hddn', str(
                                                             self._hidden_layer_sizes),
                                                         'btch', str(self._batch_size), 'vld', str(self._validation_split)))
         else:
             self._tensorboard_path = 'logs/' + self._tensorboard_path
         self._tensorboard = keras.callbacks.TensorBoard(
-            log_dir=self._tensorboard_path)
+            log_dir=self._tensorboard_path, histogram_freq=1)
 
 
     def _q(self, state, action):
@@ -188,7 +187,7 @@ class DQNAgent(Agent):
             if buffered_size >= self._buffer_size:
                 index = np.random.choice(buffered_size, self._batch_size, replace=False)
                 self._model.fit(self._training_x[index], self._training_y[index],
-                                epochs=3, callbacks=[self._tensorboard], validation_split=self._validation_split)
+                                epochs=1, callbacks=[self._tensorboard], validation_split=self._validation_split)
 
                 if self._clear_buffer:
                     self._training_x = np.array([], ndmin=2)
