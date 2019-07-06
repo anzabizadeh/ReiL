@@ -300,10 +300,17 @@ class Patient:
                                * temp for temp in (exp(-beta * t) for t in times)))
         part_3 = np.array(list(((k21 - self._ka) / ((self._ka - alpha)*(self._ka - beta)))
                                * temp for temp in (exp(-self._ka * t) for t in times)))
-        self._multiplication_term = part_1 + part_2 + part_3
+        # self._multiplication_term = part_1 + part_2 + part_3
 
-        self._data = pd.DataFrame(columns=['dose']+times)
-        self.dose = {0: 0.0}
+        self._multiplication_term = ((self._ka * self._F / 2) /
+                    self._V1) * (part_1 + part_2 + part_3)
+
+        if self._lazy:
+            self._data = pd.DataFrame(columns=['dose']+times)
+            self.dose = {0: 0.0}
+        else:
+            self._data = pd.DataFrame(columns=['dose'])
+            self._total_Cs = np.zeros(self._max_time + 1)
 
     @property
     def dose(self):
@@ -311,22 +318,30 @@ class Patient:
 
     @dose.setter
     def dose(self, dose):
-        for d, v in dose.items():
-            self._data.loc[d] = np.insert(
-                self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
+        if self._lazy:
+            for d, v in dose.items():
+                self._data.loc[d] = np.insert(
+                    self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
+        else:
+            for d, v in dose.items():
+                self._data.loc[d] = v
+                self._total_Cs = np.add(self._total_Cs, self._Cs(dose=v, t0=d*self._dose_interval))
 
     def _Cs(self, dose, t0):
-        C_s_pred = ((self._ka * self._F * dose / 2) /
-                    self._V1) * self._multiplication_term
+        # C_s_pred = ((self._ka * self._F * dose / 2) / 
+        #             self._V1) * self._multiplication_term
+
+        C_s_pred = dose * self._multiplication_term
 
         if t0 == 0:  # non steady-state
-            C_s_error = [exp(normalvariate(0, 0.09)) for _ in range(len(C_s_pred))] if self._randomized \
-                else [1]*len(C_s_pred)  # Sadjad
+            C_s_error = np.array([exp(normalvariate(0, 0.09)) for _ in range(len(C_s_pred))]) if self._randomized \
+                else np.ones(len(C_s_pred))  # Sadjad
         else:  # steady-state
-            C_s_error = [exp(normalvariate(0, 0.30)) for _ in range(len(C_s_pred))] if self._randomized \
-                else [1]*len(C_s_pred)
+            C_s_error = np.array([exp(normalvariate(0, 0.30)) for _ in range(len(C_s_pred))]) if self._randomized \
+                else np.ones(len(C_s_pred))
 
-        C_s = [C_s_pred[i] * C_s_error[i] for i in range(len(C_s_pred))]
+        # C_s = [C_s_pred[i] * C_s_error[i] for i in range(len(C_s_pred))]
+        C_s = np.multiply(C_s_pred, C_s_error).clip(min=0)
 
         return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1]
 
@@ -334,8 +349,11 @@ class Patient:
         if isinstance(days, int):
             days = [days]
 
-        Cs_gamma = np.nan_to_num(np.power(np.sum(self._data[list(
-            range(int(max(days)*self._dose_interval)+1))], axis=0), np.array(self._gamma)))
+        if self._lazy:
+            Cs_gamma = np.power(np.sum(self._data[list(
+                range(int(max(days)*self._dose_interval)+1))], axis=0), self._gamma)
+        else:
+            Cs_gamma = np.power(self._total_Cs[0:int(max(days)*self._dose_interval)+1], self._gamma)
 
         A = [1]*7
         dA = [0]*7
