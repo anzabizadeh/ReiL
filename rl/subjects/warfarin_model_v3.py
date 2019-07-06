@@ -150,13 +150,13 @@ class WarfarinModel(Subject):
         self._INR.popleft()
 
         try:
-            reward = 1 if self._TTR_range[0] <= self._INR[-1] <= self._TTR_range[1] else 0
-            # TTR = sum((self._TTR_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j <= self._TTR_range[1]
-            #            for j in range(self._d_previous)))
-            # INR_mid = (self._TTR_range[1] + self._TTR_range[0]) / 2
-            # INR_range = self._TTR_range[1] - self._TTR_range[0]
-            # reward = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
-            #                for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
+            # reward = 1 if self._TTR_range[0] <= self._INR[-1] <= self._TTR_range[1] else 0
+            TTR = sum((self._TTR_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j <= self._TTR_range[1]
+                       for j in range(self._d_previous)))
+            INR_mid = (self._TTR_range[1] + self._TTR_range[0]) / 2
+            INR_range = self._TTR_range[1] - self._TTR_range[0]
+            reward = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
+                           for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
         except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
             # TTR = 0
             reward = 0

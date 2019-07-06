@@ -89,7 +89,7 @@ class DQNAgent(Agent):
         self._model.add(keras.layers.Dense(
             1, name='output'))  # activation='sigmoid', 
 
-        self._model.compile(optimizer='adam', loss='mse')  # , metrics=['accuracy'])
+        self._model.compile(optimizer='adam', loss='mae')  # , metrics=['accuracy'])
 
         if self._tensorboard_path is None:
             self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),

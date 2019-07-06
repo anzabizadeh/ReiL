@@ -588,8 +588,8 @@ if __name__ == '__main__':
                             agent_type='DQN',  # 'ANN',
                             # alpha=0.2,
                             input_length=30,
-                            buffer_size=90,
-                            batch_size=30,
+                            buffer_size=90*10,
+                            batch_size=50,
                             validation_split=0.3,
                             hidden_layer_sizes=(20, 20),
                             clear_buffer=False
