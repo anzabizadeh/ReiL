@@ -51,7 +51,7 @@ class WarfarinModel(Subject):
                              d_previous=0, d_current=1, d_max=30,
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
                              dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
-                             dose_list=[None]*5
+                             dose_list=[None]*5, dose_change_penalty_coef=0
                              )
 
         Subject.set_params(self, **kwargs)
@@ -69,6 +69,7 @@ class WarfarinModel(Subject):
             self._max_day = 0
             self._current_dose = 0
             self._max_dose = 0
+            self._dose_change_penalty_coef = 0
             self._dose_steps = 0
             self._dose_history = 0
             self._INR_history = 0
@@ -151,12 +152,14 @@ class WarfarinModel(Subject):
 
         try:
             # reward = 1 if self._TTR_range[0] <= self._INR[-1] <= self._TTR_range[1] else 0
-            TTR = sum((self._TTR_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j <= self._TTR_range[1]
-                       for j in range(self._d_previous)))
+            # TTR = sum((self._TTR_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j <= self._TTR_range[1]
+            #            for j in range(self._d_previous)))
             INR_mid = (self._TTR_range[1] + self._TTR_range[0]) / 2
             INR_range = self._TTR_range[1] - self._TTR_range[0]
-            reward = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
+            INR_penalty = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
                            for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
+            dose_change_penalty = -abs(self._dose_list[-2] - self._dose_list[-1])
+            reward = INR_penalty + self._dose_change_penalty_coef * dose_change_penalty
         except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
             # TTR = 0
             reward = 0

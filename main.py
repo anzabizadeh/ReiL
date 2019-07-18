@@ -416,6 +416,7 @@ def warfarin(**kwargs):
     INR_history = kwargs.get('INR_history', 10)
     patient_selection = kwargs.get('patient_selection', '')
     randomized = kwargs.get('randomized', True)
+    dose_change_penalty_coef = kwargs.get('dose_change_penalty_coef', 0.0)
 
     gamma = kwargs.get('gamma', 0.99)
     alpha = kwargs.get('alpha', 0.2)
@@ -462,6 +463,7 @@ def warfarin(**kwargs):
                              'dose_{:2}'.format(dose_history),
                              'INR_{:2}'.format(INR_history),
                              'T' if randomized else 'F',
+                             '_dose_change_coef_{:2.2f}'.format(dose_change_penalty_coef),
                              agent_type, text)).replace(' ', '')
 
     try:
@@ -484,6 +486,7 @@ def warfarin(**kwargs):
                                       patient_selection=patient_selection,
                                       dose_history=dose_history,
                                       INR_history=INR_history,
+                                      dose_change_penalty_coef=dose_change_penalty_coef,
                                       randomized=randomized)
         # define agents
         if agent_type.lower() == 'q':
@@ -592,5 +595,6 @@ if __name__ == '__main__':
                             batch_size=50,
                             validation_split=0.3,
                             hidden_layer_sizes=(20, 20),
-                            clear_buffer=False
+                            clear_buffer=False,
+                            dose_change_penalty_coef=0.0
                             )
