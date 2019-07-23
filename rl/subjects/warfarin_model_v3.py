@@ -42,11 +42,11 @@ class WarfarinModel(Subject):
         Subject.__init__(self, **kwargs)
 
         Subject.set_defaults(self, patient_selection='random',
-                             age_list=list(range(70, 86)),
+                             age_list=list(range(71, 86)),
                              CYP2C9_list=['*1/*1', '*1/*2',
                                           '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
                              VKORC1_list=['G/G', 'G/A', 'A/A'],
-                             age=60, CYP2C9='*1/*1', VKORC1='A/A', SS=0, max_time=24*90,
+                             age=71, CYP2C9='*1/*1', VKORC1='A/A', SS=0, max_time=24*90,
                              day=1, max_day=90, INR=[0], INR_current=0,
                              d_previous=0, d_current=1, d_max=30,
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
@@ -87,13 +87,19 @@ class WarfarinModel(Subject):
             self._TTR_range = ()
             self._randomized = True
 
-        self._max_time = (self._max_day + 1)*24  # until the end of max_day
-        self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
-                                randomized=self._randomized, max_time=self._max_time)
+        if self._patient_selection in ['ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017']:
+            if self._CYP2C9_list != ['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'] or \
+                self._VKORC1_list != ['G/G', 'G/A', 'A/A']:
+                raise ValueError('For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
 
-        self._INR = deque([0.0]*(self._INR_history + 1))
-        self._INR[-1] = self._patient.INR([0])[-1]
-        self._dose_list = deque([0.0]*self._dose_history)
+        self._max_time = (self._max_day + 1)*24  # until the end of max_day
+        # self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
+        #                         randomized=self._randomized, max_time=self._max_time)
+        self.reset()
+
+        # self._INR = deque([0.0]*(self._INR_history + 1))
+        # self._INR[-1] = self._patient.INR([0])[-1]
+        # self._dose_list = deque([0.0]*self._dose_history)
         self._possible_actions = RLData([x*self._dose_steps
                          for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
                         lower=0, upper=self._max_dose).as_rldata_array()
@@ -105,7 +111,7 @@ class WarfarinModel(Subject):
                        'VKORC1': self._VKORC1,
                        'Doses': tuple(self._dose_list),
                        'INRs': tuple(self._INR)},
-                      lower={'Age': 65,
+                      lower={'Age': 71,
                              'Doses': 0.0,
                              'INRs': 0.0},
                       upper={'Age': 100,
@@ -176,6 +182,10 @@ class WarfarinModel(Subject):
             self._age = choice(self._age_list)
             self._CYP2C9 = choice(self._CYP2C9_list)
             self._VKORC1 = choice(self._VKORC1_list)
+        elif self._patient_selection.lower() in ['ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017']:
+            self._age = choice(self._age_list)
+            self._CYP2C9 = np.random.choice(self._CYP2C9_list, 1, p=[0.6577, 0.1460, 0.0911, 0.0641, 0.0193, 1e-5])[0]
+            self._VKORC1 = np.random.choice(self._VKORC1_list, 1, p=[0.3854, 0.4402, 0.1733])[0]
 
         self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
                                 randomized=self._randomized, max_time=self._max_time)
@@ -216,7 +226,7 @@ class Patient:
         INR: returns a list of INR values corresponding to the given list of days.
     '''
 
-    def __init__(self, age=50, CYP2C9='*3/*3', VKORC1='G/G', randomized=True, max_time=24,
+    def __init__(self, age=50, CYP2C9='*1/*1', VKORC1='G/A', randomized=True, max_time=24,
                  dose_interval=24, dose={}, lazy=False, **kwargs):
         self._age = age
         self._CYP2C9 = CYP2C9
@@ -283,6 +293,7 @@ class Patient:
         self._max_time = max_time  # The last hour of experiment
         self._dose_interval = dose_interval
         self._lazy = lazy
+        self._last_computed_day = 0
 
         # prepend time 0 to the list of times for deSolve initial conditions (remove when returning list of times)
         times = list(range(self._max_time+1))
@@ -358,40 +369,68 @@ class Patient:
         else:
             Cs_gamma = np.power(self._total_Cs[0:int(max(days)*self._dose_interval)+1], self._gamma)
 
-        A = [1]*7
-        dA = [0]*7
+        start_days = sorted([0 if days[0]<self._last_computed_day else self._last_computed_day] + days[:-1])
+        end_days = sorted(days)
+
+        if start_days[0] == 0:
+            self._A = [1]*7
+            self._dA = [0]*7
 
         INR_max = 20
         baseINR = 1
         INR = []
-        for d1, d2 in zip(sorted([0]+days[:-1]), sorted(days)):
+        for d1, d2 in zip(start_days, end_days):
             for i in range(int(d1*self._dose_interval), int(d2*self._dose_interval)):
-                dA[0] = self._ktr1 * (1 - self._E_MAX * Cs_gamma[i] /
-                                      (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr1*A[0]
+                self._dA[0] = self._ktr1 * (1 - self._E_MAX * Cs_gamma[i] /
+                                      (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr1*self._A[0]
                 for j in range(1, 6):
-                    dA[j] = self._ktr1 * (A[j-1] - A[j])
+                    self._dA[j] = self._ktr1 * (self._A[j-1] - self._A[j])
 
-                dA[6] = self._ktr2 * (1 - self._E_MAX * Cs_gamma[i] /
-                                      (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr2*A[6]
+                self._dA[6] = self._ktr2 * (1 - self._E_MAX * Cs_gamma[i] /
+                                      (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr2*self._A[6]
                 for j in range(7):
-                    A[j] += dA[j]
+                    self._A[j] += self._dA[j]
 
             e_INR = normalvariate(0, 0.0325) if self._randomized else 0
             INR.append(
-                (baseINR + (INR_max*(1-A[5]*A[6]) ** self._lambda)) * exp(e_INR))
+                (baseINR + (INR_max*(1-self._A[5]*self._A[6]) ** self._lambda)) * exp(e_INR))
+
+        self._last_computed_day = end_days[-1]
 
         return INR
 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    from time import time
 
     max_day = 100
-    p_count = range(100)
-    p = [Patient(randomized=True, max_time=24*max_day + 1) for _ in p_count]
+    p_count = range(20)
+    p = [Patient(randomized=False, max_time=24*max_day + 1) for _ in p_count]
+    t = time()
     for j in p_count:
         p[j].dose = {i: 15 for i in range(max_day)}
         # plt.plot(p.INR(list(i/24 for i in range(1, max_day*24 + 1))))
         plt.plot(list(range(24, (max_day+1)*24, 240)),
                  p[j].INR(list(i for i in range(1, max_day+1, 10))), 'x')
     plt.show()
+
+    # p = [Patient(randomized=True, max_time=24*max_day + 1) for _ in p_count]
+    # t = time()
+    # for j in p_count:
+    #     p[j].dose = {i: 15 for i in range(max_day)}
+    #     p[j].INR(list(i for i in range(1, max_day+1, 10)))
+    #     # plt.plot(p.INR(list(i/24 for i in range(1, max_day*24 + 1))))
+    # #     plt.plot(list(range(24, (max_day+1)*24, 240)),
+    # #              p[j].INR(list(i for i in range(1, max_day+1, 10))), 'x')
+    # # plt.show()
+    # print(time() - t)
+
+    # p = [Patient(randomized=True, max_time=24*max_day + 1) for _ in p_count]
+    # t = time()
+    # for j in p_count:
+    #     p[j].dose = {i: 15 for i in range(max_day)}
+    #     for i in range(max_day, 1, -10):
+    #         p[j].INR(i)
+
+    # print(time() - t)

@@ -99,7 +99,7 @@ class DQNAgent(Agent):
         else:
             self._tensorboard_path = 'logs/' + self._tensorboard_path
         self._tensorboard = keras.callbacks.TensorBoard(
-            log_dir=self._tensorboard_path, histogram_freq=1)
+            log_dir=self._tensorboard_path, histogram_freq=1, write_images=True)
 
 
     def _q(self, state, action):
@@ -162,26 +162,45 @@ class DQNAgent(Agent):
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
-            previous_state = history.at[0, 'state']
+            # previous_state = history.at[0, 'state']
+            # for i in range(len(history.index)):
+            #     previous_action = history.at[i, 'action']
+            #     reward = history.at[i, 'reward']
+            #     try:
+            #         state = history.at[i+1, 'state']
+            #         max_q = self._max_q(state)
+            #         new_q = reward + self._gamma*max_q
+            #     except KeyError:
+            #         new_q = reward
+
+            #     state_action = np.append(previous_state.normalize().as_nparray(),
+            #                              previous_action.normalize().as_nparray())
+            #     try:
+            #         self._training_x = np.vstack((self._training_x, state_action))
+            #         self._training_y = np.vstack((self._training_y, new_q))
+            #     except ValueError:
+            #         self._training_x = state_action
+            #         self._training_y = np.array(new_q)
+            #     previous_state = state
+
             for i in range(len(history.index)):
-                previous_action = history.at[i, 'action']
+                state = history.at[i, 'state']
+                action = history.at[i, 'action']
                 reward = history.at[i, 'reward']
                 try:
-                    state = history.at[i+1, 'state']
-                    max_q = self._max_q(state)
+                    max_q = self._max_q(history.at[i+1, 'state'])
                     new_q = reward + self._gamma*max_q
                 except KeyError:
                     new_q = reward
 
-                state_action = np.append(previous_state.normalize().as_nparray(),
-                                         previous_action.normalize().as_nparray())
+                state_action = np.append(state.normalize().as_nparray(),
+                                         action.normalize().as_nparray())
                 try:
                     self._training_x = np.vstack((self._training_x, state_action))
                     self._training_y = np.vstack((self._training_y, new_q))
                 except ValueError:
                     self._training_x = state_action
                     self._training_y = np.array(new_q)
-                previous_state = state
 
             buffered_size = len(self._training_x)
             if buffered_size >= self._buffer_size:
