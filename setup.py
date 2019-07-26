@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='rl',
-      version='0.1',
+      version='0.2',
       description='The reinforcement learning module for Python',
       url='https://github.uiowa.edu/sanzabizadeh/Reinforcement-Learning.git',
       author='Sadjad Anzabi Zadeh',

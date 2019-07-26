@@ -14,7 +14,8 @@ submodules
         via an environment and observing the reward.
     environments: objects that connect agents to subjects and
         elapse time.
-    valueset: a data type to store state and action data.
+    rldata: a data type to store state and action data.
+    valueset: legacy data type to store state and action data.
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''

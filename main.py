@@ -572,8 +572,8 @@ if __name__ == '__main__':
     model = 'warfarin'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    runs = 100
-    training_episodes = 100
+    runs = 200
+    training_episodes = 50
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
@@ -586,8 +586,8 @@ if __name__ == '__main__':
                             max_day=90,
                             dose_history=9,
                             INR_history=9,
-                            gamma=0.95,
-                            epsilon=lambda x: 1/(1+x/100),
+                            gamma=0.80,
+                            epsilon=lambda x: 1/(1+x/100),  # coef: 1 -> 100 episodes / 2 -> 200 / ...
                             agent_type='DQN',  # 'ANN',
                             # alpha=0.2,
                             input_length=30,
@@ -596,5 +596,5 @@ if __name__ == '__main__':
                             validation_split=0.3,
                             hidden_layer_sizes=(20, 20),
                             clear_buffer=False,
-                            dose_change_penalty_coef=0.0
+                            dose_change_penalty_coef=0.4
                             )
