@@ -43,12 +43,12 @@ class RLData:
             pass
 
         try:
-            self.categories = kwargs['categories']
+            self.is_numerical = kwargs['is_numerical']
         except KeyError:
             pass
 
         try:
-            self.is_numerical = kwargs['is_numerical']
+            self.categories = kwargs['categories']
         except KeyError:
             pass
 
@@ -99,7 +99,7 @@ class RLData:
                     self._value.at[i, 'lower'] = min(val[0]) if hasattr(val[0], '__iter__') and not isinstance(val[0], str) else val[0]
                     self._value.at[i, 'upper'] = max(val[0]) if hasattr(val[0], '__iter__') and not isinstance(val[0], str) else val[0]
                 else:
-                    self._value.at[i, 'categories'] = [val[0]]
+                    self._value.at[i, 'categories'] = val[0] if hasattr(val[0], '__iter__') and not isinstance(val[0], str) else [val[0]]
 
         if not self._lazy:
             self._normalized = self._normalize()
@@ -367,22 +367,31 @@ class RLData:
 
 
 if __name__ == '__main__':
-    d = RLData([1, 2, 3], lower=1, upper=10)
-    print(d._value)
-    print(d._normalized)
-    d.value = 10
-    print(d._normalized)
+    # d = RLData([1, 2, 3], lower=1, upper=10)
+    # print(d._value)
+    # print(d._normalized)
+    # d.value = 10
+    # print(d._normalized)
 
-    d = RLData({'a': [10, 20], 'b': [30, 10, 5, 40], 'c': 50, 'd': 'hello'},
-               lower={'a': 1, 'b': 2, 'c': 3, 'd': 'a'})
-    print(d._value)
-    print(d._normalized)
-    d.upper = {'b': 100, 'c': 50, 'a': 20, 'd': 'zzzzzz'}
-    d.lower = {'b': -10, 'c': 0, 'a': 1, 'd': '0'}
-    print(d._value)
-    print(d._normalized)
-    # d.is_numerical={'a': False}
-    for temp in d.as_rldata_array():
-        print(temp)
+    # d = RLData({'a': [10, 20], 'b': [30, 10, 5, 40], 'c': 50, 'd': 'hello'},
+    #            lower={'a': 1, 'b': 2, 'c': 3, 'd': 'a'})
+    # print(d._value)
+    # print(d._normalized)
+    # d.upper = {'b': 100, 'c': 50, 'a': 20, 'd': 'zzzzzz'}
+    # d.lower = {'b': -10, 'c': 0, 'a': 1, 'd': '0'}
+    # print(d._value)
+    # print(d._normalized)
+    # # d.is_numerical={'a': False}
+    # for temp in d.as_rldata_array():
+    #     print(temp)
 
+    # print(d.normalize())
+    d1 = RLData(['a', 'b', 'c'], categories=['a', 'b', 'c'])
+    print(d1.value)
+    print(d1.normalize())
+    print(d1.as_rldata_array())
+    d = RLData([(1, 1), (1, 2), (1, 3)], categories=[(1, 1), (1, 2), (1, 3)])
+    print(d.value)
     print(d.normalize())
+    print(d.as_rldata_array())
+    print(d.as_rldata_array()[0].normalize())
