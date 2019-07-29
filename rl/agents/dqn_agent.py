@@ -271,7 +271,7 @@ class DQNAgent(Agent):
         self._model = keras.models.load_model(kwargs.get(
             'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
         self._tensorboard = keras.callbacks.TensorBoard(
-            log_dir=self._tensorboard_path)
+            log_dir=self._tensorboard_path, histogram_freq=1, write_images=True)
 
     def save(self, **kwargs):
         '''
