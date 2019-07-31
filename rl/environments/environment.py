@@ -84,7 +84,7 @@ class Environment(RLBase):
 
     def add(self, **kwargs):
         '''
-        Add agents to the environment.
+        Add agents or subjects to the environment.
 
         Arguments
         ---------
@@ -105,7 +105,7 @@ class Environment(RLBase):
 
     def remove(self, **kwargs):
         '''
-        Remove agents from the environment.
+        Remove agents or subjects from the environment.
 
         Arguments
         ---------
@@ -144,6 +144,25 @@ class Environment(RLBase):
                 raise ValueError('Subject ' + subject_name + ' not found.')
             _id = self._subject[subject_name].register(agent_name)
             self._assignment_list[agent_name] = (subject_name, _id)
+
+    def divest(self, agent_subject_names):
+        '''
+        Divest agent subject assignment.
+
+        Arguments
+        ---------
+            agent_subject_names: a list of agent subject tuples.
+
+        Raises ValueError if an agent or subject is not found.
+        Note: An agent can be assigned to act on multiple subjects and a subject can be affected by multiple agents. 
+        '''
+        for agent_name, subject_name in agent_subject_names:
+            if agent_name not in self._agent:
+                raise ValueError('Agent ' + agent_name + ' not found.')
+            if subject_name not in self._subject:
+                raise ValueError('Subject ' + subject_name + ' not found.')
+            self._subject[subject_name].deregister(agent_name)
+            self._assignment_list.pop(agent_name)
 
     def elapse(self, **kwargs):
         '''
