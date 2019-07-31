@@ -16,12 +16,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import lognorm
 
-# from ..valueset import ValueSet
 from ..rldata import RLData
 from .subject import Subject
 
 
-class WarfarinModel(Subject):
+class WarfarinModel_v4(Subject):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model for wafarin.
 
@@ -42,8 +41,7 @@ class WarfarinModel(Subject):
         Subject.__init__(self, **kwargs)
 
         Subject.set_defaults(self, patient_selection='random',
-                             list_of_characteristics={'age': (71, 86),
-                                                      # lb
+                             list_of_characteristics={'age': (71, 86),  # lb
                                                       'weight': (35, 370),
                                                       'height': (53, 80),  # in
                                                       'gender': ('Female', 'Male'),
@@ -53,10 +51,8 @@ class WarfarinModel(Subject):
                                                       'fluvastatin': ('No', 'Yes'),
                                                       'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
                                                       'VKORC1': ('G/G', 'G/A', 'A/A')},
-                             list_of_probabilities={'age': (67.3, 14.43),
-                                                    # lb
-                                                    'weight': (199.24, 54.71),
-                                                    # in
+                             list_of_probabilities={'age': (67.3, 14.43),  # lb
+                                                    'weight': (199.24, 54.71),  # in
                                                     'height': (66.78, 4.31),
                                                     'gender': (53.14, 46.86),
                                                     'race': (95.18, 4.25, 0.39, 0.18, 1e-4),
@@ -73,7 +69,8 @@ class WarfarinModel(Subject):
                              d_previous=0, d_current=1, d_max=30,
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
                              dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
-                             dose_list=[None]*5, dose_change_penalty_coef=0,
+                             dose_list=[None]*5,
+                             dose_change_penalty_func=lambda x: int(x[-2]==x[-1]), # -0.2 * abs(x[-2]-x[-1]),
                              extended_state=False
                              )
 
@@ -89,7 +86,7 @@ class WarfarinModel(Subject):
             self._max_day = 0
             self._current_dose = 0
             self._max_dose = 0
-            self._dose_change_penalty_coef = 0
+            self._dose_change_penalty_func = lambda x: 0
             self._dose_steps = 0
             self._dose_history = 0
             self._INR_history = 0
@@ -115,13 +112,9 @@ class WarfarinModel(Subject):
                     'For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
 
         self._max_time = (self._max_day + 1)*24  # until the end of max_day
-        # self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
-        #                         randomized=self._randomized, max_time=self._max_time)
+
         self.reset()
 
-        # self._INR = deque([0.0]*(self._INR_history + 1))
-        # self._INR[-1] = self._patient.INR([0])[-1]
-        # self._dose_list = deque([0.0]*self._dose_history)
         self._possible_actions = RLData([x*self._dose_steps
                                          for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
                                         lower=0, upper=self._max_dose).as_rldata_array()
@@ -217,11 +210,10 @@ class WarfarinModel(Subject):
             INR_range = self._TTR_range[1] - self._TTR_range[0]
             INR_penalty = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
                                 for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
-            dose_change_penalty = - \
-                abs(self._dose_list[-2] - self._dose_list[-1])
-            reward = INR_penalty + self._dose_change_penalty_coef * dose_change_penalty
-        except TypeError:  # here I have assumed that for the first use of the pill, we don't have INR and TTR=0
-            # TTR = 0
+            dose_change_penalty = self._dose_change_penalty_func(self._dose_list)
+            reward = INR_penalty + dose_change_penalty
+        except TypeError: 
+            # TTR = 0  # assuming that for the first use of the pill, we don't have INR and TTR=0
             reward = 0
 
         # return TTR*self._d_current
@@ -232,38 +224,63 @@ class WarfarinModel(Subject):
         self._current_dose = 0
         self._dose_list = deque([0.0]*self._dose_history)
 
-        list_of_characteristics = {'age': (71, 86),
-                                   'weight': (35, 370),  # lb
-                                   'height': (53, 80),  # in
-                                   'gender': ('Female', 'Male'),
-                                   'race': ('White', 'Black', 'Asian', 'American Indian', 'Pacific Islander'),
-                                   'tobaco': ('No', 'Yes'),
-                                   'amiodarone': ('No', 'Yes'),
-                                   'fluvastatin': ('No', 'Yes'),
-                                   'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
-                                   'VKORC1': ('G/G', 'G/A', 'A/A')},
-
         if self._patient_selection == 'random':
-            self._characteristics['age'] = np.random.uniform(
-                self._list_of_characteristics['age'][0], self._list_of_characteristics['age'][1])
-            self._characteristics['CYP2C9'] = choice(
-                self._list_of_characteristics['CYP2C9'])
-            self._characteristics['VKORC1'] = choice(
-                self._list_of_characteristics['VKORC1'])
+            self._characteristics['age'] = np.random.uniform(self._list_of_characteristics['age'][0],
+                                                             self._list_of_characteristics['age'][1])
+            self._characteristics['weight'] = np.random.uniform(self._list_of_characteristics['weight'][0],
+                                                                self._list_of_characteristics['weight'][1])
+            self._characteristics['height'] = np.random.uniform(self._list_of_characteristics['height'][0],
+                                                                self._list_of_characteristics['height'][1])
+            self._characteristics['gender'] = choice(self._list_of_characteristics['gender'])
+            self._characteristics['race'] = choice(self._list_of_characteristics['race'])
+            self._characteristics['tobaco'] = choice(self._list_of_characteristics['tobaco'])
+            self._characteristics['amiodarone'] = choice(self._list_of_characteristics['amiodarone'])
+            self._characteristics['fluvastatin'] = choice(self._list_of_characteristics['fluvastatin'])
+            self._characteristics['CYP2C9'] = choice(self._list_of_characteristics['CYP2C9'])
+            self._characteristics['VKORC1'] = choice(self._list_of_characteristics['VKORC1'])
+
         elif self._patient_selection.lower() in ['ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017']:
             self._characteristics['age'] = min([max([np.random.normal(self._list_of_probabilities['age'][0],
                                                                       self._list_of_probabilities['age'][1]),
                                                      self._list_of_characteristics['age'][0]]),
                                                 self._list_of_characteristics['age'][1]])  # truncated normal distribution with 3-sigma bound
-            self._characteristics['CYP2C9'] = np.random.choice(
-                self._list_of_characteristics['CYP2C9'], 1, p=self._list_of_probabilities['CYP2C9'])[0]
-            self._characteristics['VKORC1'] = np.random.choice(
-                self._list_of_characteristics['VKORC1'], 1, p=self._list_of_probabilities['VKORC1'])[0]
+            self._characteristics['weight'] = min([max([np.random.normal(self._list_of_probabilities['weight'][0],
+                                                                         self._list_of_probabilities['weight'][1]),
+                                                        self._list_of_characteristics['weight'][0]]),
+                                                   self._list_of_characteristics['weight'][1]])  # truncated normal distribution with 3-sigma bound
+            self._characteristics['height'] = min([max([np.random.normal(self._list_of_probabilities['height'][0],
+                                                                         self._list_of_probabilities['height'][1]),
+                                                        self._list_of_characteristics['height'][0]]),
+                                                   self._list_of_characteristics['height'][1]])  # truncated normal distribution with 3-sigma bound
+
+            self._characteristics['gender'] = np.random.choice(self._list_of_characteristics['gender'], 1,
+                                                               p=self._list_of_probabilities['gender'])[0]
+            self._characteristics['race'] = np.random.choice(self._list_of_characteristics['race'], 1,
+                                                             p=self._list_of_probabilities['race'])[0]
+            self._characteristics['tobaco'] = np.random.choice(self._list_of_characteristics['tobaco'], 1,
+                                                               p=self._list_of_probabilities['tobaco'])[0]
+            self._characteristics['amiodarone'] = np.random.choice(self._list_of_characteristics['amiodarone'], 1,
+                                                                   p=self._list_of_probabilities['amiodarone'])[0]
+            self._characteristics['fluvastatin'] = np.random.choice(self._list_of_characteristics['fluvastatin'], 1,
+                                                                    p=self._list_of_probabilities['fluvastatin'])[0]
+
+            self._characteristics['CYP2C9'] = np.random.choice(self._list_of_characteristics['CYP2C9'], 1,
+                                                               p=self._list_of_probabilities['CYP2C9'])[0]
+            self._characteristics['VKORC1'] = np.random.choice(self._list_of_characteristics['VKORC1'], 1,
+                                                               p=self._list_of_probabilities['VKORC1'])[0]
 
         self._patient = Patient(age=self._characteristics['age'],
+                                weight=self._characteristics['weight'],  # Not in the patient model
+                                height=self._characteristics['height'],  # Not in the patient model
+                                gender=self._characteristics['gender'],  # Not in the patient model
+                                race=self._characteristics['race'],  # Not in the patient model
+                                tobaco=self._characteristics['tobaco'],  # Not in the patient model
+                                amiodarone=self._characteristics['amiodarone'],  # Not in the patient model
+                                fluvastatin=self._characteristics['fluvastatin'],  # Not in the patient model
                                 CYP2C9=self._characteristics['CYP2C9'],
                                 VKORC1=self._characteristics['VKORC1'],
                                 randomized=self._randomized, max_time=self._max_time)
+
         self._INR = deque([0.0]*(self._INR_history + 1))
         self._INR[-1] = self._patient.INR([0])[-1]
 
@@ -272,8 +289,8 @@ class WarfarinModel(Subject):
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: [age: {}, CYP2C9: {}, VKORC1: {}, INR: {}, d_prev: {}, d: {}]'.format(
-                self._characteristics['age'], self._characteristics['CYP2C9'], self._characteristics['VKORC1'], self._INR, self._d_previous, self._d_current)
+            return 'WarfarinModel: {}, INR: {}, d_prev: {}, d: {}'.format(
+                [' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()], self._INR, self._d_previous, self._d_current)
         except:
             return 'WarfarinModel'
 

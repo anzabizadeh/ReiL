@@ -16,3 +16,4 @@ Classes
 '''
 
 from .environment import Environment
+from .experiment import Experiment

@@ -18,6 +18,7 @@ Classes
     CancerModel: a 4-ordinary differential equation model of cancer
     ConstrainedCancerModel: a constrained version of CancerModel
     WarfarinModel: a PK/PD model for warfarin
+    WarfarinModel_v4: a PK/PD model for warfarin with extended state definition
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
@@ -25,8 +26,9 @@ Classes
 from .subject import Subject
 from .mnkgame import MNKGame
 from .windy_gridworld import WindyGridworld
-from .snake import Snake
-#from .risk import Risk
+# from .snake import Snake
+# from .risk import Risk
 from .cancer_model import CancerModel
 from .constrained_cancer_model import ConstrainedCancerModel
 from .warfarin_model_v3 import WarfarinModel
+from .warfarin_model_v4 import WarfarinModel_v4

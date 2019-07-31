@@ -401,14 +401,14 @@ def risk(**kwargs):
 
 
 def warfarin(**kwargs):
-    from rl.subjects.warfarin_model_v3 import WarfarinModel
+    from rl.subjects import WarfarinModel
+    from rl.subjects import WarfarinModel_v4
 
     # set experiment variables
     runs = kwargs.get('runs', 1000)
     training_episodes = kwargs.get('training_episodes', 100)
-    test_episodes = kwargs.get('test_episodes', 100)
 
-    age = kwargs.get('age', 74)
+    age = kwargs.get('age', 71)
     CYP2C9 = kwargs.get('CYP2C9', '*2/*2')
     VKORC1 = kwargs.get('VKORC1', 'G/A')
     max_day = kwargs.get('max_day', 90)
@@ -423,6 +423,7 @@ def warfarin(**kwargs):
     epsilon = kwargs.get('epsilon', 0.1)
 
     agent_type = kwargs.get('agent_type', 'Q')
+    patient_model = kwargs.get('patient_model', 'WARF').upper()
 
     if agent_type.lower() == 'warfarinq':
         method = kwargs.get('method', 'fixed policy first')
@@ -453,7 +454,7 @@ def warfarin(**kwargs):
     try:
         filename = kwargs['filename']
     except KeyError:
-        filename = '_'.join(('WARF',
+        filename = '_'.join((patient_model,
                              str(age) if patient_selection != 'random' else '00',
                              {'*1/*1': '11', '*1/*2': '12', '*1/*3': '13', '*2/*2': '22', '*2/*3': '23', '*3/*3': '33'}[
                                  CYP2C9] if patient_selection != 'random' else '00',
@@ -477,17 +478,33 @@ def warfarin(**kwargs):
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel(age=age,
-                                      CYP2C9=CYP2C9,
-                                      VKORC1=VKORC1,
-                                      TTR_range=(2, 3),
-                                      d_max=kwargs.get('d_max', 1),
-                                      max_day=max_day,
-                                      patient_selection=patient_selection,
-                                      dose_history=dose_history,
-                                      INR_history=INR_history,
-                                      dose_change_penalty_coef=dose_change_penalty_coef,
-                                      randomized=randomized)
+        if patient_model == 'WARF':
+            subjects['W'] = WarfarinModel(age=age,
+                                        CYP2C9=CYP2C9,
+                                        VKORC1=VKORC1,
+                                        TTR_range=(2, 3),
+                                        d_max=kwargs.get('d_max', 1),
+                                        max_day=max_day,
+                                        patient_selection=patient_selection,
+                                        dose_history=dose_history,
+                                        INR_history=INR_history,
+                                        dose_change_penalty_coef=dose_change_penalty_coef,
+                                        randomized=randomized)
+        elif patient_model == 'WARFV4':
+            subjects['W'] = WarfarinModel_v4(age=age,
+                                        CYP2C9=CYP2C9,
+                                        VKORC1=VKORC1,
+                                        TTR_range=(2, 3),
+                                        d_max=kwargs.get('d_max', 1),
+                                        max_day=max_day,
+                                        patient_selection=patient_selection,
+                                        dose_history=dose_history,
+                                        INR_history=INR_history,
+                                        dose_change_penalty_coef=dose_change_penalty_coef,
+                                        randomized=randomized)
+        else:
+            print('Model not found!')
+
         # define agents
         if agent_type.lower() == 'q':
             agents['protocol'] = QAgent(gamma=gamma,
@@ -572,8 +589,8 @@ if __name__ == '__main__':
     model = 'warfarin'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    runs = 200
-    training_episodes = 50
+    runs = 100
+    training_episodes = 100
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
@@ -586,7 +603,7 @@ if __name__ == '__main__':
                             max_day=90,
                             dose_history=9,
                             INR_history=9,
-                            gamma=0.80,
+                            gamma=0.95,
                             epsilon=lambda x: 1/(1+x/100),  # coef: 1 -> 100 episodes / 2 -> 200 / ...
                             agent_type='DQN',  # 'ANN',
                             # alpha=0.2,
@@ -596,5 +613,6 @@ if __name__ == '__main__':
                             validation_split=0.3,
                             hidden_layer_sizes=(20, 20),
                             clear_buffer=False,
-                            dose_change_penalty_coef=0.4
+                            dose_change_penalty_coef=1.0,
+                            patient_model='WARFV4'
                             )
