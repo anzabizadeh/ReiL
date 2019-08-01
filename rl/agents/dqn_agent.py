@@ -61,6 +61,13 @@ class DQNAgent(Agent):
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 
+        if 'filename' in kwargs:
+            if 'path' in kwargs:
+                self.load(filename=kwargs['filename'], path=kwargs['path'])
+            else:
+                self.load(filename=kwargs['filename'])
+            return
+
         self._generate_network()
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -77,6 +84,8 @@ class DQNAgent(Agent):
         '''
         Generate a tensorflow ANN network.
         '''
+        self._session = tf.Session()
+        keras.backend.set_session(self._session)
         tf.reset_default_graph()
 
         self._model = keras.models.Sequential()
@@ -101,6 +110,7 @@ class DQNAgent(Agent):
         self._tensorboard = keras.callbacks.TensorBoard(
             log_dir=self._tensorboard_path, histogram_freq=1, write_images=True)
 
+        self._graph = tf.get_default_graph()
 
     def _q(self, state, action):
         '''
@@ -129,7 +139,10 @@ class DQNAgent(Agent):
         else:
             raise ValueError('State and action should be of the same size or at least one should be of size one.')
 
-        result = self._model.predict(X)
+        with self._session.as_default():
+            with self._graph.as_default():
+                result = self._model.predict(X)
+
         return result
 
     def _max_q(self, state):
@@ -162,26 +175,6 @@ class DQNAgent(Agent):
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
-            # previous_state = history.at[0, 'state']
-            # for i in range(len(history.index)):
-            #     previous_action = history.at[i, 'action']
-            #     reward = history.at[i, 'reward']
-            #     try:
-            #         state = history.at[i+1, 'state']
-            #         max_q = self._max_q(state)
-            #         new_q = reward + self._gamma*max_q
-            #     except KeyError:
-            #         new_q = reward
-
-            #     state_action = np.append(previous_state.normalize().as_nparray(),
-            #                              previous_action.normalize().as_nparray())
-            #     try:
-            #         self._training_x = np.vstack((self._training_x, state_action))
-            #         self._training_y = np.vstack((self._training_y, new_q))
-            #     except ValueError:
-            #         self._training_x = state_action
-            #         self._training_y = np.array(new_q)
-            #     previous_state = state
 
             for i in range(len(history.index)):
                 state = history.at[i, 'state']
@@ -205,8 +198,10 @@ class DQNAgent(Agent):
             buffered_size = len(self._training_x)
             if buffered_size >= self._buffer_size:
                 index = np.random.choice(buffered_size, self._batch_size, replace=False)
-                self._model.fit(self._training_x[index], self._training_y[index],
-                                epochs=1, callbacks=[self._tensorboard], validation_split=self._validation_split)
+                with self._session.as_default():
+                    with self._graph.as_default():
+                        self._model.fit(self._training_x[index], self._training_y[index],
+                                        epochs=1, callbacks=[self._tensorboard], validation_split=self._validation_split)
 
                 if self._clear_buffer:
                     self._training_x = np.array([], ndmin=2)
@@ -267,11 +262,14 @@ class DQNAgent(Agent):
         Raises ValueError if the filename is not specified.
         '''
         Agent.load(self, **kwargs)
-        tf.reset_default_graph()
+        self._session = tf.Session()
+        keras.backend.set_session(self._session)
         self._model = keras.models.load_model(kwargs.get(
             'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
         self._tensorboard = keras.callbacks.TensorBoard(
             log_dir=self._tensorboard_path, histogram_freq=1, write_images=True)
+        self._graph = tf.get_default_graph()
+        tf.reset_default_graph()
 
     def save(self, **kwargs):
         '''
@@ -287,7 +285,7 @@ class DQNAgent(Agent):
         '''
 
         pickle_data = tuple(key for key in self.__dict__ if key not in [
-                            '_model', '_tensorboard', 'data_collector'])
+                            '_graph', '_session', '_model', '_tensorboard', 'data_collector'])
         path, filename = Agent.save(self, **kwargs, data=pickle_data)
         try:
             self._model.save(kwargs.get('path', self._path) + '/' +
