@@ -257,18 +257,25 @@ class Experiment(Environment):
         for agent_name, agent in self._agent.items():
             print('Agent: {}'.format(agent_name))
             agent.status = 'testing'
-            history = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
 
-            subject_name, _id = self._assignment_list[agent_name]
+            try:
+                subject_name, _id = self._assignment_list[agent_name]
+            except KeyError:
+                continue
+
             subject = self._subject[subject_name]
 
             for subject_ID in range(number_of_subjects):
+                history = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
+
                 output_dir = Path('./'+subject_name+'/results')
                 output_dir.mkdir(parents=True, exist_ok=True)
 
                 filename = subject_name + str(subject_ID).rjust(digits, '0')
                 print('Subject: {}'.format(filename))
+                temp_agent_list = subject._agent_list
                 subject.load(filename=filename, path='./' + subject_name)
+                subject._agent_list = temp_agent_list
 
                 steps = 0
                 while not subject.is_terminated and steps < max_steps:
@@ -287,9 +294,12 @@ class Experiment(Environment):
 
                 if subject.is_terminated:
                     for affected_agent in self._agent.keys():
-                        if (self._assignment_list[affected_agent][0] == subject_name) & \
-                                (affected_agent != agent_name):
-                            history[-1] = -reward
+                        try:
+                            if (self._assignment_list[affected_agent][0] == subject_name) & \
+                                    (affected_agent != agent_name):
+                                history[-1] = -reward
+                        except KeyError:
+                            pass
 
                 history.to_pickle(output_dir / (agent_name + filename + '.pkl'))
 
