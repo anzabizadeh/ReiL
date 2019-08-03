@@ -240,7 +240,10 @@ class RLData:
 
     def as_list(self):
         ''' return the value as list.'''
-        return list(self._value.value)
+        try:
+            return list(*self._value.value)
+        except TypeError:
+            return list(self._value.value)
 
     def as_nparray(self):
         ''' return the value as numpy array.'''
@@ -277,17 +280,21 @@ class RLData:
             #     func = lambda x: list(int(x_i == x['value']) for x_i in x['categories'])
 
             try:
-                temp = np.append(temp, [func({'value': self._value.at[i, 'value'],
-                                   'lower': self._value.at[i, 'lower'],
-                                   'upper': self._value.at[i, 'upper'],
-                                   'categories': self._value.at[i, 'categories'],
-                                   'is_numerical': self._value.at[i, 'is_numerical']})])
-            except TypeError:
-                temp = np.append(temp, [func({'value': x,
-                                   'lower': self._value.at[i, 'lower'],
-                                   'upper': self._value.at[i, 'upper'],
-                                   'categories': self._value.at[i, 'categories'],
-                                   'is_numerical': self._value.at[i, 'is_numerical']}) for x in self._value.at[i, 'value']])
+                try:
+                    temp = np.append(temp, [func({'value': self._value.at[i, 'value'],
+                                    'lower': self._value.at[i, 'lower'],
+                                    'upper': self._value.at[i, 'upper'],
+                                    'categories': self._value.at[i, 'categories'],
+                                    'is_numerical': self._value.at[i, 'is_numerical']})])
+                except TypeError:
+                    temp = np.append(temp, [func({'value': x,
+                                    'lower': self._value.at[i, 'lower'],
+                                    'upper': self._value.at[i, 'upper'],
+                                    'categories': self._value.at[i, 'categories'],
+                                    'is_numerical': self._value.at[i, 'is_numerical']}) for x in self._value.at[i, 'value']])
+            except ZeroDivisionError:
+                temp = np.append(temp, 1)
+
         return temp
 
     def normalize(self):
@@ -390,8 +397,8 @@ if __name__ == '__main__':
     print(d1.value)
     print(d1.normalize())
     print(d1.as_rldata_array())
-    d = RLData([(1, 1), (1, 2), (1, 3)], categories=[(1, 1), (1, 2), (1, 3)])
+    d = RLData({'tuples': [(1, 1), (1, 2), (1, 3)], 'ints': 1})
     print(d.value)
     print(d.normalize())
-    print(d.as_rldata_array())
-    print(d.as_rldata_array()[0].normalize())
+    print(d.as_list())
+    print(d.as_rldata_array()[0].normalize().as_list())
