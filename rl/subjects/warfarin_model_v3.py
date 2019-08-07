@@ -93,13 +93,8 @@ class WarfarinModel(Subject):
                 raise ValueError('For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
 
         self._max_time = (self._max_day + 1)*24  # until the end of max_day
-        # self._patient = Patient(age=self._age, CYP2C9=self._CYP2C9, VKORC1=self._VKORC1,
-        #                         randomized=self._randomized, max_time=self._max_time)
         self.reset()
 
-        # self._INR = deque([0.0]*(self._INR_history + 1))
-        # self._INR[-1] = self._patient.INR([0])[-1]
-        # self._dose_list = deque([0.0]*self._dose_history)
         self._possible_actions = RLData([x*self._dose_steps
                          for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
                         lower=0, upper=self._max_dose).as_rldata_array()
@@ -333,13 +328,15 @@ class Patient:
     @dose.setter
     def dose(self, dose):
         if self._lazy:
-            for d, v in dose.items():
-                self._data.loc[d] = np.insert(
-                    self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
+            if dose != 0.0:
+                for d, v in dose.items():
+                    self._data.loc[d] = np.insert(
+                        self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
         else:
             for d, v in dose.items():
-                self._data.loc[d] = v
-                self._total_Cs = np.add(self._total_Cs, self._Cs(dose=v, t0=d*self._dose_interval))
+                if dose != 0.0:
+                    self._data.loc[d] = v
+                    self._total_Cs = np.add(self._total_Cs, self._Cs(dose=v, t0=d*self._dose_interval))
 
     def _Cs(self, dose, t0):
         # C_s_pred = ((self._ka * self._F * dose / 2) / 

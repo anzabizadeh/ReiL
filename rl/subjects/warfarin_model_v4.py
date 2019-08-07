@@ -426,13 +426,15 @@ class Patient:
     def dose(self, dose):
         if self._lazy:
             for d, v in dose.items():
-                self._data.loc[d] = np.insert(
-                    self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
+                if dose != 0.0:
+                    self._data.loc[d] = np.insert(
+                        self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
         else:
             for d, v in dose.items():
-                self._data.loc[d] = v
-                self._total_Cs = np.add(self._total_Cs, self._Cs(
-                    dose=v, t0=d*self._dose_interval))
+                if dose != 0.0:
+                    self._data.loc[d] = v
+                    self._total_Cs = np.add(self._total_Cs, self._Cs(
+                        dose=v, t0=d*self._dose_interval))
 
     def _Cs(self, dose, t0):
         # C_s_pred = ((self._ka * self._F * dose / 2) /
