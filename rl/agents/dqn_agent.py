@@ -84,33 +84,34 @@ class DQNAgent(Agent):
         '''
         Generate a tensorflow ANN network.
         '''
-        self._session = tf.Session()
-        keras.backend.set_session(self._session)
-        tf.reset_default_graph()
 
-        self._model = keras.models.Sequential()
-        self._model.add(keras.layers.Dense(
-            self._hidden_layer_sizes[0], activation='relu', name='layer_01', input_shape=(self._input_length,)))
-        for i, v in enumerate(self._hidden_layer_sizes[1:]):
+        self._graph = tf.Graph()
+        with self._graph.as_default():
+            self._session = tf.compat.v1.Session()
+
+            self._model = keras.models.Sequential()
             self._model.add(keras.layers.Dense(
-                v, activation='relu', name='layer_{:0>2}'.format(i+2)))
+                self._hidden_layer_sizes[0], activation='relu', name='layer_01', input_shape=(self._input_length,)))
+            for i, v in enumerate(self._hidden_layer_sizes[1:]):
+                self._model.add(keras.layers.Dense(
+                    v, activation='relu', name='layer_{:0>2}'.format(i+2)))
 
-        self._model.add(keras.layers.Dense(
-            1, name='output'))  # activation='sigmoid', 
+            self._model.add(keras.layers.Dense(
+                1, name='output'))  # activation='sigmoid', 
 
-        self._model.compile(optimizer='adam', loss='mae')  # , metrics=['accuracy'])
+            self._model.compile(optimizer='adam', loss='mae')  # , metrics=['accuracy'])
 
-        if self._tensorboard_path is None:
-            self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
-                                                        'lrn', str(self._learning_rate), 'hddn', str(
-                                                            self._hidden_layer_sizes),
-                                                        'btch', str(self._batch_size), 'vld', str(self._validation_split)))
-        else:
-            self._tensorboard_path = 'logs/' + self._tensorboard_path
-        self._tensorboard = keras.callbacks.TensorBoard(
-            log_dir=self._tensorboard_path, histogram_freq=1, write_images=True)
+            if self._tensorboard_path is None:
+                self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
+                                                            'lrn', str(self._learning_rate), 'hddn', str(
+                                                                self._hidden_layer_sizes),
+                                                            'btch', str(self._batch_size), 'vld', str(self._validation_split)))
+            else:
+                self._tensorboard_path = 'logs/' + self._tensorboard_path
+            self._tensorboard = keras.callbacks.TensorBoard(
+                log_dir=self._tensorboard_path, histogram_freq=1)  #, write_images=True)
 
-        self._graph = tf.get_default_graph()
+            # self._session = tf.get_default_session()
 
     def _q(self, state, action):
         '''
@@ -262,14 +263,23 @@ class DQNAgent(Agent):
         Raises ValueError if the filename is not specified.
         '''
         Agent.load(self, **kwargs)
-        self._session = tf.Session()
-        keras.backend.set_session(self._session)
-        self._model = keras.models.load_model(kwargs.get(
-            'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
-        self._tensorboard = keras.callbacks.TensorBoard(
-            log_dir=self._tensorboard_path, histogram_freq=1, write_images=True)
-        self._graph = tf.get_default_graph()
-        tf.reset_default_graph()
+
+        # self._session = tf.Session()
+        # keras.backend.set_session(self._session)
+        # self._model = keras.models.load_model(kwargs.get(
+        #     'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+        # self._tensorboard = keras.callbacks.TensorBoard(
+        #     log_dir=self._tensorboard_path, histogram_freq=1)  # , write_images=True)
+        # self._graph = tf.get_default_graph()
+        # tf.reset_default_graph()
+
+        self._graph = tf.Graph()
+        with self._graph.as_default():
+            self._session = tf.compat.v1.Session()
+            self._model = keras.models.load_model(kwargs.get(
+                'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+            self._tensorboard = keras.callbacks.TensorBoard(
+                log_dir=self._tensorboard_path, histogram_freq=1)  # , write_images=True)
 
     def save(self, **kwargs):
         '''
