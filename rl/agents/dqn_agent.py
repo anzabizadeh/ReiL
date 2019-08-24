@@ -87,7 +87,7 @@ class DQNAgent(Agent):
 
         self._graph = tf.Graph()
         with self._graph.as_default():
-            self._session = tf.compat.v1.Session()
+            self._session = tf.Session()
 
             self._model = keras.models.Sequential()
             self._model.add(keras.layers.Dense(
@@ -275,7 +275,8 @@ class DQNAgent(Agent):
 
         self._graph = tf.Graph()
         with self._graph.as_default():
-            self._session = tf.compat.v1.Session()
+            self._session = keras.backend.get_session()
+            # self._session = tf.Session()
             self._model = keras.models.load_model(kwargs.get(
                 'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
             self._tensorboard = keras.callbacks.TensorBoard(
@@ -298,13 +299,23 @@ class DQNAgent(Agent):
                             '_graph', '_session', '_model', '_tensorboard', 'data_collector'])
         path, filename = Agent.save(self, **kwargs, data=pickle_data)
         try:
-            self._model.save(kwargs.get('path', self._path) + '/' +
-                             kwargs['filename'] + '.tf/' + kwargs['filename'])
+            # with self._session.as_default():
+            #     with self._graph.as_default():
+            #         self._model.save(kwargs.get('path', self._path) + '/' +
+            #                         kwargs['filename'] + '.tf/' + kwargs['filename'])
+            with self._graph.as_default():
+                self._model.save(kwargs.get('path', self._path) + '/' +
+                                kwargs['filename'] + '.tf/' + kwargs['filename'])
         except OSError:
             os.makedirs(kwargs.get('path', self._path) +
                         '/' + kwargs['filename'] + '.tf/')
-            self._model.save(kwargs.get('path', self._path) + '/' +
-                             kwargs['filename'] + '.tf/' + kwargs['filename'])
+            # with self._session.as_default():
+            #     with self._graph.as_default():
+            #         self._model.save(kwargs.get('path', self._path) + '/' +
+            #                         kwargs['filename'] + '.tf/' + kwargs['filename'])
+            with self._graph.as_default():
+                self._model.save(kwargs.get('path', self._path) + '/' +
+                                kwargs['filename'] + '.tf/' + kwargs['filename'])
         return path, filename
 
     def _report(self, **kwargs):
