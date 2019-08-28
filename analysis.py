@@ -1,15 +1,20 @@
 #%%
-import numpy as np
-import pandas as pd
-
+import csv
+import json
+import pathlib
 from os import listdir
 from os.path import isfile, join
+from random import random
 
-from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from dill import HIGHEST_PROTOCOL, dump, load
 from mpl_toolkits.mplot3d import Axes3D
-
+from rl.environments import Environment
 from sklearn.cluster import KMeans
+from sklearn.manifold import TSNE
 
 
 #%%
@@ -25,7 +30,7 @@ class Analyzer:
         self._df_for_stats = {}
         self._df_for_segmentation = {}
 
-    def load_data(self, **kwargs):
+    def load_experiment_data(self, **kwargs):
         result_path = kwargs.get('result_path', self._result_path)
         self._dose_history = kwargs.get('dose_history', 9)
         self._INR_history = kwargs.get('INR_history', 9)
@@ -161,7 +166,45 @@ class Analyzer:
 
         return results
 
+    def load(self, filename=None, path='.'):
+        '''
+        Load an object from a file.
 
+        Arguments
+        ---------
+            filename: the name of the file to be loaded.
+            path: the path of the file to be loaded. (Default='.')
+
+        Raises ValueError if the filename is not specified.
+        '''
+        if filename is None:
+            raise ValueError('name of the output file not specified.')
+
+        with open(path + '/' + filename + '.pkl', 'rb') as f:
+            try:
+                data = load(f)
+            except EOFError:
+                raise RuntimeError('Corrupted data file: '+filename)
+            for key, value in data.items():
+                self.__dict__[key] = value
+
+    def save(self, filename=None, path='.'):
+        '''
+        Save the object to a file.
+
+        Arguments
+        ---------
+            filename: the name of the object (Default=self._name)
+            path: the path of the file to be loaded. (Default='.')
+        '''
+        if filename is None:
+            raise ValueError('name of the output file not specified.')
+
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True) 
+        with open(path + '/' + filename + '.pkl', 'wb+') as f:
+            dump(self.__dict__, f, HIGHEST_PROTOCOL)
+
+        return path, filename
 
 #%%
 experiment_path = r'.\W'
@@ -175,8 +218,16 @@ analysis = Analyzer(experiment_path=experiment_path,
                     INR_history=INR_history)
 
 #%%
-analysis.load_data()
+analysis.load_experiment_data()
+analysis.save(filename='collected_data')
 
+#%%
+analysis = Analyzer(experiment_path=experiment_path,
+                    result_path=result_path,
+                    dose_history=dose_history,
+                    INR_history=INR_history)
+
+analysis.load(filename='collected_data')
 #%%
 analysis.plot()
 
@@ -346,8 +397,6 @@ for agent, df in temp.items():
 # X.columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
 # Y.columns = ['action']
 
-#%%
-from sklearn.cluster import KMeans
 
 kmeans = KMeans(n_clusters=5)
 kmeans.fit(X)
@@ -388,17 +437,9 @@ plt.show()
 
 
 
-#%%
-from rl.environments import Environment
 
-from random import random
 
-import numpy as np
-import pandas as pd
 
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 #%%
 generation_cycles = 1
@@ -412,8 +453,6 @@ RL_filenames = ['WARF_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.20_DQN_(2
                 'WARF_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.40_DQN_(20,20)_g_0.8_e_func_lr_0.02_buff_900_clr_F_btch_50_vld_0.3',
                 'WARF_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.80_DQN_(20,20)_g_0.8_e_func_lr_0.02_buff_900_clr_F_btch_50_vld_0.3']
 
-#%%
-import tensorflow as tf
 
 #%%
 tf.reset_default_graph()
@@ -472,8 +511,6 @@ Y.columns = ['action']
 #%% [markdown]
 # ## Clustering and its plot
 
-#%%
-from sklearn.cluster import KMeans
 
 kmeans = KMeans(n_clusters=5)
 kmeans.fit(X)
@@ -655,8 +692,6 @@ for patient, r in actions.items():
     print('{}\t{:3}\t{:3.2}\t{:3.2}\t{:3.2}'.format(patient, len(r), min(r), sum(r)/len(r), max(r)))
 
 
-#%%
-import json
 
 j_results = {}
 for p, v in results.items():
@@ -676,8 +711,6 @@ for r in all_records:
     print(r[0], r[1])
 
 
-#%%
-import csv
 csv.writer()
 
 
@@ -688,4 +721,3 @@ for patient in sorted(results, key=lambda s: s[2]+s[1]+str(s[0])):
                      '{:3.2}'.format(min(results[patient])),
                      '{:3.2}'.format(sum(results[patient])/len(results[patient])),
                      '{:3.2}'.format(max(results[patient])))))
-
