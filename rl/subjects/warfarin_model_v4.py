@@ -70,9 +70,18 @@ class WarfarinModel_v4(Subject):
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
                              dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
                              dose_list=[None]*5,
-                             dose_change_penalty_func=lambda x: int(x[-2]==x[-1]), # -0.2 * abs(x[-2]-x[-1]),
+                             dose_change_penalty_func=lambda x: int(x[-2]!=x[-1]), # -0.2 * abs(x[-2]-x[-1]),
                              extended_state=False
                              )
+
+        for key, value in kwargs.items():
+            if isinstance(value, dict):
+                try:
+                    temp = self._defaults[key]
+                    temp.update(kwargs[key])
+                    kwargs[key] = temp
+                except KeyError:
+                    pass
 
         Subject.set_params(self, **kwargs)
 
@@ -132,17 +141,20 @@ class WarfarinModel_v4(Subject):
                            'fluvastatin': self._characteristics['fluvastatin'],
                            'CYP2C9': self._characteristics['CYP2C9'],
                            'VKORC1': self._characteristics['VKORC1'],
+                           'day': self._day,
                            'Doses': tuple(self._dose_list),
                            'INRs': tuple(self._INR)},
                           lower={'age': self._list_of_characteristics['age'][0],
                                  'weight': self._list_of_characteristics['weight'][0],
                                  'height': self._list_of_characteristics['height'][0],
+                                 'day': 0,
                                  'Doses': 0.0,
                                  'INRs': 0.0},
                           upper={'age': self._list_of_characteristics['age'][-1],
                                  'weight': self._list_of_characteristics['weight'][-1],
                                  'height': self._list_of_characteristics['height'][-1],
-                                 'Doses': 15.0,
+                                 'day': self._max_day,
+                                 'Doses': self._max_dose,
                                  'INRs': 15.0},
                           categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
                                       'VKORC1': self._list_of_characteristics['VKORC1'],
@@ -161,7 +173,7 @@ class WarfarinModel_v4(Subject):
                              'Doses': 0.0,
                              'INRs': 0.0},
                       upper={'age': self._list_of_characteristics['age'][-1],
-                             'Doses': 15.0,
+                             'Doses': self._max_dose,
                              'INRs': 15.0},
                       categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
                                   'VKORC1': self._list_of_characteristics['VKORC1']})
