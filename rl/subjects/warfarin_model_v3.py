@@ -10,7 +10,7 @@ This `warfarin_model` class implements a two compartment PK/PD model for warfari
 
 from collections import deque
 from math import exp, log, sqrt
-from random import choice, normalvariate, sample, seed, shuffle
+from random import choice, gauss, sample, seed, shuffle
 
 import numpy as np
 import pandas as pd
@@ -345,10 +345,10 @@ class Patient:
         C_s_pred = dose * self._multiplication_term
 
         if t0 == 0:  # non steady-state
-            C_s_error = np.array([exp(normalvariate(0, 0.09)) for _ in range(len(C_s_pred))]) if self._randomized \
+            C_s_error = np.array([exp(gauss(0, 0.09)) for _ in range(len(C_s_pred))]) if self._randomized \
                 else np.ones(len(C_s_pred))  # Sadjad
         else:  # steady-state
-            C_s_error = np.array([exp(normalvariate(0, 0.30)) for _ in range(len(C_s_pred))]) if self._randomized \
+            C_s_error = np.array([exp(gauss(0, 0.30)) for _ in range(len(C_s_pred))]) if self._randomized \
                 else np.ones(len(C_s_pred))
 
         # C_s = [C_s_pred[i] * C_s_error[i] for i in range(len(C_s_pred))]
@@ -388,7 +388,7 @@ class Patient:
                 for j in range(7):
                     self._A[j] += self._dA[j]
 
-            e_INR = normalvariate(0, 0.0325) if self._randomized else 0
+            e_INR = gauss(0, 0.0325) if self._randomized else 0
             INR.append(
                 (baseINR + (INR_max*(1-self._A[5]*self._A[6]) ** self._lambda)) * exp(e_INR))
 

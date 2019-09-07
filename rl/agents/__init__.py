@@ -28,3 +28,4 @@ from .td_agent import TD0Agent
 from .fixed_agent import FixedAgent
 from .warfarin_q import WarfarinQAgent
 from .dqn_agent import DQNAgent
+from .warfarin_agent import WarfarinAgent

@@ -102,12 +102,12 @@ class DQNAgent(Agent):
             self._model.compile(optimizer='adam', loss='mae')  # , metrics=['accuracy'])
 
             if self._tensorboard_path is None:
-                self._tensorboard_path = 'logs/' + '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
+                self._tensorboard_path = os.path.join('logs', '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
                                                             'lrn', str(self._learning_rate), 'hddn', str(
                                                                 self._hidden_layer_sizes),
-                                                            'btch', str(self._batch_size), 'vld', str(self._validation_split)))
+                                                            'btch', str(self._batch_size), 'vld', str(self._validation_split))))
             else:
-                self._tensorboard_path = 'logs/' + self._tensorboard_path
+                self._tensorboard_path = os.path.join('logs', self._tensorboard_path)
             self._tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self._tensorboard_path, histogram_freq=1)  #, write_images=True)
 
@@ -215,7 +215,7 @@ class DQNAgent(Agent):
 
             return
         except KeyError:
-            raise RuntimeError('ANNAgent only works using \'history\'')
+            raise RuntimeError('DQNAgent only works using \'history\'')
 
     def act(self, state, **kwargs):
         '''
@@ -299,23 +299,23 @@ class DQNAgent(Agent):
                             '_graph', '_session', '_model', '_tensorboard', 'data_collector'])
         path, filename = Agent.save(self, **kwargs, data=pickle_data)
         try:
-            # with self._session.as_default():
-            #     with self._graph.as_default():
-            #         self._model.save(kwargs.get('path', self._path) + '/' +
-            #                         kwargs['filename'] + '.tf/' + kwargs['filename'])
-            with self._graph.as_default():
-                self._model.save(kwargs.get('path', self._path) + '/' +
-                                kwargs['filename'] + '.tf/' + kwargs['filename'])
+            with self._session.as_default():
+                with self._graph.as_default():
+                    self._model.save(kwargs.get('path', self._path) + '/' +
+                                    kwargs['filename'] + '.tf/' + kwargs['filename'])
+            # with self._graph.as_default():
+            #     self._model.save(kwargs.get('path', self._path) + '/' +
+            #                     kwargs['filename'] + '.tf/' + kwargs['filename'])
         except OSError:
             os.makedirs(kwargs.get('path', self._path) +
                         '/' + kwargs['filename'] + '.tf/')
-            # with self._session.as_default():
-            #     with self._graph.as_default():
-            #         self._model.save(kwargs.get('path', self._path) + '/' +
-            #                         kwargs['filename'] + '.tf/' + kwargs['filename'])
-            with self._graph.as_default():
-                self._model.save(kwargs.get('path', self._path) + '/' +
-                                kwargs['filename'] + '.tf/' + kwargs['filename'])
+            with self._session.as_default():
+                with self._graph.as_default():
+                    self._model.save(kwargs.get('path', self._path) + '/' +
+                                    kwargs['filename'] + '.tf/' + kwargs['filename'])
+            # with self._graph.as_default():
+            #     self._model.save(kwargs.get('path', self._path) + '/' +
+            #                     kwargs['filename'] + '.tf/' + kwargs['filename'])
         return path, filename
 
     def _report(self, **kwargs):

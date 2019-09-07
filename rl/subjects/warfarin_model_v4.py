@@ -10,7 +10,7 @@ This `warfarin_model` class implements a two compartment PK/PD model for warfari
 
 from collections import deque
 from math import exp, log, sqrt
-from random import choice, normalvariate, sample, seed, shuffle
+from random import choice, gauss, sample, seed, shuffle
 
 import numpy as np
 import pandas as pd
@@ -41,8 +41,8 @@ class WarfarinModel_v4(Subject):
         Subject.__init__(self, **kwargs)
 
         Subject.set_defaults(self, patient_selection='random',
-                             list_of_characteristics={'age': (71, 86),  # lb
-                                                      'weight': (35, 370),
+                             list_of_characteristics={'age': (71, 86),
+                                                      'weight': (35, 370),  # lb
                                                       'height': (53, 80),  # in
                                                       'gender': ('Female', 'Male'),
                                                       'race': ('White', 'Black', 'Asian', 'American Indian', 'Pacific Islander'),
@@ -51,9 +51,9 @@ class WarfarinModel_v4(Subject):
                                                       'fluvastatin': ('No', 'Yes'),
                                                       'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
                                                       'VKORC1': ('G/G', 'G/A', 'A/A')},
-                             list_of_probabilities={'age': (67.3, 14.43),  # lb
-                                                    'weight': (199.24, 54.71),  # in
-                                                    'height': (66.78, 4.31),
+                             list_of_probabilities={'age': (67.3, 14.43),
+                                                    'weight': (199.24, 54.71),  # lb
+                                                    'height': (66.78, 4.31),  # in
                                                     'gender': (53.14, 46.86),
                                                     'race': (95.18, 4.25, 0.39, 0.18, 1e-4),
                                                     'tobaco': (90.33, 9.66),
@@ -70,6 +70,7 @@ class WarfarinModel_v4(Subject):
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
                              dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
                              dose_list=[None]*5,
+                             dose_change_penalty_coef=1,
                              dose_change_penalty_func=lambda x: int(x[-2]!=x[-1]), # -0.2 * abs(x[-2]-x[-1]),
                              extended_state=False
                              )
@@ -96,6 +97,7 @@ class WarfarinModel_v4(Subject):
             self._current_dose = 0
             self._max_dose = 0
             self._dose_change_penalty_func = lambda x: 0
+            self._dose_change_penalty_coef = 0
             self._dose_steps = 0
             self._dose_history = 0
             self._INR_history = 0
@@ -222,8 +224,8 @@ class WarfarinModel_v4(Subject):
             INR_range = self._TTR_range[1] - self._TTR_range[0]
             INR_penalty = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
                                 for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
-            dose_change_penalty = self._dose_change_penalty_func(self._dose_list)
-            reward = INR_penalty + dose_change_penalty
+            dose_change_penalty = -self._dose_change_penalty_func(self._dose_list)
+            reward = INR_penalty + self._dose_change_penalty_coef * dose_change_penalty
         except TypeError: 
             # TTR = 0  # assuming that for the first use of the pill, we don't have INR and TTR=0
             reward = 0
@@ -449,19 +451,28 @@ class Patient:
                         dose=v, t0=d*self._dose_interval))
 
     def _Cs(self, dose, t0):
-        # C_s_pred = ((self._ka * self._F * dose / 2) /
-        #             self._V1) * self._multiplication_term
+        # C_s_pred = dose * self._multiplication_term
+
+        # if t0 == 0:  # non steady-state
+        #     C_s_error = np.array([exp(gauss(0, 0.09)) for _ in range(len(C_s_pred))]) if self._randomized \
+        #         else np.ones(len(C_s_pred))  # Sadjad
+        # else:  # steady-state
+        #     C_s_error = np.array([exp(gauss(0, 0.30)) for _ in range(len(C_s_pred))]) if self._randomized \
+        #         else np.ones(len(C_s_pred))
+
+        # C_s = np.multiply(C_s_pred, C_s_error).clip(min=0)
+
+        # return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1]
 
         C_s_pred = dose * self._multiplication_term
 
         if t0 == 0:  # non steady-state
-            C_s_error = np.array([exp(normalvariate(0, 0.09)) for _ in range(len(C_s_pred))]) if self._randomized \
+            C_s_error = np.exp(np.random.normal(0, 0.09, len(C_s_pred))) if self._randomized \
                 else np.ones(len(C_s_pred))  # Sadjad
         else:  # steady-state
-            C_s_error = np.array([exp(normalvariate(0, 0.30)) for _ in range(len(C_s_pred))]) if self._randomized \
+            C_s_error = np.exp(np.random.normal(0, 0.30, len(C_s_pred))) if self._randomized \
                 else np.ones(len(C_s_pred))
 
-        # C_s = [C_s_pred[i] * C_s_error[i] for i in range(len(C_s_pred))]
         C_s = np.multiply(C_s_pred, C_s_error).clip(min=0)
 
         return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1]
@@ -500,7 +511,7 @@ class Patient:
                 for j in range(7):
                     self._A[j] += self._dA[j]
 
-            e_INR = normalvariate(0, 0.0325) if self._randomized else 0
+            e_INR = gauss(0, 0.0325) if self._randomized else 0
             INR.append(
                 (baseINR + (INR_max*(1-self._A[5]*self._A[6]) ** self._lambda)) * exp(e_INR))
 
