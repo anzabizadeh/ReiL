@@ -10,10 +10,12 @@ from rl.environments import Environment
 from rl.subjects import WarfarinModel_v4
 import random
 import numpy as np
+import tensorflow as tf
 
 if __name__ == "__main__":
     random.seed(1234)
     np.random.seed(1234)
+    tf.set_random_seed(1234)
 
     runs = 100
     training_episodes = 10
