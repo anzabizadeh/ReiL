@@ -417,6 +417,7 @@ def warfarin(**kwargs):
     patient_selection = kwargs.get('patient_selection', '')
     randomized = kwargs.get('randomized', True)
     dose_change_penalty_coef = kwargs.get('dose_change_penalty_coef', 0.0)
+    dose_change_penalty_func = kwargs.get('dose_change_penalty_func', lambda x: int(x[-2]!=x[-1]))
 
     gamma = kwargs.get('gamma', 0.99)
     alpha = kwargs.get('alpha', 0.2)
@@ -489,6 +490,7 @@ def warfarin(**kwargs):
                                         dose_history=dose_history,
                                         INR_history=INR_history,
                                         dose_change_penalty_coef=dose_change_penalty_coef,
+                                        dose_change_penalty_func=dose_change_penalty_func,
                                         randomized=randomized)
         elif patient_model == 'WARFV4':
             subjects['W'] = WarfarinModel_v4(age=age,
@@ -501,6 +503,7 @@ def warfarin(**kwargs):
                                         dose_history=dose_history,
                                         INR_history=INR_history,
                                         dose_change_penalty_coef=dose_change_penalty_coef,
+                                        dose_change_penalty_func=dose_change_penalty_func,
                                         randomized=randomized)
         else:
             print('Model not found!')
@@ -589,8 +592,8 @@ if __name__ == '__main__':
     model = 'warfarin'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN20x20'
     # filename = 'WARF_74_22_GA_days90_hist10_DQN10x10'
-    runs = 100
-    training_episodes = 100
+    runs = 1
+    training_episodes = 5
     function = {'windy': windy, 'mnk': mnk, 'cancer': cancer, 'risk': risk,
                 'warfarin': warfarin, 'warfarin_results': warfarin_results}
     function[model.lower()](runs=runs,
@@ -606,13 +609,14 @@ if __name__ == '__main__':
                             gamma=0.95,
                             epsilon=lambda x: 1/(1+x/100),  # coef: 1 -> 100 episodes / 2 -> 200 / ...
                             agent_type='DQN',  # 'ANN',
-                            # alpha=0.2,
                             input_length=30,
-                            buffer_size=90*10,
+                            buffer_size=90*1,
                             batch_size=50,
                             validation_split=0.3,
                             hidden_layer_sizes=(20, 20),
                             clear_buffer=False,
-                            dose_change_penalty_coef=1.0,
-                            patient_model='WARFV4'
+                            dose_change_penalty_coef=0.2,
+                            dose_change_penalty_func=lambda x: int(x[-2]!=x[-1]),
+                            patient_model='WARFV4',
+                            extended_state=True
                             )
