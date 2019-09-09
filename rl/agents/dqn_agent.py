@@ -109,7 +109,7 @@ class DQNAgent(Agent):
             else:
                 self._tensorboard_path = os.path.join('logs', self._tensorboard_path)
             self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path, histogram_freq=1)  #, write_images=True)
+                log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
 
             # self._session = tf.get_default_session()
 
@@ -280,7 +280,7 @@ class DQNAgent(Agent):
             self._model = keras.models.load_model(kwargs.get(
                 'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
             self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path, histogram_freq=1)  # , write_images=True)
+                log_dir=self._tensorboard_path)  #, histogram_freq=1)  # , write_images=True)
 
     def save(self, **kwargs):
         '''
