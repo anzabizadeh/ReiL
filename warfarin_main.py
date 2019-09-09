@@ -17,8 +17,8 @@ if __name__ == "__main__":
     np.random.seed(1234)
     tf.set_random_seed(1234)
 
-    runs = 100
-    training_episodes = 10
+    runs = 10
+    training_episodes = 1000
 
     max_day = 90
     dose_history = 9
@@ -40,6 +40,7 @@ if __name__ == "__main__":
     dose_change_penalty_func = lambda x: 0  # int(x[-2]!=x[-1])
     patient_model = 'WARFV4'
     extended_state = False  # True
+    save_patients = True
 
     text = '_'.join((str(hidden_layer_sizes),
                         'g', str(gamma),
@@ -75,7 +76,8 @@ if __name__ == "__main__":
                                         dose_change_penalty_coef=dose_change_penalty_coef,
                                         dose_change_penalty_func=dose_change_penalty_func,
                                         extended_state=extended_state,
-                                        randomized=randomized)
+                                        randomized=randomized,
+                                        save_patients=save_patients)
 
         agents['protocol'] = DQNAgent(gamma=gamma,
                                         epsilon=epsilon,
@@ -86,8 +88,8 @@ if __name__ == "__main__":
                                         validation_split=validation_split,
                                         hidden_layer_sizes=hidden_layer_sizes,
                                         default_actions=subjects['W'].possible_actions,
-                                        tensorboard_path=filename)
-
+                                        tensorboard_path=filename,
+                                        save_patients=save_patients)
 
         # update environment
         env.add(agents=agents, subjects=subjects)

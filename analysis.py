@@ -178,7 +178,7 @@ class Analyzer:
         Raises ValueError if the filename is not specified.
         '''
         if filename is None:
-            raise ValueError('name of the output file not specified.')
+            raise ValueError('name of the input file not specified.')
 
         with open(path + '/' + filename + '.pkl', 'rb') as f:
             try:
