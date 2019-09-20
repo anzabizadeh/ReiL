@@ -55,18 +55,16 @@ class WarfarinModel_v4(Subject):
                                                       'fluvastatin': ('No', 'Yes'),
                                                       'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
                                                       'VKORC1': ('G/G', 'G/A', 'A/A')},
-                             list_of_probabilities={'age': (67.3, 14.43),
-                                                    # lb
-                                                    'weight': (199.24, 54.71),
-                                                    # in
-                                                    'height': (66.78, 4.31),
-                                                    'gender': (53.14, 46.86),
-                                                    'race': (95.18, 4.25, 0.39, 0.18, 1e-4),
-                                                    'tobaco': (90.33, 9.66),
-                                                    'amiodarone': (88.45, 11.54),
-                                                    'fluvastatin': (99.97, 0.03),
-                                                    'CYP2C9': (0.6577, 0.1460, 0.0911, 0.0641, 0.0193, 1e-5),
-                                                    'VKORC1': (0.3854, 0.4402, 0.1733)},
+                             list_of_probabilities={'age': (67.3, 14.43),  # lb  - Aurora population
+                                                    'weight': (199.24, 54.71),  # in - Aurora population
+                                                    'height': (66.78, 4.31),  # Aurora population
+                                                    'gender': (0.5314, 0.4686),  # Aurora population
+                                                    'race': (0.9522, 0.0419, 0.0040, 0.0018, 1e-4),  # Aurora Avatar Population
+                                                    'tobaco': (0.9067, 0.0933),  # Aurora Avatar Population
+                                                    'amiodarone': (0.8849, 0.1151),  # Aurora Avatar Population
+                                                    'fluvastatin': (0.9998, 0.0002),  # Aurora Avatar Population
+                                                    'CYP2C9': (0.6739, 0.1486, 0.0925, 0.0651, 0.0197, 2e-4),  # Aurora Avatar Population
+                                                    'VKORC1': (0.3837, 0.4418, 0.1745)},  # Aurora Avatar Population
                              characteristics={'age': 71, 'weight': 199.24, 'height': 66.78, 'gender': 'Male',
                                               'race': 'White', 'tobaco': 'No', 'amiodarone': 'No', 'fluvastatin': 'No',
                                               'CYP2C9': '*1/*1', 'VKORC1': 'A/A'},
@@ -137,9 +135,9 @@ class WarfarinModel_v4(Subject):
             self._patient_use_existing = True
             self._extended_state = False
 
-        if self._patient_selection in ['ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017']:
-            if self._list_of_characteristics['CYP2C9'] != ['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'] or \
-                    self._list_of_characteristics['VKORC1'] != ['G/G', 'G/A', 'A/A']:
+        if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
+            if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
+                    self._list_of_characteristics['VKORC1'] != ('G/G', 'G/A', 'A/A'):
                 raise ValueError(
                     'For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
 
