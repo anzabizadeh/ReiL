@@ -257,14 +257,14 @@ class RLData:
                             upper=self._value.at[row, 'upper'],
                             categories=self._value.at[row, 'categories'],
                             is_numerical=self._value.at[row, 'is_numerical'],
-                            lazy=self._lazy) for row in self._value.index]
+                            lazy_evaluation=self._lazy) for row in self._value.index]
         else:
             array = [RLData(value=v,
                             lower=self._value.at['value', 'lower'],
                             upper=self._value.at['value', 'upper'],
                             categories=self._value.at['value', 'categories'],
                             is_numerical=self._value.at['value', 'is_numerical'],
-                            lazy=self._lazy) for v in self._value.at['value', 'value']]
+                            lazy_evaluation=self._lazy) for v in self._value.at['value', 'value']]
 
         return array
 
@@ -304,9 +304,9 @@ class RLData:
         This function uses max and min for numericals and categories for categoricals to turn them into [0, 1] values.
         '''
         if self._lazy:
-            return RLData(self._normalize(), lower=0, upper=1)
+            return RLData(self._normalize(), lower=0, upper=1, lazy_evaluation=True)
         else:
-            return RLData(self._normalized, lower=0, upper=1)
+            return RLData(self._normalized, lower=0, upper=1, lazy_evaluation=True)
 
     def __eq__(self, other):
         try:

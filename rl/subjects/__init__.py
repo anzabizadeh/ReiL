@@ -32,3 +32,4 @@ from .cancer_model import CancerModel
 from .constrained_cancer_model import ConstrainedCancerModel
 from .warfarin_model_v3 import WarfarinModel
 from .warfarin_model_v4 import WarfarinModel_v4
+from .warfarin_model_v5 import WarfarinModel_v5

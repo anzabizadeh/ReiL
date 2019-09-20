@@ -7,9 +7,14 @@ Created on Mon Feb 19 15:47:46 2018
 
 from rl.agents import DQNAgent  # QAgent, ANNAgent, WarfarinQAgent
 from rl.environments import Environment
-from rl.subjects import WarfarinModel_v4
+from rl.subjects import WarfarinModel_v5
 import random
 import numpy as np
+import os
+
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID" 
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 import tensorflow as tf
 
 if __name__ == "__main__":
@@ -17,8 +22,8 @@ if __name__ == "__main__":
     np.random.seed(1234)
     tf.set_random_seed(1234)
 
-    runs = 10
-    training_episodes = 1000
+    runs = 100
+    training_episodes = 100
 
     max_day = 90
     dose_history = 9
@@ -26,18 +31,18 @@ if __name__ == "__main__":
     patient_selection = 'random'
 
     randomized = True
-    
+
     gamma = 0.95
     epsilon = lambda x: 1/(1+x/100)
     agent_type = 'DQN'
     input_length = 30  # 46
-    buffer_size = 90*1
+    buffer_size = 90*10
     batch_size = 50
     validation_split = 0.3
     hidden_layer_sizes = (20, 20)
     clear_buffer = False
-    dose_change_penalty_coef = 0.0  # 0.2
-    dose_change_penalty_func = lambda x: 0  # int(x[-2]!=x[-1])
+    dose_change_penalty_coef = 0.5
+    dose_change_penalty_func = lambda x: int(x[-7]!=x[-6]!=x[-5]!=x[-4]!=x[-3]!=x[-2]!=x[-1])
     patient_model = 'WARFV4'
     extended_state = False  # True
     save_patients = True
@@ -69,7 +74,7 @@ if __name__ == "__main__":
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel_v4(max_day=max_day,
+        subjects['W'] = WarfarinModel_v5(max_day=max_day,
                                         patient_selection=patient_selection,
                                         dose_history=dose_history,
                                         INR_history=INR_history,

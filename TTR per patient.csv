@@ -1,0 +1,16 @@
+TTR>0.65,,,,,
+Row Labels,dose penalty 0.2,dose penalty 0.4,dose penalty 0.6,dose penalty 0.8,dose penalty 1.0
+Normal,85%,73%,71%,76%,78%
+Sensitive,84%,74%,79%,91%,49%
+Highly Sensitive,42%,64%,86%,75%,41%
+Grand Total,68%,70%,81%,82%,50%
+,,,,,
+,,,,,
+,,,,,
+# of patients,,,,,
+Number of Patients,Column Labels,,,,
+Row Labels,0,1,Grand Total,,
+Normal,164,,164,,
+Sensitive,431,4,435,,
+Highly Sensitive,398,3,401,,
+Grand Total,993,7,1000,,

@@ -14,7 +14,7 @@ from pickle import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
 
-from math import exp
+from math import exp, log, sqrt
 
 import numpy as np
 
@@ -42,7 +42,8 @@ class WarfarinAgent(Agent):
         Initialize a warfarin agent.
         '''
         Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, method='aurora')
+        Agent.set_defaults(self, study_arm='', method='aurora', day=1, retest_day=2, red_flag=False, skip_dose=0, dose=0, weekly_dose=0)
+
         Agent.set_params(self, **kwargs)
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
@@ -52,6 +53,7 @@ class WarfarinAgent(Agent):
         if False:
             self._day = 1
             self._method = 'aurora'
+            self._study_arm = ''
 
     def learn(self, **kwargs):
         '''
@@ -69,18 +71,38 @@ class WarfarinAgent(Agent):
         ---------
             state: the state for which an action is chosen.
         '''
+        if self._study_arm.lower() in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
+            self._method = 'Aurora'
+        elif self._study_arm.lower() in ['caa', 'ravvaz caa', 'ravvaz_caa']:
+            if state.value.day <= 2:
+                self._method = 'IWPC Clinical'
+            else:
+                self._method = 'Aurora'
+        elif self._study_arm.lower() in ['pgaa', 'ravvaz pgaa', 'ravvaz_pgaa']:
+            if state.value.day <= 2:
+                self._method = 'IWPC PG'
+            else:
+                self._method = 'Aurora'
+        elif self._study_arm.lower() in ['pgpgi', 'ravvaz pgpgi', 'ravvaz_pgpgi']:
+            raise NotImplementedError('This arm contains Intermountain dosing algorithm that has not been implemented.')
+        elif self._study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
+            if state.value.day <= 3:
+                self._method = 'Modified IWPC PG'
+            elif state.value.day <= 5:
+                self._method = 'Lenzini PG'
+            else:
+                self._method = 'Aurora'
 
-        return RLData(self._action(self._method, state), lower=0.0, upper=15.0)
+        r = RLData(self._action(self._method, state), lower=0.0, upper=15.0)
+        print(r.value.value)
+        return r
 
     def _action(self, method, state):
-        # ONLY AURORA IS FULLY IMPLEMENTED!!! 
         patient = state.value
 
         if patient.day <= 1:
+            self.reset()
             self._retest_day = patient.day
-            self._red_flag = False
-            self._skip_dose = 0
-            self._dose = 0
         elif self._retest_day > patient.day and not self._red_flag:
             if self._skip_dose > 0:
                 self._skip_dose -= 1
@@ -144,50 +166,66 @@ class WarfarinAgent(Agent):
                     self._retest_day = patient.day + 2
                     return 0.0
 
-            return self._dose
+            if self._skip_dose == 0:
+                return self._dose
+            else:
+                return 0.0
 
         elif method.lower() in ['iwpc_clinical', 'iwpc', 'iwpc clinical']:
-            weekly_dose = (4.0376
-                        - 0.2546 * patient.age / 10
-                        + 0.0118 * patient.height * 2.54  # in to cm
-                        + 0.0134 * patient.weight * 0.454  # lb to kg
-                        - 0.6752 * (patient.race == 'Asian')
-                        + 0.4060 * (patient.race == 'Black')
-                        + 0.0443 * (patient.race not in  ['Asian', 'Black'])
-                        + 1.2799 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
-                        - 0.5695 * patient.amiodarone) ** 2
+            if self._weekly_dose == 0:
+                self._weekly_dose = (4.0376
+                            - 0.2546 * patient.age / 10
+                            + 0.0118 * patient.height * 2.54  # in to cm
+                            + 0.0134 * patient.weight * 0.454  # lb to kg
+                            - 0.6752 * (patient.race == 'Asian')
+                            + 0.4060 * (patient.race == 'Black')
+                            + 0.0443 * (patient.race not in  ['Asian', 'Black'])
+                            + 1.2799 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
+                            - 0.5695 * patient.amiodarone) ** 2
+                self._dose = self._weekly_dose / 7
+
+            if patient.day <= 3:
+                return self._dose
+
         elif method.lower() in ['iwpc_pg', 'iwpc pg']:
-            weekly_dose = (5.6044
-                        - 0.2614 * patient.age / 10
-                        + 0.0087 * patient.height * 2.54  # in to cm
-                        + 0.0128 * patient.weight * 0.454  # lb to kg
-                        - 0.8677 * (patient.VKORC1 == 'G/A')
-                        - 1.6974 * (patient.VKORC1 == 'A/A')
-                        - 0.4854 * (patient.VKORC1 not in  ['G/A', 'A/A', 'G/G'])
-                        - 0.5211 * (patient.CYP2C9 == '*1/*2')
-                        - 0.9357 * (patient.CYP2C9 == '*1/*3')
-                        - 1.0616 * (patient.CYP2C9 == '*2/*2')
-                        - 1.9206 * (patient.CYP2C9 == '*2/*3')
-                        - 2.3312 * (patient.CYP2C9 == '*3/*3')
-                        - 0.2188 * (patient.CYP2C9 not in ['*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', '*1/*1'])
-                        - 0.1092 * (patient.race == 'Asian')
-                        + 0.2760 * (patient.race == 'Black')
-                        + 1.0320 * (patient.race not in  ['Asian', 'Black'])
-                        + 1.1816 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
-                        - 0.5503 * patient.amiodarone) ** 2
+            if self._weekly_dose == 0:
+                self._weekly_dose = (5.6044
+                            - 0.2614 * patient.age / 10
+                            + 0.0087 * patient.height * 2.54  # in to cm
+                            + 0.0128 * patient.weight * 0.454  # lb to kg
+                            - 0.8677 * (patient.VKORC1 == 'G/A')
+                            - 1.6974 * (patient.VKORC1 == 'A/A')
+                            - 0.4854 * (patient.VKORC1 not in  ['G/A', 'A/A', 'G/G'])
+                            - 0.5211 * (patient.CYP2C9 == '*1/*2')
+                            - 0.9357 * (patient.CYP2C9 == '*1/*3')
+                            - 1.0616 * (patient.CYP2C9 == '*2/*2')
+                            - 1.9206 * (patient.CYP2C9 == '*2/*3')
+                            - 2.3312 * (patient.CYP2C9 == '*3/*3')
+                            - 0.2188 * (patient.CYP2C9 not in ['*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', '*1/*1'])
+                            - 0.1092 * (patient.race == 'Asian')
+                            + 0.2760 * (patient.race == 'Black')
+                            + 1.0320 * (patient.race not in  ['Asian', 'Black'])
+                            + 1.1816 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
+                            - 0.5503 * patient.amiodarone) ** 2
+                self._dose = self._weekly_dose / 7
+
+            if patient.day <= 3:
+                return self._dose
+
         elif method.lower() in ['modified_iwpc_pg', 'modified iwpc pg']:
-            weekly_dose = (5.6044
-                        - 0.2614 * patient.age / 10
-                        + 0.0087 * patient.height * 2.54  # in to cm
-                        + 0.0128 * patient.weight * 0.454  # lb to kg
-                        - 0.8677 * (patient.VKORC1 == 'G/A')
-                        - 1.6974 * (patient.VKORC1 == 'A/A')
-                        - 0.5211 * (patient.CYP2C9 == '*1/*2')
-                        - 0.9357 * (patient.CYP2C9 == '*1/*3')
-                        - 1.0616 * (patient.CYP2C9 == '*2/*2')
-                        - 1.9206 * (patient.CYP2C9 == '*2/*3')
-                        - 2.3312 * (patient.CYP2C9 == '*3/*3')
-                        - 0.5503 * patient.amiodarone) ** 2
+            if self._weekly_dose == 0:
+                self._weekly_dose = (5.6044
+                            - 0.2614 * patient.age / 10
+                            + 0.0087 * patient.height * 2.54  # in to cm
+                            + 0.0128 * patient.weight * 0.454  # lb to kg
+                            - 0.8677 * (patient.VKORC1 == 'G/A')
+                            - 1.6974 * (patient.VKORC1 == 'A/A')
+                            - 0.5211 * (patient.CYP2C9 == '*1/*2')
+                            - 0.9357 * (patient.CYP2C9 == '*1/*3')
+                            - 1.0616 * (patient.CYP2C9 == '*2/*2')
+                            - 1.9206 * (patient.CYP2C9 == '*2/*3')
+                            - 2.3312 * (patient.CYP2C9 == '*3/*3')
+                            - 0.5503 * patient.amiodarone) ** 2
 
             k = {'*1/*1': 0.0189,
                  '*1/*2': 0.0158,
@@ -196,14 +234,36 @@ class WarfarinAgent(Agent):
                  '*2/*3': 0.0090,
                  '*3/*3': 0.0075
                  }
-            LD3 = weekly_dose / (1 - exp(-24*k[patient.CYP2C9])) * (1 + exp(-24*k[patient.CYP2C9]) + exp(-48*k[patient.CYP2C9]))
+            LD3 = self._weekly_dose / (1 - exp(-24*k[patient.CYP2C9])) * (1 + exp(-24*k[patient.CYP2C9]) + exp(-48*k[patient.CYP2C9]))
             if patient.day == 1:
-                self._dose = 1.5 * LD3 - 0.5 * weekly_dose
+                self._dose = 1.5 * LD3 - 0.5 * self._weekly_dose
             elif patient.day == 2:
                 self._dose = LD3
             else:
-                self._dose = 0.5 * LD3 + 0.5 * weekly_dose
+                self._dose = 0.5 * LD3 + 0.5 * self._weekly_dose
 
+        elif method.lower() in ['lenzini_pg', 'lenzini pg'] and patient.day in (4, 5):
+            self._dose = exp(3.10894
+                            - 0.00767 * patient.age
+                            - 0.51611 * log(patient.INRs[-1])
+                            - 0.23032 * (patient.VKORC1 == 'G/A')
+                            - 0.14745 * (patient.CYP2C9 in ['*1/*2', '*2/*2'])
+                            - 0.30770 * (patient.CYP2C9 in ['*1/*3', '*2/*3', '*3/*3'])
+                            + 0.24597 * sqrt(patient.height * 2.54 * patient.weight * 0.454 / 3600)  # BSA
+                            + 0.26729 * 2.5  # target INR
+                            - 0.10350 * patient.amiodarone
+                            + 0.01690 * patient.Doses[-2]
+                            + 0.02018 * patient.Doses[-3]
+                            + 0.01065 * patient.Doses[-4]
+                            ) / 7
+
+
+    def reset(self):
+        self._retest_day = 1
+        self._red_flag = False
+        self._skip_dose = 0
+        self._dose = 0
+        self._weekly_dose = 0
 
     # def load(self, **kwargs):
     #     '''
