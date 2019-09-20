@@ -14,6 +14,7 @@ from pickle import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
 
+from collections import deque
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -55,7 +56,8 @@ class DQNAgent(Agent):
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, epsilon=0, default_actions={},
                            learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1,
-                           training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2),
+                           training_x=deque(), training_y=deque(), buffer_index=-1, buffer_ready=False,
+                           # np.array([], ndmin=2), training_y=np.array([], ndmin=2),
                            buffer_size=50, batch_size=10, validation_split=0.3, clear_buffer=False, tensorboard_path=None)
         Agent.set_params(self, **kwargs)
         self.data_collector.available_statistics = {}
@@ -68,6 +70,8 @@ class DQNAgent(Agent):
                 self.load(filename=kwargs['filename'])
             return
 
+        self._training_x = deque([0.0]*self._buffer_size)
+        self._training_y = deque([0.0]*self._buffer_size)
         self._generate_network()
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -77,8 +81,10 @@ class DQNAgent(Agent):
             self._default_actions = {}
             self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (1,), 1
             self._batch_size, self._buffer_size, self._validation_split, self._clear_buffer = 10, 0, 0.3, False
-            self._training_x, self._training_y = np.array([], ndmin=2), np.array([], ndmin=2)
+            self._training_x, self._training_y, self._buffer_index, self._buffer_ready = deque(), deque(), -1, False
             self._tensorboard_path = None
+
+        self._normalized_action_list = [a.normalize().as_list() for a in self._default_actions]
 
     def _generate_network(self):
         '''
@@ -97,9 +103,9 @@ class DQNAgent(Agent):
                     v, activation='relu', name='layer_{:0>2}'.format(i+2)))
 
             self._model.add(keras.layers.Dense(
-                1, name='output'))  # activation='sigmoid', 
+                1, name='output'))
 
-            self._model.compile(optimizer='adam', loss='mae')  # , metrics=['accuracy'])
+            self._model.compile(optimizer='adam', loss='mae')
 
             if self._tensorboard_path is None:
                 self._tensorboard_path = os.path.join('logs', '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
@@ -111,39 +117,40 @@ class DQNAgent(Agent):
             self._tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
 
-            # self._session = tf.get_default_session()
-
-    def _q(self, state, action):
+    def _q(self, state, action=None):
         '''
         Return the Q-value of a state action pair.
 
         Arguments
         ---------
             state: the state for which Q-value is returned.
-            action: the action for which Q-value is returned.
+            action: the action for which Q-value is returned. 'None' uses default_actions.
         '''
         if isinstance(state, RLData):
             state = [state]
-        if isinstance(action, RLData):
-            action = [action]
-
+        state_list = [s.normalize().as_list() for s in state]
         len_state = len(state)
-        len_action = len(action)
+
+        if action is None:
+            action_list = self._normalized_action_list
+        else:
+            if isinstance(action, RLData):
+                action = [action]
+            action_list = [a.normalize().as_list() for a in action]
+        len_action = len(action_list)
+
         if len_state == len_action:
-            X = np.stack([np.append(state[i].normalize().as_nparray(), action[i].normalize().as_nparray()) for i in range(len_state)], axis=0)
+            X = np.array([state_list[i] + action_list[i] for i in range(len_state)])
         elif len_action == 1:
-            action_np = action[0].normalize().as_nparray()
-            X = np.stack([np.append(state[i].normalize().as_nparray(), action_np) for i in range(len_state)], axis=0)
+            X = np.array([state_list[i] + action_list[0] for i in range(len_state)])
         elif len_state == 1:
-            state_np = state[0].normalize().as_nparray()
-            X = np.stack([np.append(state_np, action[i].normalize().as_nparray()) for i in range(len_action)], axis=0)
+            X = np.array([state_list[0] + action_list[i] for i in range(len_action)])
         else:
             raise ValueError('State and action should be of the same size or at least one should be of size one.')
 
         with self._session.as_default():
             with self._graph.as_default():
                 result = self._model.predict(X)
-
         return result
 
     def _max_q(self, state):
@@ -155,7 +162,7 @@ class DQNAgent(Agent):
             state: the state for which MAX(Q) is returned.
         '''
         try:
-            q_values = self._q(state, self._default_actions)
+            q_values = self._q(state)
             max_q = np.max(q_values)
         except ValueError:
             max_q = 0
@@ -187,31 +194,26 @@ class DQNAgent(Agent):
                 except KeyError:
                     new_q = reward
 
-                state_action = np.append(state.normalize().as_nparray(),
-                                         action.normalize().as_nparray())
                 try:
-                    self._training_x = np.vstack((self._training_x, state_action))
-                    self._training_y = np.vstack((self._training_y, new_q))
-                except ValueError:
-                    self._training_x = state_action
-                    self._training_y = np.array(new_q)
+                    self._buffer_index += 1
+                    self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
+                    self._training_y[self._buffer_index] = [new_q]
+                except IndexError:
+                    self._buffer_ready = True
+                    self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
+                    self._training_y[0] = [new_q]
+                    self._buffer_index = 1
 
-            buffered_size = len(self._training_x)
-            if buffered_size >= self._buffer_size:
-                index = np.random.choice(buffered_size, self._batch_size, replace=False)
+            if self._buffer_ready:
+                index = np.random.choice(self._buffer_size, self._batch_size, replace=False)
                 with self._session.as_default():
                     with self._graph.as_default():
-                        self._model.fit(self._training_x[index], self._training_y[index],
+                        self._model.fit(np.array(self._training_x)[index], np.array(self._training_y)[index],
                                         epochs=1, callbacks=[self._tensorboard], validation_split=self._validation_split)
 
                 if self._clear_buffer:
-                    self._training_x = np.array([], ndmin=2)
-                    self._training_y = np.array([], ndmin=2)
-                else:
-                    self._training_x = np.delete(self._training_x,
-                                                range(buffered_size-self._buffer_size), axis=0)
-                    self._training_y = np.delete(self._training_y,
-                                                range(buffered_size-self._buffer_size), axis=0)
+                    self._buffer_index = 0
+                    self._buffer_ready = False
 
             return
         except KeyError:
@@ -239,11 +241,9 @@ class DQNAgent(Agent):
         if (self._training_flag) & (random() < epsilon):
             result = possible_actions
         else:
-            q_values = self._q(state, possible_actions)
+            q_values = self._q(state, None if possible_actions == self._default_actions else possible_actions)  # None is used to avoid redundant normalization of default_actions
             max_q = np.max(q_values)
             result = tuple(possible_actions[i] for i in np.nonzero(q_values==max_q)[0])
-            # result = max(((possible_actions[i], q_values[i]) for i in range(len(possible_actions))), key=lambda x: x[1])
-            # action = result[0]
 
         action = choice(result)
 
@@ -264,19 +264,9 @@ class DQNAgent(Agent):
         '''
         Agent.load(self, **kwargs)
 
-        # self._session = tf.Session()
-        # keras.backend.set_session(self._session)
-        # self._model = keras.models.load_model(kwargs.get(
-        #     'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
-        # self._tensorboard = keras.callbacks.TensorBoard(
-        #     log_dir=self._tensorboard_path, histogram_freq=1)  # , write_images=True)
-        # self._graph = tf.get_default_graph()
-        # tf.reset_default_graph()
-
         self._graph = tf.Graph()
         with self._graph.as_default():
             self._session = keras.backend.get_session()
-            # self._session = tf.Session()
             self._model = keras.models.load_model(kwargs.get(
                 'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
             self._tensorboard = keras.callbacks.TensorBoard(
@@ -303,9 +293,6 @@ class DQNAgent(Agent):
                 with self._graph.as_default():
                     self._model.save(kwargs.get('path', self._path) + '/' +
                                     kwargs['filename'] + '.tf/' + kwargs['filename'])
-            # with self._graph.as_default():
-            #     self._model.save(kwargs.get('path', self._path) + '/' +
-            #                     kwargs['filename'] + '.tf/' + kwargs['filename'])
         except OSError:
             os.makedirs(kwargs.get('path', self._path) +
                         '/' + kwargs['filename'] + '.tf/')
@@ -313,9 +300,6 @@ class DQNAgent(Agent):
                 with self._graph.as_default():
                     self._model.save(kwargs.get('path', self._path) + '/' +
                                     kwargs['filename'] + '.tf/' + kwargs['filename'])
-            # with self._graph.as_default():
-            #     self._model.save(kwargs.get('path', self._path) + '/' +
-            #                     kwargs['filename'] + '.tf/' + kwargs['filename'])
         return path, filename
 
     def _report(self, **kwargs):
@@ -329,10 +313,6 @@ class DQNAgent(Agent):
         Note: this function is not implemented yet!
         '''
         raise NotImplementedError
-
-    # def __del__(self):
-    #     self._tf['log_writer'].close()
-    #     self._tf['session'].close()
 
     def __repr__(self):
         return 'DQNAgent'
