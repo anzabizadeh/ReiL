@@ -5,22 +5,27 @@ Created on Mon Feb 19 15:47:46 2018
 @author: Sadjad
 """
 
+import argparse
+import os
+import random
+
+import numpy as np
+import tensorflow as tf
 from rl.agents import DQNAgent  # QAgent, ANNAgent, WarfarinQAgent
 from rl.environments import Environment
 from rl.subjects import WarfarinModel_v5
-import random
-import numpy as np
-import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-import tensorflow as tf
 
 if __name__ == "__main__":
     random.seed(1234)
     np.random.seed(1234)
     tf.set_random_seed(1234)
+
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('runs', default=)
 
     runs = 100
     training_episodes = 100

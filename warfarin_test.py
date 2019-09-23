@@ -15,7 +15,7 @@ randomized = True
 extended_state = True
 
 agents={
-        'aurora': WarfarinAgent()
+        'aurora': WarfarinAgent(study_arm='AAA')
         # '0.20_2_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.20_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
         # '0.40_2_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.40_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
         # '0.50_4_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.50_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),

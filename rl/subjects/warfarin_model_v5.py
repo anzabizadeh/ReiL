@@ -79,9 +79,10 @@ class WarfarinModel_v5(Subject):
                                  x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
                              save_patients=False,
                              patients_save_path='./',
-                             patients_save_prefix='warfv4',
+                             patients_save_prefix='warfv5',
                              patient_save_overwrite=False,
                              patient_use_existing=True,
+                             patient_counter_start=0,
                              extended_state=False
                              )
 
@@ -130,10 +131,11 @@ class WarfarinModel_v5(Subject):
             self._extended_state = False
             self._save_patients = False
             self._patients_save_path = './'
-            self._patients_save_prefix = 'warfv4'
+            self._patients_save_prefix = 'warfv5'
             self._patient_save_overwrite = False
             self._patient_use_existing = True
             self._extended_state = False
+            self._patient_counter_start = 0
 
         if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
             if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
@@ -143,7 +145,7 @@ class WarfarinModel_v5(Subject):
 
         self._max_time = (self._max_day + 1)*24  # until the end of max_day
 
-        self._filename_counter = 0
+        self._filename_counter = self._patient_counter_start
         if self._save_patients:
             if not self._patient_save_overwrite and not self._patient_use_existing:
                 while os.path.exists(os.path.join(self._patients_save_path,
@@ -352,7 +354,6 @@ class WarfarinModel_v5(Subject):
                 self._randomized = self._patient._randomized
                 self._max_time = self._patient._max_time
 
-                done_resetting = True
             except FileNotFoundError:
                 pass
 
