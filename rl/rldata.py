@@ -310,7 +310,10 @@ class RLData:
 
     def __eq__(self, other):
         try:
-            return self._value == other._value
+            # return self._value == other._value
+            return (self.value == other.value).bool() and (
+                ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else 
+                    (self.categories == other.categories).bool())
         except AttributeError:
             return False
 
