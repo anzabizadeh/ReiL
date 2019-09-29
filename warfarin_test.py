@@ -1,47 +1,81 @@
-from rl.environments import Experiment
-from rl.agents import DQNAgent, WarfarinAgent
-from rl.subjects import WarfarinModel, WarfarinModel_v4
+# Disable GPU before loading tensorflow
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-# age=70,
-# CYP2C9='*1/*3',
-# VKORC1='A/A',
+from rl.subjects import WarfarinModel_v5
+from rl.agents import DQNAgent, WarfarinAgent
+from rl.environments import Experiment
+import tensorflow as tf
+import numpy as np
+import random
+from pathlib import Path
+from math import log10, ceil
+
+random.seed(4321)
+np.random.seed(4321)
+tf.set_random_seed(4321)
+
+number_of_subjects = 1000
+
 max_day = 90
 patient_selection = 'ravvaz'
-dose_history = 9
-INR_history = 9
-dose_change_penalty_coef = 0.2
-dose_change_penalty_func = lambda x: 0.2*int(x[-2]!=x[-1])
-randomized = True
-extended_state = True
+dose_history = 10
+INR_history = 10
 
-agents={
-        'aurora': WarfarinAgent(study_arm='AAA')
-        # '0.20_2_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.20_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
-        # '0.40_2_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.40_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
-        # '0.50_4_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.50_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
-        # '0.60_2_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.60_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
-        # '0.80_2_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.80_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
-        # '1.00_2_day': DQNAgent(path='./WARFV4_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_1.00_DQN_(20,20)_g_0.95_e_func_lr_0.01_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol')
-        }
+agents = {
+    '00.0_2_day': DQNAgent(path='./WARFV4_d_90_dose_9_INR_9_T__dose_change_coef_0.00_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
+    '00.2_2_day': DQNAgent(path='./WARFV4_d_90_dose_9_INR_9_T__dose_change_coef_0.20_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
+    '00.5_7_day': DQNAgent(path='./WARFV4_d_90_dose_9_INR_9_T__dose_change_coef_0.50_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
+    '00.6_2_day': DQNAgent(path='./WARFV4_d_90_dose_9_INR_9_T__dose_change_coef_0.60_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
+    '00.8_2_day': DQNAgent(path='./WARFV4_d_90_dose_9_INR_9_T__dose_change_coef_0.80_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
+    '01.0_2_day': DQNAgent(path='./WARFV4_d_90_dose_9_INR_9_T__dose_change_coef_1.00_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
+    '05.0_2_day': DQNAgent(path='./WARFV5_d_90_dose_9_INR_9_T__dose_change_coef_5.00_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol'),
+    '10.0_2_day': DQNAgent(path='./WARFV5_d_90_dose_9_INR_9_T__dose_change_coef_10.00_DQN_(20,20)_g_0.95_e_func_buff_900_clr_F_btch_50_vld_0.3.data', filename='protocol')
+}
 
-subjects={'Warfarin_v4_extended_state': WarfarinModel_v4(max_day=max_day,
-                                patient_selection=patient_selection,
-                                dose_history=dose_history,
-                                INR_history=INR_history,
-                                randomized=randomized,
-                                dose_change_penalty_coef=dose_change_penalty_coef,
-                                dose_change_penalty_func=dose_change_penalty_func,
-                                extended_state=extended_state,
-                                save_patient=False)}
+subjects = {'Warfv5': WarfarinModel_v5(max_day=max_day,
+                                            patient_selection=patient_selection,
+                                            dose_history=dose_history,
+                                            INR_history=INR_history,
+                                            randomized=True,
+                                            extended_state=False,
+                                            save_patient=False)}
 
 exp = Experiment()
 
 exp.add(agents=agents, subjects=subjects)
 
-exp.generate_subjects(number_of_subjects=10)
+exp.generate_subjects(number_of_subjects=number_of_subjects)
 
 for agent in agents:
-        exp.assign([(agent, 'Warfarin_v4_extended_state')])
-        print(agent)
-        exp.run()
-        exp.divest([(agent, 'Warfarin_v4_extended_state')])
+    exp.assign([(agent, 'Warfv5')])
+    print(agent)
+    exp.run()
+    exp.divest([(agent, 'Warfv5')])
+
+
+subject = subjects['Warfv5']
+digits = ceil(log10(number_of_subjects))
+for subject_ID in range(number_of_subjects):
+        filename = 'Warfv5' + str(subject_ID).rjust(digits, '0')
+        subject.load(filename=filename, path='./' + 'Warfv5')
+        subject._extended_state = True
+        subject.save(filename=filename, path='./' + 'Warfv5')
+
+
+agents = {
+    'AAA': WarfarinAgent(study_arm='AAA'),
+    'CAA': WarfarinAgent(study_arm='CAA'),
+    'PGAA': WarfarinAgent(study_arm='PGAA'),
+#     'PGPGA': WarfarinAgent(study_arm='PGPGA')
+}
+
+exp = Experiment(number_of_subjects=number_of_subjects)
+
+exp.add(agents=agents, subjects=subjects)
+for agent in agents:
+    exp.assign([(agent, 'Warfv5')])
+    print(agent)
+    exp.run()
+    exp.divest([(agent, 'Warfv5')])
