@@ -94,7 +94,6 @@ class WarfarinAgent(Agent):
                 self._method = 'Aurora'
 
         r = RLData(self._action(self._method, state), lower=0.0, upper=15.0)
-        print(r.value.value)
         return r
 
     def _action(self, method, state):
@@ -181,7 +180,7 @@ class WarfarinAgent(Agent):
                             + 0.4060 * (patient.race == 'Black')
                             + 0.0443 * (patient.race not in  ['Asian', 'Black'])
                             + 1.2799 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
-                            - 0.5695 * patient.amiodarone) ** 2
+                            - 0.5695 * (patient.amiodarone == 'Yes')) ** 2
                 self._dose = self._weekly_dose / 7
 
             if patient.day <= 3:
@@ -206,7 +205,7 @@ class WarfarinAgent(Agent):
                             + 0.2760 * (patient.race == 'Black')
                             + 1.0320 * (patient.race not in  ['Asian', 'Black'])
                             + 1.1816 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
-                            - 0.5503 * patient.amiodarone) ** 2
+                            - 0.5503 * (patient.amiodarone == 'Yes')) ** 2
                 self._dose = self._weekly_dose / 7
 
             if patient.day <= 3:
@@ -225,7 +224,7 @@ class WarfarinAgent(Agent):
                             - 1.0616 * (patient.CYP2C9 == '*2/*2')
                             - 1.9206 * (patient.CYP2C9 == '*2/*3')
                             - 2.3312 * (patient.CYP2C9 == '*3/*3')
-                            - 0.5503 * patient.amiodarone) ** 2
+                            - 0.5503 * (patient.amiodarone == 'Yes')) ** 2
 
             k = {'*1/*1': 0.0189,
                  '*1/*2': 0.0158,
@@ -234,7 +233,7 @@ class WarfarinAgent(Agent):
                  '*2/*3': 0.0090,
                  '*3/*3': 0.0075
                  }
-            LD3 = self._weekly_dose / (1 - exp(-24*k[patient.CYP2C9])) * (1 + exp(-24*k[patient.CYP2C9]) + exp(-48*k[patient.CYP2C9]))
+            LD3 = self._weekly_dose / ((1 - exp(-24*k[patient.CYP2C9])) * (1 + exp(-24*k[patient.CYP2C9]) + exp(-48*k[patient.CYP2C9])))
             if patient.day == 1:
                 self._dose = 1.5 * LD3 - 0.5 * self._weekly_dose
             elif patient.day == 2:
@@ -251,12 +250,13 @@ class WarfarinAgent(Agent):
                             - 0.30770 * (patient.CYP2C9 in ['*1/*3', '*2/*3', '*3/*3'])
                             + 0.24597 * sqrt(patient.height * 2.54 * patient.weight * 0.454 / 3600)  # BSA
                             + 0.26729 * 2.5  # target INR
-                            - 0.10350 * patient.amiodarone
+                            - 0.10350 * (patient.amiodarone == 'Yes')
                             + 0.01690 * patient.Doses[-2]
                             + 0.02018 * patient.Doses[-3]
                             + 0.01065 * patient.Doses[-4]
                             ) / 7
 
+        return self._dose
 
     def reset(self):
         self._retest_day = 1
