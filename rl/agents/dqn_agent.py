@@ -264,6 +264,10 @@ class DQNAgent(Agent):
         '''
         Agent.load(self, **kwargs)
 
+        # To resolve a compatibility issue
+        if not hasattr(self, '_normalized_action_list'):
+            self._normalized_action_list = [a.normalize().as_list() for a in self._default_actions]
+
         self._graph = tf.Graph()
         with self._graph.as_default():
             self._session = keras.backend.get_session()
