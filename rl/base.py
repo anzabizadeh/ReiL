@@ -12,6 +12,7 @@ from dill import load, dump, HIGHEST_PROTOCOL
 # from pickle import load, dump, HIGHEST_PROTOCOL
 from random import randrange
 import pathlib
+import os
 
 from .data_collector import DataCollector
 
@@ -84,7 +85,7 @@ class RLBase():
             raise ValueError('name of the output file not specified.')
         path = kwargs.get('path', self._path)
 
-        with open(path + '/' + filename + '.pkl', 'rb') as f:
+        with open(os.path.join(path, filename + '.pkl'), 'rb') as f:
             try:
                 data = load(f)
             except EOFError:
@@ -116,7 +117,7 @@ class RLBase():
             data = self.__dict__
 
         pathlib.Path(path).mkdir(parents=True, exist_ok=True) 
-        with open(path + '/' + filename + '.pkl', 'wb+') as f:
+        with open(os.path.join(path, filename + '.pkl'), 'wb+') as f:
             dump(data, f, HIGHEST_PROTOCOL)
 
         return path, filename
