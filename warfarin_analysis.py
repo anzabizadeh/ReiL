@@ -41,6 +41,24 @@ class Analyzer:
             self._df_for_stats = {}  # to calculate TTR and other possible measures
             self._df_for_segmentation = {}  # a point is defined as a 90-day dose
 
+        def sensitivity(row):
+            if row['G/G'] * (row['*1/*1'] + row['*1/*2']) == 1:
+                return 'normal'
+            elif row['G/A'] * row['*1/*1'] == 1:
+                return 'normal'
+            elif row['G/A'] * (row['*1/*2'] + row['*1/*3'] + row['*2/*2']) == 1:
+                return 'sensitive'
+            elif row['G/G'] * (row['*1/*3'] + row['*2/*2'] + row['*2/*3']) == 1:
+                return 'sensitive'
+            elif row['A/A'] * (row['*1/*1'] + row['*1/*2']) == 1:
+                return 'sensitive'
+            elif row['G/G'] * row['*3/*3'] == 1:
+                return 'highly sensitive'
+            elif row['G/A'] * (row['*2/*3'] + row['*3/*3']) == 1:
+                return 'highly sensitive'
+            elif row['A/A'] * (row['*1/*3'] + row['*2/*2'] + row['*2/*3'] + row['*3/*3']):
+                return 'highly sensitive'
+
         for f in listdir(result_path):
             full_filename = join(result_path, f)
             if isfile(full_filename) and full_filename not in self._files_loaded:
@@ -86,6 +104,7 @@ class Analyzer:
                 df_state_action['TTR'] = df_state_action.INR_current.apply(
                     lambda x: 1 if 2 <= x <= 3 else 0)
                 df_state_action['patient'] = subject
+                df_state_action['agent'] = agent
 
                 df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + [
                                      'INR-{:02}'.format(INR_history-i) for i in range(INR_history)], inplace=True, axis=1)
@@ -94,6 +113,8 @@ class Analyzer:
                         [self._df_for_stats[agent], df_state_action], ignore_index=True)
                 except KeyError:
                     self._df_for_stats[agent] = df_state_action
+
+                self._df_for_stats[agent]['sensitivity'] = self._df_for_stats[agent].apply(lambda row: sensitivity(row), axis=1)
 
                 self._files_loaded.append(full_filename)
 
@@ -160,27 +181,39 @@ class Analyzer:
 
         return fig
 
-    def stats(self, items='all', stats='all', groupby=['A/A', 'G/A', 'G/G', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']):
+    def stats(self, items='all', stats='all',
+              groupby=['A/A', 'G/A', 'G/G',
+                       '*1/*1', '*1/*2', '*1/*3',
+                       '*2/*2', '*2/*3', '*3/*3'],
+              filename=None):
         if items == 'all':
             items = self._df_for_segmentation.keys()
         if stats == 'all':
-            stats = ['TTR', 'TTR>0.65', 'dose change']
+            stats = ['TTR', 'TTR>0.65', 'dose change', 'count']
+
+        groupby = ['agent'] + groupby
 
         results = {}
         for agent in items:
             for stat in stats:
                 if stat == 'TTR':
-                    stat_temp = (self._df_for_stats[agent].groupby(groupby).sum() /
-                                 self._df_for_stats[agent].groupby(groupby).count())['TTR']
-                # elif stat[:4] == 'TTR>':
-                #     stat_temp = (self._df_for_stats[agent].groupby('patient').sum() /
-                #                  self._df_for_stats[agent].groupby('patient').count())['TTR']
-                #     stat_temp = stat_temp.groupby(groupby).agg({stat: lambda x})
+                    stat_temp = (self._df_for_stats[agent].groupby(groupby).sum()['TTR'] /
+                                 self._df_for_stats[agent].groupby(groupby).count()['TTR'])
+                elif stat[:4] == 'TTR>':
+                    stat_temp_temp = (self._df_for_stats[agent].groupby(groupby + ['patient']).sum()['TTR'] / 
+                                       self._df_for_stats[agent].groupby(groupby + ['patient']).count()['TTR']) > float(stat[4:])  # .reset_index(level='patient', drop='patient')
+                    stat_temp = (stat_temp_temp.groupby(groupby).sum() / stat_temp_temp.groupby(groupby).count()).rename(stat)
                 elif stat == 'dose change':
-                    stat_temp = (self._df_for_stats[agent].groupby(groupby).sum() /
-                                 self._df_for_stats[agent].groupby(groupby).count())['dose change']
+                    stat_temp = (self._df_for_stats[agent].groupby(groupby).sum()['dose change'] /
+                                 self._df_for_stats[agent].groupby(groupby).count()['dose change'])
+                elif stat == 'count':
+                    stat_temp = self._df_for_stats[agent].groupby(groupby).count()['dose change'].rename(stat)
 
                 results[(agent, stat)] = stat_temp
+
+                if filename is not None:
+                    with open('_'.join((filename, stat.replace('>',''), '.csv')), 'a') as f:
+                        stat_temp.to_csv(f, header=False)
 
         return results
 
@@ -226,8 +259,8 @@ class Analyzer:
 
 
 # %%
-experiment_path = r'.\Warfarin_v4_default_state'
-result_path = experiment_path + r'\results'
+experiment_path = r'.\warfv5'
+result_path = experiment_path + r'\results\DQN'
 dose_history = 9
 INR_history = 9
 
@@ -246,14 +279,14 @@ analysis = Analyzer(experiment_path=experiment_path,
                     dose_history=dose_history,
                     INR_history=INR_history)
 
-analysis.load(filename='collected_data')
+analysis.load(filename='collected_data_DQN')
 # %%
 analysis.plot()
 
 # %%
-analysis.stats()
+analysis.stats(filename='saved_stats', groupby=['sensitivity'])
 
-# #%%
+#%%
 # experiment_path = r'.\W'
 # result_path = experiment_path + r'\results'
 # dose_history = 9
@@ -726,4 +759,5 @@ analysis.stats()
 #                      '{:3.2}'.format(max(results[patient])))))
 
 
-# %%
+
+#%%
