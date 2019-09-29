@@ -78,7 +78,7 @@ class WarfarinModel_v5(Subject):
                              dose_change_penalty_func=lambda x: int(
                                  x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
                              save_patients=False,
-                             patients_save_path='./',
+                             patients_save_path='./patients',
                              patients_save_prefix='warfv5',
                              patient_save_overwrite=False,
                              patient_use_existing=True,
@@ -130,7 +130,7 @@ class WarfarinModel_v5(Subject):
             self._randomized = True
             self._extended_state = False
             self._save_patients = False
-            self._patients_save_path = './'
+            self._patients_save_path = './patients'
             self._patients_save_prefix = 'warfv5'
             self._patient_save_overwrite = False
             self._patient_use_existing = True
@@ -334,12 +334,11 @@ class WarfarinModel_v5(Subject):
                                 VKORC1=self._characteristics['VKORC1'],
                                 randomized=self._randomized, max_time=self._max_time)
 
-        current_patient = os.path.join(self._patients_save_path,
-                                        ''.join((self._patients_save_prefix, '{:06}'.format(self._filename_counter))))
+        current_patient = ''.join((self._patients_save_prefix, '{:06}'.format(self._filename_counter)))
         if self._save_patients and not self._patient_save_overwrite:
             try:
                 # self._patient = Patient()
-                self._patient.load(filename=current_patient)
+                self._patient.load(path=self._patients_save_path, filename=current_patient)
 
                 self._characteristics['age'] = self._patient._age
                 self._characteristics['weight'] = self._patient._weight
@@ -357,7 +356,7 @@ class WarfarinModel_v5(Subject):
             except FileNotFoundError:
                 pass
 
-        self._patient.save(filename=current_patient)
+        self._patient.save(path=self._patients_save_path, filename=current_patient)
 
         self._filename_counter += 1
 
