@@ -94,13 +94,13 @@ class Environment(RLBase):
         try:
             for name, agent in kwargs['agents'].items():
                 self._agent[name] = agent
-        except IndexError:
+        except (IndexError, KeyError):
             pass
 
         try:
             for name, subject in kwargs['subjects'].items():
                 self._subject[name] = subject
-        except IndexError:
+        except (IndexError, KeyError):
             pass
 
     def remove(self, **kwargs):
