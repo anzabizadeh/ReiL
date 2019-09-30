@@ -11,7 +11,7 @@ This `environment` class provides an experimentation environment for any reinfor
 from math import log10, ceil
 from pathlib import Path
 # from zipfile import ZipFile 
-from os import path
+import os
 import pandas as pd
 import numpy as np
 
@@ -45,19 +45,11 @@ class Experiment(Environment):
 
         Arguments
         ---------
-            filename: if given, Environment attempts to open a saved environment by openning the file. This argument cannot be used along other arguments.
-            path: path of the file to be loaded (should be used with filename)
-            name: the name of the environment
-            episodes: number of episodes of run. (Default = 1)
-            termination: when to terminate one episode. (Default = 'any')
-                'any': terminate if any of the subjects is terminated.
-                'all': terminate if all the subjects are terminated.
-            reset: how to reset subjects after each episode. (Default = 'any')
-                'any': reset only the subject that is terminated.
-                'all': reset all subjects.
-            learning_method: how to learn from each episode. (Default = 'every step')
-                'every step': learn after every move.
-                'history': learn after each episode.
+            filename: if given, Experiment attempts to open a saved experiment by openning the file. This argument cannot be used along other arguments.
+            path: path of the file to be loaded (should be used with filename).
+            number_of_subjects: number of subjects to create for experimentation (Default = 1)
+            max_steps: maximum number of steps to go for each subject (Default = 10,000)
+            save_subjects: whether to save subject files or not (Default = True)
         '''
         Environment.__init__(self, **kwargs)
         if 'filename' in kwargs:
@@ -66,7 +58,8 @@ class Experiment(Environment):
             return
 
         Environment.set_defaults(self, agent={}, subject={}, assignment_list={},
-                            number_of_subjects=1, max_steps=10000, save_subjects=True)
+                            number_of_subjects=1, max_steps=10000, save_subjects=True,
+                            file_index_generator=None)
         Environment.set_params(self, **kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -74,22 +67,34 @@ class Experiment(Environment):
         if False:
             self._agent, self._subject, self._assignment_list = {}, {}, {}
             self._number_of_subjects, self._max_steps = 1, 10000
-            self._save_subjects = 'all'
+            self._save_subjects = True
+            self._file_index_generator = None
+
+    def _default_file_index_generator(self, number_of_subjects):
+        digits = ceil(log10(number_of_subjects))
+        for subject_ID in range(number_of_subjects):
+            print(subject_ID)
+            yield str(subject_ID).rjust(digits, '0')
 
     def generate_subjects(self, **kwargs):
         number_of_subjects = kwargs.get('number_of_subjects', self._number_of_subjects)
+        subjects_path = kwargs.get('subjects_path', './subjects')
+        file_index_generator = kwargs.get('file_index_generator',
+            self._file_index_generator if self._file_index_generator is not None else self._default_file_index_generator)
+        print(file_index_generator)
         self._number_of_subjects = number_of_subjects
         # save_subjects = kwargs.get('save_subjects', self._save_subjects)
-        digits = ceil(log10(number_of_subjects))
 
         for subject_name, subject in self._subject.items():
             subject.reset()
-            for subject_ID in range(number_of_subjects):
-                filename = subject_name + str(subject_ID).rjust(digits, '0')
-                if path.exists('./' + subject_name + '/' + filename + '.pkl'):
+            print('generating')
+            for file_index in file_index_generator(number_of_subjects):
+                print(file_index)
+                filename = subject_name + file_index
+                if os.path.exists(os.path.join(subjects_path, filename + '.pkl')):
                     print('{} already exists! Skipping the file!'.format(filename))
                 else:
-                    subject.save(filename=filename, path='./' + subject_name)
+                    subject.save(filename=filename, path=subjects_path)
                     subject.reset()
                 # with ZipFile(subject_name,'w') as zip:
                 #     for file in file_paths: 
@@ -97,7 +102,7 @@ class Experiment(Environment):
 
     def run(self, **kwargs):
         '''
-        ...
+        Run the experiment.
 
         Arguments
         ---------
@@ -106,7 +111,10 @@ class Experiment(Environment):
         '''
         max_steps = kwargs.get('max_steps', self._max_steps)
         number_of_subjects = kwargs.get('number_of_subjects', self._number_of_subjects)
-        digits = ceil(log10(number_of_subjects))
+        subjects_path = kwargs.get('subjects_path', './subjects')
+        outputs_path = kwargs.get('outputs_path', './' + '/outputs')
+        file_index_generator = kwargs.get('file_index_generator',
+            self._file_index_generator if self._file_index_generator is not None else self._default_file_index_generator)
 
         for agent_name, agent in self._agent.items():
             print('Agent: {}'.format(agent_name))
@@ -119,16 +127,17 @@ class Experiment(Environment):
 
             subject = self._subject[subject_name]
 
-            for subject_ID in range(number_of_subjects):
+            for file_index in file_index_generator(number_of_subjects):
+                print(file_index)
                 history = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
 
-                output_dir = Path('./'+subject_name+'/results')
+                output_dir = Path(outputs_path)
                 output_dir.mkdir(parents=True, exist_ok=True)
 
-                filename = subject_name + str(subject_ID).rjust(digits, '0')
+                filename = subject_name + file_index
                 print('Subject: {}'.format(filename))
                 temp_agent_list = subject._agent_list
-                subject.load(filename=filename, path='./' + subject_name)
+                subject.load(filename=filename, path=subjects_path)  # './' + subject_name)
                 subject._agent_list = temp_agent_list
 
                 steps = 0
@@ -171,9 +180,13 @@ if __name__ == "__main__":
     from rl.agents import RandomAgent
     from rl.subjects import WarfarinModel_v4
 
-    exp = Experiment(agents={'R': RandomAgent()},
-                     subjects={'W': WarfarinModel_v4},
-                     assignment_list={'R': 'W'})
+    def index_generator(number_of_subjects, start_number=3, digits=5):
+        for i in range(start_number, start_number + number_of_subjects):
+            yield str(i).rjust(digits,'0')
 
-    exp.generate_subjects(number_of_subjects=5)
-    exp.run()
+    exp = Experiment(agent={'R': RandomAgent()},
+                     subject={'': WarfarinModel_v4()},
+                     assignment_list={'R': ('', 1)})
+
+    exp.generate_subjects(number_of_subjects=7, subjects_path='./patients', file_index_generator=index_generator)
+    exp.run(subjects_path='./patients', outputs_path='./experiment_outputs', file_index_generator=index_generator)
