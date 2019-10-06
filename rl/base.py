@@ -13,6 +13,7 @@ from dill import load, dump, HIGHEST_PROTOCOL
 from random import randrange
 import pathlib
 import os
+from time import sleep
 
 from .data_collector import DataCollector
 
@@ -89,7 +90,11 @@ class RLBase():
             try:
                 data = load(f)
             except EOFError:
-                raise RuntimeError('Corrupted data file: '+filename)
+                try:
+                    sleep(5)
+                    data = load(f)
+                except EOFError:
+                    raise RuntimeError('Corrupted data file: '+filename)
             for key, value in data.items():
                 self.__dict__[key] = value
             self.data_collector._object = self
