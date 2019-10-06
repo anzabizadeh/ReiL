@@ -42,6 +42,17 @@ subjects = {'Warfv5': WarfarinModel_v5(max_day=max_day,
                                             extended_state=False,
                                             save_patient=False)}
 
+def index_generator(number_of_subjects, start_number=3, digits=5):
+    for i in range(start_number, start_number + number_of_subjects):
+        yield str(i).rjust(digits,'0')
+
+exp = Experiment(agent={'R': RandomAgent()},
+                    subject={'': WarfarinModel_v4()},
+                    assignment_list={'R': ('', 1)})
+
+exp.generate_subjects(number_of_subjects=7, subjects_path='./patients', file_index_generator=index_generator)
+
+
 exp = Experiment()
 
 exp.add(agents=agents, subjects=subjects)
