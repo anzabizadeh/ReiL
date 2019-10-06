@@ -19,23 +19,31 @@ from sklearn.manifold import TSNE
 
 # %%
 class Analyzer:
-    def __init__(self, **kwargs):
-        self._experiment_path = kwargs.get('experiment_path', r'.\W')
-        self._result_path = kwargs.get(
-            'result_path', experiment_path + r'\results')
+    def __init__(self, experiment_path, **kwargs):
+        self._experiment_path = experiment_path
+        self._results_path = kwargs.get(
+            'results_path', experiment_path + r'\results')
         self._aggregated_data_path = kwargs.get(
             'aggregated_data_path', experiment_path + r'\aggregated')
-        self._dose_history = kwargs.get('dose_history', 9)
-        self._INR_history = kwargs.get('INR_history', 9)
+        self._dose_history = kwargs.get('dose_history', 10)
+        self._INR_history = kwargs.get('INR_history', 10)
+        self._extended_state = kwargs.get('extended_state', False)
+        if self._extended_state:
+            self._column_names = ['age', 'weight', 'height', 'female', 'male', 'White', 'Black', 'Asian', 'American Indian', 'Pacific Islander',
+            'tobaco_no', 'tobaco_yes', 'amiodarone_no', 'amiodarone_yes', 'fluvastatin_no', 'fluvastatin_yes', 
+            '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A']
+        else:
+            self._column_names = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A']
         self._X_embedded = {}
         self._files_loaded = []
         self._df_for_stats = {}
         self._df_for_segmentation = {}
 
     def load_experiment_data(self, **kwargs):
-        result_path = kwargs.get('result_path', self._result_path)
-        self._dose_history = kwargs.get('dose_history', 9)
-        self._INR_history = kwargs.get('INR_history', 9)
+        experiment_path = kwargs.get('experiment_path', self._experiment_path)
+        print(experiment_path)
+        self._dose_history = kwargs.get('dose_history', 10)
+        self._INR_history = kwargs.get('INR_history', 10)
         if kwargs.get('reload', False):
             self._files_loaded = []
             self._df_for_stats = {}  # to calculate TTR and other possible measures
@@ -59,9 +67,16 @@ class Analyzer:
             elif row['A/A'] * (row['*1/*3'] + row['*2/*2'] + row['*2/*3'] + row['*3/*3']):
                 return 'highly sensitive'
 
-        for f in listdir(result_path):
-            full_filename = join(result_path, f)
+        # temp_size = len([f for f in listdir(experiment_path) if isfile(join(experiment_path, f)) and join(experiment_path, f) not in self._files_loaded])
+        # temp_list_segmentation = [0] * temp_size
+        # temp_list_stats = [0] * temp_size
+        # print(temp_size)
+
+        # counter = -1
+        for f in listdir(experiment_path):
+            full_filename = join(experiment_path, f)
             if isfile(full_filename) and full_filename not in self._files_loaded:
+                # counter += 1
                 agent, subject = f[:-4].split(sep='@', )
                 print(agent, subject)
                 df_from_file = pd.read_pickle(full_filename)[
@@ -71,30 +86,22 @@ class Analyzer:
                 if len(patient_info) == 1:
                     patient_info = list(
                         *df_from_file.iloc[0].state.normalize().value)
+                # temp_list_segmentation[counter] = patient_info[:10] + [float(a.value)
+                #                              for a in df_from_file.action]
                 try:
                     self._df_for_segmentation[agent].loc[len(self._df_for_segmentation[agent])] = \
                         patient_info[:10] + [float(a.value)
                                              for a in df_from_file.action]
-                    # df_for_segmentation[agent].append(np.concatenate([df_from_file.iloc[0].state.normalize().as_nparray()[:, :10],
-                    #         np.array(tuple(float(a.value) for a in df_from_file.action), ndmin=2)], axis=1), ignore_index=True)
                 except KeyError:
-                    self._df_for_segmentation[agent] = pd.DataFrame(dict(zip(['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A']
+                    self._df_for_segmentation[agent] = pd.DataFrame(dict(zip(self._column_names
                                                                              + ['dose {:02}'.format(i) for i in range(90)],
                                                                              patient_info[:10] + [float(a.value) for a in df_from_file.action])),
                                                                     index=[0])
-                    # df_for_segmentation[agent] = pd.DataFrame(df_from_file.iloc[0].state.normalize().as_list()[:10]
-                    #     + [float(a.value) for a in df_from_file.action])
-                    # df_for_segmentation[agent] = pd.DataFrame(np.concatenate([df_from_file.iloc[0].state.normalize().as_nparray()[:, :10],
-                    #     np.array(tuple(float(a.value) for a in df_from_file.action), ndmin=2)], axis=1))
-                    # df_for_segmentation[agent].columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose {:02}'.format(i) for i in range(90)]
 
-                # df_state_action = pd.DataFrame(np.concatenate((df_from_file.iloc[0].state.normalize().as_nparray(),
-                #         np.array(tuple(float(a.value) for a in df_from_file.action), ndmin=2)), axis=1))
-                # df_state_action.columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose {:02}'.format(i) for i in range(90)]
                 INR_factor = df_from_file.loc[0, 'state'].upper.loc['INRs']
                 df_state_action = df_from_file.apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(
                     x, str) else [x] for x in row.state.normalize().value] for z in y] + row.action.as_list(), axis=1, result_type='expand')
-                df_state_action.columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose-{:02}'.format(
+                df_state_action.columns = self._column_names + ['dose-{:02}'.format(
                     dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
                 # df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current'], inplace=True, axis=1)
                 df_state_action['dose change'] = df_state_action.apply(
@@ -105,18 +112,22 @@ class Analyzer:
                     lambda x: 1 if 2 <= x <= 3 else 0)
                 df_state_action['patient'] = subject
                 df_state_action['agent'] = agent
+                df_state_action['sensitivity'] = df_state_action.apply(lambda row: sensitivity(row), axis=1)
 
                 df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + [
                                      'INR-{:02}'.format(INR_history-i) for i in range(INR_history)], inplace=True, axis=1)
+                # temp_list_stats[counter] = df_state_action
                 try:
                     self._df_for_stats[agent] = pd.concat(
-                        [self._df_for_stats[agent], df_state_action], ignore_index=True)
+                        [self._df_for_stats[agent], df_state_action], ignore_index=True, sort=False)
                 except KeyError:
                     self._df_for_stats[agent] = df_state_action
 
-                self._df_for_stats[agent]['sensitivity'] = self._df_for_stats[agent].apply(lambda row: sensitivity(row), axis=1)
 
                 self._files_loaded.append(full_filename)
+
+        # self._df_for_segmentation = pd.concat([self._df_for_segmentation] + temp_list_segmentation)
+        # self._df_for_stats = pd.concat([self._df_for_stats] + temp_list_stats)
 
     def TSNE(self, items='all'):
         if items == 'all':
@@ -259,44 +270,45 @@ class Analyzer:
 
 
 # %%
-experiment_path = r'.\warfv5'
-result_path = experiment_path + r'\results\DQN'
-dose_history = 9
-INR_history = 9
+experiment_path = r'.\output_ravvaz'
+results_path = experiment_path + r'\DQN'
+dose_history = 10
+INR_history = 10
 
 analysis = Analyzer(experiment_path=experiment_path,
-                    result_path=result_path,
+                    results_path=results_path,
                     dose_history=dose_history,
-                    INR_history=INR_history)
+                    INR_history=INR_history,
+                    extended_state=True)
 
 # %%
 analysis.load_experiment_data()
-analysis.save(filename='collected_data')
+analysis.save(filename='collected_data_ravvaz')
 
 # %%
-analysis = Analyzer(experiment_path=experiment_path,
-                    result_path=result_path,
-                    dose_history=dose_history,
-                    INR_history=INR_history)
+# analysis = Analyzer(experiment_path=experiment_path,
+#                     results_path=results_path,
+#                     dose_history=dose_history,
+#                     INR_history=INR_history)
 
-analysis.load(filename='collected_data_DQN')
+# analysis.load(filename='collected_data_DQN')
 # %%
-analysis.plot()
+# analysis.plot()
 
 # %%
-analysis.stats(filename='saved_stats', groupby=['sensitivity'])
+analysis.stats(filename='saved_stats_ravvaz', groupby=['sensitivity'])
 
 #%%
 # experiment_path = r'.\W'
-# result_path = experiment_path + r'\results'
+# results_path = experiment_path + r'\results'
 # dose_history = 9
 # INR_history = 9
 
 # #%%
 # df_for_stats = {}  # to calculate TTR and other possible measures
 # df_for_segmentation = {}  # a point is defined as a 90-day dose
-# for f in listdir(result_path):
-#     full_filename = join(result_path, f)
+# for f in listdir(results_path):
+#     full_filename = join(results_path, f)
 #     if isfile(full_filename):
 #         agent, subject = f[:-4].split(sep='@', )
 #         print(agent, subject)
@@ -439,7 +451,7 @@ analysis.stats(filename='saved_stats', groupby=['sensitivity'])
 
 
 # ##%%
-# #temp_df = pd.concat([pd.read_pickle(join(result_path, f))[['state', 'action']] for f in listdir(result_path) if isfile(join(result_path, f))], ignore_index=True)
+# #temp_df = pd.concat([pd.read_pickle(join(results_path, f))[['state', 'action']] for f in listdir(results_path) if isfile(join(results_path, f))], ignore_index=True)
 
 # # #%%
 # # print('Extracting Xs and Ys.')
