@@ -27,6 +27,7 @@ class Analyzer:
             'aggregated_data_path', experiment_path + r'\aggregated')
         self._dose_history = kwargs.get('dose_history', 10)
         self._INR_history = kwargs.get('INR_history', 10)
+        self._cluster_count = kwargs.get('cluster_count', 3)
         self._extended_state = kwargs.get('extended_state', False)
         if self._extended_state:
             self._column_names = ['age', 'weight', 'height', 'female', 'male', 'White', 'Black', 'Asian', 'American Indian', 'Pacific Islander',
@@ -38,6 +39,8 @@ class Analyzer:
         self._files_loaded = []
         self._df_for_stats = {}
         self._df_for_segmentation = {}
+        self._gmm = {}
+        self._gmm_results = {}
 
     def load_experiment_data(self, **kwargs):
         experiment_path = kwargs.get('experiment_path', self._experiment_path)
@@ -133,10 +136,21 @@ class Analyzer:
         if items == 'all':
             items = self._df_for_segmentation.keys()
 
-        self._X_embedded = {}
         for agent in items:
             self._X_embedded[agent] = TSNE(n_components=2).fit_transform(
                 self._df_for_segmentation[agent])
+
+    def GMM(self, items='all', **kwargs):
+        if items == 'all':
+            items = self._df_for_segmentation.keys()
+
+        self._cluster_count = kwargs.get('cluster_count', self._cluster_count)
+
+        for agent in items:
+            self._gmm[agent] = GaussianMixture(n_components=self._cluster_count)
+            self._gmm_results[agent] = self._gmm[agent].fit_predict(self._df_for_segmentation[agent])
+        
+        return self._gmm_results
 
     def plot(self, items='all', plots='all', show=True):
         if self._X_embedded == {}:
@@ -145,7 +159,8 @@ class Analyzer:
         if items == 'all':
             items = self._df_for_segmentation.keys()
         if plots == 'all':
-            plots = ['age', 'CYP2C9', 'VKORC1', 'sensitivity']
+            plots = ['age', 'CYP2C9', 'VKORC1', 'sensitivity',
+                     'mixture_model']
 
         fig, axs = plt.subplots(len(plots), len(
             items), figsize=(5*len(items), 5*len(plots)))
@@ -181,6 +196,9 @@ class Analyzer:
                         3 * self._df_for_segmentation[agent]['A/A'] * (self._df_for_segmentation[agent]['*1/*3'] + self._df_for_segmentation[agent]
                                                                        ['*2/*2'] + self._df_for_segmentation[agent]['*2/*3'] + self._df_for_segmentation[agent]['*3/*3'])
                     color_map = 'coolwarm'
+                elif plot == 'mixture_model':
+                    colors = self._gmm_results.get(agent, self.GMM(items=[agent]))
+                    color_map = 'jet'
 
                 axs[index_plot, index_agent].scatter(self._X_embedded[agent][:, 0],
                                                      self._X_embedded[agent][:, 1],
@@ -223,7 +241,7 @@ class Analyzer:
                 results[(agent, stat)] = stat_temp
 
                 if filename is not None:
-                    with open('_'.join((filename, stat.replace('>',''), '.csv')), 'a') as f:
+                    with open('_'.join((self._results_path + filename, stat.replace('>',''), '.csv')), 'a+') as f:
                         stat_temp.to_csv(f, header=False)
 
         return results
@@ -270,20 +288,21 @@ class Analyzer:
 
 
 # %%
-experiment_path = r'.\output_ravvaz'
-results_path = experiment_path + r'\DQN'
+# experiment_path = r'./ravvaz_outputs'
+experiment_path = r'./outputs'
+results_path = experiment_path + r'/results/'
 dose_history = 10
 INR_history = 10
 
 analysis = Analyzer(experiment_path=experiment_path,
                     results_path=results_path,
                     dose_history=dose_history,
-                    INR_history=INR_history,
-                    extended_state=True)
+                    INR_history=INR_history)
 
 # %%
-analysis.load_experiment_data()
-analysis.save(filename='collected_data_ravvaz')
+# analysis.load_experiment_data()
+# analysis.save(filename='collected_data_ravvaz')
+# analysis.save(filename='collected_data')
 
 # %%
 # analysis = Analyzer(experiment_path=experiment_path,
@@ -291,12 +310,19 @@ analysis.save(filename='collected_data_ravvaz')
 #                     dose_history=dose_history,
 #                     INR_history=INR_history)
 
-# analysis.load(filename='collected_data_DQN')
-# %%
-# analysis.plot()
+analysis.load(filename='collected_data')
+analysis._results_path = results_path
 
 # %%
-analysis.stats(filename='saved_stats_ravvaz', groupby=['sensitivity'])
+# analysis.stats(filename='saved_stats', groupby=['sensitivity'], stats=['TTR>0.75', 'TTR>0.85', 'TTR>0.90', 'TTR>0.95'])
+# analysis.stats(filename='all', groupby=['patient'])
+# analysis.stats(filename='per_category', stats=['TTR>0.75', 'TTR>0.85', 'TTR>0.90', 'TTR>0.95'])
+# analysis.stats(filename='all', groupby=['patient', 'sensitivity', 'A/A', 'G/A', 'G/G',
+#                        '*1/*1', '*1/*2', '*1/*3',
+#                        '*2/*2', '*2/*3', '*3/*3'], stats=['count', 'TTR'])
+
+# %%
+analysis.plot()  #.savefig('TSNE.png')
 
 #%%
 # experiment_path = r'.\W'
