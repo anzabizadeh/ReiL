@@ -108,3 +108,7 @@ warfarin_pkpd_model.py
 /logs
 /log
 /Saved Models
+
+# pickle files
+.pkl
+**/.pkl
