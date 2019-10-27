@@ -21,4 +21,4 @@ submodules
 '''
 
 
-__all__ = ['environments', 'agents', 'subjects', 'valueset', 'rldata', 'data_collector']
+__all__ = ['environments', 'agents', 'subjects', 'rlbase', 'rldata', 'data_collector', 'valueset']

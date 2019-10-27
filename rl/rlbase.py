@@ -9,7 +9,6 @@ The base class for reinforcement learning
 '''
 
 from dill import load, dump, HIGHEST_PROTOCOL
-# from pickle import load, dump, HIGHEST_PROTOCOL
 from random import randrange
 import pathlib
 import os
@@ -36,7 +35,7 @@ class RLBase():
     def __init__(self, **kwargs):
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
-        self.set_defaults(name=self.__repr__() + ' - {:0<7}'.format(str(randrange(1, 1000000))), version=0.1, path='.')
+        self.set_defaults(name=self.__repr__() + ' - {:0<7}'.format(str(randrange(1, 1000000))), version=0.3, path='.')
         self.set_params(**kwargs)
 
         if False: self._name, self._version, self._path = [], [], []

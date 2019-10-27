@@ -68,6 +68,12 @@ class RLData:
 
     @value.setter
     def value(self, v):
+        '''
+        Sets the value of the RLData instance.
+
+        Attributes:
+            v: value to store as a list or a dictionary. If a list is provided, it is stored as `value`. To have named values, use dictionary.
+        '''
         if isinstance(v, dict):
             same_index = list(self._value.index) == list(v.keys())
         else:
@@ -115,6 +121,8 @@ class RLData:
     def lower(self, value):
         '''
         Set the lower bound
+
+        Raises ValueError if the provided lower bound is greater than the currently stored value. 
         '''
         try:
             for i, val in value.items():
@@ -156,6 +164,8 @@ class RLData:
     def upper(self, value):
         '''
         Set the upper bound
+
+        Raises ValueError if the provided upper bound is less than the currently stored value. 
         '''
         try:
             for i, val in value.items():
@@ -188,6 +198,9 @@ class RLData:
 
     @property
     def categories(self):
+        '''
+        Return the list of all categories.
+        '''
         return self._value.categories
 
     @categories.setter
@@ -208,6 +221,9 @@ class RLData:
 
     @property
     def is_numerical(self):
+        '''
+        Return a boolean dataframe that shows if each component is numerical or not.
+        '''
         return self._value.is_numerical
 
     @is_numerical.setter
@@ -310,7 +326,6 @@ class RLData:
 
     def __eq__(self, other):
         try:
-            # return self._value == other._value
             return (self.value == other.value).bool() and (
                 ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else 
                     (self.categories == other.categories).bool())
@@ -319,31 +334,31 @@ class RLData:
 
     def __ge__(self, other):
         try:
-            return self._value >= other._value
+            return (self.value >= other.value).bool()
         except AttributeError:
             return False
 
     def __gt__(self, other):
         try:
-            return self._value > other._value
+            return (self.value > other.value).bool()
         except AttributeError:
             return False
 
     def __le__(self, other):
         try:
-            return self._value <= other._value
+            return (self.value <= other.value).bool()
         except AttributeError:
             return False
 
     def __lt__(self, other):
         try:
-            return self._value < other._value
+            return (self.value < other.value).bool()
         except AttributeError:
             return False
 
     def __ne__(self, other):
         try:
-            return self._value != other._value
+            return (self.value != other.value).bool()
         except AttributeError:
             return False
 
