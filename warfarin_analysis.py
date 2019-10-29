@@ -7,15 +7,16 @@ from os.path import isfile, join
 from random import random
 
 import matplotlib.pyplot as plt
+from matplotlib import patches
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from dill import HIGHEST_PROTOCOL, dump, load
-from mpl_toolkits.mplot3d import Axes3D
 from rl.environments import Environment
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 
+from rl.agents import WarfarinClusterAgent
 
 # %%
 class Analyzer:
@@ -27,7 +28,8 @@ class Analyzer:
             'aggregated_data_path', experiment_path + r'\aggregated')
         self._dose_history = kwargs.get('dose_history', 10)
         self._INR_history = kwargs.get('INR_history', 10)
-        self._cluster_count = kwargs.get('cluster_count', 3)
+        # self._cluster_filename = kwargs.get('cluster_filename', None)
+        # self._cluster_count = kwargs.get('cluster_count', 3)
         self._extended_state = kwargs.get('extended_state', False)
         if self._extended_state:
             self._column_names = ['age', 'weight', 'height', 'female', 'male', 'White', 'Black', 'Asian', 'American Indian', 'Pacific Islander',
@@ -39,8 +41,8 @@ class Analyzer:
         self._files_loaded = []
         self._df_for_stats = {}
         self._df_for_segmentation = {}
-        self._gmm = {}
-        self._gmm_results = {}
+        # self._gmm = {}
+        # self._gmm_results = {}
 
     def load_experiment_data(self, **kwargs):
         experiment_path = kwargs.get('experiment_path', self._experiment_path)
@@ -49,6 +51,7 @@ class Analyzer:
         self._INR_history = kwargs.get('INR_history', 10)
         if kwargs.get('reload', False):
             self._files_loaded = []
+            self._all_data = pd.DataFrame()
             self._df_for_stats = {}  # to calculate TTR and other possible measures
             self._df_for_segmentation = {}  # a point is defined as a 90-day dose
 
@@ -70,16 +73,9 @@ class Analyzer:
             elif row['A/A'] * (row['*1/*3'] + row['*2/*2'] + row['*2/*3'] + row['*3/*3']):
                 return 'highly sensitive'
 
-        # temp_size = len([f for f in listdir(experiment_path) if isfile(join(experiment_path, f)) and join(experiment_path, f) not in self._files_loaded])
-        # temp_list_segmentation = [0] * temp_size
-        # temp_list_stats = [0] * temp_size
-        # print(temp_size)
-
-        # counter = -1
         for f in listdir(experiment_path):
             full_filename = join(experiment_path, f)
             if isfile(full_filename) and full_filename not in self._files_loaded:
-                # counter += 1
                 agent, subject = f[:-4].split(sep='@', )
                 print(agent, subject)
                 df_from_file = pd.read_pickle(full_filename)[
@@ -89,8 +85,7 @@ class Analyzer:
                 if len(patient_info) == 1:
                     patient_info = list(
                         *df_from_file.iloc[0].state.normalize().value)
-                # temp_list_segmentation[counter] = patient_info[:10] + [float(a.value)
-                #                              for a in df_from_file.action]
+
                 try:
                     self._df_for_segmentation[agent].loc[len(self._df_for_segmentation[agent])] = \
                         patient_info[:10] + [float(a.value)
@@ -101,21 +96,26 @@ class Analyzer:
                                                                              patient_info[:10] + [float(a.value) for a in df_from_file.action])),
                                                                     index=[0])
 
-                INR_factor = df_from_file.loc[0, 'state'].upper.loc['INRs']
+                INR_max = df_from_file.loc[0, 'state'].upper.loc['INRs']
+                dose_max = df_from_file.loc[0, 'state'].upper.loc['Doses']
                 df_state_action = df_from_file.apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(
                     x, str) else [x] for x in row.state.normalize().value] for z in y] + row.action.as_list(), axis=1, result_type='expand')
                 df_state_action.columns = self._column_names + ['dose-{:02}'.format(
                     dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
                 # df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current'], inplace=True, axis=1)
-                df_state_action['dose change'] = df_state_action.apply(
-                    lambda row: int(row['action']/15.0 != row['dose-01']), axis=1)
+                df_state_action['delta_dose'] = df_state_action.apply(
+                    lambda row: row['action'] - row['dose-01'] * dose_max, axis=1)
+                df_state_action['dose_change'] = df_state_action.apply(
+                    lambda row: int(row['action'] != row['dose-01']*dose_max), axis=1)
                 df_state_action.INR_current = df_state_action.INR_current.apply(
-                    lambda x: x * INR_factor)
+                    lambda x: x * INR_max)
                 df_state_action['TTR'] = df_state_action.INR_current.apply(
                     lambda x: 1 if 2 <= x <= 3 else 0)
                 df_state_action['patient'] = subject
                 df_state_action['agent'] = agent
-                df_state_action['sensitivity'] = df_state_action.apply(lambda row: sensitivity(row), axis=1)
+                df_state_action['sensitivity'] = sensitivity(df_state_action.iloc[0, :])  # df_state_action.apply(lambda row: sensitivity(row), axis=1)
+                df_state_action['VKORC1'] = df_state_action.loc[[0], ['A/A', 'G/A', 'G/G']].idxmax(axis=1)[0] # .apply(lambda row: row[['A/A', 'G/A', 'G/G']].idxmax(), axis=1)
+                df_state_action['CYP2C9'] = df_state_action.loc[[0], ['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']].idxmax(axis=1)[0]  # .apply(lambda row: row[['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']].idxmax(), axis=1)
 
                 df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + [
                                      'INR-{:02}'.format(INR_history-i) for i in range(INR_history)], inplace=True, axis=1)
@@ -126,11 +126,21 @@ class Analyzer:
                 except KeyError:
                     self._df_for_stats[agent] = df_state_action
 
-
                 self._files_loaded.append(full_filename)
 
         # self._df_for_segmentation = pd.concat([self._df_for_segmentation] + temp_list_segmentation)
         # self._df_for_stats = pd.concat([self._df_for_stats] + temp_list_stats)
+
+    def assign_cluster_label(self, cluster_filename, items='all', **kwargs):
+        self._clustering_agent = WarfarinClusterAgent(cluster_filename=cluster_filename, **kwargs)
+        if items == 'all':
+            items = self._df_for_stats.keys()
+        
+        for agent in items:
+            self._df_for_stats[agent]['cluster'] = self._df_for_stats[agent].apply(
+                lambda row: self._clustering_agent._assign_to_cluster(age=row['age'], CYP2C9=row['CYP2C9'], VKORC1=row['VKORC1']), axis=1)
+        
+        print('done')
 
     def TSNE(self, items='all'):
         if items == 'all':
@@ -139,18 +149,6 @@ class Analyzer:
         for agent in items:
             self._X_embedded[agent] = TSNE(n_components=2).fit_transform(
                 self._df_for_segmentation[agent])
-
-    def GMM(self, items='all', **kwargs):
-        if items == 'all':
-            items = self._df_for_segmentation.keys()
-
-        self._cluster_count = kwargs.get('cluster_count', self._cluster_count)
-
-        for agent in items:
-            self._gmm[agent] = GaussianMixture(n_components=self._cluster_count)
-            self._gmm_results[agent] = self._gmm[agent].fit_predict(self._df_for_segmentation[agent])
-        
-        return self._gmm_results
 
     def plot(self, items='all', plots='all', show=True):
         if self._X_embedded == {}:
@@ -199,6 +197,7 @@ class Analyzer:
                 elif plot == 'mixture_model':
                     colors = self._gmm_results.get(agent, self.GMM(items=[agent]))
                     color_map = 'jet'
+                    # axs[index_plot, index_agent].add_patch(patches.Ellipse())
 
                 axs[index_plot, index_agent].scatter(self._X_embedded[agent][:, 0],
                                                      self._X_embedded[agent][:, 1],
@@ -214,35 +213,52 @@ class Analyzer:
               groupby=['A/A', 'G/A', 'G/G',
                        '*1/*1', '*1/*2', '*1/*3',
                        '*2/*2', '*2/*3', '*3/*3'],
-              filename=None):
+              filename=None, drop_days=[0]):
         if items == 'all':
             items = self._df_for_segmentation.keys()
         if stats == 'all':
-            stats = ['TTR', 'TTR>0.65', 'dose change', 'count']
+            stats = ['TTR', 'TTR>0.65', 'dose_change', 'count', 'INR', 'INR_percent_dose_change']
 
         groupby = ['agent'] + groupby
 
         results = {}
         for agent in items:
+            records_to_keep = [i+j for j in range(0, self._df_for_stats[agent].shape[0], 90) for i in range(90) if i not in drop_days]
+            temp_df = self._df_for_stats[agent].loc[records_to_keep]
             for stat in stats:
                 if stat == 'TTR':
-                    stat_temp = (self._df_for_stats[agent].groupby(groupby).sum()['TTR'] /
-                                 self._df_for_stats[agent].groupby(groupby).count()['TTR'])
+                    stat_temp = (temp_df.groupby(groupby).sum()['TTR'] /
+                                 temp_df.groupby(groupby).count()['TTR'])
                 elif stat[:4] == 'TTR>':
-                    stat_temp_temp = (self._df_for_stats[agent].groupby(groupby + ['patient']).sum()['TTR'] / 
-                                       self._df_for_stats[agent].groupby(groupby + ['patient']).count()['TTR']) > float(stat[4:])  # .reset_index(level='patient', drop='patient')
+                    stat_temp_temp = (temp_df.groupby(groupby + ['patient']).sum()['TTR'] / 
+                                       temp_df.groupby(groupby + ['patient']).count()['TTR']) > float(stat[4:])  # .reset_index(level='patient', drop='patient')
                     stat_temp = (stat_temp_temp.groupby(groupby).sum() / stat_temp_temp.groupby(groupby).count()).rename(stat)
-                elif stat == 'dose change':
-                    stat_temp = (self._df_for_stats[agent].groupby(groupby).sum()['dose change'] /
-                                 self._df_for_stats[agent].groupby(groupby).count()['dose change'])
+                elif stat == 'dose_change':
+                    stat_temp = (temp_df.groupby(groupby).sum()['dose_change'] /
+                                 temp_df.groupby(groupby).count()['dose_change']).rename(stat)
                 elif stat == 'count':
-                    stat_temp = self._df_for_stats[agent].groupby(groupby).count()['dose change'].rename(stat)
+                    stat_temp = temp_df.groupby(groupby).count()['dose_change'].rename(stat)
+                elif stat == 'INR':
+                    if 'patient' not in groupby:
+                        groupby_temp = ['patient'] + groupby
+                    else:
+                        groupby_temp = groupby
+                    stat_temp = (temp_df.groupby(groupby_temp).sum()['INR_current'] /
+                                 temp_df.groupby(groupby_temp).count()['INR_current']).rename(stat)
+                elif stat == 'INR_percent_dose_change':
+                    if 'patient' not in groupby:
+                        groupby_temp = ['patient', 'INR_current'] + groupby
+                    else:
+                        groupby_temp = ['INR_current'] + groupby
+                    stat_temp = (temp_df.groupby(groupby_temp).sum()['delta_dose'] /
+                                 (temp_df.groupby(groupby_temp).sum()['action']
+                                 - temp_df.groupby(groupby_temp).sum()['delta_dose'])).rename(stat)
 
                 results[(agent, stat)] = stat_temp
 
                 if filename is not None:
                     with open('_'.join((self._results_path + filename, stat.replace('>',''), '.csv')), 'a+') as f:
-                        stat_temp.to_csv(f, header=False)
+                        stat_temp.to_csv(f, header=True)
 
         return results
 
@@ -289,8 +305,10 @@ class Analyzer:
 
 # %%
 # experiment_path = r'./ravvaz_outputs'
+# filename = 'collected_data_4_6_16_with_4_clusters'
+filename = 'collected_data'
 experiment_path = r'./outputs'
-results_path = experiment_path + r'/results/'
+results_path = experiment_path + r'/results_INR_dose_change/'
 dose_history = 10
 INR_history = 10
 
@@ -299,503 +317,17 @@ analysis = Analyzer(experiment_path=experiment_path,
                     dose_history=dose_history,
                     INR_history=INR_history)
 
-# %%
-# analysis.load_experiment_data()
-# analysis.save(filename='collected_data_ravvaz')
-# analysis.save(filename='collected_data')
 
-# %%
-# analysis = Analyzer(experiment_path=experiment_path,
-#                     results_path=results_path,
-#                     dose_history=dose_history,
-#                     INR_history=INR_history)
-
-analysis.load(filename='collected_data')
-analysis._results_path = results_path
-
-# %%
-# analysis.stats(filename='saved_stats', groupby=['sensitivity'], stats=['TTR>0.75', 'TTR>0.85', 'TTR>0.90', 'TTR>0.95'])
-# analysis.stats(filename='all', groupby=['patient'])
-# analysis.stats(filename='per_category', stats=['TTR>0.75', 'TTR>0.85', 'TTR>0.90', 'TTR>0.95'])
-# analysis.stats(filename='all', groupby=['patient', 'sensitivity', 'A/A', 'G/A', 'G/G',
-#                        '*1/*1', '*1/*2', '*1/*3',
-#                        '*2/*2', '*2/*3', '*3/*3'], stats=['count', 'TTR'])
-
-# %%
-analysis.plot()  #.savefig('TSNE.png')
-
-#%%
-# experiment_path = r'.\W'
-# results_path = experiment_path + r'\results'
-# dose_history = 9
-# INR_history = 9
-
-# #%%
-# df_for_stats = {}  # to calculate TTR and other possible measures
-# df_for_segmentation = {}  # a point is defined as a 90-day dose
-# for f in listdir(results_path):
-#     full_filename = join(results_path, f)
-#     if isfile(full_filename):
-#         agent, subject = f[:-4].split(sep='@', )
-#         print(agent, subject)
-#         # agent, subject = f[:-4].split(sep='_')
-#         df_from_file = pd.read_pickle(full_filename)[['state', 'action']]
-
-#         patient_info = df_from_file.iloc[0].state.normalize().as_list()
-#         if len(patient_info) == 1:
-#             patient_info = list(*df_from_file.iloc[0].state.normalize().value)
-#         try:
-#             df_for_segmentation[agent].loc[len(df_for_segmentation[agent])] = \
-#                 patient_info[:10] + [float(a.value) for a in df_from_file.action]
-#             # df_for_segmentation[agent].append(np.concatenate([df_from_file.iloc[0].state.normalize().as_nparray()[:, :10],
-#             #         np.array(tuple(float(a.value) for a in df_from_file.action), ndmin=2)], axis=1), ignore_index=True)
-#         except KeyError:
-#             df_for_segmentation[agent] = pd.DataFrame(dict(zip(['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A']
-#                                 + ['dose {:02}'.format(i) for i in range(90)],
-#                                 patient_info[:10] + [float(a.value) for a in df_from_file.action])),
-#                                 index=[0])
-#             # df_for_segmentation[agent] = pd.DataFrame(df_from_file.iloc[0].state.normalize().as_list()[:10]
-#             #     + [float(a.value) for a in df_from_file.action])
-#             # df_for_segmentation[agent] = pd.DataFrame(np.concatenate([df_from_file.iloc[0].state.normalize().as_nparray()[:, :10],
-#             #     np.array(tuple(float(a.value) for a in df_from_file.action), ndmin=2)], axis=1))
-#             # df_for_segmentation[agent].columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose {:02}'.format(i) for i in range(90)]
-
-#         # df_state_action = pd.DataFrame(np.concatenate((df_from_file.iloc[0].state.normalize().as_nparray(),
-#         #         np.array(tuple(float(a.value) for a in df_from_file.action), ndmin=2)), axis=1))
-#         # df_state_action.columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose {:02}'.format(i) for i in range(90)]
-#         INR_factor = df_from_file.loc[0, 'state'].upper.loc['INRs']
-#         df_state_action = df_from_file.apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(x, str) else [x] for x in row.state.normalize().value] for z in y] + row.action.as_list(), axis=1, result_type='expand')
-#         df_state_action.columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
-#         # df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current'], inplace=True, axis=1)
-#         df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)], inplace=True, axis=1)
-#         df_state_action.INR_current = df_state_action.INR_current.apply(lambda x: x * INR_factor)
-#         df_state_action['TTR'] = df_state_action.INR_current.apply(lambda x: 1 if 2<=x<=3 else 0)
-#         try:
-#             df_for_stats[agent] = pd.concat([df_for_stats[agent], df_state_action], ignore_index=True)
-#         except KeyError:
-#             df_for_stats[agent] = df_state_action
-
-
-# #%%
-# # Plot doses
-# for i in df.index:
-#     plt.plot(df.loc[i, 'dose 0': 'dose 89'])
-
-# plt.show()
-
-
-# #%%
-# # stats
-# df_for_stats['0.60_2_day'].groupby(['A/A', 'G/A', 'G/G', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']).count()/90
-
-# #%%
-# # Visualization of protocols
-# k_means = {}
-# X_embedded = {}
-# plot_index = 0
-# fig = plt.figure()
-
-# for agent, df in df_for_segmentation.items():
-#     plot_index += 1
-#     try:
-#         X_embedded[agent] = TSNE(n_components=2).fit_transform(df)
-#         plt.subplot(len(df_for_segmentation), 1, plot_index) # plt.figure(figsize=(10, 10))
-#         # ax = fig.axis(projection='2d')  # Axes3D(fig)
-#         # colors = dict((i, (random(), random(), random(), 0.7)) for i in pd.unique(Y))
-#         plt.scatter(X_embedded[agent][:, 0],
-#                     X_embedded[agent][:, 1])
-#                     # X_embedded[:, 2],
-#                     # c=df_for_segmentation['0.50_4_day'].age,
-#                     # label=y_kmeans)
-#     except ValueError:
-#         pass
-
-# plt.show()
-
-#     # kmeans = KMeans(n_clusters=5)
-#     # kmeans.fit(X)
-#     # y_kmeans = kmeans.predict(X)
-
-
-# #%%
-# # Different plots:
-
-# # age
-# for plot_index, agent in enumerate(df_for_segmentation):
-#     plt.subplot(len(df_for_segmentation), 1, plot_index + 1) # plt.figure(figsize=(10, 10))
-#     plt.scatter(X_embedded[agent][:, 0], X_embedded[agent][:, 1], c=df_for_segmentation[agent]['age'], cmap='Greens')
-#     # fig.suptitle('G/G->Red \n G/A -> Green \n A/A -> Blue')
-# plt.show()
-
-# # G/G, G/A, A/A
-# for plot_index, agent in enumerate(df_for_segmentation):
-#     plt.subplot(len(df_for_segmentation), 1, plot_index + 1) # plt.figure(figsize=(10, 10))
-#     plt.scatter(X_embedded[agent][:, 0], X_embedded[agent][:, 1], c=list(zip(df_for_segmentation[agent]['G/G'], df_for_segmentation[agent]['G/A'], df_for_segmentation[agent]['A/A'])))
-#     # fig.suptitle('G/G->Red \n G/A -> Green \n A/A -> Blue')
-# plt.show()
-
-
-# # *1/*1, *1/*2, *1/*3, *2/*3, *3/*3
-# for plot_index, agent in enumerate(df_for_segmentation):
-#     plt.subplot(len(df_for_segmentation), 1, plot_index + 1) # plt.figure(figsize=(10, 10))
-#     colors = df_for_segmentation[agent]['*1/*1'] * 2 + \
-#              df_for_segmentation[agent]['*1/*2'] * 4 + \
-#              df_for_segmentation[agent]['*1/*3'] * 6 + \
-#              df_for_segmentation[agent]['*2/*2'] * 8 + \
-#              df_for_segmentation[agent]['*2/*3'] * 10 + \
-#              df_for_segmentation[agent]['*3/*3'] * 12
-
-#     plt.scatter(X_embedded[agent][:, 0], X_embedded[agent][:, 1], c=colors, cmap='tab10')
-# plt.show()
-
-
-# # Normal, Sensitive, Highly Sensitive
-# for plot_index, agent in enumerate(df_for_segmentation):
-#     plt.subplot(len(df_for_segmentation), 1, plot_index + 1) # plt.figure(figsize=(10, 10))
-#     colors = 1 * df_for_segmentation[agent]['G/G'] * (df_for_segmentation[agent]['*1/*1'] + df_for_segmentation[agent]['*1/*2']) + \
-#              1 * df_for_segmentation[agent]['G/A'] * df_for_segmentation[agent]['*1/*1'] + \
-#              2 * df_for_segmentation[agent]['G/G'] * (df_for_segmentation[agent]['*1/*3'] + df_for_segmentation[agent]['*2/*2'] + df_for_segmentation[agent]['*2/*3']) + \
-#              2 * df_for_segmentation[agent]['G/A'] * (df_for_segmentation[agent]['*1/*2'] + df_for_segmentation[agent]['*1/*3'] + df_for_segmentation[agent]['*2/*2']) + \
-#              2 * df_for_segmentation[agent]['A/A'] * (df_for_segmentation[agent]['*1/*1'] + df_for_segmentation[agent]['*1/*2']) + \
-#              3 * df_for_segmentation[agent]['G/G'] * df_for_segmentation[agent]['*3/*3'] + \
-#              3 * df_for_segmentation[agent]['G/A'] * (df_for_segmentation[agent]['*2/*3'] + df_for_segmentation[agent]['*3/*3']) + \
-#              3 * df_for_segmentation[agent]['A/A'] * (df_for_segmentation[agent]['*1/*3'] + df_for_segmentation[agent]['*2/*2'] + df_for_segmentation[agent]['*2/*3'] + df_for_segmentation[agent]['*3/*3'])
-
-#     plt.scatter(X_embedded[agent][:, 0], X_embedded[agent][:, 1], c=colors, cmap='coolwarm')
-# plt.show()
-
-# #%%
-# print('Extracting Xs and Ys.')
-
-# X = {}
-# Y = {}
-# for agent, df in temp.items():
-#     X[agent] = df[:10000].apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(x, str) else [x] for x in row.state.normalize().value] for z in y ] + row.action.as_list(), axis=1, result_type='expand')
-#     Y[agent] = df[:10000].apply(lambda row: row.action.as_list()[0], axis=1)
-#     X[agent].columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
-#     Y[agent].columns = ['action']
-
-
-# ##%%
-# #temp_df = pd.concat([pd.read_pickle(join(results_path, f))[['state', 'action']] for f in listdir(results_path) if isfile(join(results_path, f))], ignore_index=True)
-
-# # #%%
-# # print('Extracting Xs and Ys.')
-# # X = temp_df[:10000].apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(x, str) else [x] for x in row.state.normalize().value] for z in y ] + row.action.as_list(), axis=1, result_type='expand')
-# # Y = temp_df[:10000].apply(lambda row: row.action.as_list()[0], axis=1)
-
-# # X.columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
-# # Y.columns = ['action']
-
-
-# kmeans = KMeans(n_clusters=5)
-# kmeans.fit(X)
-# y_kmeans = kmeans.predict(X)
-
-
-# #%%
-# X_embedded = TSNE(n_components=2).fit_transform(X)
-
-
-# #%%
-# plt.savefig('t-sne of kNN 5 of states - 10000.png')
-
-
-# #%%
-# get_ipython().run_line_magic('matplotlib', 'notebook')
-
-# fig = plt.figure(figsize=(10, 10))
-# ax = fig.gca(projection='3d')  # Axes3D(fig)
-# colors = dict((i, (random(), random(), random(), 0.7)) for i in pd.unique(Y))
-# scatter = ax.scatter(X_embedded[:, 0],
-#                      X_embedded[:, 1],
-#                      X_embedded[:, 2],
-#                      c=y_kmeans,
-#                      label=y_kmeans)
-# ax.legend()
-# plt.show()
-# #plt.savefig('t-sne of states - 10000.png')
-
-
-# #%%
-# generation_cycles = 1
-# patient_count = 10
-# dose_history = 9
-# INR_history = 9
-# file_names = ['./sampled_policies_0.20.pkl',
-#               './sampled_policies_0.40.pkl',
-#               './sampled_policies_0.80.pkl']
-# RL_filenames = ['WARF_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.20_DQN_(20,20)_g_0.8_e_func_lr_0.02_buff_900_clr_F_btch_50_vld_0.3',
-#                 'WARF_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.40_DQN_(20,20)_g_0.8_e_func_lr_0.02_buff_900_clr_F_btch_50_vld_0.3',
-#                 'WARF_00_00_XX_d_90_dose_9_INR_9_T__dose_change_coef_0.80_DQN_(20,20)_g_0.8_e_func_lr_0.02_buff_900_clr_F_btch_50_vld_0.3']
-
-
-# #%%
-# tf.reset_default_graph()
-
-# #%%
-# env = []
-# agent = []
-# subject = []
-
-# for f in RL_filenames:
-#     print(f)
-#     env.append(Environment(filename=f))
-#     agent.append(env[-1]._agent['protocol'])
-#     subject.append(env[-1]._subject['W'])
-
-# #%% [markdown]
-# # ## Create state-action Dataset
-
-# #%%
-# temp_df = []
-# for f in range(len(RL_filenames)):
-#     print('Reading previous records.')
-#     try:
-#         temp_df.append(pd.read_pickle(file_name[f]))
-#     except FileNotFoundError:
-#         print('No previous records found.')
-
-#     for i in range(generation_cycles):
-#         print('\n\ncycle {:03}\n'.format(i))
-#         print('Generating new records.')
-#         new_records = pd.concat([env[f].trajectory()['protocol'][['state', 'action']] for i in range(patient_count)], ignore_index=True)
-
-#         try:
-#             temp_df = pd.concat([temp_df, new_records], ignore_index=True)
-#         except FileNotFoundError:
-#             temp_df = new_records
-
-#         print('Saving.')
-#         temp_df.to_pickle(file_name[f])
-
-# #%% [markdown]
-# # ## Read the dataset and extract
-
-# #%%
-# temp_df = pd.read_pickle(file_name)
-
-
-# #%%
-# print('Extracting Xs and Ys.')
-# X = temp_df[:10000].apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(x, str) else [x] for x in row.state.normalize().value] for z in y ] + row.action.as_list(), axis=1, result_type='expand')
-# Y = temp_df[:10000].apply(lambda row: row.action.as_list()[0], axis=1)
-
-# X.columns = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A'] + ['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
-# Y.columns = ['action']
-
-# #%% [markdown]
-# # ## Clustering and its plot
-
-
-# kmeans = KMeans(n_clusters=5)
-# kmeans.fit(X)
-# y_kmeans = kmeans.predict(X)
-
-
-# #%%
-# X_embedded = TSNE(n_components=3).fit_transform(X)
-
-
-# #%%
-# plt.savefig('t-sne of kNN 5 of states - 10000.png')
-
-
-# #%%
-# get_ipython().run_line_magic('matplotlib', 'notebook')
-
-# fig = plt.figure(figsize=(10, 10))
-# ax = fig.gca(projection='3d')  # Axes3D(fig)
-# colors = dict((i, (random(), random(), random(), 0.7)) for i in pd.unique(Y))
-# scatter = ax.scatter(X_embedded[:, 0],
-#                      X_embedded[:, 1],
-#                      X_embedded[:, 2],
-#                      c=y_kmeans,
-#                      label=y_kmeans)
-# ax.legend()
-# plt.show()
-# #plt.savefig('t-sne of states - 10000.png')
-
-# #%% [markdown]
-# # ## Plots per dose level
-
-# #%%
-# get_ipython().run_line_magic('matplotlib', 'notebook')
-
-# fig = plt.figure(figsize=(16, 16))
-# ax = fig.gca(projection='3d')  # Axes3D(fig)
-# colors = dict((i, (random(), random(), random(), 0.7)) for i in pd.unique(Y))
-# for label in sorted(pd.unique(Y)):
-#     scatter = ax.scatter(X_embedded[Y[Y==label].index, 0],
-#                          X_embedded[Y[Y==label].index, 1],
-#                          X_embedded[Y[Y==label].index, 2],
-#                          c=[colors[label]],
-#                          label=label)
-# ax.legend()
-# plt.show()
-# plt.savefig('t-sne of states - 10000.png')
-#     #plt.savefig('t-sne 3d of states - 10000 - {:02.1f}.png'.format(label))
-#     #plt.cla()
-
-
-# #%%
-# plt.savefig('t-sne of states.png')
-
-# #%% [markdown]
-# # ## TTR
-
-# #%%
-# TTRs = {}
-# counts = {}
-# temp = temp_df
-# for i in range(0, temp_df.shape[0], 90):
-#     print('{:02}\tpatient: Age: {}, CYP2C9: {}, VKORC1: {}'.format(
-#       i,
-#       temp.state[i].value['Age'],
-#       temp.state[i].value['CYP2C9'],
-#       temp.state[i].value['VKORC1'])
-#      )
-
-#     try:
-#         TTR = sum(1 if 2.0<=temp.state[i+j].value.INRs[-1]<=3.0 else 0 for j in range(90)) / 90
-#         TTRs[(temp.state[i].value['Age'],
-#                  temp.state[i].value['CYP2C9'],
-#                  temp.state[i].value['VKORC1'])].append(TTR)
-
-#     except KeyError:
-#         TTRs[(temp.state[i].value['Age'],
-#                  temp.state[i].value['CYP2C9'],
-#                  temp.state[i].value['VKORC1'])] = [TTR]
-
-# print('TTR\npatient\t\t\tcount\tmin\taverage\tmax')
-# for patient, r in TTRs.items():
-#     print('{}\t{:3}\t{:2.2%}\t{:2.2%}\t{:2.2%}'.format(patient, len(r), min(r), sum(r)/len(r), max(r)))
-
-
-# #%%
-# TTRs = {}
-# counts = {}
-# temp = temp_df
-# for i in range(temp_df.shape[0]):
-# #    print('{:02}\tpatient: Age: {}, CYP2C9: {}, VKORC1: {}'.format(
-#  #     i,
-#   #    temp.state[i].value['Age'],
-#    #   temp.state[i].value['CYP2C9'],
-#     #  temp.state[i].value['VKORC1'])
-#      #)
-#     try:
-#         TTRs[(temp.state[i].value['Age'],
-#                  temp.state[i].value['CYP2C9'],
-#                  temp.state[i].value['VKORC1'])] += 1 if 2.0 <= temp_df.state[i].value.INRs[-1] <= 3.0 else 0
-#         counts[(temp.state[i].value['Age'],
-#                  temp.state[i].value['CYP2C9'],
-#                  temp.state[i].value['VKORC1'])] += 1
-#     except KeyError:
-#         TTRs[(temp.state[i].value['Age'],
-#                  temp.state[i].value['CYP2C9'],
-#                  temp.state[i].value['VKORC1'])] = 1 if 2.0 <= temp_df.state[i].value.INRs[-1] <= 3.0 else 0
-#         counts[(temp.state[i].value['Age'],
-#                  temp.state[i].value['CYP2C9'],
-#                  temp.state[i].value['VKORC1'])] = 1
-
-# print('TTR\npatient\t\t\tcount\tTTR')
-# for patient, r in TTRs.items():
-#     print('{}\t{:3}\t{:3.2%}'.format(patient, counts[patient], r/counts[patient]))  # len(r), min(r), sum(r)/len(r), max(r)))
-
-
-# #%%
-# print('TTR\npatient\t\t\tcount\tTTR')
-# for patient, r in TTRs.items():
-#     print('{}\t{:3}\t{:3.2%}'.format(patient, counts[patient]/90, r/counts[patient]))
-
-# #%% [markdown]
-# # ## One Patient
-
-# #%%
-# temp = env.trajectory()['protocol']
-# print('patient: Age: {}, CYP2C9: {}, VKORC1: {}'.format(
-#       temp.state[0].value['Age'],
-#       temp.state[0].value['CYP2C9'],
-#       temp.state[0].value['VKORC1'])
-#      )
-# print('day\tINR\taction\treward')
-# TTR = 0
-# for t in temp.iterrows():
-#     print('{}\t{:3.1f}\t{:5.1f}\t{:3.2f}'.format(t[0],
-#                                               t[1].state.value['INRs'][-1],
-#                                               t[1].action.value['value'],
-#                                               t[1].reward))
-#     if 2 <= t[1].state.value['INRs'][-1] <= 3:
-#         TTR += 1
-# print(TTR/90)
-
-
-# #%%
-# TTRs = {}
-# actions = {}
-# for i in range(50):
-
-#     temp = env.trajectory()['protocol']
-#     print('{:02}\tpatient: Age: {}, CYP2C9: {}, VKORC1: {}'.format(
-#       i,
-#       temp.state[0].value['Age'],
-#       temp.state[0].value['CYP2C9'],
-#       temp.state[0].value['VKORC1'])
-#      )
-#     try:
-#         TTR = sum(1 if 2.0<=t[1].state.value['INRs'][-1]<=3.0 else 0 for t in temp.iterrows()) / len(temp)
-#         ave_action = sum(t[1].action.value['value'] for t in temp.iterrows()) / len(temp)
-#         TTRs[(temp.state[0].value['Age'],
-#                  temp.state[0].value['CYP2C9'],
-#                  temp.state[0].value['VKORC1'])].append(TTR)
-#         actions[(temp.state[0].value['Age'],
-#                 temp.state[0].value['CYP2C9'],
-#                 temp.state[0].value['VKORC1'])].append(ave_action)
-#     except KeyError:
-#         TTRs[(temp.state[0].value['Age'],
-#                  temp.state[0].value['CYP2C9'],
-#                  temp.state[0].value['VKORC1'])] = [TTR]
-#         actions[(temp.state[0].value['Age'],
-#                  temp.state[0].value['CYP2C9'],
-#                  temp.state[0].value['VKORC1'])] = [ave_action]
-
-# print('TTR\npatient\t\t\tcount\tmin\taverage\tmax')
-# for patient, r in TTRs.items():
-#     print('{}\t{:3}\t{:2.2%}\t{:2.2%}\t{:2.2%}'.format(patient, len(r), min(r), sum(r)/len(r), max(r)))
-
-# print('actions\npatient\t\t\tcount\tmin\taverage\tmax')
-# for patient, r in actions.items():
-#     print('{}\t{:3}\t{:3.2}\t{:3.2}\t{:3.2}'.format(patient, len(r), min(r), sum(r)/len(r), max(r)))
-
-
-# j_results = {}
-# for p, v in results.items():
-#     j_results[', '.join((p[2], p[1], str(p[0])))] = v
-
-# with open("10000patients.json", "w") as write_file:
-#     json.dump(j_results, write_file)
-
-
-# #%%
-# all_records = []
-# for p, value in results.items():
-#     all_records.extend(list((p, v) for v in value))
-
-# for r in all_records:
-#     print(r[0], r[1])
-
-
-# csv.writer()
-
-
-# #%%
-# for patient in sorted(results, key=lambda s: s[2]+s[1]+str(s[0])):
-#     print('\t'.join((patient[2], patient[1], str(patient[0]),
-#                      '{: 3}'.format(len(results[patient])),
-#                      '{:3.2}'.format(min(results[patient])),
-#                      '{:3.2}'.format(sum(results[patient])/len(results[patient])),
-#                      '{:3.2}'.format(max(results[patient])))))
-
-
-
-#%%
+try:
+    analysis.load(filename=filename)
+    analysis._results_path = experiment_path + r'/results_INR_dose_change/'
+except:
+    analysis.load_experiment_data()
+    analysis.assign_cluster_label('Weka output (4 clusters).csv')
+    analysis.save(filename='collected_data_4_6_16_with_4_clusters')
+
+analysis.stats(stats=['INR', 'delta_dose', 'INR_percent_dose_change'],
+               groupby=['sensitivity', 'cluster'],
+               items=['WCA04_00_0.0'],
+               filename='4_6_16_with_4_clusters',
+               drop_days=range(7))
