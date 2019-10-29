@@ -11,6 +11,8 @@ Classes
 -------
     Environment: the base class that provides minimum required
         functionality for a reinforcement learning environment.
+    Experiment: an environment to explore performance of trained
+        agents on subjects.
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''

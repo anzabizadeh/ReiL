@@ -21,7 +21,7 @@ from ..rldata import RLData
 from .subject import Subject
 
 
-class WarfarinModel(Subject):
+class WarfarinModel_v3(Subject):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model for wafarin.
 

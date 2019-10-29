@@ -116,6 +116,9 @@ class Experiment(Environment):
         file_index_generator = kwargs.get('file_index_generator',
             self._file_index_generator if self._file_index_generator is not None else self._default_file_index_generator)
 
+        output_dir = Path(outputs_path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         for agent_name, agent in self._agent.items():
             print('Agent: {}'.format(agent_name))
             agent.status = 'testing'
@@ -131,13 +134,13 @@ class Experiment(Environment):
                 print(file_index)
                 history = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
 
-                output_dir = Path(outputs_path)
-                output_dir.mkdir(parents=True, exist_ok=True)
-
                 filename = subject_name + file_index
                 print('Subject: {}'.format(filename))
                 temp_agent_list = subject._agent_list
-                subject.load(filename=filename, path=subjects_path)  # './' + subject_name)
+                # THIs SHOULD BE subject.load(...), I ADDED ._patient TEMPORARILY! ALSO,
+                # DELETE subject.reset()
+                subject.reset()
+                subject._patient.load(filename=filename, path=subjects_path)  # './' + subject_name)
                 subject._agent_list = temp_agent_list
 
                 steps = 0

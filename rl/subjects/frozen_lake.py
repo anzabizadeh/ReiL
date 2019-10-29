@@ -3,9 +3,9 @@
 WindyGridworld class
 ==============
 
-This class creates a gridworld (board) in which one square is the goal.
+This class creates a frozen lake (board) in which one square is the goal.
 The agent starts from a location and should find the fastest route to the goal.
-Wind is a fixed amount of padding based on the location of the agent on the board.
+Some locations are holes.
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
@@ -13,9 +13,9 @@ Wind is a fixed amount of padding based on the location of the agent on the boar
 
 from random import choice
 
-from rl.subjects.mnkboard import MNKBoard
-from rl.subjects.subject import Subject
-from rl.valueset import ValueSet
+from ..utils.mnkboard import MNKBoard
+from ..subjects.subject import Subject
+from ..legacy.valueset import ValueSet
 
 
 def main():
