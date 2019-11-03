@@ -12,8 +12,8 @@ from collections import deque
 from math import exp
 from random import choice, shuffle
 
-from ..valueset import ValueSet
-from .subject import Subject
+from ..legacy import ValueSet
+from ..subjects import Subject
 from .warfarin_pkpd_model import hamberg_2007
 
 

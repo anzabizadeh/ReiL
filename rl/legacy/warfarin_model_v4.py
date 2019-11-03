@@ -18,10 +18,9 @@ import pandas as pd
 from dill import HIGHEST_PROTOCOL, dump, load
 from scipy.stats import lognorm
 
-from ..base import RLBase
+from ..rlbase import RLBase
 from ..rldata import RLData
 from ..subjects import Subject
-from rl.subjects.subject import Subject
 
 class WarfarinModel_v4(Subject):
     '''

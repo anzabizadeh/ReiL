@@ -8,7 +8,7 @@ This `agent` class is the super class of all agent classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from ..base import RLBase
+from ..rlbase import RLBase
 
 
 def main():

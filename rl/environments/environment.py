@@ -15,7 +15,7 @@ import inspect
 import pathlib
 import pandas as pd
 
-from ..base import RLBase
+from ..rlbase import RLBase
 import rl.agents as agents
 import rl.subjects as subjects
 

@@ -15,8 +15,8 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from rpy2.robjects.vectors import StrVector
 
-from ..valueset import ValueSet
-from .subject import Subject
+from ..legacy.valueset import ValueSet
+from ..subjects import Subject
 
 
 class WarfarinModel(Subject):

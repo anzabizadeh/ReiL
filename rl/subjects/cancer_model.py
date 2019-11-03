@@ -10,7 +10,7 @@ This `cancer_model` class implements a four-state nonlinear cancer chemotherapy 
 
 from math import exp
 
-from ..valueset import ValueSet
+from ..legacy import ValueSet
 from .subject import Subject
 
 

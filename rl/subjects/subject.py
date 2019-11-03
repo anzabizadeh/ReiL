@@ -8,7 +8,7 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from ..base import RLBase
+from ..rlbase import RLBase
 
 
 class Subject(RLBase):

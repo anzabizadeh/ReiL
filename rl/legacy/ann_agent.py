@@ -15,7 +15,7 @@ from time import time
 import numpy as np
 import tensorflow as tf
 
-from .agent import Agent
+from ..agents import Agent
 from ..rldata import RLData
 
 

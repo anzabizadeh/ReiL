@@ -18,7 +18,7 @@ from scipy.stats import lognorm
 
 # from ..valueset import ValueSet
 from ..rldata import RLData
-from .subject import Subject
+from ..subjects import Subject
 
 
 class WarfarinModel_v3(Subject):

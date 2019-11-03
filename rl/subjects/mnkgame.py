@@ -9,10 +9,10 @@ This `subject` class emulates mnk game.
 '''
 
 
-from rl.subjects.mnkboard import MNKBoard
-from rl.subjects.subject import Subject
+from ..utils.mnkboard import MNKBoard
+from ..subjects.subject import Subject
 # from rl.valueset import ValueSet
-from rl.rldata import RLData
+from ..rldata import RLData
 
 
 def main():

@@ -8,7 +8,7 @@ This `cancer_model` class implements a four-state nonlinear cancer chemotherapy 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from ..valueset import ValueSet
+from ..legacy import ValueSet
 from .cancer_model import CancerModel
 
 

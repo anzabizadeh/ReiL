@@ -76,7 +76,7 @@ class WekaClusterer:
     
 
 #%%
-if if __name__ == "__main__":
+if __name__ == "__main__":
     filename = 'data_for_clustering_dose_only.csv'
     test = WekaClusterer(data_filename=filename, columns_to_drop=[1])
     test.cluster(number_of_clusters=4)
