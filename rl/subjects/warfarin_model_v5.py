@@ -39,6 +39,42 @@ class WarfarinModel_v5(Subject):
     '''
 
     def __init__(self, **kwargs):
+        '''
+        Create a warfarin model:
+        \nArguments:
+        \n   max_day: maximum number of days of simulation (Default: 90 days)
+        \n   initial_phase_duration: number of days initial phase (INR measured every day) lasts. If it is set to -1, it automatically
+        \n       switches from initial to maintenance as soon as INR is in the range. (Default: -1)
+        \n   maintenance_day_interval: how many days between two INR measurements in the maintenance phase (Default: 1)
+        \n   max_day_1_dose: the maximum dose the experiment can start with. (Default: 15 mg/day)
+        \n   max_initial_dose_change: maximum change of the dose in the initial phase. (Default: 15 mg/day)
+        \n   max_maintenance_dose_change: maximum change of the dose in the maintenance phase. (Default: 15 mg/day)
+
+        \n   max_dose: maximum possible dose (Default: 15 mg/day)
+        \n   dose_steps: minimum possible change in dose (Default: 0.5)
+        \n   dose_change_penalty_func: a function that computes penalty of changing dose from its previous value. The
+        \n     argument for this function is the list of previous doses and should return a scalar. (Default: lambda x: int(x[-2] != x[-1]))
+        \n   dose_change_penalty_coef: the magnigute of impact of dose change penalty.
+        \n      (Total penalty = INR penalty + coef. * dose change penalty) (Default: 1)
+
+        \n   dose_history: number of days of history for doses (Default: 5 days)
+        \n   INR_history: number of days of history for INRs (Default: 5 days)
+
+        \n   therapeutic_range: acceptable range of INR values (Default: (2, 3))
+        \n   patient_selection: how to generate patients. One of 'random', 'ravvaz' and 'fixed'. (Default: 'random')
+        \n   characteristics: a dictionary describing the patient. (Default: {'age': 71, 'weight': 199.24, 'height': 66.78, 'gender': 'Male',
+        \n     'race': 'White', 'tobaco': 'No', 'amiodarone': 'No', 'fluvastatin': 'No', 'CYP2C9': '*1/*1', 'VKORC1': 'A/A'})
+        \n   randomized: whether to have random effect in the PK/PD model (Default: True)
+        \n   extended_state: whether to return full state definition or just `age`, 'CYP2C9`, `VKORC1`, `dose`s and `INR`s (Default: False).
+
+        \n   save_patients: should the generated patients be saved? (Default: False)
+        \n   patients_save_path: where to save patient files (Default: './patients')
+        \n   patients_save_prefix: prefix to use when saving patients (Default: 'warfv5')
+        \n   patient_save_overwrite: overwrite currently saved patients? (Default: False)
+        \n   patient_use_existing: use currently saved patients if they exist? (Default: True)
+        \n   patient_counter_start: the starting value for patient filename counter (Default: 0)
+        ''' 
+        
         Subject.__init__(self, **kwargs)
 
         Subject.set_defaults(self, patient_selection='random',
@@ -69,7 +105,7 @@ class WarfarinModel_v5(Subject):
                              SS=0, max_time=24*90,
                              day=1, max_day=90, INR=[0], INR_current=0,
                              d_previous=0, d_current=1, d_max=30,
-                             current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3),
+                             current_dose=0, max_dose=15, dose_steps=0.5, therapeutic_range=(2, 3),
                              dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
                              dose_list=[None]*5,
                              dose_change_penalty_coef=1,
@@ -81,7 +117,13 @@ class WarfarinModel_v5(Subject):
                              patient_save_overwrite=False,
                              patient_use_existing=True,
                              patient_counter_start=0,
-                             extended_state=False
+                             extended_state=False,
+                             initial_phase_duration=-1,
+                             phase='initial',
+                             maintenance_day_interval=1,
+                             max_day_1_dose=15,
+                             max_initial_dose_change=15,
+                             max_maintenance_dose_change=15
                              )
 
         # this makes sure that if some elements of dictionaries
@@ -99,11 +141,7 @@ class WarfarinModel_v5(Subject):
         Subject.set_params(self, **kwargs)
 
         if False:
-            self._model_filename = ''
-            self._Cs_super = 0
-            self._SS = 0
             self._max_time = 0
-            self._rseed = 0
             self._day = 1
             self._max_day = 0
             self._current_dose = 0
@@ -113,7 +151,6 @@ class WarfarinModel_v5(Subject):
             self._dose_steps = 0
             self._dose_history = 0
             self._INR_history = 0
-            self._pill_per_day = 0
 
             self._patient_selection = ''
             self._list_of_characteristics = {}
@@ -123,8 +160,7 @@ class WarfarinModel_v5(Subject):
 
             self._d_previous = 0
             self._d_current = 0
-            self._d_max = 0
-            self._TTR_range = ()
+            self._therapeutic_range = ()
             self._randomized = True
             self._extended_state = False
             self._save_patients = False
@@ -132,8 +168,14 @@ class WarfarinModel_v5(Subject):
             self._patients_save_prefix = 'warfv5'
             self._patient_save_overwrite = False
             self._patient_use_existing = True
-            self._extended_state = False
             self._patient_counter_start = 0
+
+            self._initial_phase_duration = -1
+            self._phase = 'initial'
+            self._maintenance_day_interval = 1
+            self._max_day_1_dose = 15
+            self._max_initial_dose_change = 15
+            self._max_maintenance_dose_change = 15
 
         if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
             if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
@@ -155,6 +197,9 @@ class WarfarinModel_v5(Subject):
         self._possible_actions = RLData([x*self._dose_steps
                                          for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
                                         lower=0, upper=self._max_dose).as_rldata_array()
+        self._day_1_possible_actions = RLData([x*self._dose_steps
+                                                for x in range(int(self._max_day_1_dose/self._dose_steps), -1, -1)],
+                                                lower=0, upper=self._max_dose).as_rldata_array()
 
     @property
     def state(self):
@@ -213,6 +258,21 @@ class WarfarinModel_v5(Subject):
     @property
     # only considers the dose
     def possible_actions(self):
+        if self._day == 1:
+            return self._day_1_possible_actions
+
+        if self._phase == 'initial' and self._max_initial_dose_change != self._max_dose:
+            return RLData([x*self._dose_steps
+                           for x in range(int(self._max_dose/self._dose_steps) + 1)
+                           if abs(x*self._dose_steps - self._current_dose) <= self._max_initial_dose_change],
+                           lower=0, upper=self._max_dose).as_rldata_array()
+
+        if self._phase == 'maintenance' and self._max_maintenance_dose_change != self._max_dose:
+            return RLData([x*self._dose_steps
+                           for x in range(int(self._max_dose/self._dose_steps) + 1)
+                           if abs(x*self._dose_steps - self._current_dose) <= self._max_maintenance_dose_change],
+                           lower=0, upper=self._max_dose).as_rldata_array()
+
         return self._possible_actions
 
     def register(self, agent_name):
@@ -235,23 +295,34 @@ class WarfarinModel_v5(Subject):
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
 
-        self._patient.dose = {self._day: self._current_dose}
-        self._d_current = 1  # action.value[1]
+        # self._patient.dose = {self._day: self._current_dose}
+        if (self._initial_phase_duration == -1 and self._therapeutic_range[0] <= self._INR[-1] <= self._therapeutic_range[1]) \
+            or self._day == self._initial_phase_duration:
+                self._phase = 'maintenance'
+        if self._phase == 'initial':
+            self._d_current = 1  # action.value[1]
+            self._patient.dose = {self._day: self._current_dose}
+        else:
+            self._d_current = min(self._maintenance_day_interval, self._max_day-self._day)
+            self._patient.dose = dict(tuple((i + self._day, self._current_dose) for i in range(self._d_current)))
+
         self._day += self._d_current
 
         self._INR.append(self._patient.INR(self._day)[-1])
         self._INR.popleft()
 
         try:
-            # reward = 1 if self._TTR_range[0] <= self._INR[-1] <= self._TTR_range[1] else 0
-            # TTR = sum((self._TTR_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j <= self._TTR_range[1]
+            # reward = 1 if self._therapeutic_range[0] <= self._INR[-1] <= self._therapeutic_range[1] else 0
+            # TTR = sum((self._therapeutic_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j <= self._therapeutic_range[1]
             #            for j in range(self._d_previous)))
-            INR_mid = (self._TTR_range[1] + self._TTR_range[0]) / 2
-            INR_range = self._TTR_range[1] - self._TTR_range[0]
-            INR_penalty = -sum(((2 * (INR_mid - self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j)) ** 2
-                                for j in range(self._d_previous))) / INR_range  # negative squared distance as reward (used *2/range to normalize)
-            dose_change_penalty = - \
-                self._dose_change_penalty_func(self._dose_list)
+            INR_mid = (self._therapeutic_range[1] + self._therapeutic_range[0]) / 2
+            INR_range = self._therapeutic_range[1] - self._therapeutic_range[0]
+            # considering day=1 in INR_penalty calculation
+            # INR_penalty = -sum(((2 / INR_range * (INR_mid - self._INR[-2] - (self._INR[-1]-self._INR[-2])/self._d_current*j)) ** 2
+            #                     for j in range(0 if self._day==1 else 1, self._d_current + 1)))  # negative squared distance as reward (used *2/range to normalize)
+            INR_penalty = -sum(((2 / INR_range * (INR_mid - self._INR[-2] - (self._INR[-1]-self._INR[-2])/self._d_current*j)) ** 2
+                                for j in range(1, self._d_current + 1)))  # negative squared distance as reward (used *2/range to normalize)
+            dose_change_penalty = - self._dose_change_penalty_func(self._dose_list)
             reward = INR_penalty + self._dose_change_penalty_coef * dose_change_penalty
         except TypeError:
             # TTR = 0  # assuming that for the first use of the pill, we don't have INR and TTR=0
@@ -360,6 +431,7 @@ class WarfarinModel_v5(Subject):
 
         self._day = 1
         self._current_dose = 0
+        self._phase = 'initial'
         self._dose_list = deque([0.0]*self._dose_history)
 
         self._INR = deque([0.0]*(self._INR_history + 1))
