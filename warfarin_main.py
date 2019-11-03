@@ -26,54 +26,66 @@ if __name__ == "__main__":
     np.random.seed(1234)
     tf.set_random_seed(1234)
 
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--runs', type=int, default=500)
-    # parser.add_argument('--training_episodes', type=int, default=200)
-    # parser.add_argument('--max_day', type=int, default=90)
-    # parser.add_argument('--dose_history', type=int, default=10)
-    # parser.add_argument('--INR_history', type=int, default=10)
-    # parser.add_argument('--patient_selection', type=str, default='ravvaz')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--runs', type=int, default=500)
+    parser.add_argument('--training_episodes', type=int, default=200)
+    parser.add_argument('--max_day', type=int, default=90)
+    parser.add_argument('--dose_history', type=int, default=10)
+    parser.add_argument('--INR_history', type=int, default=10)
+    parser.add_argument('--patient_selection', type=str, default='ravvaz')
+    parser.add_argument('--dose_change_penalty_coef', type=float, default=0.0)
+    parser.add_argument('--dose_change_penalty_days', type=int, default=2)
 
-    runs = 500
-    training_episodes = 200
+    parser.add_argument('--randomized', type=bool, default=True)
 
-    max_day = 90
-    dose_history = 10
-    INR_history = 10
-    patient_selection = 'ravvaz'
+    parser.add_argument('--gamma', type=float, default=0.95)
+    parser.add_argument('--agent_type', type=str, default='DQN')
+    parser.add_argument('--buffer_size', type=int, default=90*10)
+    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--validation_split', type=float, default=0.3)
+    parser.add_argument('--hidden_layer_sizes', nargs='+', type=int, default=(32, 32, 32))
+    parser.add_argument('--clear_buffer', type=bool, default=False)
 
-    randomized = True
+    parser.add_argument('--initial_phase_duration', type=int, default=-1)
+    parser.add_argument('--max_initial_dose_change', type=int, default=5)
+    parser.add_argument('--max_day_1_dose', type=int, default=5)
+    parser.add_argument('--maintenance_day_interval', type=int, default=7)
+    parser.add_argument('--max_maintenance_dose_change', type=int, default=15)
 
-    gamma = 0.95
-    epsilon = lambda x: 1/(1+x/200)
-    agent_type = 'DQN'
-    input_length = 32  # 46
-    buffer_size = 90*10
-    batch_size = 50
-    validation_split = 0.3
-    hidden_layer_sizes = (20, 20)
-    clear_buffer = False
-    dose_change_penalty_coef = 0.0
-    dose_change_penalty_func = lambda x: 0  # int(x[-7]!=x[-6]!=x[-5]!=x[-4]!=x[-3]!=x[-2]!=x[-1])
+    parser.add_argument('--extended_state', type=bool, default=False)
+    parser.add_argument('--save_patients', type=bool, default=False)
+
+    args = parser.parse_args()
+    print(args)
+
+    epsilon = lambda n: 1/(1+n/200)
+    if args.dose_change_penalty_days >= 2:
+        dose_change_penalty_func = lambda x: int(max(x[-i]!=x[-i-1] for i in range(1, args.dose_change_penalty_days)))
+    else:
+        dose_change_penalty_func = lambda x: 0
+
     patient_model = 'WARFV5'
-    extended_state = False  # True
-    save_patients = True
 
-    text = ''.join((str(hidden_layer_sizes),
-                        'g', str(gamma),
+    text = ''.join((str(args.hidden_layer_sizes),
+                        'g', str(args.gamma),
                         'e', 'fn' if callable(epsilon) else str(epsilon),
-                        'bff', str(buffer_size),
-                        'clr', 'T' if clear_buffer else 'F',
-                        'btch', str(batch_size),
-                        'vld', str(validation_split)))
+                        'bff', str(args.buffer_size),
+                        'clr', 'T' if args.clear_buffer else 'F',
+                        'btch', str(args.batch_size),
+                        'vld', str(args.validation_split)))
 
     filename = ''.join((patient_model,
-                            'd_{:2}'.format(max_day),
-                            'dose_{:2}'.format(dose_history),
-                            'INR_{:2}'.format(INR_history),
-                            'T' if randomized else 'F',
-                            'dose_change_coef_{:2.2f}'.format(dose_change_penalty_coef),
-                            agent_type, text)).replace(' ', '')
+                            '{:2}'.format(args.max_day) + 'day',
+                            'd_{:2}'.format(args.dose_history),
+                            'INR_{:2}'.format(args.INR_history),
+                            'T' if args.randomized else 'F',
+                            'd_chg_coef_{:2.2f}'.format(args.dose_change_penalty_coef),
+                            'ph1_{:2}'.format(args.initial_phase_duration),
+                            'ph1chg_{:2}'.format(args.max_initial_dose_change),
+                            'mxd1_{:2}'.format(args.max_day_1_dose),
+                            'ph2d_{:2}'.format(args.maintenance_day_interval),
+                            'ph2chg_{:2}'.format(args.max_maintenance_dose_change),
+                            args.agent_type, text)).replace(' ', '')
 
     try:
         env = Environment(filename=filename)
@@ -86,36 +98,43 @@ if __name__ == "__main__":
         subjects = {}
 
         # define subjects
-        subjects['W'] = WarfarinModel_v5(max_day=max_day,
-                                        patient_selection=patient_selection,
-                                        dose_history=dose_history,
-                                        INR_history=INR_history,
-                                        dose_change_penalty_coef=dose_change_penalty_coef,
+        subjects['W'] = WarfarinModel_v5(max_day=args.max_day,
+                                        patient_selection=args.patient_selection,
+                                        dose_history=args.dose_history,
+                                        INR_history=args.INR_history,
+                                        dose_change_penalty_coef=args.dose_change_penalty_coef,
                                         dose_change_penalty_func=dose_change_penalty_func,
-                                        extended_state=extended_state,
-                                        randomized=randomized,
-                                        save_patients=save_patients,
-                                        patients_save_prefix='')
+                                        extended_state=args.extended_state,
+                                        randomized=args.randomized,
+                                        save_patients=args.save_patients,
+                                        patients_save_prefix='',
+                                        initial_phase_duration=args.initial_phase_duration,
+                                        max_initial_dose_change=args.max_initial_dose_change,
+                                        max_day_1_dose=args.max_day_1_dose,
+                                        maintenance_day_interval=args.maintenance_day_interval,
+                                        max_maintenance_dose_change=args.max_maintenance_dose_change)
 
-        agents['protocol'] = DQNAgent(gamma=gamma,
+        input_length = len(subjects['W'].state.normalize().as_list()) + len(subjects['W'].possible_actions[0].normalize().as_list())
+
+        agents['protocol'] = DQNAgent(gamma=args.gamma,
                                         epsilon=epsilon,
-                                        buffer_size=buffer_size,
-                                        clear_buffer=clear_buffer,
-                                        batch_size=batch_size,
+                                        buffer_size=args.buffer_size,
+                                        clear_buffer=args.clear_buffer,
+                                        batch_size=args.batch_size,
                                         input_length=input_length,
-                                        validation_split=validation_split,
-                                        hidden_layer_sizes=hidden_layer_sizes,
+                                        validation_split=args.validation_split,
+                                        hidden_layer_sizes=tuple(args.hidden_layer_sizes),
                                         default_actions=subjects['W'].possible_actions,
                                         tensorboard_path=filename,
-                                        save_patients=save_patients)
+                                        save_patients=args.save_patients)
 
         # update environment
         env.add(agents=agents, subjects=subjects)
         env.assign([('protocol', 'W')])
 
-    for i in range(runs):
+    for i in range(args.runs):
         print('run {: }'.format(i))
-        env.elapse(episodes=training_episodes, reset='all',
+        env.elapse(episodes=args.training_episodes, reset='all',
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
 
