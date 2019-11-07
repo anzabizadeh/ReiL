@@ -14,6 +14,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import argparse
 import random
 
+from statistics import stdev
+
 import numpy as np
 import tensorflow as tf
 from rl.agents import DQNAgent  # , WarfarinQAgent
@@ -34,7 +36,8 @@ if __name__ == "__main__":
     parser.add_argument('--INR_history', type=int, default=10)
     parser.add_argument('--patient_selection', type=str, default='ravvaz')
     parser.add_argument('--dose_change_penalty_coef', type=float, default=0.0)
-    parser.add_argument('--dose_change_penalty_days', type=int, default=2)
+    parser.add_argument('--dose_change_penalty_func', type=str, default='none')
+    parser.add_argument('--dose_change_penalty_days', type=int, default=0)
 
     parser.add_argument('--randomized', type=bool, default=True)
 
@@ -46,23 +49,27 @@ if __name__ == "__main__":
     parser.add_argument('--hidden_layer_sizes', nargs='+', type=int, default=(32, 32, 32))
     parser.add_argument('--clear_buffer', type=bool, default=False)
 
-    parser.add_argument('--initial_phase_duration', type=int, default=-1)
-    parser.add_argument('--max_initial_dose_change', type=int, default=5)
-    parser.add_argument('--max_day_1_dose', type=int, default=5)
-    parser.add_argument('--maintenance_day_interval', type=int, default=7)
+    parser.add_argument('--initial_phase_duration', type=int, default=1)
+    parser.add_argument('--max_initial_dose_change', type=int, default=15)
+    parser.add_argument('--max_day_1_dose', type=int, default=15)
+    parser.add_argument('--maintenance_day_interval', type=int, default=1)
     parser.add_argument('--max_maintenance_dose_change', type=int, default=15)
 
     parser.add_argument('--extended_state', type=bool, default=False)
     parser.add_argument('--save_patients', type=bool, default=False)
 
+    parser.add_argument('--save_runs', type=bool, default=False)
+
     args = parser.parse_args()
     print(args)
 
     epsilon = lambda n: 1/(1+n/200)
-    if args.dose_change_penalty_days >= 2:
+    if args.dose_change_penalty_func.lower() == 'none':
+        dose_change_penalty_func = lambda x: 0
+    elif args.dose_change_penalty_func == 'change':
         dose_change_penalty_func = lambda x: int(max(x[-i]!=x[-i-1] for i in range(1, args.dose_change_penalty_days)))
     else:
-        dose_change_penalty_func = lambda x: 0
+        dose_change_penalty_func = lambda x: stdev(list(x[-i] for i in range(1, args.dose_change_penalty_days)))
 
     patient_model = 'WARFV5'
 
@@ -126,11 +133,17 @@ if __name__ == "__main__":
                                         hidden_layer_sizes=tuple(args.hidden_layer_sizes),
                                         default_actions=subjects['W'].possible_actions,
                                         tensorboard_path=filename,
-                                        save_patients=args.save_patients)
+                                        save_patients=args.save_patients,
+                                        method='backward')
 
         # update environment
         env.add(agents=agents, subjects=subjects)
         env.assign([('protocol', 'W')])
+
+    if args.save_runs:
+        env_filename = lambda i: filename+'{:04}'.format(i)
+    else:
+        env_filename = lambda i: filename
 
     for i in range(args.runs):
         print('run {: }'.format(i))
@@ -138,8 +151,10 @@ if __name__ == "__main__":
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
 
-        env.save(filename=filename+'{:04}'.format(i))
+        env.save(filename=env_filename(i))
 
-        for row in env.trajectory()['protocol'].iterrows():
-            # print('{}, {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].reward))
-            print('{}, {} \t {} \t {}'.format(row[0], row[1].state.value.loc['Doses'][-1], row[1].state.value.loc['INRs'][-1], row[1].reward))
+        with open(filename+'.txt', 'a+') as f:
+            f.write('{:-^20}\n'.format(i))
+            for row in env.trajectory()['protocol'].iterrows():
+                # print('{}, {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].reward))
+                f.write('{}, {} \t {} \t {}\n'.format(row[0], row[1].state.value.loc['Doses'][-1], row[1].state.value.loc['INRs'][-1], row[1].reward))
