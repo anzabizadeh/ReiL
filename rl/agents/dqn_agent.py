@@ -55,7 +55,7 @@ class DQNAgent(Agent):
         '''
         Agent.__init__(self, **kwargs)
         Agent.set_defaults(self, gamma=1, epsilon=0, default_actions={},
-                           learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1,
+                           learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1, method='forward',
                            training_x=deque(), training_y=deque(), buffer_index=-1, buffer_ready=False,
                            # np.array([], ndmin=2), training_y=np.array([], ndmin=2),
                            buffer_size=50, batch_size=10, validation_split=0.3, clear_buffer=False, tensorboard_path=None)
@@ -184,25 +184,50 @@ class DQNAgent(Agent):
         try:
             history = kwargs['history']
 
-            for i in range(len(history.index)):
-                state = history.at[i, 'state']
-                action = history.at[i, 'action']
-                reward = history.at[i, 'reward']
-                try:
-                    max_q = self._max_q(history.at[i+1, 'state'])
-                    new_q = reward + self._gamma*max_q
-                except KeyError:
-                    new_q = reward
+            if self._method == 'forward':
+                for i in range(len(history.index)):
+                    state = history.at[i, 'state']
+                    action = history.at[i, 'action']
+                    reward = history.at[i, 'reward']
+                    try:
+                        max_q = self._max_q(history.at[i+1, 'state'])
+                        new_q = reward + self._gamma*max_q
+                    except KeyError:
+                        new_q = reward
 
-                try:
-                    self._buffer_index += 1
-                    self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
-                    self._training_y[self._buffer_index] = [new_q]
-                except IndexError:
-                    self._buffer_ready = True
-                    self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
-                    self._training_y[0] = [new_q]
-                    self._buffer_index = 1
+                    try:
+                        self._buffer_index += 1
+                        self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_y[self._buffer_index] = [new_q]
+                    except IndexError:
+                        self._buffer_ready = True
+                        self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_y[0] = [new_q]
+                        self._buffer_index = 1
+            
+            else:  # backward
+                q_list = [0] * len(history.index)
+                for i in range(len(history.index)-1, -1, -1):
+                    state = history.at[i, 'state']
+                    action = history.at[i, 'action']
+                    reward = history.at[i, 'reward']
+                    try:
+                        new_q = reward + self._gamma*q_list[i+1]
+                        # max_q = self._max_q(history.at[i+1, 'state'])
+                        # new_q_2 = reward + self._gamma*max_q
+                    except IndexError:
+                        new_q = reward
+                    q_list[i] = new_q
+
+                    try:
+                        self._buffer_index += 1
+                        self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_y[self._buffer_index] = [new_q]
+                    except IndexError:
+                        self._buffer_ready = True
+                        self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_y[0] = [new_q]
+                        self._buffer_index = 1
 
             if self._buffer_ready:
                 index = np.random.choice(self._buffer_size, self._batch_size, replace=False)
@@ -216,6 +241,7 @@ class DQNAgent(Agent):
                     self._buffer_ready = False
 
             return
+
         except KeyError:
             raise RuntimeError('DQNAgent only works using \'history\'')
 
