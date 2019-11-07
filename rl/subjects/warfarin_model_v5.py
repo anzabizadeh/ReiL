@@ -104,7 +104,7 @@ class WarfarinModel_v5(Subject):
                                               'CYP2C9': '*1/*1', 'VKORC1': 'A/A'},
                              SS=0, max_time=24*90,
                              day=1, max_day=90, INR=[0], INR_current=0,
-                             d_previous=0, d_current=1, d_max=30,
+                             dosing_intervals=[None]*5, d_current=1, d_max=30,
                              current_dose=0, max_dose=15, dose_steps=0.5, therapeutic_range=(2, 3),
                              dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
                              dose_list=[None]*5,
@@ -158,7 +158,7 @@ class WarfarinModel_v5(Subject):
             self._characteristics = {}
             self._INR = []
 
-            self._d_previous = 0
+            self._dosing_intervals = 0
             self._d_current = 0
             self._therapeutic_range = ()
             self._randomized = True
@@ -241,13 +241,16 @@ class WarfarinModel_v5(Subject):
                        'CYP2C9': self._characteristics['CYP2C9'],
                        'VKORC1': self._characteristics['VKORC1'],
                        'Doses': tuple(self._dose_list),
-                       'INRs': tuple(self._INR)},
+                       'INRs': tuple(self._INR),
+                       'Intervals': tuple(self._dosing_intervals)},
                       lower={'age': self._list_of_characteristics['age'][0],
                              'Doses': 0.0,
-                             'INRs': 0.0},
+                             'INRs': 0.0,
+                             'Intervals': 1},
                       upper={'age': self._list_of_characteristics['age'][-1],
                              'Doses': self._max_dose,
-                             'INRs': 15.0},
+                             'INRs': 15.0,
+                             'Intervals': self._max_day},
                       categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
                                   'VKORC1': self._list_of_characteristics['VKORC1']})
 
@@ -291,7 +294,8 @@ class WarfarinModel_v5(Subject):
 
     def take_effect(self, _id, action):
         self._current_dose = action.value[0]
-        self._d_previous = self._d_current
+        self._dosing_intervals.append(self._d_current)
+        self._dosing_intervals.popleft()
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
 
@@ -313,8 +317,8 @@ class WarfarinModel_v5(Subject):
 
         try:
             # reward = 1 if self._therapeutic_range[0] <= self._INR[-1] <= self._therapeutic_range[1] else 0
-            # TTR = sum((self._therapeutic_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._d_previous*j <= self._therapeutic_range[1]
-            #            for j in range(self._d_previous)))
+            # TTR = sum((self._therapeutic_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._dosing_intervals*j <= self._therapeutic_range[1]
+            #            for j in range(self._dosing_intervals)))
             INR_mid = (self._therapeutic_range[1] + self._therapeutic_range[0]) / 2
             INR_range = self._therapeutic_range[1] - self._therapeutic_range[0]
             # considering day=1 in INR_penalty calculation
@@ -433,16 +437,16 @@ class WarfarinModel_v5(Subject):
         self._current_dose = 0
         self._phase = 'initial'
         self._dose_list = deque([0.0]*self._dose_history)
+        self._dosing_intervals = deque([1]*self._dose_history)
 
         self._INR = deque([0.0]*(self._INR_history + 1))
         self._INR[-1] = self._patient.INR([0])[-1]
 
-        self._d_previous = 0
         self._d_current = 1
 
     def __repr__(self):
         try:
             return 'WarfarinModel: {}, INR: {}, d_prev: {}, d: {}'.format(
-                [' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()], self._INR, self._d_previous, self._d_current)
+                [' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()], self._INR, self._dosing_intervals, self._d_current)
         except:
             return 'WarfarinModel'
