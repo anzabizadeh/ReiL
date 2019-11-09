@@ -72,7 +72,7 @@ if __name__ == "__main__":
     elif args.dose_change_penalty_func == 'stdev':
         if args.dose_change_penalty_days == args.dose_history:
             dose_change_penalty_func = lambda x: stdev(x)
-        else
+        else:
             dose_change_penalty_func = lambda x: stdev(list(itertools.islice(x, args.dose_history - args.dose_change_penalty_days, args.dose_history)))
 
     patient_model = 'W'
