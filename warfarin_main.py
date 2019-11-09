@@ -70,7 +70,10 @@ if __name__ == "__main__":
     elif args.dose_change_penalty_func == 'change':
         dose_change_penalty_func = lambda x: int(max(x[-i]!=x[-i-1] for i in range(1, args.dose_change_penalty_days)))
     elif args.dose_change_penalty_func == 'stdev':
-        dose_change_penalty_func = lambda x: stdev(list(itertools.islice(x, 0, args.dose_change_penalty_days)))
+        if args.dose_change_penalty_days == args.dose_history:
+            dose_change_penalty_func = lambda x: stdev(x)
+        else
+            dose_change_penalty_func = lambda x: stdev(list(itertools.islice(x, args.dose_history - args.dose_change_penalty_days, args.dose_history)))
 
     patient_model = 'W'
 
