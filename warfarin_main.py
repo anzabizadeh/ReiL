@@ -15,6 +15,7 @@ import argparse
 import random
 
 from statistics import stdev
+import itertools
 
 import numpy as np
 import tensorflow as tf
@@ -35,9 +36,9 @@ if __name__ == "__main__":
     parser.add_argument('--dose_history', type=int, default=10)
     parser.add_argument('--INR_history', type=int, default=10)
     parser.add_argument('--patient_selection', type=str, default='ravvaz')
-    parser.add_argument('--dose_change_penalty_coef', type=float, default=0.0)
-    parser.add_argument('--dose_change_penalty_func', type=str, default='none')
-    parser.add_argument('--dose_change_penalty_days', type=int, default=0)
+    parser.add_argument('--dose_change_penalty_coef', type=float, default=1.0)
+    parser.add_argument('--dose_change_penalty_func', type=str, default='stdev')
+    parser.add_argument('--dose_change_penalty_days', type=int, default=10)
 
     parser.add_argument('--randomized', type=bool, default=True)
 
@@ -49,7 +50,7 @@ if __name__ == "__main__":
     parser.add_argument('--hidden_layer_sizes', nargs='+', type=int, default=(32, 32, 32))
     parser.add_argument('--clear_buffer', type=bool, default=False)
 
-    parser.add_argument('--initial_phase_duration', type=int, default=1)
+    parser.add_argument('--initial_phase_duration', type=int, default=90)
     parser.add_argument('--max_initial_dose_change', type=int, default=15)
     parser.add_argument('--max_day_1_dose', type=int, default=15)
     parser.add_argument('--maintenance_day_interval', type=int, default=1)
@@ -68,10 +69,10 @@ if __name__ == "__main__":
         dose_change_penalty_func = lambda x: 0
     elif args.dose_change_penalty_func == 'change':
         dose_change_penalty_func = lambda x: int(max(x[-i]!=x[-i-1] for i in range(1, args.dose_change_penalty_days)))
-    else:
-        dose_change_penalty_func = lambda x: stdev(list(x[-i] for i in range(1, args.dose_change_penalty_days)))
+    elif args.dose_change_penalty_func == 'stdev':
+        dose_change_penalty_func = lambda x: stdev(list(itertools.islice(x, 0, args.dose_change_penalty_days)))
 
-    patient_model = 'WARFV5'
+    patient_model = 'W'
 
     text = ''.join((str(args.hidden_layer_sizes),
                         'g', str(args.gamma),
@@ -87,6 +88,7 @@ if __name__ == "__main__":
                             'INR_{:2}'.format(args.INR_history),
                             'T' if args.randomized else 'F',
                             'd_chg_coef_{:2.2f}'.format(args.dose_change_penalty_coef),
+                            'func{}'.format(args.dose_change_penalty_func),
                             'ph1_{:2}'.format(args.initial_phase_duration),
                             'ph1chg_{:2}'.format(args.max_initial_dose_change),
                             'mxd1_{:2}'.format(args.max_day_1_dose),
