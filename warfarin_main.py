@@ -37,13 +37,14 @@ if __name__ == "__main__":
     parser.add_argument('--INR_history', type=int, default=10)
     parser.add_argument('--patient_selection', type=str, default='ravvaz')
     parser.add_argument('--dose_change_penalty_coef', type=float, default=1.0)
-    parser.add_argument('--dose_change_penalty_func', type=str, default='stdev')
+    parser.add_argument('--dose_change_penalty_func', type=str, default='change_count')
     parser.add_argument('--dose_change_penalty_days', type=int, default=10)
 
     parser.add_argument('--randomized', type=bool, default=True)
 
-    parser.add_argument('--gamma', type=float, default=0.95)
     parser.add_argument('--agent_type', type=str, default='DQN')
+    parser.add_argument('--method', type=str, default='backward')
+    parser.add_argument('--gamma', type=float, default=0.95)
     parser.add_argument('--buffer_size', type=int, default=90*10)
     parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--validation_split', type=float, default=0.3)
@@ -74,6 +75,13 @@ if __name__ == "__main__":
             dose_change_penalty_func = lambda x: stdev(x)
         else:
             dose_change_penalty_func = lambda x: stdev(list(itertools.islice(x, args.dose_history - args.dose_change_penalty_days, args.dose_history)))
+    elif args.dose_change_penalty_func == 'change_count':
+        if args.dose_change_penalty_days == args.dose_history:
+            dose_change_penalty_func = lambda x: (np.diff(x) != 0).sum()
+        else:
+            dose_change_penalty_func = lambda x: (np.diff(itertools.islice(x,
+                                                          args.dose_history - args.dose_change_penalty_days,
+                                                          args.dose_history)) != 0).sum()
 
     patient_model = 'W'
 
@@ -97,7 +105,8 @@ if __name__ == "__main__":
                             'mxd1_{:2}'.format(args.max_day_1_dose),
                             'ph2d_{:2}'.format(args.maintenance_day_interval),
                             'ph2chg_{:2}'.format(args.max_maintenance_dose_change),
-                            args.agent_type, text)).replace(' ', '')
+                            args.agent_type,
+                            'fwd' if args.method.lower() == 'forward' else 'bwd', text)).replace(' ', '')
 
     try:
         env = Environment(filename=filename)
@@ -139,7 +148,7 @@ if __name__ == "__main__":
                                         default_actions=subjects['W'].possible_actions,
                                         tensorboard_path=filename,
                                         save_patients=args.save_patients,
-                                        method='backward')
+                                        method=args.method)
 
         # update environment
         env.add(agents=agents, subjects=subjects)
