@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--runs', type=int, default=500)
-    parser.add_argument('--training_episodes', type=int, default=200)
+    parser.add_argument('--training_episodes', type=int, default=10)
     parser.add_argument('--max_day', type=int, default=90)
     parser.add_argument('--dose_history', type=int, default=10)
     parser.add_argument('--INR_history', type=int, default=10)
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     parser.add_argument('--randomized', type=bool, default=True)
 
     parser.add_argument('--agent_type', type=str, default='DQN')
-    parser.add_argument('--method', type=str, default='backward')
+    parser.add_argument('--method', type=str, default='forward')
     parser.add_argument('--gamma', type=float, default=0.95)
     parser.add_argument('--buffer_size', type=int, default=90*10)
     parser.add_argument('--batch_size', type=int, default=50)
@@ -137,7 +137,8 @@ if __name__ == "__main__":
 
         input_length = len(subjects['W'].state.normalize().as_list()) + len(subjects['W'].possible_actions[0].normalize().as_list())
 
-        agents['protocol'] = DQNAgent(gamma=args.gamma,
+        agents['protocol'] = DQNAgent(learning_rate=0.1,
+                                        gamma=args.gamma,
                                         epsilon=epsilon,
                                         buffer_size=args.buffer_size,
                                         clear_buffer=args.clear_buffer,
@@ -146,7 +147,7 @@ if __name__ == "__main__":
                                         validation_split=args.validation_split,
                                         hidden_layer_sizes=tuple(args.hidden_layer_sizes),
                                         default_actions=subjects['W'].possible_actions,
-                                        tensorboard_path=filename,
+                                        tensorboard_path='temp_log',
                                         save_patients=args.save_patients,
                                         method=args.method)
 
@@ -165,10 +166,17 @@ if __name__ == "__main__":
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
 
-        env.save(filename=env_filename(i))
+        # env.save(filename=env_filename(i))
 
-        with open(filename+'.txt', 'a+') as f:
-            f.write('{:-^20}\n'.format(i))
-            for row in env.trajectory()['protocol'].iterrows():
-                # print('{}, {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].reward))
-                f.write('{}, {} \t {} \t {}\n'.format(row[0], row[1].state.value.loc['Doses'][-1], row[1].state.value.loc['INRs'][-1], row[1].reward))
+        for row in env.trajectory()['protocol'].iterrows():
+            print('{}, {} \t {} \t {} \t {}\n'.format(row[0],
+                                                row[1].state.value.loc['Doses'][-1],
+                                                row[1].state.value.loc['INRs'][-1],
+                                                row[1].reward,
+                                                row[1].q))
+
+        # with open(filename+'.txt', 'a+') as f:
+        #     f.write('{:-^20}\n'.format(i))
+        #     for row in env.trajectory()['protocol'].iterrows():
+        #         print('{}, {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].reward))
+        #         f.write('{}, {} \t {} \t {}\n'.format(row[0], row[1].state.value.loc['Doses'][-1], row[1].state.value.loc['INRs'][-1], row[1].reward))
