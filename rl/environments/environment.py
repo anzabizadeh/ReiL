@@ -9,7 +9,7 @@ This `environment` class provides a learning environment for any reinforcement l
 '''
 
 from pickle import load, dump, HIGHEST_PROTOCOL
-import signal
+import os
 import sys
 import inspect
 import pathlib
@@ -70,10 +70,8 @@ class Environment(RLBase):
         RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
                             episodes=1, max_steps=10000, termination='any', reset='all',
                             learning_method='every step', total_experienced_episodes=0)
-                            # allow_user_to_halt=True, save_on_exit=True)
         RLBase.set_params(self, **kwargs)
 
-        # signal.signal(signal.SIGINT, self.__signal_handler)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -221,11 +219,9 @@ class Environment(RLBase):
         for episode in range(episodes):
             if reporting != 'none':
                 report_string = f'episode: {episode+1}'
-            # if learning_method == 'history':
             history = {}
             for agent_name in self._agent:
                 history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
-                # history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
             done = False
             stopping_criterion = max_steps * (episode+1)
             while not done:
@@ -247,10 +243,6 @@ class Environment(RLBase):
 
                             history[agent_name].loc[len(history[agent_name].index)] = [state, action, reward]
 
-                            # history[agent_name].append(state)
-                            # history[agent_name].append(action)
-                            # history[agent_name].append(reward)
-
                             if subject.is_terminated:
                                 if tally & (reward > 0):
                                     win_count[agent_name] += 1
@@ -271,8 +263,6 @@ class Environment(RLBase):
                 if learning_method == 'every step':
                     for agent_name, agent in self._agent.items():
                         state = self._subject[self._assignment_list[agent_name][0]].state
-                        # agent.learn(state=state, reward=history[agent_name][-1]['reward'])
-                        # history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
                         agent.learn(state=state, reward=history[agent_name][2])
                         history[agent_name] = []
 
@@ -344,10 +334,6 @@ class Environment(RLBase):
                         action = agent.act(state, actions=possible_actions)
                         q = agent._q(state, action)
                         reward = subject.take_effect(_id, action)
-                        # history[agent_name].append(state)
-                        # history[agent_name].append(action)
-                        # history[agent_name].append(q)
-                        # history[agent_name].append(reward)
 
                         history[agent_name].loc[len(history[agent_name].index)] = [state, action, q, reward]
                         if subject.is_terminated:
@@ -390,12 +376,11 @@ class Environment(RLBase):
             for name, obj_type in self._env_data['agents']:
                 self._agent[name] = obj_type()
                 self._agent[name].load(
-                    path=path+'/'+filename+'.data', filename=name)
-
+                    path=os.path.join(path, filename + '.data'), filename=name)
             for name, obj_type in self._env_data['subjects']:
                 self._subject[name] = obj_type()
                 self._subject[name].load(
-                    path=path+'/'+filename+'.data', filename=name)
+                    path=os.path.join(path, filename + '.data'), filename=name)
 
             del self._env_data
 
@@ -403,11 +388,11 @@ class Environment(RLBase):
             for obj in object_name:
                 if obj in self._agent:
                     self._agent[obj].load(
-                        path=path+'/'+filename+'.data', filename=obj)
+                        path=os.path.join(path, filename + '.data'), filename=obj)
                     self._agent[obj].reset()
                 elif obj in self._subject:
                     self._subject[obj].load(
-                        path=path+'/'+filename+'.data', filename=obj)
+                        path=os.path.join(path, filename + '.data'), filename=obj)
                     self._subject[obj].reset()
 
     def save(self, **kwargs):
@@ -428,13 +413,12 @@ class Environment(RLBase):
             self._env_data = {'agents': [], 'subjects': []}
 
             for name, agent in self._agent.items():
-                _, fn = agent.save(path=path+'/'+filename +
-                                   '.data', filename=name)
+                _, fn = agent.save(path=os.path.join(path, filename + '.data'), filename=name)
                 self._env_data['agents'].append((fn, type(agent)))
 
             for name, subject in self._subject.items():
                 _, fn = subject.save(
-                    path=path+'/'+filename+'.data', filename=name)
+                    path=os.path.join(path, filename + '.data'), filename=name)
                 self._env_data['subjects'].append((fn, type(subject)))
 
             RLBase.save(self, filename=filename, path=path,
@@ -446,10 +430,10 @@ class Environment(RLBase):
             for obj in object_name:
                 if obj in self._agent:
                     self._agent[obj].save(
-                        path=path+'/'+filename+'.data', filename=obj)
+                        path=os.path.join(path, filename + '.data'), filename=obj)
                 elif obj in self._subject:
                     self._subject[obj].save(
-                        path=path+'/'+filename+'.data', filename=obj)
+                        path=os.path.join(path, filename + '.data'), filename=obj)
 
     def __repr__(self):
         try:
