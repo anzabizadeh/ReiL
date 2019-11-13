@@ -20,7 +20,7 @@ def main():
     board.set_piece(1, row=0, column=0)
     board.set_piece(2, index=4)
     board.set_piece(3, index=8)
-    print(board.printable())
+    print(f'{board}')
 
 
 class MNKBoard:
@@ -38,7 +38,6 @@ class MNKBoard:
         get_board: return the board either as a vector or as a matrix.
         get_action_set: return a list of empty squares.
         reset: clear the board.
-        printable: format the board state for more readability. 
     '''
     def __init__(self, **kwargs):
         '''
@@ -171,9 +170,9 @@ class MNKBoard:
         '''Clear the board.'''
         self._board = [0]*(self._m*self._n)
 
-    def printable(self):
+    def __str__(self):
         '''Return a printable format string of the board.''' 
-        return ('\n'.join([''.join(['{:4}'.format(item) for item in row])
+        return ('\n'.join([''.join([f'{item:4}' for item in row])
                            for row in self._matrix()]))
 
     def _matrix(self, *args):

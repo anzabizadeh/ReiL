@@ -22,7 +22,7 @@ def main():
     player['P2'] = board.register('P2')
     board.take_effect(player['P1'], RLData(0))  # ValueSet(0))
     board.take_effect(player['P2'], RLData(1))  # ValueSet(1))
-    print(board.printable())
+    print(f'{board}')
 
 
 class MNKGame(MNKBoard, Subject):

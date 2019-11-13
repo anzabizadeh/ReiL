@@ -58,7 +58,7 @@ class WarfarinClusterAgent(Agent):
         try:
             self._cluster_data = pd.read_csv(self._cluster_filename, sep=',', index_col='Index')
         except FileNotFoundError:
-            raise FileNotFoundError('{} not found.'.format(kwargs['cluster_filename']))
+            raise FileNotFoundError(f'{kwargs["cluster_filename"]} not found.')
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -115,9 +115,9 @@ class WarfarinClusterAgent(Agent):
 
         if self._type == 'smoothed':
             try:
-                dose = round(self._cluster_data.at['dose {:02} mean'.format(self._day), str(self._cluster_label)] / self._dose_step) * self._dose_step
+                dose = round(self._cluster_data.at[f'dose {self._day:02} mean', str(self._cluster_label)] / self._dose_step) * self._dose_step
             except ZeroDivisionError:
-                dose = self._cluster_data.at['dose {:02} mean'.format(self._day), str(self._cluster_label)]
+                dose = self._cluster_data.at[f'dose {self._day:02} mean', str(self._cluster_label)]
 
             if abs(dose - self._previous_dose) >= self._smoothing_dose_threshold:
                 action = RLData(dose, lower=0.0, upper=15.0)
@@ -126,10 +126,10 @@ class WarfarinClusterAgent(Agent):
                 action = RLData(self._previous_dose, lower=0.0, upper=15.0)
         elif self._type == 'two phase':
             if self._day == 0:
-                self._dose = np.average(self._cluster_data.loc[['dose {:02} mean'.format(i) for i in range(self._phase_change_day)],
+                self._dose = np.average(self._cluster_data.loc[[f'dose {i:02} mean' for i in range(self._phase_change_day)],
                                                                str(self._cluster_label)])
             elif self._day == self._phase_change_day:
-                self._dose = np.average(self._cluster_data.loc[['dose {:02} mean'.format(i) for i in range(self._phase_change_day, self._max_day)],
+                self._dose = np.average(self._cluster_data.loc[[f'dose {i:02} mean' for i in range(self._phase_change_day, self._max_day)],
                                                                str(self._cluster_label)])
             
             action = RLData(self._dose, lower=0.0, upper=15.0)
@@ -146,7 +146,7 @@ class WarfarinClusterAgent(Agent):
 
     def __repr__(self):
         try:
-            return 'WarfarinClusterAgent({})'.format(self._cluster_filename)
+            return f'WarfarinClusterAgent({self._cluster_filename})'
         except AttributeError:
             return 'WarfarinClusterAgent'
 

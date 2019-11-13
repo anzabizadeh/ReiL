@@ -48,7 +48,6 @@ def cancer(**kwargs):
             def __call__(self, x):
                 if random() < self._prob:
                     self._cap = randint(self._min, self._max)
-                    # print('Changed cap to {} on day {}'.format(self._cap, x['day']))
                 return self._cap
 
         # state_range = list(x/1000 for x in range(0,9000))
@@ -106,7 +105,7 @@ def cancer(**kwargs):
     actions = list(a.value[0] for i, a in enumerate(
         history['Doctor']) if (i % 3) == 1)
     rewards = list(r for i, r in enumerate(history['Doctor']) if (i % 3) == 2)
-    print('Total reward: {}, total drug: {}'.format(sum(rewards), sum(actions)))
+    print(f'Total reward: {sum(rewards)}, total drug: {sum(actions)}')
     x = list(range(len(states)))
     plt.subplot(1, 3, 1)
     plt.plot(x, states, 'b')
@@ -196,9 +195,13 @@ def mnk(**kwargs):
         results['ANN testing draw'].append(0)
 
         # # print result of each run
-        print('run {: }: TRAINING: win: {: } draw:{: } lose:{: } TESTING: win: {: } draw:{: } lose:{: }'
-              .format(i, results['ANN training win'][-1], results['ANN training draw'][-1], results['ANN training lose'][-1],
-                      results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
+        print(f'run {i}:' \
+              f'TRAINING: win: {results["ANN training win"][-1]}' \
+              f'draw: {results["ANN training draw"][-1]}' \
+              f'lose: {results["ANN training lose"][-1]}' \
+              f'TESTING: win: {results["ANN testing win"][-1]}' \
+              f'draw: {results["ANN testing draw"][-1]}' \
+              f'lose: {results["ANN testing lose"][-1]}')
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
@@ -279,8 +282,7 @@ def windy(**kwargs):
                 statistic=['diff-coef'])['diff-coef'])
 
             # print result of each run
-            print('{}: {} {: 3.10f}'.format(
-                i, steps2, results[active_agent_name][-1]))
+            print(f'{i}: {steps2} {results[active_agent_name][-1]: 3.10f}')
 
         # save occasionally in case you don't lose data if you get bored of running the code!
     env.save(filename=filename)
@@ -368,9 +370,13 @@ def risk(**kwargs):
         results['ANN testing draw'].append(0)
 
         # # print result of each run
-        print('run {: }: TRAINING: win: {: } draw:{: } lose:{: } TESTING: win: {: } draw:{: } lose:{: }'
-              .format(i, results['ANN training win'][-1], results['ANN training draw'][-1], results['ANN training lose'][-1],
-                      results['ANN testing win'][-1], results['ANN testing draw'][-1], results['ANN testing lose'][-1]))
+        print("run {i}:" \
+            f"TRAINING: win: {results['ANN training win'][-1]}" \
+            f"draw: {results['ANN training draw'][-1]}" \
+            f"lose: {results['ANN training lose'][-1]}" \
+            f"TESTING: win: {results['ANN testing win'][-1]}" \
+            f"draw: {results['ANN testing draw'][-1]}" \
+            f"lose: {results['ANN testing lose'][-1]}")
 
         # # save occasionally in case you don't lose data if you get bored of running the code!
         env.save(filename=filename)
@@ -430,7 +436,7 @@ def warfarin(**kwargs):
         method = kwargs.get('method', 'fixed policy first')
         if method == 'fixed policy first':
             fixed_policy_attempts = kwargs.get('fixed_policy_attempts', 30)
-            text = '{:2}'.format(fixed_policy_attempts)
+            text = f'{fixed_policy_attempts:2}'
 
     elif agent_type.lower() in ['ann', 'dqn']:
         learning_rate = kwargs.get('learning_rate', 1e-2)
@@ -461,11 +467,11 @@ def warfarin(**kwargs):
                                  CYP2C9] if patient_selection != 'random' else '00',
                              {'A/A': 'AA', 'A/G': 'AG', 'G/A': 'AG', 'G/G': 'GG'}[
                                  VKORC1] if patient_selection != 'random' else 'XX',
-                             'd_{:2}'.format(max_day),
-                             'dose_{:2}'.format(dose_history),
-                             'INR_{:2}'.format(INR_history),
+                             f'd_{max_day:2}',
+                             f'dose_{dose_history:2}',
+                             f'INR_{INR_history:2}',
                              'T' if randomized else 'F',
-                             '_dose_change_coef_{:2.2f}'.format(dose_change_penalty_coef),
+                             f'_dose_change_coef_{dose_change_penalty_coef:2.2f}',
                              agent_type, text)).replace(' ', '')
 
     try:
@@ -552,7 +558,7 @@ def warfarin(**kwargs):
 
     # agents['protocol'].data_collector.start()
     for i in range(runs):
-        print('run {: }'.format(i))
+        print(f'run {i}')
         env.elapse(episodes=training_episodes, reset='all',
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
@@ -561,8 +567,7 @@ def warfarin(**kwargs):
         env.save(filename=filename)
 
         for row in env.trajectory()['protocol'].iterrows():
-            # print('{}, {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].reward))
-            print('{}, {} \n {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].state.value.loc['INRs'], row[1].reward))
+            print(f'{row[0]}, {row[1].state.value.loc["Doses"]} \n {row[1].state.value.loc["INRs"]} \n {row[1].reward}')
 
 
 def warfarin_results(**kwargs):

@@ -57,7 +57,7 @@ class ConstrainedCancerModel(CancerModel):
 
     def __repr__(self):
         try:
-            return 'ConstrainedCancerModel: [day: {}, N: {}, T: {}, N: {}, C: {}, drug cap: {}]'.format(
-                self._x['day'], self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'], self._x.get('drug_cap','N/A'))
+            return f"ConstrainedCancerModel: [day: {self._x['day']}, N: {self._x['normal_cells']}, T: {self._x['tumor_cells']}, " \
+                   f"N: {self._x['immune_cells']}, C: {self._x['drug']}, drug cap: {self._x.get('drug_cap','N/A')}]"
         except:
             return 'ConstrainedCancerModel'

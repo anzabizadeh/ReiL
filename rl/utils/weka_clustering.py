@@ -35,7 +35,7 @@ class WekaClusterer:
             classname = {'em': 'weka.clusterers.EM',
                          'kmeans': 'weka.clusterers.SimpleKMeans'}[clustering_method.lower()]
         except KeyError:
-            raise KeyError('Method {} not found!'.format(clustering_method))
+            raise KeyError(f'Method {clustering_method} not found!')
         
         self._clusterer = Clusterer(classname=classname, options=['-N', str(number_of_clusters)] + options)
         self._clusterer.build_clusterer(self._data)

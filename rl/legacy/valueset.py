@@ -17,14 +17,14 @@ def main():
     print(e.value, e.to_list(), e.to_nparray())
     # create a ValueSet with data and print binary representation and normalized versions:
     s = ValueSet([1, 7, 10, 3], min=0, max=15)
-    print('{}'.format(s))
+    print(f'{s}')
     print([10, 3] in s)
-    print('{}'.format(s.binary_representation()))
-    print('{:2.2} {}'.format(s.normalizer(0, 1), s.to_nparray()))
+    print(f'{s.binary_representation()}')
+    print(f'{s.normalizer(0, 1):2.2} {s.to_nparray()}')
     directions = ['U', 'D', 'L', 'R']
     t = ValueSet(directions, binary=lambda x: (
         directions.index(x), len(directions)))
-    print('{}, {}'.format(t, t.binary_representation()))
+    print(f'{t}, {t.binary_representation()}')
 
     def convert(x, directions=['U', 'D', 'L', 'R']):
         bin_rep = [0]*(len(directions)-1)
@@ -35,7 +35,7 @@ def main():
         return bin_rep
 
     t = ValueSet(directions, binary=convert)
-    print('{}, {}'.format(t, t.binary_representation()))
+    print(f'{t}, {t.binary_representation()}')
     array = s.as_valueset_array()
     for a in array:
         print(a.value, a.max, a.min)

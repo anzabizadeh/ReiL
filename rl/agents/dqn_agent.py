@@ -100,7 +100,7 @@ class DQNAgent(Agent):
                 self._hidden_layer_sizes[0], activation='relu', name='layer_01', input_shape=(self._input_length,)))
             for i, v in enumerate(self._hidden_layer_sizes[1:]):
                 self._model.add(keras.layers.Dense(
-                    v, activation='relu', name='layer_{:0>2}'.format(i+2)))
+                    v, activation='relu', name=f'layer_{i+2:0>2}'))
 
             self._model.add(keras.layers.Dense(
                 1, name='output'))

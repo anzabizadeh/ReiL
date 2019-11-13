@@ -8,9 +8,6 @@ An agent that prints the state and asks the user for action.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-# KNOWN ISSUES:
-# NOTE TO MYSELF: This implementation is not good! It should get either the state or the printable.
-
 
 from ..legacy.valueset import ValueSet
 from .agent import Agent
@@ -30,15 +27,10 @@ class UserAgent(Agent):
         Arguments
         ---------
             state: the state for which the action should be returned.
-            printable: user friendly format of the state. If not supplied, the state is printed as a list.
         '''
-        try:
-            s = '\n'+kwargs['printable']+'\n'
-        except KeyError:
-            s = state.to_list()
         action = None
         while action is None:
-            action = input('Choose action for this state: {}'.format(s))
+            action = input(f'Choose action for this state: {s}')
         return ValueSet(action)
 
     def __repr__(self):

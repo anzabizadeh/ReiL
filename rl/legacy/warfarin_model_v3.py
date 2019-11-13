@@ -192,8 +192,8 @@ class WarfarinModel_v3(Subject):
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: [age: {}, CYP2C9: {}, VKORC1: {}, INR: {}, d_prev: {}, d: {}]'.format(
-                self._age, self._CYP2C9, self._VKORC1, self._INR, self._d_previous, self._d_current)
+            return f'WarfarinModel: [age: {self._age}, CYP2C9: {self._CYP2C9}, VKORC1: {self._VKORC1}, ' \
+                   f'INR: {self._INR}, d_prev: {self._d_previous}, d: {self._d_current}]'
         except:
             return 'WarfarinModel'
 

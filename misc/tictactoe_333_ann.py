@@ -81,8 +81,8 @@ def mnk():
             results[i]['ANN draw'] = test_episodes-tally[i]['ANN']-tally[i]['Opponent']
 
             # print result of each run
-            print('{} \t{} \t{: } \t{: } \t{: }'
-                .format(run, i, results[i]['ANN win'], results[i]['ANN draw'], results[i]['ANN lose']))
+            print(f'{run} \t{i} \t{results[i]["ANN win"]} \t{results[i]["ANN draw"]} \t{results[i]["ANN lose"]}')
+
         env.save(path='./test')
 
     # x = list(range(len(results[0]['ANN win'])))

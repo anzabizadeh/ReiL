@@ -94,17 +94,17 @@ if __name__ == "__main__":
                         'vld', str(args.validation_split)))
 
     filename = ''.join((patient_model,
-                            '{:2}'.format(args.max_day) + 'day',
-                            'd_{:2}'.format(args.dose_history),
-                            'INR_{:2}'.format(args.INR_history),
+                            f'{args.max_day:2}' + 'day',
+                            f'd_{args.dose_history:2}',
+                            f'INR_{args.INR_history:2}',
                             'T' if args.randomized else 'F',
-                            'd_chg_coef_{:2.2f}'.format(args.dose_change_penalty_coef),
-                            'func{}'.format(args.dose_change_penalty_func),
-                            'ph1_{:2}'.format(args.initial_phase_duration),
-                            'ph1chg_{:2}'.format(args.max_initial_dose_change),
-                            'mxd1_{:2}'.format(args.max_day_1_dose),
-                            'ph2d_{:2}'.format(args.maintenance_day_interval),
-                            'ph2chg_{:2}'.format(args.max_maintenance_dose_change),
+                            f'd_chg_coef_{args.dose_change_penalty_coef:2.2f}',
+                            f'func{args.dose_change_penalty_func}',
+                            f'ph1_{args.initial_phase_duration:2}',
+                            f'ph1chg_{args.max_initial_dose_change:2}',
+                            f'mxd1_{args.max_day_1_dose:2}',
+                            f'ph2d_{args.maintenance_day_interval:2}',
+                            f'ph2chg_{args.max_maintenance_dose_change:2}',
                             args.agent_type,
                             'fwd' if args.method.lower() == 'forward' else 'bwd', text)).replace(' ', '')
 
@@ -156,12 +156,12 @@ if __name__ == "__main__":
         env.assign([('protocol', 'W')])
 
     if args.save_runs:
-        env_filename = lambda i: filename+'{:04}'.format(i)
+        env_filename = lambda i: filename+f'{i:04}'
     else:
         env_filename = lambda i: filename
 
     for i in range(args.runs):
-        print('run {: }'.format(i))
+        print(f'run {i: }')
         env.elapse(episodes=args.training_episodes, reset='all',
                    termination='all', learning_method='history',
                    reporting='none', tally='no')
@@ -169,14 +169,10 @@ if __name__ == "__main__":
         # env.save(filename=env_filename(i))
 
         for row in env.trajectory()['protocol'].iterrows():
-            print('{}, {} \t {} \t {} \t {}\n'.format(row[0],
-                                                row[1].state.value.loc['Doses'][-1],
-                                                row[1].state.value.loc['INRs'][-1],
-                                                row[1].reward,
-                                                row[1].q))
+            print(f'{row[0]}, {row[1].state.value.loc["Doses"][-1]} \t {row[1].state.value.loc["INRs"][-1]} \t {row[1].reward} \t {row[1].q}\n')
 
-        # with open(filename+'.txt', 'a+') as f:
-        #     f.write('{:-^20}\n'.format(i))
-        #     for row in env.trajectory()['protocol'].iterrows():
-        #         print('{}, {} \n {}'.format(row[0], row[1].state.value.loc['Doses'], row[1].reward))
-        #         f.write('{}, {} \t {} \t {}\n'.format(row[0], row[1].state.value.loc['Doses'][-1], row[1].state.value.loc['INRs'][-1], row[1].reward))
+        with open(filename+'.txt', 'a+') as f:
+            f.write(f'{i:-^20}\n')
+            for row in env.trajectory()['protocol'].iterrows():
+                print(f'{row[0]}, {row[1].state.value.loc["Doses"]} \n {row[1].reward}')
+                f.write(f'{row[0]}, {row[1].state.value.loc["Doses"][-1]} \t {row[1].state.value.loc["INRs"][-1]} \t {row[1].reward} \t {row[1].q}\n')

@@ -7,16 +7,16 @@ from os.path import isfile, join
 from random import random
 
 import matplotlib.pyplot as plt
-from matplotlib import patches
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from dill import HIGHEST_PROTOCOL, dump, load
+from matplotlib import patches
+from rl.agents import WarfarinClusterAgent
 from rl.environments import Environment
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 
-from rl.agents import WarfarinClusterAgent
 
 # %%
 class Analyzer:
@@ -33,10 +33,11 @@ class Analyzer:
         self._extended_state = kwargs.get('extended_state', False)
         if self._extended_state:
             self._column_names = ['age', 'weight', 'height', 'female', 'male', 'White', 'Black', 'Asian', 'American Indian', 'Pacific Islander',
-            'tobaco_no', 'tobaco_yes', 'amiodarone_no', 'amiodarone_yes', 'fluvastatin_no', 'fluvastatin_yes', 
+            'tobaco_no', 'tobaco_yes', 'amiodarone_no', 'amiodarone_yes', 'fluvastatin_no', 'fluvastatin_yes',
             '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A']
         else:
-            self._column_names = ['age', '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A']
+            self._column_names = ['age', '*1/*1', '*1/*2', '*1/*3',
+                '*2/*2', '*2/*3', '*3/*3', 'G/G', 'G/A', 'A/A']
         self._X_embedded = {}
         self._files_loaded = []
         self._df_for_stats = {}
@@ -92,7 +93,7 @@ class Analyzer:
                                              for a in df_from_file.action]
                 except KeyError:
                     self._df_for_segmentation[agent] = pd.DataFrame(dict(zip(self._column_names
-                                                                             + ['dose {:02}'.format(i) for i in range(90)],
+                                                                             + [f'dose {i:02}' for i in range(90)],
                                                                              patient_info[:10] + [float(a.value) for a in df_from_file.action])),
                                                                     index=[0])
 
@@ -100,10 +101,8 @@ class Analyzer:
                 dose_max = df_from_file.loc[0, 'state'].upper.loc['Doses']
                 df_state_action = df_from_file.apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(
                     x, str) else [x] for x in row.state.normalize().value] for z in y] + row.action.as_list(), axis=1, result_type='expand')
-                df_state_action.columns = self._column_names + ['dose-{:02}'.format(
-                    dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current', 'action']
-                # df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + ['INR-{:02}'.format(INR_history-i) for i in range(INR_history)] + ['INR_current'], inplace=True, axis=1)
-                df_state_action['delta_dose'] = df_state_action.apply(
+                df_state_action.columns = self._column_names + [f'dose-{dose_history-i:02}') for i in range(dose_history)] + [f'INR-{INR_history-i:02}' for i in range(INR_history)] + ['INR_current', 'action']
+                df_state_action['delta_dose']=df_state_action.apply(
                     lambda row: row['action'] - row['dose-01'] * dose_max, axis=1)
                 df_state_action['dose_change'] = df_state_action.apply(
                     lambda row: int(row['action'] != row['dose-01']*dose_max), axis=1)
@@ -117,29 +116,30 @@ class Analyzer:
                 df_state_action['VKORC1'] = df_state_action.loc[[0], ['A/A', 'G/A', 'G/G']].idxmax(axis=1)[0] # .apply(lambda row: row[['A/A', 'G/A', 'G/G']].idxmax(), axis=1)
                 df_state_action['CYP2C9'] = df_state_action.loc[[0], ['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']].idxmax(axis=1)[0]  # .apply(lambda row: row[['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3']].idxmax(), axis=1)
 
-                df_state_action.drop(['dose-{:02}'.format(dose_history-i) for i in range(dose_history)] + [
-                                     'INR-{:02}'.format(INR_history-i) for i in range(INR_history)], inplace=True, axis=1)
+                df_state_action.drop([f'dose-{dose_history-i:02}' for i in range(dose_history)] + [
+                                     f'INR-{INR_history-i:02}' for i in range(INR_history)], inplace=True, axis=1)
                 # temp_list_stats[counter] = df_state_action
                 try:
                     self._df_for_stats[agent] = pd.concat(
-                        [self._df_for_stats[agent], df_state_action], ignore_index=True, sort=False)
+                        [self._df_for_stats[agent], df_state_action], ignore_index = True, sort = False)
                 except KeyError:
-                    self._df_for_stats[agent] = df_state_action
+                    self._df_for_stats[agent]=df_state_action
 
                 self._files_loaded.append(full_filename)
 
         # self._df_for_segmentation = pd.concat([self._df_for_segmentation] + temp_list_segmentation)
         # self._df_for_stats = pd.concat([self._df_for_stats] + temp_list_stats)
 
-    def assign_cluster_label(self, cluster_filename, items='all', **kwargs):
-        self._clustering_agent = WarfarinClusterAgent(cluster_filename=cluster_filename, **kwargs)
+    def assign_cluster_label(self, cluster_filename, items = 'all', **kwargs):
+        self._clustering_agent=WarfarinClusterAgent(
+            cluster_filename = cluster_filename, **kwargs)
         if items == 'all':
-            items = self._df_for_stats.keys()
-        
+            items=self._df_for_stats.keys()
+
         for agent in items:
-            self._df_for_stats[agent]['cluster'] = self._df_for_stats[agent].apply(
+            self._df_for_stats[agent]['cluster']=self._df_for_stats[agent].apply(
                 lambda row: self._clustering_agent._assign_to_cluster(age=row['age'], CYP2C9=row['CYP2C9'], VKORC1=row['VKORC1']), axis=1)
-        
+
         print('done')
 
     def TSNE(self, items='all'):
@@ -150,14 +150,14 @@ class Analyzer:
             self._X_embedded[agent] = TSNE(n_components=2).fit_transform(
                 self._df_for_segmentation[agent])
 
-    def plot(self, items='all', plots='all', show=True):
+    def plot(self, items = 'all', plots = 'all', show = True):
         if self._X_embedded == {}:
             self.TSNE(items)
 
         if items == 'all':
-            items = self._df_for_segmentation.keys()
+            items=self._df_for_segmentation.keys()
         if plots == 'all':
-            plots = ['age', 'CYP2C9', 'VKORC1', 'sensitivity',
+            plots=['age', 'CYP2C9', 'VKORC1', 'sensitivity',
                      'mixture_model']
 
         fig, axs = plt.subplots(len(plots), len(
@@ -176,27 +176,28 @@ class Analyzer:
                                       self._df_for_segmentation[agent]['A/A']))
                     color_map = 'jet'
                 elif plot == 'VKORC1':
-                    colors = self._df_for_segmentation[agent]['*1/*1'] * 2 + \
-                        self._df_for_segmentation[agent]['*1/*2'] * 4 + \
-                        self._df_for_segmentation[agent]['*1/*3'] * 6 + \
-                        self._df_for_segmentation[agent]['*2/*2'] * 8 + \
-                        self._df_for_segmentation[agent]['*2/*3'] * 10 + \
+                    colors= self._df_for_segmentation[agent]['*1/*1'] * 2 +
+                        self._df_for_segmentation[agent]['*1/*2'] * 4 +
+                        self._df_for_segmentation[agent]['*1/*3'] * 6 +
+                        self._df_for_segmentation[agent]['*2/*2'] * 8 +
+                        self._df_for_segmentation[agent]['*2/*3'] * 10 +
                         self._df_for_segmentation[agent]['*3/*3'] * 12
                     color_map = 'tab10'
                 elif plot == 'sensitivity':
-                    colors = 1 * self._df_for_segmentation[agent]['G/G'] * (self._df_for_segmentation[agent]['*1/*1'] + self._df_for_segmentation[agent]['*1/*2']) + \
-                        1 * self._df_for_segmentation[agent]['G/A'] * self._df_for_segmentation[agent]['*1/*1'] + \
-                        2 * self._df_for_segmentation[agent]['G/G'] * (self._df_for_segmentation[agent]['*1/*3'] + self._df_for_segmentation[agent]['*2/*2'] + self._df_for_segmentation[agent]['*2/*3']) + \
-                        2 * self._df_for_segmentation[agent]['G/A'] * (self._df_for_segmentation[agent]['*1/*2'] + self._df_for_segmentation[agent]['*1/*3'] + self._df_for_segmentation[agent]['*2/*2']) + \
-                        2 * self._df_for_segmentation[agent]['A/A'] * (self._df_for_segmentation[agent]['*1/*1'] + self._df_for_segmentation[agent]['*1/*2']) + \
-                        3 * self._df_for_segmentation[agent]['G/G'] * self._df_for_segmentation[agent]['*3/*3'] + \
-                        3 * self._df_for_segmentation[agent]['G/A'] * (self._df_for_segmentation[agent]['*2/*3'] + self._df_for_segmentation[agent]['*3/*3']) + \
+                    colors= 1 * self._df_for_segmentation[agent]['G/G'] * (self._df_for_segmentation[agent]['*1/*1'] + self._df_for_segmentation[agent]['*1/*2']) +
+                        1 * self._df_for_segmentation[agent]['G/A'] * self._df_for_segmentation[agent]['*1/*1'] +
+                        2 * self._df_for_segmentation[agent]['G/G'] * (self._df_for_segmentation[agent]['*1/*3'] + self._df_for_segmentation[agent]['*2/*2'] + self._df_for_segmentation[agent]['*2/*3']) +
+                        2 * self._df_for_segmentation[agent]['G/A'] * (self._df_for_segmentation[agent]['*1/*2'] + self._df_for_segmentation[agent]['*1/*3'] + self._df_for_segmentation[agent]['*2/*2']) +
+                        2 * self._df_for_segmentation[agent]['A/A'] * (self._df_for_segmentation[agent]['*1/*1'] + self._df_for_segmentation[agent]['*1/*2']) +
+                        3 * self._df_for_segmentation[agent]['G/G'] * self._df_for_segmentation[agent]['*3/*3'] +
+                        3 * self._df_for_segmentation[agent]['G/A'] * (self._df_for_segmentation[agent]['*2/*3'] + self._df_for_segmentation[agent]['*3/*3']) +
                         3 * self._df_for_segmentation[agent]['A/A'] * (self._df_for_segmentation[agent]['*1/*3'] + self._df_for_segmentation[agent]
                                                                        ['*2/*2'] + self._df_for_segmentation[agent]['*2/*3'] + self._df_for_segmentation[agent]['*3/*3'])
-                    color_map = 'coolwarm'
+                    color_map='coolwarm'
                 elif plot == 'mixture_model':
-                    colors = self._gmm_results.get(agent, self.GMM(items=[agent]))
-                    color_map = 'jet'
+                    colors=self._gmm_results.get(
+                        agent, self.GMM(items=[agent]))
+                    color_map='jet'
                     # axs[index_plot, index_agent].add_patch(patches.Ellipse())
 
                 axs[index_plot, index_agent].scatter(self._X_embedded[agent][:, 0],

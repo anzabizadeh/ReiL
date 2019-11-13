@@ -131,7 +131,6 @@ class CancerModel(Subject):
 
     def __repr__(self):
         try:
-            return 'CancerModel: [day: {}, N: {}, T: {}, N: {}, C: {}]'.format(
-                self._x['day'], self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'])
+            return f"CancerModel: [day: {self._x['day']}, N: {self._x['normal_cells']}, T: {self._x['tumor_cells']}, N: {self._x['immune_cells']}, C: {self._x['drug']}]"
         except:
             return 'CancerModel'

@@ -82,7 +82,7 @@ class ANNAgent(Agent):
             layer = [self._tf['inputs']]
             for i, v in enumerate(self._hidden_layer_sizes):
                 layer.append(tf.layers.dense(
-                    layer[i], v, activation=tf.nn.relu, name='layer_{:0>2}'.format(i+1)))
+                    layer[i], v, activation=tf.nn.relu, name=f'layer_{i+1:0>2}'))
 
             self._tf['output'] = tf.layers.dense(layer[-1], 1, name='output')
 

@@ -26,7 +26,7 @@ def main():
         my_action = choice(board.possible_actions)
         board.take_effect(1, my_action)
         print(my_action.value)
-        print(board.printable())
+        print(f'{board}')
 
 
 class FrozenLake(MNKBoard, Subject):

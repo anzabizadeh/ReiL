@@ -88,16 +88,16 @@ class DataCollector():
             raise RuntimeError('Data collector should be stopped before assignment.')
         for s, args in statistics.items():
             if not isinstance(s, str):
-                raise TypeError('Statistic\'s name should be of type str ({}).'.format(s))
+                raise TypeError(f'Statistic\'s name should be of type str ({s}).')
             if not isinstance(args[0], bool):
-                raise TypeError('Statistic\'s first item should be of type bool ({}).'.format(args[0]))
+                raise TypeError(f'Statistic\'s first item should be of type bool ({args[0]}).')
             if not callable(args[1]):
-                raise TypeError('Statistic\'s second item should be a function ({}).'.format(args[1]))
+                raise TypeError(f'Statistic\'s second item should be a function ({args[1]}).')
             if len(args) < 3:
                 raise ValueError('A statistic should have at least one variable name.')
             for i in range(2,len(args)):
                 if not isinstance(args[i], str):
-                    raise TypeError('Variable\'s name should be of type str ({}).'.format(args[i]))
+                    raise TypeError(f'Variable\'s name should be of type str ({args[i]}).')
         self._available_statistics = statistics
 
     @property
@@ -119,9 +119,9 @@ class DataCollector():
             return
         for s in statistics:
             if not isinstance(s, str):
-                raise TypeError('Statistic\'s name should be of type str ({}).'.format(s))
+                raise TypeError(f'Statistic\'s name should be of type str ({s}).')
             if not s in self._available_statistics:
-                raise ValueError('Requested statistic is not available ({}).'.format(s))
+                raise ValueError(f'Requested statistic is not available ({s}).')
         self._active_statistics = statistics
 
     def start(self, flush=False):
@@ -198,7 +198,7 @@ class DataCollector():
                     # self._data[s] = dict((variable, self._object.__dict__[variable]) 
                     #                                 for variable in self._available_statistics[s][2:])
                 except KeyError:
-                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
+                    raise RuntimeError(f'Object doesn\'t have the attribute provided for {s}.')
 
     def retrieve(self, **kwargs):
         '''
@@ -276,7 +276,7 @@ class DataCollector():
                 try:
                     results[s] = self._available_statistics[s][1](new=self._data[s], old=old_data[s], statistic=s)
                 except KeyError:
-                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
+                    raise RuntimeError(f'Object doesn\'t have the attribute provided for {s}.')
             else:
                 results[s] = self._available_statistics[s][1](data=self._data[s], statistic=s)
         

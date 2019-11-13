@@ -26,7 +26,6 @@ class Subject(RLBase):
         register: register a new agent and return its ID or return ID of an existing agent.
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
-        printable: return a readable format of subject's state
     '''
     def __init__(self, **kwargs):
         RLBase.__init__(self, **kwargs)
@@ -76,9 +75,6 @@ class Subject(RLBase):
 
     def reset(self):
         raise NotImplementedError
-
-    def printable(self):
-        pass
 
     def __repr__(self):
         return 'Subject'

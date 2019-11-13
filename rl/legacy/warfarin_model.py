@@ -59,7 +59,7 @@ class WarfarinModel(Subject):
         utils = importr('utils')
         utils.chooseCRANmirror(ind=1)
         utils.install_packages(StrVector(['deSolve']))
-        robjects.r('set.seed({})'.format(self._rseed))
+        robjects.r(f'set.seed({self._rseed})')
         robjects.r(warfarin_code)
         self._hamberg_2007 = robjects.r['hamberg_2007']
 
@@ -187,7 +187,7 @@ class WarfarinModel(Subject):
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: [{}, {}, {}, INR_prev: {}, INR: {}, d_prev: {}, d: {}]'.format(
-                self._age, self._CYP2C9, self._VKORC1, self._INR_previous, self._INR_current, self._d_previous, self._d_current)
+            return f'WarfarinModel: [{self._age}, {self._CYP2C9}, {self._VKORC1}, ' \
+                   f'INR_prev: {self._INR_previous}, INR: {self._INR_current}, d_prev: {self._d_previous}, d: {self._d_current}]'
         except:
             return 'WarfarinModel'

@@ -220,7 +220,7 @@ class Environment(RLBase):
         steps = 0
         for episode in range(episodes):
             if reporting != 'none':
-                report_string = 'episode: {}'.format(episode+1)
+                report_string = f'episode: {episode+1}'
             # if learning_method == 'history':
             history = {}
             for agent_name in self._agent:
@@ -240,11 +240,9 @@ class Environment(RLBase):
                             state = subject.state
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
-                                               episode=self._total_experienced_episodes,
-                                               printable=subject.printable())
+                                               episode=self._total_experienced_episodes)
                             if reporting == 'all':
-                                print('step: {: 4} episode: {:2} state: {} action: {} by:{}'
-                                      .format(steps, episode, state, action, agent_name))
+                                print(f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
                             reward = subject.take_effect(_id, action)
 
                             history[agent_name].loc[len(history[agent_name].index)] = [state, action, reward]
@@ -294,9 +292,9 @@ class Environment(RLBase):
                         self._subject[subject_name[0]].reset()
 
             if tally & (reporting != 'none'):
-                report_string += '\n tally:'
+                report_string += f'\n tally:'
                 for agent in self._agent:
-                    report_string += '\n {} {}'.format(agent, win_count[agent])
+                    report_string += f'\n {agent} {win_count[agent]}'
 
             if reporting != 'none':
                 print(report_string)
@@ -343,8 +341,7 @@ class Environment(RLBase):
                     if not subject.is_terminated:
                         state = subject.state
                         possible_actions = subject.possible_actions
-                        action = agent.act(state, actions=possible_actions,
-                                           printable=subject.printable())
+                        action = agent.act(state, actions=possible_actions)
                         q = agent._q(state, action)
                         reward = subject.take_effect(_id, action)
                         # history[agent_name].append(state)

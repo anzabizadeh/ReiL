@@ -92,7 +92,7 @@ class Experiment(Environment):
                 print(file_index)
                 filename = subject_name + file_index
                 if os.path.exists(os.path.join(subjects_path, filename + '.pkl')):
-                    print('{} already exists! Skipping the file!'.format(filename))
+                    print(f'{filename} already exists! Skipping the file!')
                 else:
                     subject.save(filename=filename, path=subjects_path)
                     subject.reset()
@@ -120,7 +120,7 @@ class Experiment(Environment):
         output_dir.mkdir(parents=True, exist_ok=True)
 
         for agent_name, agent in self._agent.items():
-            print('Agent: {}'.format(agent_name))
+            print(f'Agent: {agent_name}')
             agent.status = 'testing'
 
             try:
@@ -135,7 +135,7 @@ class Experiment(Environment):
                 history = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
 
                 filename = subject_name + file_index
-                print('Subject: {}'.format(filename))
+                print(f'Subject: {filename}')
                 temp_agent_list = subject._agent_list
                 # THIs SHOULD BE subject.load(...), I ADDED ._patient TEMPORARILY! ALSO,
                 # DELETE subject.reset()

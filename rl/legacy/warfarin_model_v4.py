@@ -146,7 +146,7 @@ class WarfarinModel_v4(Subject):
         if self._save_patients:
             if not self._patient_save_overwrite and not self._patient_use_existing:
                 while os.path.exists(os.path.join(self._patients_save_path,
-                                                  ''.join((self._patients_save_prefix, '{:06}'.format(self._filename_counter))))):
+                                                  ''.join((self._patients_save_prefix, f'{self._filename_counter:06}')))):
                     self._filename_counter += 1
 
         self.reset()
@@ -332,7 +332,7 @@ class WarfarinModel_v4(Subject):
                                 randomized=self._randomized, max_time=self._max_time)
 
         current_patient = os.path.join(self._patients_save_path,
-                                        ''.join((self._patients_save_prefix, '{:06}'.format(self._filename_counter))))
+                                        ''.join((self._patients_save_prefix, f'{self._filename_counter:06}')))
         if self._save_patients and not self._patient_save_overwrite:
             try:
                 # self._patient = Patient()
@@ -371,8 +371,8 @@ class WarfarinModel_v4(Subject):
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: {}, INR: {}, d_prev: {}, d: {}'.format(
-                [' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()], self._INR, self._d_previous, self._d_current)
+            return f"WarfarinModel: {[' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()]}, " \
+                f"INR: {self._INR}, d_prev: {self._d_previous}, d: {self._d_current}"
         except:
             return 'WarfarinModel'
 
