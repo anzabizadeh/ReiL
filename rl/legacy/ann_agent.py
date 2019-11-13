@@ -8,7 +8,7 @@ A Q-learning agent with Neural Network Q-function approximator
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from pickle import HIGHEST_PROTOCOL, dump, load
+from dill import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
 

@@ -10,7 +10,7 @@ An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 
 
 import os
-from pickle import HIGHEST_PROTOCOL, dump, load
+from dill import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
 

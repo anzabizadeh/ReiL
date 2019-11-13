@@ -8,7 +8,7 @@ The base class for data collection in reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from pickle import load, dump, HIGHEST_PROTOCOL
+from dill import load, dump, HIGHEST_PROTOCOL
 from copy import deepcopy
 
 

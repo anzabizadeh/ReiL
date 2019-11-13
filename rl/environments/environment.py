@@ -8,7 +8,7 @@ This `environment` class provides a learning environment for any reinforcement l
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from pickle import load, dump, HIGHEST_PROTOCOL
+from dill import load, dump, HIGHEST_PROTOCOL
 import os
 import sys
 import inspect

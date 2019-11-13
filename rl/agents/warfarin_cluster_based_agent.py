@@ -10,7 +10,7 @@ An agent that produces action based on similarity of the state with clusters.
 
 
 import os
-from pickle import HIGHEST_PROTOCOL, dump, load
+from dill import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
 from scipy.stats import norm
