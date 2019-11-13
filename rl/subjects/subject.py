@@ -8,7 +8,7 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from ..base import RLBase
+from ..rlbase import RLBase
 
 
 class Subject(RLBase):
@@ -59,9 +59,17 @@ class Subject(RLBase):
         try:
             return self._agent_list[agent_name]
         except KeyError:
-            _id = len(self._agent_list) + 1
+            _id = max(self._agent_list.values()) + 1
             self._agent_list[agent_name] = _id
             return _id
+
+    def deregister(self, agent_name):
+        '''
+        Deegisters an agent given its name.
+        \nArguments:
+        \n    agent_name: the name of the agent to be registered.
+        '''
+        self._agent_list.pop(agent_name)
 
     def take_effect(self, _id, action):
         raise NotImplementedError

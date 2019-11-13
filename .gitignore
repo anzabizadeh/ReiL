@@ -103,3 +103,12 @@ ENV/
 # PKPD model
 .pkpd
 warfarin_pkpd_model.py
+
+# TF logs
+/logs
+/log
+/Saved Models
+
+# pickle files
+*.pkl
+outputs/.pkl

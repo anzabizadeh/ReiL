@@ -12,7 +12,7 @@ An agent that prints the state and asks the user for action.
 # NOTE TO MYSELF: This implementation is not good! It should get either the state or the printable.
 
 
-from ..valueset import ValueSet
+from ..legacy.valueset import ValueSet
 from .agent import Agent
 
 

@@ -9,9 +9,10 @@ This `subject` class emulates mnk game.
 '''
 
 
-from rl.subjects.mnkboard import MNKBoard
-from rl.subjects.subject import Subject
-from rl.valueset import ValueSet
+from ..utils.mnkboard import MNKBoard
+from ..subjects.subject import Subject
+# from rl.valueset import ValueSet
+from ..rldata import RLData
 
 
 def main():
@@ -19,8 +20,8 @@ def main():
     player = {}
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')
-    board.take_effect(player['P1'], ValueSet(0))
-    board.take_effect(player['P2'], ValueSet(1))
+    board.take_effect(player['P1'], RLData(0))  # ValueSet(0))
+    board.take_effect(player['P2'], RLData(1))  # ValueSet(1))
     print(board.printable())
 
 
@@ -77,7 +78,8 @@ class MNKGame(MNKBoard, Subject):
     @property
     def possible_actions(self):
         '''Return a list of indexes of empty squares.'''
-        return ValueSet(list(self.get_action_set()), min=0, max=len(self._board)-1).as_valueset_array()
+        # return ValueSet(list(self.get_action_set()), min=0, max=len(self._board)-1).as_valueset_array()
+        return RLData(list(self.get_action_set()), lower=0, upper=len(self._board)-1).as_rldata_array()
 
     def register(self, player_name):
         '''

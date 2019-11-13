@@ -11,18 +11,23 @@ Classes
     UserAgent: an agent that shows current state and asks for
         user's choice of action
     RandomAgent: an agent that randomly chooses an action
+    FixedAgent: an agent that outputs a constant action
     QAgent: the Q-learning agent
-    ANNAgent: the agent with neural network as a Q-function
-        estimator (Not Implemented Yet)
+    TD0Agent: a TD(0) agent (might not work! Uses legacy ValueSet instead of RLData)
+    DQNAgent: the agent with neural network as a Q-function
+        estimator
+    WarfarinAgent: an agent based on Ravvaz et al (2016) paper for Warfarin Dosing
+    WarfarinClusterAgent: an agent whose actions are based on clustering of observations
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
 from .agent import Agent
-from .q_learning import QAgent
-from .random_agent import RandomAgent
 from .user_agent import UserAgent
-from .ann_agent import ANNAgent
-from .policy_gradient import PGAgent
-from .td_agent import TD0Agent
+from .random_agent import RandomAgent
 from .fixed_agent import FixedAgent
+from .q_learning import QAgent
+from .td_agent import TD0Agent
+from .dqn_agent import DQNAgent
+from .warfarin_agent import WarfarinAgent
+from .warfarin_cluster_based_agent import WarfarinClusterAgent

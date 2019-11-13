@@ -7,17 +7,27 @@ This module provides different reinforcement learning methods.
 
 submodules
 ----------
+    agents: objects that learn by acting on one or more subject
+        via an environment and observing the reward.
     subjects: objects with an internal state that get one or
         more agent's action via environment and return new
         state and reward.
-    agents: objects that learn by acting on one or more subject
-        via an environment and observing the reward.
     environments: objects that connect agents to subjects and
         elapse time.
-    valueset: a data type to store state and action data.
+    rlbase: base class for all rl objects.
+    rldata: a data type to store states and actions.
+    utils: all classes that are not part of the agent, subject, environment framework.
+    legacy: all classes that are no longer supported.
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
 
-__all__ = ['environments', 'agents', 'subjects', 'valueset', 'data_collector']
+__all__ = ['agents',
+           'environments',
+           'subjects',
+           'rlbase',
+           'rldata',
+           'data_collector',
+           'utils',
+           'legacy']
