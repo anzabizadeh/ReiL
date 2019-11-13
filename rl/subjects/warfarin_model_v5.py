@@ -194,6 +194,10 @@ class WarfarinModel_v5(Subject):
 
         self.reset()
 
+        self._INR_mid = (self._therapeutic_range[1] + self._therapeutic_range[0]) / 2
+        self._INR_range = self._therapeutic_range[1] - self._therapeutic_range[0]
+
+
         self._possible_actions = RLData([x*self._dose_steps
                                          for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
                                         lower=0, upper=self._max_dose).as_rldata_array()
@@ -319,12 +323,10 @@ class WarfarinModel_v5(Subject):
             # reward = 1 if self._therapeutic_range[0] <= self._INR[-1] <= self._therapeutic_range[1] else 0
             # TTR = sum((self._therapeutic_range[0] <= self._INR[-2] + (self._INR[-1]-self._INR[-2])/self._dosing_intervals*j <= self._therapeutic_range[1]
             #            for j in range(self._dosing_intervals)))
-            INR_mid = (self._therapeutic_range[1] + self._therapeutic_range[0]) / 2
-            INR_range = self._therapeutic_range[1] - self._therapeutic_range[0]
             # considering day=1 in INR_penalty calculation
             # INR_penalty = -sum(((2 / INR_range * (INR_mid - self._INR[-2] - (self._INR[-1]-self._INR[-2])/self._d_current*j)) ** 2
             #                     for j in range(0 if self._day==1 else 1, self._d_current + 1)))  # negative squared distance as reward (used *2/range to normalize)
-            INR_penalty = -sum(((2 / INR_range * (INR_mid - self._INR[-2] - (self._INR[-1]-self._INR[-2])/self._d_current*j)) ** 2
+            INR_penalty = -sum(((2 / self._INR_range * (self._INR_mid - self._INR[-2] - (self._INR[-1]-self._INR[-2])/self._d_current*j)) ** 2
                                 for j in range(1, self._d_current + 1)))  # negative squared distance as reward (used *2/range to normalize)
             dose_change_penalty = - self._dose_change_penalty_func(self._dose_list)
             reward = INR_penalty + self._dose_change_penalty_coef * dose_change_penalty
