@@ -70,7 +70,7 @@ class Subject(RLBase):
         '''
         self._agent_list.pop(agent_name)
 
-    def take_effect(self, _id, action):
+    def take_effect(self, action, _id=None):
         raise NotImplementedError
 
     def reset(self):
