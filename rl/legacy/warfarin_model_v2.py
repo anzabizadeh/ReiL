@@ -169,7 +169,7 @@ class WarfarinModel_v2(Subject):
             self._agent_list[agent_name] = 1
             return 1
 
-    def take_effect(self, _id, action):
+    def take_effect(self, action, _id=None):
         self._current_dose = action.value[0]
         self._d_previous = self._d_current
         self._dose_list.append(self._current_dose)

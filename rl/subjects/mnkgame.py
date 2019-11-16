@@ -20,8 +20,8 @@ def main():
     player = {}
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')
-    board.take_effect(player['P1'], RLData(0))  # ValueSet(0))
-    board.take_effect(player['P2'], RLData(1))  # ValueSet(1))
+    board.take_effect(RLData(0), player['P1'])  # ValueSet(0))
+    board.take_effect(RLData(1), player['P2'])  # ValueSet(1))
     print(f'{board}')
 
 
@@ -92,19 +92,19 @@ class MNKGame(MNKBoard, Subject):
         '''
         return Subject.register(self, player_name)
 
-    def take_effect(self, id_, action):
+    def take_effect(self, action, _id):
         '''
         Set a piece for the given player on the board.
 
         Arguments
         ---------
-            id_: ID of the player who sets the piece.
+            _id: ID of the player who sets the piece.
             action: the location in which the piece is set. Can be either in index format or row column format.
         ''' 
         self._set_piece(id_, index=int(action.value[0]), update='yes')
         if self._board_status is None:
             return 0
-        if self._board_status == id_:
+        if self._board_status == _id:
             return 1
         if self._board_status > 0:
             return -1

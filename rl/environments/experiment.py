@@ -154,7 +154,7 @@ class Experiment(Environment):
                         q = agent._q(state, action)
                     except AttributeError:
                         q = np.nan
-                    reward = subject.take_effect(_id, action)
+                    reward = subject.take_effect(action, _id)
 
                     history.loc[len(history.index)] = [state, action, q, reward]
 

@@ -189,7 +189,7 @@ class WarfarinModel_v5(Subject):
         if self._save_patients:
             if not self._patient_save_overwrite and not self._patient_use_existing:
                 while os.path.exists(os.path.join(self._patients_save_path,
-                                                  ''.join((self._patients_save_prefix, f'{self._filename_counter:06}'))):
+                                                  ''.join((self._patients_save_prefix, f'{self._filename_counter:06}')))):
                     self._filename_counter += 1
 
         self.reset()
@@ -296,7 +296,7 @@ class WarfarinModel_v5(Subject):
             self._agent_list[agent_name] = 1
             return 1
 
-    def take_effect(self, _id, action):
+    def take_effect(self, action, _id=None):
         self._current_dose = action.value[0]
         self._dosing_intervals.append(self._d_current)
         self._dosing_intervals.popleft()

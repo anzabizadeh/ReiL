@@ -46,8 +46,8 @@ class ConstrainedCancerModel(CancerModel):
         return ValueSet([self._x['drug_cap']*x/self._u_steps for x in range(0, self._u_steps+1)], min=0, max=self._u_max, 
                         binary=lambda x: (int(x * self._u_steps // self._u_max), self._u_steps+1)).as_valueset_array()
 
-    def take_effect(self, _id, action):
-        r = CancerModel.take_effect(self, _id, action)
+    def take_effect(self, action, _id=None):
+        r = CancerModel.take_effect(self, action, _id)
         self._x['drug_cap'] = self._drug_cap(self._x)
         return r
 

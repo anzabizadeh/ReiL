@@ -97,13 +97,13 @@ class Risk(Subject):
         if len(self._agent_list)<2:
             return Subject.register(self, player_name)
 
-    def take_effect(self, id_, action):
+    def take_effect(self, action, _id=None):
         '''
         Set a piece for the given player on the board.
 
         Arguments
         ---------
-            id_: ID of the player who sets the piece.
+            _id: ID of the player who sets the piece.
             action: the location in which the piece is set. Can be either in index format or row column format.
         '''
         if self._turn == 0:

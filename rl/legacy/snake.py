@@ -68,13 +68,13 @@ class Snake(MNKBoard, Subject):
         '''Return the moves as ValueSet (left, none, right).'''
         return ValueSet(['left', 'none', 'right'])
 
-    def take_effect(self, _id, action):
+    def take_effect(self, action, _id=None):
         '''
         Move the snake on the board.
 
         Arguments
         ---------
-            id_: ID of the player. (Not used in the code)
+            _id: ID of the player. (Not used in the code)
             action: one of three possible actions: left, none, right.
         ''' 
         self._win.border(0)

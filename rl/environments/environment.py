@@ -11,8 +11,6 @@ This `environment` class provides a learning environment for any reinforcement l
 from dill import load, dump, HIGHEST_PROTOCOL
 import os
 import sys
-import inspect
-import pathlib
 import pandas as pd
 
 from ..rlbase import RLBase
@@ -239,7 +237,7 @@ class Environment(RLBase):
                                                episode=self._total_experienced_episodes)
                             if reporting == 'all':
                                 print(f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
-                            reward = subject.take_effect(_id, action)
+                            reward = subject.take_effect(action, _id)
 
                             history[agent_name].loc[len(history[agent_name].index)] = [state, action, reward]
 
@@ -333,7 +331,7 @@ class Environment(RLBase):
                         possible_actions = subject.possible_actions
                         action = agent.act(state, actions=possible_actions)
                         q = agent._q(state, action)
-                        reward = subject.take_effect(_id, action)
+                        reward = subject.take_effect(action, _id)
 
                         history[agent_name].loc[len(history[agent_name].index)] = [state, action, q, reward]
                         if subject.is_terminated:

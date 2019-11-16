@@ -24,7 +24,7 @@ def main():
     for _ in range(10):
         print(board.state)
         my_action = choice(board.possible_actions)
-        board.take_effect(1, my_action)
+        board.take_effect(my_action, 1)
         print(my_action.value)
         print(f'{board}')
 
@@ -113,13 +113,13 @@ class FrozenLake(MNKBoard, Subject):
             return Subject.register(self, player_name)
         raise ValueError('Windy Gridworld only accepts one player.')
 
-    def take_effect(self, id_, action):
+    def take_effect(self, action, _id=None):
         '''
         Move according to the action.
 
         Arguments
         ---------
-            id_: ID of the player.
+            _id: ID of the player.
             action: the location in which the piece is set. Can be either in index format or row column format.
         '''
         row, column = [*self._player_location]

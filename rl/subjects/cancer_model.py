@@ -91,7 +91,7 @@ class CancerModel(Subject):
             self._agent_list[agent_name] = 1
             return 1
 
-    def take_effect(self, _id, action):
+    def take_effect(self, action, _id=None):
         self._drug['infusion_rate'] = action.value[0]
         x_dot = {}
         x_dot['day'] = 1
