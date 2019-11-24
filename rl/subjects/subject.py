@@ -58,7 +58,11 @@ class Subject(RLBase):
         try:
             return self._agent_list[agent_name]
         except KeyError:
-            _id = max(self._agent_list.values()) + 1
+            try:
+                _id = max(self._agent_list.values()) + 1
+            except ValueError:
+                _id = 1
+
             self._agent_list[agent_name] = _id
             return _id
 

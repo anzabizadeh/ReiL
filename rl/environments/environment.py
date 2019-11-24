@@ -9,6 +9,7 @@ This `environment` class provides a learning environment for any reinforcement l
 '''
 
 from dill import load, dump, HIGHEST_PROTOCOL
+from functools import reduce
 import os
 import sys
 import pandas as pd
@@ -67,7 +68,8 @@ class Environment(RLBase):
 
         RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
                             episodes=1, max_steps=10000, termination='any', reset='all',
-                            learning_method='every step', total_experienced_episodes=0)
+                            learning_batch_size=-1,
+                            learning_method='every step', total_experienced_episodes={})
         RLBase.set_params(self, **kwargs)
 
 
@@ -75,8 +77,8 @@ class Environment(RLBase):
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
             self._agent, self._subject, self._assignment_list = {}, {}, {}
-            self._episodes, self._total_experienced_episodes, self._max_steps = 1, 0, 10000
-            self._termination, self._reset, self._learning_method = 'any', 'all', 'every step'
+            self._episodes, self._total_experienced_episodes, self._max_steps = 1, {}, 10000
+            self._termination, self._reset, self._learning_batch_size, self._learning_method = 'any', 'all', -1, 'every step'
 
     def add(self, **kwargs):
         '''
@@ -114,13 +116,13 @@ class Environment(RLBase):
             try:
                 del self._agent[name]
             except KeyError:
-                raise KeyError('Agent '+name+' not found')
+                raise KeyError(f'Agent {name} not found!')
 
         for name in kwargs['subjects']:
             try:
                 del self._subject[name]
             except KeyError:
-                raise KeyError('Subject '+name+' not found')
+                raise KeyError(f'Subject {name} not found!')
 
     def assign(self, agent_subject_names):
         '''
@@ -131,15 +133,21 @@ class Environment(RLBase):
             agent_subject_names: a list of agent subject tuples.
 
         Raises ValueError if an agent or subject is not found.
-        Note: An agent can be assigned to act on multiple subjects and a subject can be affected by multiple agents. 
+        Note: An agent cannot be assigned to act on multiple subjects, but a subject can be affected by multiple agents. 
         '''
         for agent_name, subject_name in agent_subject_names:
             if agent_name not in self._agent:
-                raise ValueError('Agent ' + agent_name + ' not found.')
+                raise ValueError(f'Agent {agent_name} not found!')
             if subject_name not in self._subject:
-                raise ValueError('Subject ' + subject_name + ' not found.')
+                raise ValueError(f'Subject {subject_name} not found!')
             _id = self._subject[subject_name].register(agent_name)
-            self._assignment_list[agent_name] = (subject_name, _id)
+
+            self._total_experienced_episodes[(agent_name, subject_name)] = 0
+            self._assignment_list[(agent_name, subject_name)] = _id
+            # try:
+            #     self._assignment_list[agent_name].append((subject_name, _id))
+            # except KeyError:
+            #     self._assignment_list[agent_name] = [(subject_name, _id)]
 
     def divest(self, agent_subject_names):
         '''
@@ -154,11 +162,12 @@ class Environment(RLBase):
         '''
         for agent_name, subject_name in agent_subject_names:
             if agent_name not in self._agent:
-                raise ValueError('Agent ' + agent_name + ' not found.')
+                raise ValueError(f'Agent {agent_name} not found!')
             if subject_name not in self._subject:
-                raise ValueError('Subject ' + subject_name + ' not found.')
+                raise ValueError(f'Subject {subject_name} not found!')
             self._subject[subject_name].deregister(agent_name)
-            self._assignment_list.pop(agent_name)
+            self._assignment_list.pop((agent_name, subject_name))
+            del self._total_experienced_episodes[(agent_name, subject_name)]
 
     def elapse(self, **kwargs):
         '''
@@ -192,17 +201,20 @@ class Environment(RLBase):
         '''
         episodes = kwargs.get('episodes', self._episodes)
         max_steps = kwargs.get('max_steps', self._max_steps)
-        termination = kwargs.get('termination', self._termination).lower()
+        if kwargs.get('termination', self._termination).lower() == 'all':
+            termination_func = lambda x, y: x & y.is_terminated
+            list_of_subjects = [True] + list(self._subject.values())
+        else:
+            termination_func = lambda x, y: x | y.is_terminated
+            list_of_subjects = [False] + list(self._subject.values())
+
         reset = kwargs.get('reset', self._reset)
         learning_method = kwargs.get(
             'learning_method', self._learning_method).lower()
         reporting = kwargs.get('reporting', 'none').lower()
 
         tally = kwargs.get('tally', 'no').lower() == 'yes'
-        if tally:
-            win_count = {}
-            for agent in self._agent:
-                win_count[agent] = 0
+        win_count = dict((agent, 0) for agent in self._agent)
 
         step_count = kwargs.get('step_count', 'no').lower() == 'yes'
 
@@ -217,9 +229,8 @@ class Environment(RLBase):
         for episode in range(episodes):
             if reporting != 'none':
                 report_string = f'episode: {episode+1}'
-            history = {}
-            for agent_name in self._agent:
-                history[agent_name] = pd.DataFrame(columns=['state', 'action', 'reward'])
+            # history = dict((agent_name, pd.DataFrame(columns=['state', 'action', 'reward'])) for agent_name in self._agent)
+            history = dict((agent_name, []) for agent_name in self._agent)
             done = False
             stopping_criterion = max_steps * (episode+1)
             while not done:
@@ -234,40 +245,39 @@ class Environment(RLBase):
                             state = subject.state
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
-                                               episode=self._total_experienced_episodes)
-                            if reporting == 'all':
-                                print(f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
+                                               episode=self._total_experienced_episodes[(agent_name, subject_name)])
                             reward = subject.take_effect(action, _id)
 
-                            history[agent_name].loc[len(history[agent_name].index)] = [state, action, reward]
+                            if reporting == 'all':
+                                print(f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
+
+                            # history[agent_name].loc[len(history[agent_name].index)] = [state, action, reward]
+                            history[agent_name].append([state, action, reward])
 
                             if subject.is_terminated:
-                                if tally & (reward > 0):
-                                    win_count[agent_name] += 1
+                                win_count[agent_name] += int(reward > 0)
                                 for affected_agent in self._agent.keys():
                                     if (self._assignment_list[affected_agent][0] == subject_name) & \
                                             (affected_agent != agent_name):
-                                        history[affected_agent][-1] = -reward
+                                        # history[affected_agent].iloc[-1, 2] = -reward
+                                        history[affected_agent][-1][-1] = -reward
 
-                    if termination == 'all':
-                        done = True
-                        for sub in self._subject.values():
-                            done = done & sub.is_terminated
-                    elif termination == 'any':
-                        done = False
-                        for sub in self._subject.values():
-                            done = done | sub.is_terminated
+                    done = reduce(termination_func, list_of_subjects)
 
                 if learning_method == 'every step':
                     for agent_name, agent in self._agent.items():
-                        state = self._subject[self._assignment_list[agent_name][0]].state
-                        agent.learn(state=state, reward=history[agent_name][2])
+                        agent.learn(state=self._subject[self._assignment_list[agent_name][0]].state,
+                            reward=history[agent_name][-1][-1])
                         history[agent_name] = []
 
             if learning_method == 'history':
                 for agent_name, agent in self._agent.items():
-                    agent.learn(history=history[agent_name])
+                    agent.learn(history=pd.DataFrame(history[agent_name], columns=['state', 'action', 'reward']))
 
+            for agent_name, subject_name in self._total_experienced_episodes.keys():
+                if self._subject[subject_name].is_terminated:
+                    self._total_experienced_episodes[(agent_name, subject_name)] += 1
+            
             if reset == 'all':
                 for agent in self._agent.values():
                     agent.reset()
@@ -287,12 +297,115 @@ class Environment(RLBase):
             if reporting != 'none':
                 print(report_string)
 
-            self._total_experienced_episodes += 1
-
         if tally:
             return win_count
         if step_count:
             return steps/episodes
+
+    def elapse_iterable(self, **kwargs):
+        '''
+        Move forward in time until IterableSubject is consumed.
+
+        For each IterableSubject, agents are called sequentially to act based on the assignment list.
+        Method ends if all IterableSubjects are consumed.
+        Arguments
+        ---------
+            max_steps: maximum number of steps in each episode (Default = 10,000)
+            learning_batch_size: how many observations to collect before calling agent's `learn` method. (Default = -1)
+                -1: collect the whole sample path.
+            training_mode: whether it is in training or test mode. (Default: True)
+            Not implemented:
+            -> reporting: what to report. (Default = 'none')
+                'all': prints every move.
+                'none' reports nothing.
+                'important' reports important parts only.
+            -> tally: count wins of each agent or not. (Default = 'no')
+                'yes': counts the number of wins of each agent.
+                'no': doesn't tally.
+            -> step_count: count average number of steps in each episode. (Default = 'no')
+                'yes': counts the average number of steps in each episode.
+                'no': doesn't count.
+        '''
+        max_steps = kwargs.get('max_steps', self._max_steps)
+        learning_batch_size = kwargs.get(
+            'learning_batch_size', self._learning_batch_size)
+        training_status = kwargs.get('training_status', dict((agent, True) for agent in self._agent.values()))
+        return_output = kwargs.get('return_output', False)
+        # reporting = kwargs.get('reporting', 'none').lower()
+
+        # tally = kwargs.get('tally', 'no').lower() == 'yes'
+        # win_count = dict((agent, 0) for agent in self._agent)
+
+        # step_count = kwargs.get('step_count', 'no').lower() == 'yes'
+
+        output = {}
+        # for agent in self._agent.values():
+        #     if training_status[agent]:
+        #         agent.status = 'training'
+        # else:
+        #     return_output = True
+        #     for agent in self._agent.values():
+        #         agent.status = 'testing'
+
+        for subject_name, subject in self._subject.items():
+            assigned_agents = list((k[0], v) for k, v in self._assignment_list.items() if k[1] == subject_name)
+
+            for agent_name, _ in assigned_agents:
+                self._agent[agent_name].status = 'training' if training_status[(agent_name, subject_name)] else 'testing'
+            history = dict((agent_name, []) for agent_name, _ in assigned_agents)
+            for subject_instance in subject:
+                steps = 0
+                while not subject_instance.is_terminated:
+                    for agent_name, _id in assigned_agents:
+                        agent = self._agent[agent_name]
+                        if subject_instance.is_terminated or steps >= max_steps:
+                            break
+                        steps += 1
+
+                        state = subject_instance.state
+                        possible_actions = subject_instance.possible_actions
+                        action = agent.act(state, actions=possible_actions,
+                                            episode=self._total_experienced_episodes[(agent_name, subject_name)])
+                        reward = subject_instance.take_effect(action, _id)
+
+                        history[agent_name].append([state, action, reward])
+
+                        if subject_instance.is_terminated:
+                            # win_count[agent_name] += int(reward > 0)
+                            for affected_agent in self._agent.keys():
+                                if (affected_agent, subject_name) in self._assignment_list and \
+                                        (affected_agent != agent_name):
+                                    history[affected_agent][-1][-1] = -reward
+
+                        if training_status[(agent_name, subject_name)] and learning_batch_size != -1 and len(history[agent_name]) >= learning_batch_size:
+                            agent.learn(history=pd.DataFrame(history[agent_name], columns=['state', 'action', 'reward']))
+                            history[agent_name] = []
+
+                if training_status[(agent_name, subject_name)]:
+                    self._total_experienced_episodes[(agent_name, subject_name)] += 1
+
+                    if learning_batch_size == -1:
+                        for agent_name, _ in assigned_agents:
+                            self._agent[agent_name].learn(history=pd.DataFrame(history[agent_name], columns=['state', 'action', 'reward']))
+
+                if return_output:
+                    for agent_name, _ in assigned_agents:
+                        try:
+                            output[(agent_name, subject_name)].append(history[agent_name])
+                        except KeyboardInterrupt:
+                            output[(agent_name, subject_name)] = history[agent_name]
+
+        return output
+        #     if tally & (reporting != 'none'):
+        #         report_string += f'\n tally:'
+        #         for agent in self._agent:
+        #             report_string += f'\n {agent} {win_count[agent]}'
+
+        #     if reporting != 'none':
+        #         print(report_string)
+
+        # if tally:
+        #     return win_count
 
     def trajectory(self, **kwargs):
         '''
