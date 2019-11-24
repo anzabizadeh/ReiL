@@ -273,7 +273,6 @@ class DQNAgent(Agent):
 
         action = choice(result)
 
-        self._previous_action = action
         return action
 
     def load(self, **kwargs):
