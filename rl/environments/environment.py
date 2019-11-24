@@ -32,6 +32,7 @@ class Environment(RLBase):
         remove: remove objects (agents/ subjects) from the environment.
         assign: assign agents to subjects.
         elapse: move forward in time and interact agents and subjects.
+        elapse_iterable: iterate over instances of each subject and interact agents in each subject instance.
         trajectory: extract (state, action, reward) trajectory.
         load: load an object (agent/ subject) or an environment.
         save: save an object (agent/ subject) or the current environment.
@@ -173,7 +174,8 @@ class Environment(RLBase):
         '''
         Move forward in time for a number of episodes.
 
-        At each episode, agents are called sequentially to act on their respective subject(s).
+        At each episode, agents are called sequentially to act on their respective subject.
+        NOTE: This method loops over agents and only assumes one subject per agent.
         An episode ends if one (all) subject(s) terminates.
         Arguments
         ---------
@@ -229,7 +231,6 @@ class Environment(RLBase):
         for episode in range(episodes):
             if reporting != 'none':
                 report_string = f'episode: {episode+1}'
-            # history = dict((agent_name, pd.DataFrame(columns=['state', 'action', 'reward'])) for agent_name in self._agent)
             history = dict((agent_name, []) for agent_name in self._agent)
             done = False
             stopping_criterion = max_steps * (episode+1)
@@ -251,28 +252,26 @@ class Environment(RLBase):
                             if reporting == 'all':
                                 print(f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
 
-                            # history[agent_name].loc[len(history[agent_name].index)] = [state, action, reward]
-                            history[agent_name].append([state, action, reward])
+                            history[agent_name].append({'state': state, 'action': action, 'reward': action})
 
                             if subject.is_terminated:
                                 win_count[agent_name] += int(reward > 0)
                                 for affected_agent in self._agent.keys():
                                     if (self._assignment_list[affected_agent][0] == subject_name) & \
                                             (affected_agent != agent_name):
-                                        # history[affected_agent].iloc[-1, 2] = -reward
-                                        history[affected_agent][-1][-1] = -reward
+                                        history[affected_agent][-1]['reward'] = -reward
 
                     done = reduce(termination_func, list_of_subjects)
 
                 if learning_method == 'every step':
                     for agent_name, agent in self._agent.items():
                         agent.learn(state=self._subject[self._assignment_list[agent_name][0]].state,
-                            reward=history[agent_name][-1][-1])
+                            reward=history[agent_name][-1]['reward'])
                         history[agent_name] = []
 
             if learning_method == 'history':
                 for agent_name, agent in self._agent.items():
-                    agent.learn(history=pd.DataFrame(history[agent_name], columns=['state', 'action', 'reward']))
+                    agent.learn(history=history[agent_name])
 
             for agent_name, subject_name in self._total_experienced_episodes.keys():
                 if self._subject[subject_name].is_terminated:
@@ -368,17 +367,17 @@ class Environment(RLBase):
                                             episode=self._total_experienced_episodes[(agent_name, subject_name)])
                         reward = subject_instance.take_effect(action, _id)
 
-                        history[agent_name].append([state, action, reward])
+                        history[agent_name].append({'state': state, 'action': action, 'reward': reward})
 
                         if subject_instance.is_terminated:
                             # win_count[agent_name] += int(reward > 0)
                             for affected_agent in self._agent.keys():
                                 if (affected_agent, subject_name) in self._assignment_list and \
                                         (affected_agent != agent_name):
-                                    history[affected_agent][-1][-1] = -reward
+                                    history[affected_agent][-1]['reward'] = -reward
 
                         if training_status[(agent_name, subject_name)] and learning_batch_size != -1 and len(history[agent_name]) >= learning_batch_size:
-                            agent.learn(history=pd.DataFrame(history[agent_name], columns=['state', 'action', 'reward']))
+                            agent.learn(history=history[agent_name])
                             history[agent_name] = []
 
                 if training_status[(agent_name, subject_name)]:
@@ -386,7 +385,7 @@ class Environment(RLBase):
 
                     if learning_batch_size == -1:
                         for agent_name, _ in assigned_agents:
-                            self._agent[agent_name].learn(history=pd.DataFrame(history[agent_name], columns=['state', 'action', 'reward']))
+                            self._agent[agent_name].learn(history=history[agent_name])
 
                 if return_output:
                     for agent_name, _ in assigned_agents:
@@ -421,14 +420,19 @@ class Environment(RLBase):
                 'all': terminate if all the subjects are terminated.
         '''
         max_steps = kwargs.get('max_steps', self._max_steps)
-        termination = kwargs.get('termination', self._termination).lower()
+
+        if kwargs.get('termination', self._termination).lower() == 'all':
+            termination_func = lambda x, y: x & y.is_terminated
+            list_of_subjects = [True] + list(self._subject.values())
+        else:
+            termination_func = lambda x, y: x | y.is_terminated
+            list_of_subjects = [False] + list(self._subject.values())
 
         for agent in self._agent.values():
             agent.status = 'testing'
 
-        history = {}
-        for agent_subject in self._assignment_list:
-            history[agent_subject] = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
+        history = dict((agent_subject, []) for agent_subject in self._assignment_list)
+
         done = False
         steps = 0
         while not done:
@@ -447,21 +451,14 @@ class Environment(RLBase):
                         q = agent._q(state, action)
                         reward = subject.take_effect(action, _id)
 
-                        history[(agent_name, subject_name)].loc[len(history[(agent_name, subject_name)].index)] = [state, action, q, reward]
+                        history[(agent_name, subject_name)].append({'state': state, 'action': action, 'q': q, 'reward': reward})
                         if subject.is_terminated:
                             for affected_agent in self._agent.keys():
                                 if ((affected_agent, subject) in self._assignment_list.keys()) & \
                                         (affected_agent != agent_name):
-                                    history[(affected_agent, subject)][-1] = -reward
+                                    history[(affected_agent, subject)][-1]['reward'] = -reward
 
-                if termination == 'all':
-                    done = True
-                    for sub in self._subject.values():
-                        done = done & sub.is_terminated
-                elif termination == 'any':
-                    done = False
-                    for sub in self._subject.values():
-                        done = done | sub.is_terminated
+                done = reduce(termination_func, list_of_subjects)
 
         for sub in self._subject.values():
             sub.reset()

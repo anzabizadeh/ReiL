@@ -1,31 +1,58 @@
 # import numpy as np
 import pandas as pd
 from time import time
+from collections import deque
 
-entries = 10
-
-agent_list = ['a', 'b', 'c']
-h = dict((agent_info, []) for agent_info in agent_list)
+entries = 1000
 
 t = time()
+
+agent_list = ['a', 'b', 'c']
+h = dict((agent_info, deque([])) for agent_info in agent_list)
+
+for i in range(entries):
+    for agent_name in agent_list:
+        h[agent_name].append({'state': tuple(range(10)), 'action': 2.0, 'reward': 3.0})
+
+for agent_name in agent_list:
+    for i in range(len(h[agent_name])):
+        state = h[agent_name][i]['state']
+        action = h[agent_name][i]['action']
+        reward = h[agent_name][i]['reward']
+
+print(time() - t)
+
+
+t = time()
+
+gent_list = ['a', 'b', 'c']
+h = dict((agent_info, []) for agent_info in agent_list)
+
 for i in range(entries):
     for agent_name in agent_list:
         h[agent_name].append([tuple(range(10)), 2.0, 3.0])
 
-history2 = {}
 for agent_name in agent_list:
-    history2[agent_name] = pd.DataFrame(h[agent_name], columns=['state', 'action', 'reward'])
+    for i in range(len(h[agent_name])):
+        state = h[agent_name][i][0]
+        action = h[agent_name][i][1]
+        reward = h[agent_name][i][2]
 
 print(time() - t)
-
-
-agent_list = ['a', 'b', 'c']
-history = dict((agent_info, pd.DataFrame(columns=['state', 'action', 'reward'])) for agent_info in agent_list)
 
 t = time()
+
+gent_list = ['a', 'b', 'c']
+h = dict((agent_info, deque([])) for agent_info in agent_list)
+
 for i in range(entries):
     for agent_name in agent_list:
-        history[agent_name].loc[len(history[agent_name].index)] = [tuple(range(10)), 2.0, 3.0]
+        h[agent_name].append([tuple(range(10)), 2.0, 3.0])
+
+for agent_name in agent_list:
+    for i in range(len(h[agent_name])):
+        state = h[agent_name][i][0]
+        action = h[agent_name][i][1]
+        reward = h[agent_name][i][2]
 
 print(time() - t)
-
