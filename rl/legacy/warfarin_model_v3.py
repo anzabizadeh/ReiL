@@ -39,9 +39,9 @@ class WarfarinModel_v3(Subject):
     '''
 
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
-        Subject.set_defaults(self, patient_selection='random',
+        super().set_defaults(patient_selection='random',
                              age_list=list(range(71, 86)),
                              CYP2C9_list=['*1/*1', '*1/*2',
                                           '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
@@ -54,7 +54,7 @@ class WarfarinModel_v3(Subject):
                              dose_list=[None]*5, dose_change_penalty_coef=0
                              )
 
-        Subject.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
         if False:
             self._model_filename = ''

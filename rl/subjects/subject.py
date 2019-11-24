@@ -28,9 +28,9 @@ class Subject(RLBase):
         reset: reset the state and is_terminated.
     '''
     def __init__(self, **kwargs):
-        RLBase.__init__(self, **kwargs)
-        RLBase.set_defaults(self, agent_list={})
-        RLBase.set_params(self, **kwargs)
+        super().__init__(**kwargs)
+        super().set_defaults(agent_list={})
+        super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!

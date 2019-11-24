@@ -39,9 +39,9 @@ class TD0Agent(Agent):
             default_actions: list of default actions. (Default = empty ValueSet)
             state_action_list: state action list from a previous training. (Default = {}})
         '''
-        Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, default_actions=ValueSet(), state_action_list={})
-        Agent.set_params(self, **kwargs)
+        super().__init__(**kwargs)
+        super().set_defaults(gamma=1, alpha=1, epsilon=0, default_actions=ValueSet(), state_action_list={})
+        super().set_params(**kwargs)
 
         self.data_collector.available_statistics = {'states q': [False, self._report, '_state_action_list'],
                                                     'states action': [False, self._report, '_state_action_list'],

@@ -40,9 +40,9 @@ class WarfarinModel_v4(Subject):
     '''
 
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
-        Subject.set_defaults(self, patient_selection='random',
+        super().set_defaults(patient_selection='random',
                              list_of_characteristics={'age': (71, 86),
                                                       # lb
                                                       'weight': (35, 370),
@@ -96,7 +96,7 @@ class WarfarinModel_v4(Subject):
                 except KeyError:
                     pass
 
-        Subject.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
         if False:
             self._model_filename = ''
@@ -402,9 +402,9 @@ class Patient(RLBase):
 
     def __init__(self, age=50, CYP2C9='*1/*1', VKORC1='G/A', randomized=True, max_time=24,
                  dose_interval=24, dose={}, lazy=False, **kwargs):
-        RLBase.__init__(self, **kwargs)
-        RLBase.set_defaults(self, **kwargs)
-        RLBase.set_params(self, **kwargs)
+        super().__init__(**kwargs)
+        super().set_defaults(**kwargs)
+        super().set_params(**kwargs)
 
         self._age = age
         self._CYP2C9 = CYP2C9

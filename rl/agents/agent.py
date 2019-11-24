@@ -29,9 +29,9 @@ class Agent(RLBase):
         reset: reset the agent.
     '''
     def __init__(self, **kwargs):
-        RLBase.__init__(self, **kwargs)
-        RLBase.set_defaults(self, training_flag=True)
-        RLBase.set_params(self, **kwargs)
+        super().__init__(**kwargs)
+        super().set_defaults(training_flag=True)
+        super().set_params(**kwargs)
 
     @property
     def status(self):

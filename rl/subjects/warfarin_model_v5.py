@@ -75,9 +75,9 @@ class WarfarinModel_v5(Subject):
         \n   patient_counter_start: the starting value for patient filename counter (Default: 0)
         ''' 
         
-        Subject.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
-        Subject.set_defaults(self, patient_selection='random',
+        super().set_defaults(patient_selection='random',
                              list_of_characteristics={'age': (71, 86),
                                                       # lb
                                                       'weight': (35, 370),
@@ -138,7 +138,7 @@ class WarfarinModel_v5(Subject):
                 except KeyError:
                     pass
 
-        Subject.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
         if False:
             self._max_time = 0

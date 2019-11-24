@@ -33,21 +33,21 @@ class IterableSubject(RLBase):
         reset: reset the state and is_terminated.
     '''
     def __init__(self, subject, **kwargs):
-        RLBase.__init__(self, **kwargs)
-        RLBase.set_defaults(self,
-            subject=subject,
-            agent_list={},
-            save_instances=False,
-            use_existing_instances=True,
-            save_path='./',
-            save_prefix='',
-            instance_counter_start=0,
-            instance_counter=-1,
-            instance_counter_end=[1],  # -1: infinite
-            end_index=0,
-            auto_rewind=False
-            )
-        RLBase.set_params(self, subject=subject, **kwargs)
+        super().__init__(**kwargs)
+        super().set_defaults(subject=subject,
+                            agent_list={},
+                            save_instances=False,
+                            use_existing_instances=True,
+                            save_path='./',
+                            save_prefix='',
+                            instance_counter_start=0,
+                            instance_counter=-1,
+                            instance_counter_end=[1],  # -1: infinite
+                            end_index=0,
+                            auto_rewind=False
+                            )
+
+        super().set_params(subject=subject, **kwargs)
 
         if isinstance(self._instance_counter_end, int):
             self._instance_counter_end = [self._instance_counter_end]

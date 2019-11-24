@@ -59,9 +59,9 @@ class WindyGridworld(MNKBoard, Subject):
             move_pattern: whether to choose 'R'ook moves or 'Q'ueen moves. (default='R')
             state_type: board (zero one list), tuple ()
         '''
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, dim=(5, 5), start=(0, 0), goal=(4, 4), h_wind=[0]*5, v_wind=[0]*5, move_pattern='R')
-        Subject.set_params(self, **kwargs)
+        super().__init__(**kwargs)
+        super().set_defaults(dim=(5, 5), start=(0, 0), goal=(4, 4), h_wind=[0]*5, v_wind=[0]*5, move_pattern='R')
+        super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -77,7 +77,7 @@ class WindyGridworld(MNKBoard, Subject):
 
         self._default_moves = ValueSet(moves, binary=lambda x:(moves.index(x), len(moves))).as_valueset_array()
 
-        MNKBoard.__init__(self, m=self._dim[0], n=self._dim[1], players=1)
+        super().__init__(m=self._dim[0], n=self._dim[1], players=1)
         self.reset()
 
     @property

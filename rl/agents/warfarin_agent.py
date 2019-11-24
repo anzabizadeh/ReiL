@@ -41,10 +41,10 @@ class WarfarinAgent(Agent):
         '''
         Initialize a warfarin agent.
         '''
-        Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, study_arm='', method='aurora', day=1, retest_day=2, red_flag=False, skip_dose=0, dose=0, weekly_dose=0)
+        super().__init__(**kwargs)
+        super().set_defaults(study_arm='', method='aurora', day=1, retest_day=2, red_flag=False, skip_dose=0, dose=0, weekly_dose=0)
 
-        Agent.set_params(self, **kwargs)
+        super().set_params(**kwargs)
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 

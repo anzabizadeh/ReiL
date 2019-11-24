@@ -58,10 +58,10 @@ class MNKGame(MNKBoard, Subject):
             k: winning criteria (default=3)
             players: number of players (default=2)
         '''
-        MNKBoard.__init__(self, **kwargs, can_recapture=False)
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, board_status=None)
-        Subject.set_params(self, **kwargs)
+        super().__init__(**kwargs, can_recapture=False)
+        super().__init__(**kwargs)
+        super().set_defaults(board_status=None)
+        super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -101,7 +101,7 @@ class MNKGame(MNKBoard, Subject):
             _id: ID of the player who sets the piece.
             action: the location in which the piece is set. Can be either in index format or row column format.
         ''' 
-        self._set_piece(id_, index=int(action.value[0]), update='yes')
+        self._set_piece(_id, index=int(action.value[0]), update='yes')
         if self._board_status is None:
             return 0
         if self._board_status == _id:

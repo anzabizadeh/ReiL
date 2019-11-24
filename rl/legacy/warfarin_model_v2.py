@@ -35,9 +35,9 @@ class WarfarinModel_v2(Subject):
     '''
 
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
-        Subject.set_defaults(self, patient_selection='random',
+        super().set_defaults(patient_selection='random',
                              age_list=list(range(70, 86)),
                              CYP2C9_list=['*1/*1', '*1/*2',
                                           '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
@@ -50,7 +50,7 @@ class WarfarinModel_v2(Subject):
                              dose_list=[None]*10
                              )
 
-        Subject.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
         self._maxTime = self._dose_history*24
         result = hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9,

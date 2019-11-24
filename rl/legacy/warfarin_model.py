@@ -37,9 +37,9 @@ class WarfarinModel(Subject):
     '''
 
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
-        Subject.set_defaults(self, model_filename='./rl/subjects/warfarin.pkpd', patient_selection='random',
+        super().set_defaults(model_filename='./rl/subjects/warfarin.pkpd', patient_selection='random',
                              age_list=list(range(70, 86)),
                              CYP2C9_list=['*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
                              VKORC1_list=['G/G', 'G/A', 'A/A'],
@@ -49,7 +49,7 @@ class WarfarinModel(Subject):
                              current_dose=0, max_dose=15, dose_steps=0.5, TTR_range=(2, 3)
                              )
 
-        Subject.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
         try:
             with open(self._model_filename, mode='r') as file:

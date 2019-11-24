@@ -31,8 +31,8 @@ class CancerModel(Subject):
         reset: reset the state and is_terminated.
     '''
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self,
+        super().__init__(**kwargs)
+        super().set_defaults(
             drug={'initial_value': 0, 'infusion_rate': 0, 'decay_rate': 0,
                   'normal_cell_kill_rate': 0, 'tumor_cell_kill_rate': 0, 'immune_cell_kill_rate': 0},
             normal_cells={'initial_value': 0, 'growth_rate': 0, 'carrying_capacity': 0},
@@ -44,7 +44,7 @@ class CancerModel(Subject):
             termination_check= lambda x: x['tumor_cells']==0,
             # e=lambda x: 0, state_range=[0],
             u_max=10, u_steps=20)
-        Subject.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!

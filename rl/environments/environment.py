@@ -60,17 +60,17 @@ class Environment(RLBase):
                 'every step': learn after every move.
                 'history': learn after each episode.
         '''
-        RLBase.__init__(self, **kwargs)
+        super().__init__(**kwargs)
         if 'filename' in kwargs:
             self.load(path=kwargs.get('path', '.'),
                       filename=kwargs['filename'])
             return
 
-        RLBase.set_defaults(self, agent={}, subject={}, assignment_list={},
+        super().set_defaults(agent={}, subject={}, assignment_list={},
                             episodes=1, max_steps=10000, termination='any', reset='all',
                             learning_batch_size=-1,
                             learning_method='every step', total_experienced_episodes={})
-        RLBase.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
 
         # The following code is just to suppress debugger's undefined variable errors!
@@ -427,17 +427,18 @@ class Environment(RLBase):
             agent.status = 'testing'
 
         history = {}
-        for agent_name in self._agent:
-            history[agent_name] = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
+        for agent_subject in self._assignment_list:
+            history[agent_subject] = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
         done = False
         steps = 0
         while not done:
             if steps >= max_steps:
                 break
             steps += 1
-            for agent_name, agent in self._agent.items():
+            for agent_name, subject_name in self._assignment_list:
                 if not done:
-                    subject_name, _id = self._assignment_list[agent_name]
+                    _id = self._assignment_list[(agent_name, subject_name)]
+                    agent = self._agent[agent_name]
                     subject = self._subject[subject_name]
                     if not subject.is_terminated:
                         state = subject.state
@@ -446,12 +447,12 @@ class Environment(RLBase):
                         q = agent._q(state, action)
                         reward = subject.take_effect(action, _id)
 
-                        history[agent_name].loc[len(history[agent_name].index)] = [state, action, q, reward]
+                        history[(agent_name, subject_name)].loc[len(history[(agent_name, subject_name)].index)] = [state, action, q, reward]
                         if subject.is_terminated:
                             for affected_agent in self._agent.keys():
-                                if (self._assignment_list[affected_agent][0] == subject_name) & \
+                                if ((affected_agent, subject) in self._assignment_list.keys()) & \
                                         (affected_agent != agent_name):
-                                    history[affected_agent][-1] = -reward
+                                    history[(affected_agent, subject)][-1] = -reward
 
                 if termination == 'all':
                     done = True

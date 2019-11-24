@@ -45,9 +45,9 @@ class Snake(MNKBoard, Subject):
             m: number of rows (default=10)
             n: number of columns (default=10)
         '''
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, m=10, n=10)
-        Subject.set_params(self, **kwargs)
+        super().__init__(**kwargs)
+        super().set_defaults(m=10, n=10)
+        super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -55,7 +55,7 @@ class Snake(MNKBoard, Subject):
             self._m = 10
             self._n = 10
 
-        MNKBoard.__init__(self, m=self._m, n=self._n, players=2)  # player 1 is the snake, player 2 is the fruit!
+        super().__init__(m=self._m, n=self._n, players=2)  # player 1 is the snake, player 2 is the fruit!
         self.reset()
 
     @property
@@ -154,7 +154,7 @@ class Snake(MNKBoard, Subject):
                        [self._m // 2, self._n // 2 - 1]]                                     # Initial snake co-ordinates
         self._food = [self._m // 2 + 1, self._n // 2]                                                     # First food co-ordinates
         self._win.addch(self._food[0], self._food[1], '*')                       # Prints the food
-        Subject.__init__(self)
+        super().__init__(self)
         for location in self._snake:
             self.set_piece(1, row=location[0], column=location[1])
         self.set_piece(2, row=self._food[0], column=self._food[1])

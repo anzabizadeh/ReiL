@@ -67,10 +67,10 @@ class FrozenLake(MNKBoard, Subject):
                ['F', 'F', 'F', 'H'],
                ['H', 'F', 'F', 'G']]
 
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, map=map, start=(0, 0), goal=(4, 4))
-        Subject.set_params(self, **kwargs)
-        Subject.set_params(self, dim=(len(map), len(map[0])))
+        super().__init__(**kwargs)
+        super().set_defaults(map=map, start=(0, 0), goal=(4, 4))
+        super().set_params(**kwargs)
+        super().set_params(dim=(len(map), len(map[0])))
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -80,7 +80,7 @@ class FrozenLake(MNKBoard, Subject):
         moves = ['U', 'D', 'R', 'L']
         self._default_moves = ValueSet(moves, binary=lambda x:(moves.index(x), len(moves))).as_valueset_array()
 
-        MNKBoard.__init__(self, m=self._dim[0], n=self._dim[1], players=1)
+        super().__init__(m=self._dim[0], n=self._dim[1], players=1)
         self.reset()
 
     @property

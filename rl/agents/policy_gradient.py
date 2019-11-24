@@ -82,10 +82,10 @@ class PGAgent(Agent):
             default_actions: list of default actions
             state_size: size of the state in its binary format (len(state.binary_representation()))
         '''
-        Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, gamma=1, alpha=1e-5, epsilon=0, default_actions={},
+        super().__init__(**kwargs)
+        super().set_defaults(gamma=1, alpha=1e-5, epsilon=0, default_actions={},
                            solver='sgd', hidden_layer_sizes=(10,), max_iter=1, random_state=None)
-        Agent.set_params(self, **kwargs)
+        super().set_params(**kwargs)
         self.data_collector.available_statistics = {'diff-coef': [True, self._report, '_clf.coefs_']}
         self.data_collector.active_statistics = ['diff-coef']
 

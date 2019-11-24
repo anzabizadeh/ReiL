@@ -57,10 +57,10 @@ class Experiment(Environment):
                       filename=kwargs['filename'])
             return
 
-        Environment.set_defaults(self, agent={}, subject={}, assignment_list={},
+        super().set_defaults(agent={}, subject={}, assignment_list={},
                             number_of_subjects=1, max_steps=10000, save_subjects=True,
                             file_index_generator=None)
-        Environment.set_params(self, **kwargs)
+        super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
