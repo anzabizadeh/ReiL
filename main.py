@@ -99,21 +99,21 @@ def cancer(**kwargs):
                   for a in agents['Doctor']._state_action_list.values()))
 
     env._subject['Patient'].set_params(drug_cap=lambda x: 10)
-    history = env.trajectory()
-    states = list(s.value[0] for i, s in enumerate(
-        history['Doctor']) if (i % 3) == 0)
-    actions = list(a.value[0] for i, a in enumerate(
-        history['Doctor']) if (i % 3) == 1)
-    rewards = list(r for i, r in enumerate(history['Doctor']) if (i % 3) == 2)
-    print(f'Total reward: {sum(rewards)}, total drug: {sum(actions)}')
-    x = list(range(len(states)))
-    plt.subplot(1, 3, 1)
-    plt.plot(x, states, 'b')
-    plt.subplot(1, 3, 2)
-    plt.plot(x, actions, 'g')
-    plt.subplot(1, 3, 3)
-    plt.plot(x, rewards, 'r')
-    plt.show()
+    # history = env.trajectory()
+    # states = list(s.value[0] for i, s in enumerate(
+    #     history['Doctor']) if (i % 3) == 0)
+    # actions = list(a.value[0] for i, a in enumerate(
+    #     history['Doctor']) if (i % 3) == 1)
+    # rewards = list(r for i, r in enumerate(history['Doctor']) if (i % 3) == 2)
+    # print(f'Total reward: {sum(rewards)}, total drug: {sum(actions)}')
+    # x = list(range(len(states)))
+    # plt.subplot(1, 3, 1)
+    # plt.plot(x, states, 'b')
+    # plt.subplot(1, 3, 2)
+    # plt.plot(x, actions, 'g')
+    # plt.subplot(1, 3, 3)
+    # plt.plot(x, rewards, 'r')
+    # plt.show()
 
 
 def mnk(**kwargs):

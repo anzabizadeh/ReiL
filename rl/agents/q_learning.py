@@ -157,12 +157,12 @@ class QAgent(Agent):
             raise ValueError('Not in training mode!')
         try:  # history
             history = kwargs['history']
-            previous_state = history[0]
-            for i in range(1, len(history), 3):
-                previous_action = history[i]
-                reward = history[i+1]
+            previous_state = history[0]['state']
+            for i in range(len(history)):
+                previous_action = history[i]['action']
+                reward = history[i]['reward']
                 try:
-                    state = history[i+2]
+                    state = history[i+1]['state']
                 except IndexError:
                     state = None
                 q_sa = self._q(previous_state, previous_action)

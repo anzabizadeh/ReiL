@@ -106,13 +106,13 @@ class TD0Agent(Agent):
         '''
         try:  # history
             history = kwargs['history']
-            previous_state = history[0]
-            for i in range(1, len(history), 3):
-                previous_action = history[i]
-                reward = history[i+1]
+            previous_state = history[0]['state']
+            for i in range(1, len(history)):
+                previous_action = history[i]['action']
+                reward = history[i]['reward']
                 try:
-                    state = history[i+2]
-                    action = history[i+3]
+                    state = history[i+1]['state']
+                    action = history[i+1]['action']
                 except IndexError:
                     state = None
                     action = None
