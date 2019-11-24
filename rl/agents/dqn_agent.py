@@ -185,14 +185,14 @@ class DQNAgent(Agent):
             history = kwargs['history']
 
             if self._method == 'forward':
-                for i in range(len(history.index)):
-                    state = history.at[i, 'state']
-                    action = history.at[i, 'action']
-                    reward = history.at[i, 'reward']
+                for i in range(len(history)):
+                    state = history[i]['state']
+                    action = history[i]['action']
+                    reward = history[i]['reward']
                     try:
-                        max_q = self._max_q(history.at[i+1, 'state'])
+                        max_q = self._max_q(history[i+1]['state'])
                         new_q = reward + self._gamma*max_q
-                    except KeyError:
+                    except IndexError:
                         new_q = reward
 
                     try:
@@ -206,15 +206,13 @@ class DQNAgent(Agent):
                         self._buffer_index = 1
             
             else:  # backward
-                q_list = [0] * len(history.index)
-                for i in range(len(history.index)-1, -1, -1):
-                    state = history.at[i, 'state']
-                    action = history.at[i, 'action']
-                    reward = history.at[i, 'reward']
+                q_list = [0] * len(history)
+                for i in range(len(history)-1, -1, -1):
+                    state = history[i]['state']
+                    action = history[i]['action']
+                    reward = history[i]['reward']
                     try:
                         new_q = reward + self._gamma*q_list[i+1]
-                        # max_q = self._max_q(history.at[i+1, 'state'])
-                        # new_q_2 = reward + self._gamma*max_q
                     except IndexError:
                         new_q = reward
                     q_list[i] = new_q

@@ -211,11 +211,11 @@ if __name__ == "__main__":
         # env.save(filename=env_filename(i))
 
         trajectories = env.trajectory()
-        for row in trajectories[('protocol', 'test')].iterrows():
-            print(f'{row[0]}, {row[1].state.value.loc["Doses"][-1]} \t {row[1].state.value.loc["INRs"][-1]} \t {row[1].reward} \t {row[1].q}\n')
+        for row in trajectories[('protocol', 'test')]:
+            print(f'{row["state"].value.loc["Doses"][-1]} \t {row["state"].value.loc["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
 
         with open(filename+'.txt', 'a+') as f:
             f.write(f'{i:-^20}\n')
-            for row in trajectories[('protocol', 'test')].iterrows():
-                print(f'{row[0]}, {row[1].state.value.loc["Doses"]} \n {row[1].reward}')
-                f.write(f'{row[0]}, {row[1].state.value.loc["Doses"][-1]} \t {row[1].state.value.loc["INRs"][-1]} \t {row[1].reward} \t {row[1].q}\n')
+            for row in trajectories[('protocol', 'test')]:
+                print(f'{row["state"].value.loc["Doses"][-1]} \t {row["state"].value.loc["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
+                f.write(f'{row["state"].value.loc["Doses"][-1]} \t {row["state"].value.loc["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')

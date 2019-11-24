@@ -431,6 +431,9 @@ class Environment(RLBase):
         for agent in self._agent.values():
             agent.status = 'testing'
 
+        for subject in self._subject.values():
+            subject.reset()
+
         history = dict((agent_subject, []) for agent_subject in self._assignment_list)
 
         done = False
@@ -448,7 +451,7 @@ class Environment(RLBase):
                         state = subject.state
                         possible_actions = subject.possible_actions
                         action = agent.act(state, actions=possible_actions)
-                        q = agent._q(state, action)
+                        q = float(agent._q(state, action))
                         reward = subject.take_effect(action, _id)
 
                         history[(agent_name, subject_name)].append({'state': state, 'action': action, 'q': q, 'reward': reward})
