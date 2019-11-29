@@ -141,7 +141,7 @@ class WarfarinModel(Subject):
             return 1
 
     def take_effect(self, action, _id=None):
-        self._current_dose = action.value[0]
+        self._current_dose = action.value
         self._d_previous = self._d_current
         self._d_current = action.value[1]
         self._day += self._d_current

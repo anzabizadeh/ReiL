@@ -231,8 +231,8 @@ class RLData(dict):
     def as_list(self):
         ''' return the value as list.'''
         try:
-            return [j for i in self._value.values() for j in i]
-        except TypeError:
+            return self.__remove_nestings(self._value.values())
+        except AttributeError:
             return self._value
 
     def as_nparray(self):
@@ -258,6 +258,16 @@ class RLData(dict):
 
         return array
 
+    def __remove_nestings(self, l):
+        output = []
+        for i in l:
+            if isinstance(i, (list, dict)):
+                output += self.__remove_nestings(i)
+            else:
+                output.append(i)
+
+        return output
+
     def _normalize(self):
         temp = []
         try:
@@ -274,6 +284,12 @@ class RLData(dict):
                                         'upper': self._upper[i],
                                         'categories': self._categories[i],
                                         'is_numerical': self._is_numerical[i]})
+                    except TypeError:
+                        self._normal_form[i] = list(func({'value': x,
+                                                'lower': self._lower[i],
+                                                'upper': self._upper[i],
+                                                'categories': self._categories[i],
+                                                'is_numerical': self._is_numerical[i]}) for x in self._value[i])
                     except ZeroDivisionError:
                         self._normal_form[i] = [1]
                 temp.append(self._normal_form[i])
@@ -284,14 +300,25 @@ class RLData(dict):
                 else:
                     func = self._normalizer
 
-                self._normal_form = list(func({'value': x,
-                                        'lower': self._lower,
-                                        'upper': self._upper,
-                                        'categories': self._categories,
-                                        'is_numerical': self._is_numerical}) for x in self._value)
-                temp = [j for i in self._normal_form for j in i]
+                try:
+                    try:
+                        self._normal_form = list(func({'value': x,
+                                                'lower': self._lower,
+                                                'upper': self._upper,
+                                                'categories': self._categories,
+                                                'is_numerical': self._is_numerical}) for x in self._value)
+                    except TypeError:
+                        self._normal_form = [func({'value': self._value,
+                                                'lower': self._lower,
+                                                'upper': self._upper,
+                                                'categories': self._categories,
+                                                'is_numerical': self._is_numerical})]
+                except ZeroDivisionError:
+                    self._normal_form = [1]
 
-        return temp
+                temp = self._normal_form
+
+        return self.__remove_nestings(temp)
 
     def normalize(self):
         '''
@@ -370,7 +397,13 @@ class RLData(dict):
         return value
 
     def __getitem__(self, key):
-        return self._value[key]
+        return RLData(self._value[key],
+                      lower=self._lower[key],
+                      upper=self._upper[key],
+                      categories=self._categories[key],
+                      is_numerical=self._is_numerical[key],
+                      normalizer=self._normalizer[key],
+                      lazy_evaluation=self._lazy)
 
     def __delitem__(self, key):
         del self._value[key]
@@ -508,6 +541,11 @@ if __name__ == '__main__':
     #     print(temp)
 
     # print(d.normalize())
+    d = RLData([1, 2, 3])
+    print(d.value)
+    print(d.normalize())
+    print(d.as_rldata_array())
+
     d1 = RLData(['a', 'b', 'c'], categories=['a', 'b', 'c'])
     assert d1.value==['a', 'b', 'c']
     print(d1.value)
