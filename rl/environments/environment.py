@@ -391,7 +391,7 @@ class Environment(RLBase):
                     for agent_name, _ in assigned_agents:
                         try:
                             output[(agent_name, subject_name)].append(history[agent_name])
-                        except KeyboardInterrupt:
+                        except KeyError:
                             output[(agent_name, subject_name)] = history[agent_name]
 
         return output
