@@ -36,17 +36,17 @@ class RLData(dict):
         self.value = value
 
         try:
+            self.is_numerical = kwargs['is_numerical']
+        except KeyError:
+            pass
+
+        try:
             self.lower = kwargs['lower']
         except KeyError:
             pass
 
         try:
             self.upper = kwargs['upper']
-        except KeyError:
-            pass
-
-        try:
-            self.is_numerical = kwargs['is_numerical']
         except KeyError:
             pass
 
@@ -397,13 +397,22 @@ class RLData(dict):
         return value
 
     def __getitem__(self, key):
-        return RLData(self._value[key],
-                      lower=self._lower[key],
-                      upper=self._upper[key],
-                      categories=self._categories[key],
-                      is_numerical=self._is_numerical[key],
-                      normalizer=self._normalizer[key],
-                      lazy_evaluation=self._lazy)
+        try:
+            return RLData(self._value[key],
+                        lower=self._lower[key],
+                        upper=self._upper[key],
+                        categories=self._categories[key],
+                        is_numerical=self._is_numerical[key],
+                        normalizer=self._normalizer[key],
+                        lazy_evaluation=self._lazy)
+        except TypeError:
+            return RLData(self._value[key],
+                        lower=self._lower,
+                        upper=self._upper,
+                        categories=self._categories,
+                        is_numerical=self._is_numerical,
+                        normalizer=self._normalizer,
+                        lazy_evaluation=self._lazy)
 
     def __delitem__(self, key):
         del self._value[key]
@@ -440,7 +449,10 @@ class RLData(dict):
         return self._value.values()
 
     def items(self):
-        return self._value.items()
+        try:
+            return self._value.items()
+        except AttributeError:
+            return enumerate(self._value)
 
     def pop(self, *args):
         return self._value.pop(*args)
@@ -554,5 +566,6 @@ if __name__ == '__main__':
     d = RLData({'tuples': [(1, 1), (1, 2), (1, 3)], 'ints': 1})
     print(d.value)
     print(d.normalize())
-    print(d.as_list())
+    d_temp = d['tuples']
+    print(d_temp[0])
     print(d.as_rldata_array()[0].normalize().as_list())
