@@ -188,7 +188,7 @@ class DQNAgent(Agent):
                 for i in range(len(history)):
                     state = history[i]['state']
                     action = history[i]['action']
-                    reward = history[i]['reward']
+                    reward = history[i]['reward'][0]
                     try:
                         max_q = self._max_q(history[i+1]['state'])
                         new_q = reward + self._gamma*max_q

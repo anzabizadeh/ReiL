@@ -15,6 +15,7 @@ import sys
 import pandas as pd
 
 from ..rlbase import RLBase
+from ..rldata import RLData
 import rl.agents as agents
 import rl.subjects as subjects
 
@@ -247,7 +248,7 @@ class Environment(RLBase):
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
                                                episode=self._total_experienced_episodes[(agent_name, subject_name)])
-                            reward = subject.take_effect(action, _id)
+                            reward = RLData(subject.take_effect(action, _id))
 
                             if reporting == 'all':
                                 print(f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
@@ -330,6 +331,7 @@ class Environment(RLBase):
             'learning_batch_size', self._learning_batch_size)
         training_status = kwargs.get('training_status', dict((agent, True) for agent in self._agent.values()))
         return_output = kwargs.get('return_output', False)
+        stats_func = kwargs.get('stats_func', lambda a, d: d)
         # reporting = kwargs.get('reporting', 'none').lower()
 
         # tally = kwargs.get('tally', 'no').lower() == 'yes'
@@ -352,7 +354,7 @@ class Environment(RLBase):
             for agent_name, _ in assigned_agents:
                 self._agent[agent_name].status = 'training' if training_status[(agent_name, subject_name)] else 'testing'
             history = dict((agent_name, []) for agent_name, _ in assigned_agents)
-            for subject_instance in subject:
+            for instance_id, subject_instance in subject:
                 steps = 0
                 while not subject_instance.is_terminated:
                     for agent_name, _id in assigned_agents:
@@ -367,7 +369,7 @@ class Environment(RLBase):
                                             episode=self._total_experienced_episodes[(agent_name, subject_name)])
                         reward = subject_instance.take_effect(action, _id)
 
-                        history[agent_name].append({'state': state, 'action': action, 'reward': reward})
+                        history[agent_name].append({'instance_id': instance_id, 'state': state, 'action': action, 'reward': reward})
 
                         if subject_instance.is_terminated:
                             # win_count[agent_name] += int(reward > 0)
@@ -387,12 +389,13 @@ class Environment(RLBase):
                         for agent_name, _ in assigned_agents:
                             self._agent[agent_name].learn(history=history[agent_name])
 
-                if return_output:
-                    for agent_name, _ in assigned_agents:
-                        try:
-                            output[(agent_name, subject_name)].append(history[agent_name])
-                        except KeyError:
-                            output[(agent_name, subject_name)] = history[agent_name]
+            if return_output:
+                for agent_name, _ in assigned_agents:
+                    result = stats_func(agent_name, history[agent_name])
+                    try:
+                        output[(agent_name, subject_name)].append(result)
+                    except KeyError:
+                        output[(agent_name, subject_name)] = [result]
 
         return output
         #     if tally & (reporting != 'none'):

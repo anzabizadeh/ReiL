@@ -9,8 +9,11 @@ A data type used for state and action variables.
 '''
 
 from numbers import Number
+from collections.abc import Iterable
 
 class RLData(dict):
+    _lazy = True
+
     def __init__(self, value=[0], **kwargs):
         '''
         Create an RLData instance.
@@ -25,7 +28,6 @@ class RLData(dict):
             lazy_evaluation: whether to store normalized values or compute on-demand (Default: False)
         '''
 
-        self._lazy = True
         self._value = {}
         self._is_numerical = {}
         self._normalizer = {}
@@ -82,7 +84,7 @@ class RLData(dict):
             for i, v_i in v.items():
                 self.__setitem__(i, v_i)
         except AttributeError:
-            self.__setitem__(slice(None), v)
+            self.__setitem__(None, v)
 
     @property
     def lower(self):
@@ -98,31 +100,26 @@ class RLData(dict):
 
         Raises ValueError if the provided lower bound is greater than the currently stored value. 
         '''
+        def check_min(v, new_min):
+            try:
+                minimum = min(v)
+            except TypeError:
+                minimum = v
+
+            if minimum < new_min:
+                raise ValueError(
+                    f'The provided lower bound ({new_min}) is greater than current smallest number ({minimum}).\n{self.__repr__()}')
+
+            return new_min
+
         try:
             for i, val in value.items():
                 if self._is_numerical[i]:
-                    try:
-                        minimum = min(self._value[i])
-                    except TypeError:
-                        minimum = self._value[i]
+                    self._lower[i] = check_min(self._value[i], val)
 
-                    if minimum < val:
-                        raise ValueError(
-                            f'The provided lower bound ({val}) is greater than current smallest number ({minimum}).\n{self.__repr__()}')
-
-                    self._lower[i] = val
         except AttributeError:
             if self._is_numerical:
-                try:
-                    minimum = min(self._value)
-                except TypeError:
-                    minimum = self._value
-
-                if minimum < value:
-                    raise ValueError(
-                        f'The provided lower bound ({value}) is greater than current smallest number ({minimum}).\n{self.__repr__()}')
-
-                self._lower = value
+                self._lower = check_min(self._value, value)
 
         if not self._lazy:
             self._normalized = self._normalize()
@@ -141,31 +138,26 @@ class RLData(dict):
 
         Raises ValueError if the provided upper bound is less than the currently stored value. 
         '''
+        def check_max(v, new_max):
+            try:
+                maximum = max(v)
+            except TypeError:
+                maximum = v
+
+            if maximum > new_max:
+                raise ValueError(
+                    f'The provided upper bound ({new_max}) is less than current greatest number ({maximum}).\n{self.__repr__()}')
+
+            return new_max
+
         try:
             for i, val in value.items():
                 if self._is_numerical[i]:
-                    try:
-                        maximum = max(self._value[i])
-                    except TypeError:
-                        maximum = self._value[i]
-                        if maximum > val:
-                            raise ValueError(
-                                f'The provided upper bound ({val}) is less than current biggest number ({maximum}).\n{self.__repr__()}')
-
-                    self._upper[i] = val
+                    self._upper[i] = check_max(self._value[i], val)
 
         except AttributeError:
             if self._is_numerical:
-                try:
-                    maximum = max(self._value)
-                except TypeError:
-                    maximum = self._value
-
-                if maximum > value:
-                    raise ValueError(
-                        f'The provided upper bound ({value}) is less than current biggest number ({maximum}).\n{self.__repr__()}')
-
-                self._upper = value
+                self._upper = check_max(self._value, value)
 
         if not self._lazy:
             self._normalized = self._normalize()
@@ -234,10 +226,6 @@ class RLData(dict):
             return self.__remove_nestings(self._value.values())
         except AttributeError:
             return self._value
-
-    def as_nparray(self):
-        ''' return the value as numpy array.'''
-        return np.array(self.as_list())
 
     def as_rldata_array(self):
         ''' return the value as a list of RLData.'''
@@ -332,9 +320,11 @@ class RLData(dict):
             return RLData(self._normalized, lower=0, upper=1, lazy_evaluation=True)
 
     def __setitem__(self, key, value):
-        if isinstance(key, slice) and isinstance(self._value, dict):
+        if key is None and isinstance(self._value, dict):
             self._value = []
             del self._is_numerical
+        if not isinstance(value, Iterable):
+            value = [value]
         try:
             if key not in self._value.keys():
                 non_string_iterable = hasattr(value, '__iter__') and not isinstance(value, str)
@@ -354,9 +344,9 @@ class RLData(dict):
 
             else:
                 if self._is_numerical[key]:
-                    if not (self.lower[key] <= value <= self.upper[key]):
+                    if not all(self.lower[key] <= v <= self.upper[key] for v in value):
                         raise ValueError(f'{value} is not in the range of {self.lower[key]} to {self.upper[key]}.')
-                elif value not in self.categories[key]:
+                elif any(v not in self.categories[key] for v in value):
                     raise ValueError(f'{value} is not a valid category.')
 
                 self._value[key] = value
@@ -372,6 +362,7 @@ class RLData(dict):
                     raise ValueError(f'{value} is not a valid category.')
 
                 self._value = value
+
             except AttributeError:
                 non_string_iterable = hasattr(value, '__iter__') and not isinstance(value, str)
                 self._value = value
@@ -405,14 +396,17 @@ class RLData(dict):
                         is_numerical=self._is_numerical[key],
                         normalizer=self._normalizer[key],
                         lazy_evaluation=self._lazy)
-        except TypeError:
-            return RLData(self._value[key],
-                        lower=self._lower,
-                        upper=self._upper,
-                        categories=self._categories,
-                        is_numerical=self._is_numerical,
-                        normalizer=self._normalizer,
-                        lazy_evaluation=self._lazy)
+        except (TypeError, IndexError):
+            if isinstance(key, Number):
+                return self._value[key]
+            else:
+                return RLData(self._value[key],
+                            lower=self._lower,
+                            upper=self._upper,
+                            categories=self._categories,
+                            is_numerical=self._is_numerical,
+                            normalizer=self._normalizer,
+                            lazy_evaluation=self._lazy)
 
     def __delitem__(self, key):
         del self._value[key]
@@ -433,32 +427,55 @@ class RLData(dict):
     def clear(self):
         return self._value.clear()
 
-    def copy(self):
-        return self.__dict__.copy()
-
     def has_key(self, k):
         return k in self._value.keys()
 
-    def update(self, *args, **kwargs):
-        return self._value.update(*args, **kwargs)
+    def update(self, kwargs):
+        try:
+            if isinstance(kwargs._value, list):
+                if self.is_numerical:
+                    if min(kwargs._value) >= self.lower and max(kwargs._value) <= self.upper:
+                        self._value += kwargs._value
+                else:
+                    if all(item in self.categories for item in kwargs._value):
+                        self._value += kwargs._value
+
+                return self.value
+
+        except AttributeError:
+            pass
+
+        for k, v in kwargs.items():
+            self.__setitem__(k, v)
+
+        return self.value
 
     def keys(self):
-        return self._value.keys()
+        try:
+            return self._value.keys()
+        except AttributeError:
+            try:
+                return slice(0, len(self._value))
+            except TypeError:
+                return 0
 
     def values(self):
-        return self._value.values()
+        try:
+            return self._value.values()
+        except AttributeError:
+            return self._value
 
     def items(self):
         try:
             return self._value.items()
         except AttributeError:
-            return enumerate(self._value)
+            try:
+                return enumerate(self._value)
+            except TypeError:
+                return enumerate([self._value])
 
     def pop(self, *args):
         return self._value.pop(*args)
-
-    def __cmp__(self, dict_):
-        return self.__cmp__(self.__dict__, dict_)
 
     def __contains__(self, item):
         return item in self._value
@@ -466,52 +483,99 @@ class RLData(dict):
     def __iter__(self):
         return iter(self._value)
 
+    def __add__(self, other):
+        temp = RLData(value=self._value,
+                      lower=self.lower,
+                      upper=self.upper,
+                      categories=self.categories,
+                      is_numerical=self.is_numerical,
+                      normalizer=self._normalizer
+                      )
+        temp.update(other)
+        return temp
+
+    def __iadd__(self, other):
+        self.update(other)
+        return self
+
     def __eq__(self, other):
         try:
             return (self.value == other.value).bool() and (
                 ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else 
                     (self.categories == other.categories).bool())
         except AttributeError:
-            return False
+            return (self.value == other.value) and (
+                ((self.upper == other.upper) and (self.lower == other.lower)) if self.is_numerical else 
+                    (self.categories == other.categories))
 
     def __ge__(self, other):
+        if isinstance(other, RLData):
+            other_value = other.value
+        else:
+            other_value = other
+
         try:
-            return (self.value >= other.value).bool()
+            return (self.value >= other_value).bool()
         except AttributeError:
-            return False
+            return (self.value >= other_value)
 
     def __gt__(self, other):
+        if isinstance(other, RLData):
+            other_value = other.value
+        else:
+            other_value = other
+
         try:
-            return (self.value > other.value).bool()
+            return (self.value > other_value).bool()
         except AttributeError:
-            return False
+            return (self.value > other_value)
 
     def __le__(self, other):
+        if isinstance(other, RLData):
+            other_value = other.value
+        else:
+            other_value = other
+
         try:
-            return (self.value <= other.value).bool()
+            return (self.value <= other_value).bool()
         except AttributeError:
-            return False
+            return (self.value <= other_value)
 
     def __lt__(self, other):
+        if isinstance(other, RLData):
+            other_value = other.value
+        else:
+            other_value = other
+
         try:
-            return (self.value < other.value).bool()
+            return (self.value < other_value).bool()
         except AttributeError:
-            return False
+            return (self.value < other_value)
 
     def __ne__(self, other):
+        if isinstance(other, RLData):
+            other_value = other.value
+        else:
+            other_value = other
+
         try:
-            return (self.value != other.value).bool()
+            return (self.value != other_value).bool()
         except AttributeError:
-            return False
+            return (self.value != other_value)
 
     def __format__(self, formatstr):
         try:
-            return '[' + ', '.join(format(i, formatstr) for i in self._value) + ']'
+            return '[' + ', '.join(format(i, formatstr) for i in self.value) + ']'
+        except TypeError:
+            return format(self.value, formatstr)
         except AttributeError:
             return False
 
     def __len__(self):
-        return len(self._value)
+        try:
+            return len(self._value)
+        except TypeError:
+            return 1
 
     # def __contains__(self, x):
     #     for i in range(len(self)):
@@ -557,6 +621,17 @@ if __name__ == '__main__':
     print(d.value)
     print(d.normalize())
     print(d.as_rldata_array())
+    print(d == d)
+    d += RLData([1.5, 2.5, 3], lower=0)
+    print(d)
+
+    d = RLData({'a': 1, 'b': 2, 'c': 3},
+                lower={'a': 0, 'b': 0},
+                upper={'a': 10, 'b': 10},
+                categories={'c': (1, 2, 3)},
+                is_numerical={'c': False})
+
+    print(d+RLData({'a': 5, 'c': 1}, is_numerical={'a': True, 'c': False}, lazy_evaluation=True))
 
     d1 = RLData(['a', 'b', 'c'], categories=['a', 'b', 'c'])
     assert d1.value==['a', 'b', 'c']

@@ -335,7 +335,7 @@ class WarfarinModel_v5(Subject):
             reward = 0
 
         # return TTR*self._d_current
-        return reward
+        return RLData(reward, normalizer=lambda x: x)
 
     def reset(self):
         if self._patient_selection == 'random':

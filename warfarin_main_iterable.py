@@ -22,6 +22,7 @@ import tensorflow as tf
 from rl.agents import DQNAgent  # , WarfarinQAgent
 from rl.environments import Environment
 from rl.subjects import WarfarinModel_v5, IterableSubject
+from rl.stats import WarfarinStats
 
 
 def set_seeds(seed):
@@ -31,9 +32,9 @@ def set_seeds(seed):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--runs', type=int, default=2)
-    parser.add_argument('--training_episodes', type=int, default=5)
-    parser.add_argument('--test_episodes', type=int, default=5)
+    parser.add_argument('--runs', type=int, default=10)
+    parser.add_argument('--training_episodes', type=int, default=10)
+    parser.add_argument('--test_episodes', type=int, default=10)
     parser.add_argument('--max_day', type=int, default=90)
     parser.add_argument('--dose_history', type=int, default=10)
     parser.add_argument('--INR_history', type=int, default=10)
@@ -47,7 +48,7 @@ def parse_args():
     parser.add_argument('--agent_type', type=str, default='DQN')
     parser.add_argument('--method', type=str, default='forward')
     parser.add_argument('--gamma', type=float, default=0.95)
-    parser.add_argument('--buffer_size', type=int, default=90*1)
+    parser.add_argument('--buffer_size', type=int, default=90*10)
     parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--validation_split', type=float, default=0.3)
     parser.add_argument('--hidden_layer_sizes', nargs='+', type=int, default=(32, 32, 32))
@@ -199,6 +200,8 @@ if __name__ == "__main__":
         env.add(agents=agents, subjects=subjects)
         env.assign([('protocol', 'training'), ('protocol', 'test')])
 
+        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR']}})
+
     if args.save_runs:
         env_filename = lambda i: filename+f'{i:04}'
     else:
@@ -206,16 +209,18 @@ if __name__ == "__main__":
 
     for i in range(args.runs):
         print(f'run {i: }')
-        env.elapse_iterable(training_status={('protocol', 'training'): True, ('protocol', 'test'): False})
+        output = env.elapse_iterable(training_status={('protocol', 'training'): True, ('protocol', 'test'): False},
+                            stats_func=warf_stats.stats_func, return_output=True)
 
+        print(output)
         # env.save(filename=env_filename(i))
 
-        trajectories = env.trajectory()
-        for row in trajectories[('protocol', 'test')]:
-            print(f'{row["state"].value.loc["Doses"][-1]} \t {row["state"].value.loc["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
+        # trajectories = env.trajectory()
+        # for row in trajectories[('protocol', 'test')]:
+        #     print(f'{row["state"]["Doses"][-1]} \t {row["state"]["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
 
-        with open(filename+'.txt', 'a+') as f:
-            f.write(f'{i:-^20}\n')
-            for row in trajectories[('protocol', 'test')]:
-                print(f'{row["state"].value.loc["Doses"][-1]} \t {row["state"].value.loc["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
-                f.write(f'{row["state"].value.loc["Doses"][-1]} \t {row["state"].value.loc["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
+        # with open(filename+'.txt', 'a+') as f:
+        #     f.write(f'{i:-^20}\n')
+        #     for row in trajectories[('protocol', 'test')]:
+        #         print(f'{row["state"]["Doses"][-1]} \t {row["state"]["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
+        #         f.write(f'{row["state"]["Doses"][-1]} \t {row["state"]["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')

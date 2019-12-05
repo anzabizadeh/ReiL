@@ -83,6 +83,7 @@ class IterableSubject(RLBase):
         except IndexError:
             if self._auto_rewind:
                 self._end_index = 0
+                self._instance_counter = 1
                 end = self._instance_counter_end[self._end_index]
             else:
                 raise StopIteration
@@ -105,7 +106,7 @@ class IterableSubject(RLBase):
             if self._save_instances and new_instance:
                 self._subject.save(path=self._save_path, filename=current_instance)
 
-        return self._subject
+        return (self._instance_counter, self._subject)
 
     @property
     def state(self):
