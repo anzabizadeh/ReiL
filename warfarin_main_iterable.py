@@ -32,9 +32,9 @@ def set_seeds(seed):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--runs', type=int, default=10)
-    parser.add_argument('--training_episodes', type=int, default=10)
-    parser.add_argument('--test_episodes', type=int, default=10)
+    parser.add_argument('--runs', type=int, default=200)
+    parser.add_argument('--training_episodes', type=int, default=250)
+    parser.add_argument('--test_episodes', type=int, default=50)
     parser.add_argument('--max_day', type=int, default=90)
     parser.add_argument('--dose_history', type=int, default=10)
     parser.add_argument('--INR_history', type=int, default=10)
@@ -200,7 +200,7 @@ if __name__ == "__main__":
         env.add(agents=agents, subjects=subjects)
         env.assign([('protocol', 'training'), ('protocol', 'test')])
 
-        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR']}})
+        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR'], 'groupby': ['sensitivity']}})
 
     if args.save_runs:
         env_filename = lambda i: filename+f'{i:04}'

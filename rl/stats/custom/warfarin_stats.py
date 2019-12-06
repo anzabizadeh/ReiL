@@ -136,11 +136,27 @@ class WarfarinStats:
         # self._df_for_stats = pd.concat([self._df_for_stats] + temp_list_stats)
 
     def stats_func(self, agent_name, history):
+        def sensitivity(row):
+            combo = row['CYP2C9'] + row['VKORC1']
+            return (int(combo in ('*1/*1G/G', '*1/*2G/G', '*1/*1G/A')) * 1 +
+                    int(combo in ('*1/*2G/A', '*1/*3G/A', '*2/*2G/A',
+                                  '*2/*3G/G', '*1/*3G/G', '*2/*2G/G',
+                                  '*1/*2A/A', '*1/*1A/A')) * 2 +
+                    int(combo in ('*3/*3G/G',
+                                  '*3/*3G/A', '*2/*3G/A',
+                                  '*3/*3A/A', '*2/*3A/A', '*2/*2A/A', '*1/*3A/A')) * 4)
+
         groupby = self._agent_stat_dict[agent_name]['groupby']
         temp_df = pd.DataFrame(history)
 
         # df_state_action = df_from_file.apply(lambda row: [z for y in [x if hasattr(x, '__iter__') and not isinstance(
         #     x, str) else [x] for x in row.state.normalize().value] for z in y] + row.action.as_list(), axis=1, result_type='expand')
+        temp_df['age'] = temp_df.apply(lambda row: row['state']['age'][0], axis=1)
+        temp_df['CYP2C9'] = temp_df.apply(lambda row: row['state']['CYP2C9'][0], axis=1)
+        temp_df['VKORC1'] = temp_df.apply(lambda row: row['state']['VKORC1'][0], axis=1)
+        temp_df['Doses'] = temp_df.apply(lambda row: row['state']['Doses'], axis=1)
+        temp_df['INRs'] = temp_df.apply(lambda row: row['state']['INRs'], axis=1)
+        temp_df['Intervals'] = temp_df.apply(lambda row: row['state']['Intervals'], axis=1)
         temp_df['INR_current'] = temp_df.apply(lambda row: row['state']['INRs'][-1], axis=1)
         temp_df['delta_dose'] = temp_df.apply(
             lambda row: row['action'][0] - row['state']['Doses'][-1], axis=1)
@@ -148,8 +164,9 @@ class WarfarinStats:
             lambda row: row['action'][0] - row['state']['Doses'][-1], axis=1)
         temp_df['TTR'] = temp_df.INR_current.apply(
             lambda x: 1 if 2 <= x <= 3 else 0)
-        # temp_df['sensitivity'] = sensitivity(temp_df.iloc[0, :])  # temp_df.apply(lambda row: sensitivity(row), axis=1)
-
+        temp_df['sensitivity'] = temp_df.apply(sensitivity, axis=1)
+        temp_df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
+        
         results = {}
         for stat in self._agent_stat_dict[agent_name]['stats']:
             if stat == 'TTR':

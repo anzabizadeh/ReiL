@@ -323,7 +323,7 @@ class RLData(dict):
         if key is None and isinstance(self._value, dict):
             self._value = []
             del self._is_numerical
-        if not isinstance(value, Iterable):
+        if not isinstance(value, Iterable) or isinstance(value, str):
             value = [value]
         try:
             if key not in self._value.keys():
