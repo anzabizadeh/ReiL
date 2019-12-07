@@ -12,6 +12,12 @@
             "pythonPath": "${config:python.pythonPath}",
             "program": "${file}",
             "cwd": "${workspaceFolder}",
+            "args": [
+                "--dose_change_penalty_func=none",
+                "--run=1",
+                "--training_episodes=20",
+                "--test_episodes=20"
+            ],
             "env": {},
             "envFile": "${workspaceFolder}/.env",
             "debugOptions": [

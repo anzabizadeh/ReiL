@@ -200,7 +200,7 @@ if __name__ == "__main__":
         env.add(agents=agents, subjects=subjects)
         env.assign([('protocol', 'training'), ('protocol', 'test')])
 
-        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR'], 'groupby': ['sensitivity']}})
+        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR', 'dose_change'], 'groupby': ['sensitivity']}})
 
     if args.save_runs:
         env_filename = lambda i: filename+f'{i:04}'
@@ -212,8 +212,15 @@ if __name__ == "__main__":
         output = env.elapse_iterable(training_status={('protocol', 'training'): True, ('protocol', 'test'): False},
                             stats_func=warf_stats.stats_func, return_output=True)
 
-        print(output)
-        # env.save(filename=env_filename(i))
+        with open(filename+'.txt', 'a+') as f:
+            for k1, v1 in output.items(): 
+                for l in v1:
+                    for k2, v2 in l.items():
+                        for j in range(v2.shape[0]):
+                            print(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}')
+                            f.write(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}')
+                        
+        env.save(filename=env_filename(i))
 
         # trajectories = env.trajectory()
         # for row in trajectories[('protocol', 'test')]:
