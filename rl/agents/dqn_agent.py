@@ -105,7 +105,7 @@ class DQNAgent(Agent):
             self._model.add(keras.layers.Dense(
                 1, name='output'))
 
-            self._model.compile(optimizer='adam', loss='mae')
+            self._model.compile(optimizer=keras.optimizers.Adam(learning_rate=self._learning_rate), loss='mae')
 
             if self._tensorboard_path is None:
                 self._tensorboard_path = os.path.join('logs', '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
@@ -210,7 +210,7 @@ class DQNAgent(Agent):
                 for i in range(len(history)-1, -1, -1):
                     state = history[i]['state']
                     action = history[i]['action']
-                    reward = history[i]['reward']
+                    reward = history[i]['reward'][0]
                     try:
                         new_q = reward + self._gamma*q_list[i+1]
                     except IndexError:
