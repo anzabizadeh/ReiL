@@ -218,7 +218,7 @@ if __name__ == "__main__":
                     for k2, v2 in l.items():
                         for j in range(v2.shape[0]):
                             print(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}')
-                            f.write(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}')
+                            f.write(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}\n')
                         
         env.save(filename=env_filename(i))
 
