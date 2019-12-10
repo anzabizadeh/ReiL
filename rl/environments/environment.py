@@ -331,6 +331,7 @@ class Environment(RLBase):
             'learning_batch_size', self._learning_batch_size)
         training_status = kwargs.get('training_status', dict((agent, True) for agent in self._agent.values()))
         return_output = kwargs.get('return_output', False)
+        return_stats = kwargs.get('return_stats', False)
         stats_func = kwargs.get('stats_func', lambda a, d: d)
         # reporting = kwargs.get('reporting', 'none').lower()
 
@@ -339,14 +340,8 @@ class Environment(RLBase):
 
         # step_count = kwargs.get('step_count', 'no').lower() == 'yes'
 
+        stats = {}
         output = {}
-        # for agent in self._agent.values():
-        #     if training_status[agent]:
-        #         agent.status = 'training'
-        # else:
-        #     return_output = True
-        #     for agent in self._agent.values():
-        #         agent.status = 'testing'
 
         for subject_name, subject in self._subject.items():
             assigned_agents = list((k[0], v) for k, v in self._assignment_list.items() if k[1] == subject_name)
@@ -389,15 +384,23 @@ class Environment(RLBase):
                         for agent_name, _ in assigned_agents:
                             self._agent[agent_name].learn(history=history[agent_name])
 
+            if return_stats:
+                for agent_name, _ in assigned_agents:
+                    result = stats_func(agent_name, history[agent_name])
+                    try:
+                        stats[(agent_name, subject_name)].append(result)
+                    except KeyError:
+                        stats[(agent_name, subject_name)] = [result]
+
             if return_output:
                 for agent_name, _ in assigned_agents:
                     result = stats_func(agent_name, history[agent_name])
                     try:
-                        output[(agent_name, subject_name)].append(result)
+                        output[(agent_name, subject_name)].append(history[agent_name])
                     except KeyError:
-                        output[(agent_name, subject_name)] = [result]
+                        output[(agent_name, subject_name)] = [history[agent_name]]
 
-        return output
+        return stats, output
         #     if tally & (reporting != 'none'):
         #         report_string += f'\n tally:'
         #         for agent in self._agent:

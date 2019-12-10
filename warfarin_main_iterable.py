@@ -12,17 +12,17 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 import argparse
-import random
-
-from statistics import stdev
 import itertools
+import random
+from statistics import stdev
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from rl.agents import DQNAgent  # , WarfarinQAgent
 from rl.environments import Environment
-from rl.subjects import WarfarinModel_v5, IterableSubject
 from rl.stats import WarfarinStats
+from rl.subjects import IterableSubject, WarfarinModel_v5
 
 
 def set_seeds(seed):
@@ -118,6 +118,8 @@ if __name__ == "__main__":
                             args.agent_type,
                             'fwd' if args.method.lower() == 'forward' else 'bwd', text)).replace(' ', '')
 
+    filename = 'test'
+
     try:
         env = Environment(filename=filename)
         agents = env._agent
@@ -200,7 +202,7 @@ if __name__ == "__main__":
         env.add(agents=agents, subjects=subjects)
         env.assign([('protocol', 'training'), ('protocol', 'test')])
 
-        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR', 'dose_change'], 'groupby': ['sensitivity']}})
+        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR', 'dose_change', 'delta_dose'], 'groupby': ['sensitivity']}})
 
     if args.save_runs:
         env_filename = lambda i: filename+f'{i:04}'
@@ -209,17 +211,28 @@ if __name__ == "__main__":
 
     for i in range(args.runs):
         print(f'run {i: }')
-        output = env.elapse_iterable(training_status={('protocol', 'training'): True, ('protocol', 'test'): False},
-                            stats_func=warf_stats.stats_func, return_output=True)
+        stats, output = env.elapse_iterable(training_status={('protocol', 'training'): True, ('protocol', 'test'): False},
+                                stats_func=warf_stats.stats_func, return_stats=True, return_output=True)
 
         with open(filename+'.txt', 'a+') as f:
-            for k1, v1 in output.items(): 
+            for k1, v1 in stats.items():
                 for l in v1:
                     for k2, v2 in l.items():
                         for j in range(v2.shape[0]):
                             print(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}')
                             f.write(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}\n')
-                        
+
+        trajectories = []
+        for label in output.keys():
+            for hist in output[label]:
+                trajectories += [(i, label, h['instance_id'], h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0], h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
+        trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject', 'instance_id', 'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action', 'reward'])
+        trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(periods=-1)
+        trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
+        trajectories_df['INR'] = trajectories_df.apply(lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
+        trajectories_df.drop('shifted_id', axis=1, inplace=True)
+        trajectories_df.to_csv(f'{filename}{i:04}.csv')
+
         env.save(filename=env_filename(i))
 
         # trajectories = env.trajectory()

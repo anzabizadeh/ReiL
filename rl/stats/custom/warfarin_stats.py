@@ -155,47 +155,42 @@ class WarfarinStats:
         temp_df['CYP2C9'] = temp_df.apply(lambda row: row['state']['CYP2C9'][0], axis=1)
         temp_df['VKORC1'] = temp_df.apply(lambda row: row['state']['VKORC1'][0], axis=1)
         temp_df['Doses'] = temp_df.apply(lambda row: row['state']['Doses'], axis=1)
+        temp_df['dose_current'] = temp_df.apply(lambda row: row['action'][0], axis=1)
         temp_df['INRs'] = temp_df.apply(lambda row: row['state']['INRs'], axis=1)
         temp_df['Intervals'] = temp_df.apply(lambda row: row['state']['Intervals'], axis=1)
         temp_df['INR_current'] = temp_df.apply(lambda row: row['state']['INRs'][-1], axis=1)
         temp_df['delta_dose'] = temp_df.apply(
             lambda row: row['action'][0] - row['state']['Doses'][-1], axis=1)
         temp_df['dose_change'] = temp_df.apply(
-            lambda row: row['action'][0] - row['state']['Doses'][-1], axis=1)
+            lambda row: int(row['action'][0] != row['state']['Doses'][-1]), axis=1)
         temp_df['TTR'] = temp_df.INR_current.apply(
             lambda x: 1 if 2 <= x <= 3 else 0)
         temp_df['sensitivity'] = temp_df.apply(sensitivity, axis=1)
         temp_df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
         
         results = {}
+        grouped_df = temp_df.groupby(groupby)
+
         for stat in self._agent_stat_dict[agent_name]['stats']:
             if stat == 'TTR':
-                stat_temp = (temp_df.groupby(groupby).sum()['TTR'] /
-                                temp_df.groupby(groupby).count()['TTR'])
+                stat_temp = grouped_df['TTR'].mean()
             elif stat[:4] == 'TTR>':
-                stat_temp_temp = (temp_df.groupby(groupby + ['instance_id']).sum()['TTR'] / 
-                                    temp_df.groupby(groupby + ['instance_id']).count()['TTR']) > float(stat[4:])  # .reset_index(level='instance_id', drop='instance_id')
-                stat_temp = (stat_temp_temp.groupby(groupby).sum() / stat_temp_temp.groupby(groupby).count()).rename(stat)
+                temp_df.groupby(groupby +  [] if 'instance_id' in groupby else ['instance_id'])['TTR'].mean().apply(lambda x: int(x > float(stat[4:]))).groupby(groupby).mean().rename(stat)
+                # stat_temp_temp = (temp_df.groupby(groupby + ['instance_id'])['TTR'].mean() > float(stat[4:]))  # .reset_index(level='instance_id', drop='instance_id')
+                # stat_temp = (stat_temp_temp.groupby(groupby).sum() / stat_temp_temp.groupby(groupby).count()).rename(stat)
             elif stat == 'dose_change':
-                stat_temp = (temp_df.groupby(groupby).sum()['dose_change'] /
-                                temp_df.groupby(groupby).count()['dose_change']).rename(stat)
+                stat_temp = grouped_df['dose_change'].mean().rename(stat)
             elif stat == 'count':
-                stat_temp = temp_df.groupby(groupby).count()['dose_change'].rename(stat)
+                stat_temp = grouped_df['dose_change'].count().rename(stat)
+            elif stat == 'delta_dose':
+                stat_temp = grouped_df['delta_dose'].mean().rename(stat)
             elif stat == 'INR':
-                if 'instance_id' not in groupby:
-                    groupby_temp = ['instance_id'] + groupby
-                else:
-                    groupby_temp = groupby
-                stat_temp = (temp_df.groupby(groupby_temp).sum()['INR_current'] /
-                                temp_df.groupby(groupby_temp).count()['INR_current']).rename(stat)
+                stat_temp = temp_df.groupby(groupby + [] if 'instance_id' in groupby else ['instance_id'])['INR_current'].mean().rename(stat)
             elif stat == 'INR_percent_dose_change':
-                if 'instance_id' not in groupby:
-                    groupby_temp = ['instance_id', 'INR_current'] + groupby
-                else:
-                    groupby_temp = ['INR_current'] + groupby
-                stat_temp = (temp_df.groupby(groupby_temp).sum()['delta_dose'] /
-                                (temp_df.groupby(groupby_temp).sum()['action']
-                                - temp_df.groupby(groupby_temp).sum()['delta_dose'])).rename(stat)
+                grouped_df_temp = temp_df.groupby(['INR_current'] + groupby + [] if 'instance_id' in groupby else ['instance_id'])
+                stat_temp = (grouped_df_temp['delta_dose'].sum() /
+                                (grouped_df_temp['dose_current'].sum()
+                                - grouped_df_temp['delta_dose'].sum())).rename(stat)
 
             results[stat] = stat_temp
         
