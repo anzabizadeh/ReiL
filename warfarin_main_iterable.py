@@ -118,8 +118,6 @@ if __name__ == "__main__":
                             args.agent_type,
                             'fwd' if args.method.lower() == 'forward' else 'bwd', text)).replace(' ', '')
 
-    filename = 'test'
-
     try:
         env = Environment(filename=filename)
         agents = env._agent
