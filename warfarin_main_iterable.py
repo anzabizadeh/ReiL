@@ -22,7 +22,7 @@ import tensorflow as tf
 from rl.agents import DQNAgent  # , WarfarinQAgent
 from rl.environments import Environment
 from rl.stats import WarfarinStats
-from rl.subjects import IterableSubject, WarfarinModel_v5
+from rl.subjects import IterableSubject, WarfarinLookAhead
 
 
 def set_seeds(seed):
@@ -39,9 +39,13 @@ def parse_args():
     parser.add_argument('--dose_history', type=int, default=10)
     parser.add_argument('--INR_history', type=int, default=10)
     parser.add_argument('--patient_selection', type=str, default='ravvaz')
-    parser.add_argument('--dose_change_penalty_coef', type=float, default=1.0)
-    parser.add_argument('--dose_change_penalty_func', type=str, default='change_count')
-    parser.add_argument('--dose_change_penalty_days', type=int, default=10)
+
+    parser.add_argument('--INR_penalty_coef', type=float, default=1.0)
+    parser.add_argument('--dose_change_penalty_coef', type=float, default=0.0)
+    parser.add_argument('--dose_change_penalty_func', type=str, default='none')
+    parser.add_argument('--dose_change_penalty_days', type=int, default=0)
+    parser.add_argument('--lookahead_duration', type=int, default=7)
+    parser.add_argument('--lookahead_penalty_coef', type=float, default=0.0)
 
     parser.add_argument('--randomized', type=bool, default=True)
 
@@ -110,6 +114,8 @@ if __name__ == "__main__":
                             'T' if args.randomized else 'F',
                             f'd_chg_coef_{args.dose_change_penalty_coef:2.2f}',
                             f'func{args.dose_change_penalty_func}',
+                            f'ahead_coef_{args.lookahead_penalty_coef}',
+                            f'aheadd{args.lookahead_duration}',
                             f'ph1_{args.initial_phase_duration:2}',
                             f'ph1chg_{args.max_initial_dose_change:2}',
                             f'mxd1_{args.max_day_1_dose:2}',
@@ -129,12 +135,15 @@ if __name__ == "__main__":
         subjects = {}
 
         # define subjects
-        training_patient = WarfarinModel_v5(max_day=args.max_day,
+        training_patient = WarfarinLookAhead(max_day=args.max_day,
                                             patient_selection=args.patient_selection,
                                             dose_history=args.dose_history,
                                             INR_history=args.INR_history,
+                                            INR_penalty_coef=args.INR_penalty_coef,
                                             dose_change_penalty_coef=args.dose_change_penalty_coef,
                                             dose_change_penalty_func=dose_change_penalty_func,
+                                            lookahead_penalty_coef=args.lookahead_penalty_coef,
+                                            lookahead_duration=args.lookahead_duration,
                                             extended_state=args.extended_state,
                                             randomized=args.randomized,
                                             initial_phase_duration=args.initial_phase_duration,
@@ -143,12 +152,15 @@ if __name__ == "__main__":
                                             maintenance_day_interval=args.maintenance_day_interval,
                                             max_maintenance_dose_change=args.max_maintenance_dose_change)
 
-        test_patient = WarfarinModel_v5(max_day=args.max_day,
+        test_patient = WarfarinLookAhead(max_day=args.max_day,
                                         patient_selection=args.patient_selection,
                                         dose_history=args.dose_history,
                                         INR_history=args.INR_history,
+                                        INR_penalty_coef=args.INR_penalty_coef,
                                         dose_change_penalty_coef=args.dose_change_penalty_coef,
                                         dose_change_penalty_func=dose_change_penalty_func,
+                                        lookahead_penalty_coef=args.lookahead_penalty_coef,
+                                        lookahead_duration=args.lookahead_duration,
                                         extended_state=args.extended_state,
                                         randomized=args.randomized,
                                         initial_phase_duration=args.initial_phase_duration,
@@ -182,7 +194,7 @@ if __name__ == "__main__":
 
         input_length = len(subjects['training'].state.normalize().as_list()) + len(subjects['training'].possible_actions[0].normalize().as_list())
 
-        agents['protocol'] = DQNAgent(learning_rate=0.1,
+        agents['protocol'] = DQNAgent(learning_rate=0.001,
                                         gamma=args.gamma,
                                         epsilon=epsilon,
                                         buffer_size=args.buffer_size,
@@ -231,14 +243,4 @@ if __name__ == "__main__":
         trajectories_df.drop('shifted_id', axis=1, inplace=True)
         trajectories_df.to_csv(f'{filename}{i:04}.csv')
 
-        env.save(filename=env_filename(i))
-
-        # trajectories = env.trajectory()
-        # for row in trajectories[('protocol', 'test')]:
-        #     print(f'{row["state"]["Doses"][-1]} \t {row["state"]["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
-
-        # with open(filename+'.txt', 'a+') as f:
-        #     f.write(f'{i:-^20}\n')
-        #     for row in trajectories[('protocol', 'test')]:
-        #         print(f'{row["state"]["Doses"][-1]} \t {row["state"]["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
-        #         f.write(f'{row["state"]["Doses"][-1]} \t {row["state"]["INRs"][-1]} \t {row["reward"]} \t {row["q"]}\n')
+        # env.save(filename=env_filename(i))
