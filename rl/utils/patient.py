@@ -128,6 +128,13 @@ class Patient(RLBase):
         self._multiplication_term = ((self._ka * self._F / 2) /
                                      self._V1) * (part_1 + part_2 + part_3).clip(min=1e-5)
 
+        if self._randomized:
+            self._Cs_error = np.exp(np.random.normal(0, 0.09, len(times)))
+            self._Cs_error_ss = np.exp(np.random.normal(0, 0.30, len(times)))
+            self._exp_e_INR = np.exp(np.random.normal(0, 0.0325, len(times)))
+        else:
+            self._Cs_error = self._Cs_error_ss = np.ones(len(times))
+            self._exp_e_INR = np.ones(len(times))
 
         if self._lazy:
             self._data = pd.DataFrame(columns=['dose']+times)
@@ -148,6 +155,7 @@ class Patient(RLBase):
                 if dose != 0.0:
                     self._data.loc[d] = np.insert(
                         self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
+                    self._last_computed_day = min(d, self._last_computed_day)
         else:
             for d, v in dose.items():
                 if dose != 0.0:
@@ -156,6 +164,7 @@ class Patient(RLBase):
                     Cs = self._Cs(dose=v, t0=range_start, zero_padding=False)
                     range_end = min(range_start + Cs.shape[0], self._max_time+1)
                     self._total_Cs[range_start:range_end] += Cs[:range_end-range_start]
+                    self._last_computed_day = min(d, self._last_computed_day)
 
     def _Cs(self, dose, t0, zero_padding=True):
         # C_s_pred = dose * self._multiplication_term
@@ -173,14 +182,7 @@ class Patient(RLBase):
 
         C_s_pred = dose * self._multiplication_term
 
-        if t0 == 0:  # non steady-state
-            C_s_error = np.exp(np.random.normal(0, 0.09, len(C_s_pred))) if self._randomized \
-                else np.ones(len(C_s_pred))  # Sadjad
-        else:  # steady-state
-            C_s_error = np.exp(np.random.normal(0, 0.30, len(C_s_pred))) if self._randomized \
-                else np.ones(len(C_s_pred))
-
-        C_s = np.multiply(C_s_pred, C_s_error).clip(min=0)
+        C_s = np.multiply(C_s_pred, self._Cs_error if t0 == 0 else self._Cs_error_ss).clip(min=0)
 
         return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1] if zero_padding else C_s
 
@@ -218,9 +220,8 @@ class Patient(RLBase):
                 for j in range(7):
                     self._A[j] += self._dA[j]
 
-            e_INR = gauss(0, 0.0325) if self._randomized else 0
             INR.append(
-                (baseINR + (INR_max*(1-self._A[5]*self._A[6]) ** self._lambda)) * exp(e_INR))
+                (baseINR + (INR_max*(1-self._A[5]*self._A[6]) ** self._lambda)) * self._exp_e_INR[d2])
 
         self._last_computed_day = end_days[-1]
 
