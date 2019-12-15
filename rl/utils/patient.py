@@ -125,8 +125,8 @@ class Patient(RLBase):
         part_3 = np.array(list(((k21 - self._ka) / ((self._ka - alpha)*(self._ka - beta)))
                                * temp for temp in (exp(-self._ka * t) for t in times)))
 
-        self._multiplication_term = ((self._ka * self._F / 2) /
-                                     self._V1) * (part_1 + part_2 + part_3).clip(min=1e-5)
+        multiplication_term = ((self._ka * self._F / 2) /
+                                self._V1) * (part_1 + part_2 + part_3).clip(min=1e-5)
 
         if self._randomized:
             self._Cs_error = np.exp(np.random.normal(0, 0.09, len(times)))
@@ -142,7 +142,11 @@ class Patient(RLBase):
         else:
             self._data = pd.DataFrame(columns=['dose'])
             self._total_Cs = np.zeros(self._max_time + 1)
-            self._multiplication_term = np.trim_zeros(self._multiplication_term, 'b')
+            multiplication_term = np.trim_zeros(multiplication_term, 'b')
+
+        self._multiplication_term_err = np.multiply(multiplication_term, self._Cs_error).clip(min=0)
+        self._multiplication_term_err_ss = np.multiply(multiplication_term, self._Cs_error_ss).clip(min=0)
+
 
     @property
     def dose(self):
@@ -180,11 +184,12 @@ class Patient(RLBase):
 
         # return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1]
 
-        C_s_pred = dose * self._multiplication_term
+        if t0 == 0:
+            C_s = dose * self._multiplication_term_err
+        else:
+            C_s = dose * self._multiplication_term_err_ss
 
-        C_s = np.multiply(C_s_pred, self._Cs_error if t0 == 0 else self._Cs_error_ss).clip(min=0)
-
-        return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1] if zero_padding else C_s
+        return np.concatenate((np.array([0]*t0), C_s[:-t0])) if zero_padding else C_s
 
     def INR(self, days):
         if isinstance(days, int):
