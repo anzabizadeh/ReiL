@@ -12,7 +12,19 @@ from numbers import Number
 from collections.abc import Iterable
 
 class RLData(dict):
-    _lazy = True
+    def __new__(cls, value=[0], **kwargs):
+        obj = super().__new__(cls)
+
+        obj._lazy = True
+        obj._value = {}
+        obj._is_numerical = {}
+        obj._normalizer = {}
+        obj._categories = {}
+        obj._lower = {}
+        obj._upper = {}
+        obj._normal_form = {}
+
+        return obj
 
     def __init__(self, value=[0], **kwargs):
         '''
@@ -28,13 +40,6 @@ class RLData(dict):
             lazy_evaluation: whether to store normalized values or compute on-demand (Default: False)
         '''
 
-        self._value = {}
-        self._is_numerical = {}
-        self._normalizer = {}
-        self._categories = {}
-        self._lower = {}
-        self._upper = {}
-        self._normal_form = {}
         self.value = value
 
         try:

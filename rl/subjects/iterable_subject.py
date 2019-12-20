@@ -32,7 +32,7 @@ class IterableSubject(RLBase):
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
     '''
-    def __init__(self, subject, **kwargs):
+    def __init__(self, subject=None, **kwargs):
         super().__init__(**kwargs)
         super().set_defaults(subject=subject,
                             agent_list={},
@@ -48,6 +48,13 @@ class IterableSubject(RLBase):
                             )
 
         super().set_params(subject=subject, **kwargs)
+
+        if 'filename' in kwargs:
+            if 'path' in kwargs:
+                self.load(filename=kwargs['filename'], path=kwargs['path'])
+            else:
+                self.load(filename=kwargs['filename'])
+            return
 
         if isinstance(self._instance_counter_end, int):
             self._instance_counter_end = [self._instance_counter_end]
