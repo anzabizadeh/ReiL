@@ -223,10 +223,10 @@ class Environment(RLBase):
 
         if learning_method == 'none':
             for agent in self._agent.values():
-                agent.status = 'testing'
+                agent.training_mode = False
         else:
             for agent in self._agent.values():
-                agent.status = 'training'
+                agent.training_mode = True
 
         steps = 0
         for episode in range(episodes):
@@ -329,7 +329,7 @@ class Environment(RLBase):
         max_steps = kwargs.get('max_steps', self._max_steps)
         learning_batch_size = kwargs.get(
             'learning_batch_size', self._learning_batch_size)
-        training_status = kwargs.get('training_status', dict((agent, True) for agent in self._agent.values()))
+        training_mode = kwargs.get('training_mode', dict((agent, True) for agent in self._agent.values()))
         return_output = kwargs.get('return_output', False)
         return_stats = kwargs.get('return_stats', False)
         stats_func = kwargs.get('stats_func', lambda a, d: d)
@@ -347,10 +347,12 @@ class Environment(RLBase):
             assigned_agents = list((k[0], v) for k, v in self._assignment_list.items() if k[1] == subject_name)
 
             for agent_name, _ in assigned_agents:
-                self._agent[agent_name].status = 'training' if training_status[(agent_name, subject_name)] else 'testing'
+                self._agent[agent_name].training_mode = training_mode[(agent_name, subject_name)]
             history = dict((agent_name, []) for agent_name, _ in assigned_agents)
             for instance_id, subject_instance in subject:
                 steps = 0
+                # for agent_name, _ in assigned_agents:
+                #     self._agent[agent_name].exchange_protocol = subject_instance.requested_exchange_protocol
                 while not subject_instance.is_terminated:
                     for agent_name, _id in assigned_agents:
                         agent = self._agent[agent_name]
@@ -358,6 +360,7 @@ class Environment(RLBase):
                             break
                         steps += 1
 
+                        # subject_instance.exchange_protocol = agent.requested_exchange_protocol
                         state = subject_instance.state
                         possible_actions = subject_instance.possible_actions
                         action = agent.act(state, actions=possible_actions,
@@ -373,11 +376,11 @@ class Environment(RLBase):
                                         (affected_agent != agent_name):
                                     history[affected_agent][-1]['reward'] = -reward
 
-                        if training_status[(agent_name, subject_name)] and learning_batch_size != -1 and len(history[agent_name]) >= learning_batch_size:
+                        if training_mode[(agent_name, subject_name)] and learning_batch_size != -1 and len(history[agent_name]) >= learning_batch_size:
                             agent.learn(history=history[agent_name])
                             history[agent_name] = []
 
-                if training_status[(agent_name, subject_name)]:
+                if training_mode[(agent_name, subject_name)]:
                     self._total_experienced_episodes[(agent_name, subject_name)] += 1
 
                     if learning_batch_size == -1:
@@ -435,7 +438,7 @@ class Environment(RLBase):
             list_of_subjects = [False] + list(self._subject.values())
 
         for agent in self._agent.values():
-            agent.status = 'testing'
+            agent.training_mode = False
 
         for subject in self._subject.values():
             subject.reset()

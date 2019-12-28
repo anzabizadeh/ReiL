@@ -29,13 +29,17 @@ class Subject(RLBase):
     '''
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        super().set_defaults(agent_list={})
+        super().set_defaults(agent_list={},
+            ex_protocol_options={'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+            ex_protocol_current={'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'})
         super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
             self._agent_list = {}
+            self._ex_protocol_options = {}
+            self._ex_protocol_current = {}
 
     @property
     def state(self):

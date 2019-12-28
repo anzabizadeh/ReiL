@@ -35,10 +35,34 @@ class RLBase():
     def __init__(self, **kwargs):
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
-        self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.')
+        self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
+                          ex_protocol_options={}, ex_protocol_current={}, requested_exchange_protocol={})
         self.set_params(**kwargs)
 
-        if False: self._name, self._version, self._path = [], [], []
+        if False:
+            self._name, self._version, self._path = [], [], []
+            self._ex_protocol_options, self._ex_protocol_current, self._requested_exchange_protocol = {}, {}, {}
+
+    @property
+    def exchange_protocol_options(self):
+        return self._ex_protocol_options
+
+    @property
+    def requested_exchange_protocol(self):
+        return self._requested_exchange_protocol
+
+    @property
+    def exchange_protocol(self):
+        return self._ex_protocol_current
+
+    @exchange_protocol.setter
+    def exchange_protocol(self, p):
+        for k, v in p.items():
+            if k in self._ex_protocol_options.keys():
+                if v in self._ex_protocol_options[k]:
+                    self._ex_protocol_current[k] = v
+                else:
+                    raise KeyError(f'Protocol {k} does not have option {v}.')
 
     def set_params(self, **params):
         '''
@@ -65,8 +89,9 @@ class RLBase():
             self._defaults = {}
         for key, value in params.items():
             self._defaults[key] = value
-            if not hasattr(self, '_'+key):
-                self.__dict__['_'+key] = value
+            self.__dict__['_'+key] = value
+            # if not hasattr(self, '_'+key) or self.__dict__.get('_'+key, -1) in (None, {}, []):
+            #     self.__dict__['_'+key] = value
 
     def load(self, **kwargs):
         '''

@@ -65,7 +65,6 @@ class WarfarinModel_v5(Subject):
         \n   characteristics: a dictionary describing the patient. (Default: {'age': 71, 'weight': 199.24, 'height': 66.78, 'gender': 'Male',
         \n     'race': 'White', 'tobaco': 'No', 'amiodarone': 'No', 'fluvastatin': 'No', 'CYP2C9': '*1/*1', 'VKORC1': 'A/A'})
         \n   randomized: whether to have random effect in the PK/PD model (Default: True)
-        \n   extended_state: whether to return full state definition or just `age`, 'CYP2C9`, `VKORC1`, `dose`s and `INR`s (Default: False).
 
         \n   save_patients: should the generated patients be saved? (Default: False)
         \n   patients_save_path: where to save patient files (Default: './patients')
@@ -77,7 +76,9 @@ class WarfarinModel_v5(Subject):
         
         super().__init__(**kwargs)
 
-        super().set_defaults(patient_selection='random',
+        super().set_defaults(ex_protocol_options={'state': ['standard', 'extended'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+                             ex_protocol_current={'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
+                             patient_selection='random',
                              list_of_characteristics={'age': (71, 86),
                                                       # lb
                                                       'weight': (35, 370),
@@ -117,7 +118,6 @@ class WarfarinModel_v5(Subject):
                              patient_save_overwrite=False,
                              patient_use_existing=True,
                              patient_counter_start=0,
-                             extended_state=False,
                              initial_phase_duration=-1,
                              phase='initial',
                              maintenance_day_interval=1,
@@ -141,6 +141,8 @@ class WarfarinModel_v5(Subject):
         super().set_params(**kwargs)
 
         if False:
+            self._ex_protocol_options = {}
+            self._ex_protocol_current = {}
             self._max_time = 0
             self._day = 1
             self._max_day = 0
@@ -162,7 +164,6 @@ class WarfarinModel_v5(Subject):
             self._d_current = 0
             self._therapeutic_range = ()
             self._randomized = True
-            self._extended_state = False
             self._save_patients = False
             self._patients_save_path = './patients'
             self._patients_save_prefix = 'warfv5'
@@ -176,6 +177,11 @@ class WarfarinModel_v5(Subject):
             self._max_day_1_dose = 15
             self._max_initial_dose_change = 15
             self._max_maintenance_dose_change = 15
+
+        if self._ex_protocol_current['state'] == 'extended':
+            self.__state_func = self.__state_extended
+        else:
+            self.__state_func = self.__state_normal
 
         if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
             if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
@@ -205,42 +211,41 @@ class WarfarinModel_v5(Subject):
                                                 for x in range(int(self._max_day_1_dose/self._dose_steps), -1, -1)],
                                                 lower=0, upper=self._max_dose).as_rldata_array()
 
-    @property
-    def state(self):
-        if self._extended_state:
-            return RLData({'age': self._characteristics['age'],
-                           'weight': self._characteristics['weight'],
-                           'height': self._characteristics['height'],
-                           'gender': self._characteristics['gender'],
-                           'race': self._characteristics['race'],
-                           'tobaco': self._characteristics['tobaco'],
-                           'amiodarone': self._characteristics['amiodarone'],
-                           'fluvastatin': self._characteristics['fluvastatin'],
-                           'CYP2C9': self._characteristics['CYP2C9'],
-                           'VKORC1': self._characteristics['VKORC1'],
-                           'day': self._day,
-                           'Doses': tuple(self._dose_list),
-                           'INRs': tuple(self._INR)},
-                          lower={'age': self._list_of_characteristics['age'][0],
-                                 'weight': self._list_of_characteristics['weight'][0],
-                                 'height': self._list_of_characteristics['height'][0],
-                                 'day': 0,
-                                 'Doses': 0.0,
-                                 'INRs': 0.0},
-                          upper={'age': self._list_of_characteristics['age'][-1],
-                                 'weight': self._list_of_characteristics['weight'][-1],
-                                 'height': self._list_of_characteristics['height'][-1],
-                                 'day': self._max_day,
-                                 'Doses': self._max_dose,
-                                 'INRs': 15.0},
-                          categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                      'VKORC1': self._list_of_characteristics['VKORC1'],
-                                      'gender': self._list_of_characteristics['gender'],
-                                      'race': self._list_of_characteristics['race'],
-                                      'tobaco': self._list_of_characteristics['tobaco'],
-                                      'amiodarone': self._list_of_characteristics['amiodarone'],
-                                      'fluvastatin': self._list_of_characteristics['fluvastatin']})
+    def __state_extended(self):
+        return RLData({'age': self._characteristics['age'],
+                        'weight': self._characteristics['weight'],
+                        'height': self._characteristics['height'],
+                        'gender': self._characteristics['gender'],
+                        'race': self._characteristics['race'],
+                        'tobaco': self._characteristics['tobaco'],
+                        'amiodarone': self._characteristics['amiodarone'],
+                        'fluvastatin': self._characteristics['fluvastatin'],
+                        'CYP2C9': self._characteristics['CYP2C9'],
+                        'VKORC1': self._characteristics['VKORC1'],
+                        'day': self._day,
+                        'Doses': tuple(self._dose_list),
+                        'INRs': tuple(self._INR)},
+                        lower={'age': self._list_of_characteristics['age'][0],
+                                'weight': self._list_of_characteristics['weight'][0],
+                                'height': self._list_of_characteristics['height'][0],
+                                'day': 0,
+                                'Doses': 0.0,
+                                'INRs': 0.0},
+                        upper={'age': self._list_of_characteristics['age'][-1],
+                                'weight': self._list_of_characteristics['weight'][-1],
+                                'height': self._list_of_characteristics['height'][-1],
+                                'day': self._max_day,
+                                'Doses': self._max_dose,
+                                'INRs': 15.0},
+                        categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                    'VKORC1': self._list_of_characteristics['VKORC1'],
+                                    'gender': self._list_of_characteristics['gender'],
+                                    'race': self._list_of_characteristics['race'],
+                                    'tobaco': self._list_of_characteristics['tobaco'],
+                                    'amiodarone': self._list_of_characteristics['amiodarone'],
+                                    'fluvastatin': self._list_of_characteristics['fluvastatin']})
 
+    def __state_normal(self):
         return RLData({'age': self._characteristics['age'],
                        'CYP2C9': self._characteristics['CYP2C9'],
                        'VKORC1': self._characteristics['VKORC1'],
@@ -257,6 +262,10 @@ class WarfarinModel_v5(Subject):
                              'Intervals': self._max_day},
                       categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
                                   'VKORC1': self._list_of_characteristics['VKORC1']})
+
+    @property
+    def state(self):
+        return self.__state_func()
 
     @property
     def is_terminated(self):

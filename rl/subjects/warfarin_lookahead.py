@@ -31,23 +31,27 @@ class WarfarinLookAhead(WarfarinModel_v5):
             self._d_current = min(self._maintenance_day_interval, self._max_day-self._day)
             self._patient.dose = dict(tuple((i + self._day, self._current_dose) for i in range(self._d_current)))
 
-        temp_patient = deepcopy(self._patient)
-        temp_patient.dose = dict(tuple((i + self._day, self._current_dose) for i in range(1, self._lookahead_duration + 1)))
-        lookahead_penalty = -sum(((2 / self._INR_range * (self._INR_mid - INRi)) ** 2
-                                for INRi in temp_patient.INR(list(range(self._day + 1, self._day + self._lookahead_duration + 1)))))
-
+        d = self._day
         self._day += self._d_current
 
         self._INR.append(self._patient.INR(self._day)[-1])
         self._INR.popleft()
 
         try:
-            INR_penalty = -sum(((2 / self._INR_range * (self._INR_mid - self._INR[-2] - (self._INR[-1]-self._INR[-2])/self._d_current*j)) ** 2
-                                for j in range(1, self._d_current + 1)))  # negative squared distance as reward (used *2/range to normalize)
-            dose_change_penalty = - self._dose_change_penalty_func(self._dose_list)
-            reward = self._INR_penalty_coef * INR_penalty \
-                    + self._dose_change_penalty_coef * dose_change_penalty \
-                    + self._lookahead_penalty_coef * lookahead_penalty
+            if self.exchange_protocol['take_effect'] == 'standard':
+                temp_patient = deepcopy(self._patient)
+                temp_patient.dose = dict(tuple((i + d, self._current_dose) for i in range(1, self._lookahead_duration + 1)))
+                lookahead_penalty = -sum(((2 / self._INR_range * (self._INR_mid - INRi)) ** 2
+                                        for INRi in temp_patient.INR(list(range(d + 1, d + self._lookahead_duration + 1)))))
+
+                INR_penalty = -sum(((2 / self._INR_range * (self._INR_mid - self._INR[-2] - (self._INR[-1]-self._INR[-2])/self._d_current*j)) ** 2
+                                    for j in range(1, self._d_current + 1)))  # negative squared distance as reward (used *2/range to normalize)
+                dose_change_penalty = - self._dose_change_penalty_func(self._dose_list)
+                reward = self._INR_penalty_coef * INR_penalty \
+                        + self._dose_change_penalty_coef * dose_change_penalty \
+                        + self._lookahead_penalty_coef * lookahead_penalty
+            elif self.exchange_protocol['take_effect'] == 'no_reward':
+                reward = 0
         except TypeError:
             reward = 0
 
