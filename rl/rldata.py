@@ -11,6 +11,7 @@ A data type used for state and action variables.
 from numbers import Number
 from collections.abc import Iterable
 
+
 class RLData(dict):
     def __new__(cls, value=[0], **kwargs):
         obj = super().__new__(cls)
@@ -66,7 +67,8 @@ class RLData(dict):
             self.normalizer = kwargs['normalizer']
         except KeyError:
             pass
-        self._normalizer_lambda_func = lambda x: (x['value']-x['lower'])/(x['upper']-x['lower']) if x['is_numerical'] else list(int(x_i == x['value']) for x_i in x['categories'])
+        self._normalizer_lambda_func = lambda x: (x['value']-x['lower'])/(
+            x['upper']-x['lower']) if x['is_numerical'] else list(int(x_i == x['value']) for x_i in x['categories'])
 
         self._lazy = kwargs.get('lazy_evaluation', False)
 
@@ -273,16 +275,16 @@ class RLData(dict):
 
                     try:
                         self._normal_form[i] = func({'value': self._value[i],
-                                        'lower': self._lower[i],
-                                        'upper': self._upper[i],
-                                        'categories': self._categories[i],
-                                        'is_numerical': self._is_numerical[i]})
+                                                     'lower': self._lower[i],
+                                                     'upper': self._upper[i],
+                                                     'categories': self._categories[i],
+                                                     'is_numerical': self._is_numerical[i]})
                     except TypeError:
                         self._normal_form[i] = list(func({'value': x,
-                                                'lower': self._lower[i],
-                                                'upper': self._upper[i],
-                                                'categories': self._categories[i],
-                                                'is_numerical': self._is_numerical[i]}) for x in self._value[i])
+                                                          'lower': self._lower[i],
+                                                          'upper': self._upper[i],
+                                                          'categories': self._categories[i],
+                                                          'is_numerical': self._is_numerical[i]}) for x in self._value[i])
                     except ZeroDivisionError:
                         self._normal_form[i] = [1]
                 temp.append(self._normal_form[i])
@@ -296,16 +298,16 @@ class RLData(dict):
                 try:
                     try:
                         self._normal_form = list(func({'value': x,
-                                                'lower': self._lower,
-                                                'upper': self._upper,
-                                                'categories': self._categories,
-                                                'is_numerical': self._is_numerical}) for x in self._value)
+                                                       'lower': self._lower,
+                                                       'upper': self._upper,
+                                                       'categories': self._categories,
+                                                       'is_numerical': self._is_numerical}) for x in self._value)
                     except TypeError:
                         self._normal_form = [func({'value': self._value,
-                                                'lower': self._lower,
-                                                'upper': self._upper,
-                                                'categories': self._categories,
-                                                'is_numerical': self._is_numerical})]
+                                                   'lower': self._lower,
+                                                   'upper': self._upper,
+                                                   'categories': self._categories,
+                                                   'is_numerical': self._is_numerical})]
                 except ZeroDivisionError:
                     self._normal_form = [1]
 
@@ -332,25 +334,31 @@ class RLData(dict):
             value = [value]
         try:
             if key not in self._value.keys():
-                non_string_iterable = hasattr(value, '__iter__') and not isinstance(value, str)
+                non_string_iterable = hasattr(
+                    value, '__iter__') and not isinstance(value, str)
                 self._value[key] = value
-                self._is_numerical[key] = all(isinstance(v_i, Number) for v_i in value) if non_string_iterable else isinstance(value, Number)
+                self._is_numerical[key] = all(isinstance(
+                    v_i, Number) for v_i in value) if non_string_iterable else isinstance(value, Number)
                 self._normalizer[key] = None
                 self._categories[key] = None
 
                 if self._is_numerical[key]:
-                    self._lower[key] = min(value) if non_string_iterable else value
-                    self._upper[key] = max(value) if non_string_iterable else value
+                    self._lower[key] = min(
+                        value) if non_string_iterable else value
+                    self._upper[key] = max(
+                        value) if non_string_iterable else value
                     self._categories[key] = None
                 else:
                     self._lower[key] = None
                     self._upper[key] = None
-                    self._categories[key] = value if non_string_iterable else [value]
+                    self._categories[key] = value if non_string_iterable else [
+                        value]
 
             else:
                 if self._is_numerical[key]:
                     if not all(self.lower[key] <= v <= self.upper[key] for v in value):
-                        raise ValueError(f'{value} is not in the range of {self.lower[key]} to {self.upper[key]}.')
+                        raise ValueError(
+                            f'{value} is not in the range of {self.lower[key]} to {self.upper[key]}.')
                 elif any(v not in self.categories[key] for v in value):
                     raise ValueError(f'{value} is not a valid category.')
 
@@ -362,16 +370,19 @@ class RLData(dict):
             try:
                 if self._is_numerical:
                     if not (self.lower <= value <= self.upper):
-                        raise ValueError(f'{value} is not in the range of {self.lower} to {self.upper}.')
+                        raise ValueError(
+                            f'{value} is not in the range of {self.lower} to {self.upper}.')
                 elif value not in self.categories:
                     raise ValueError(f'{value} is not a valid category.')
 
                 self._value = value
 
             except AttributeError:
-                non_string_iterable = hasattr(value, '__iter__') and not isinstance(value, str)
+                non_string_iterable = hasattr(
+                    value, '__iter__') and not isinstance(value, str)
                 self._value = value
-                self._is_numerical = all(isinstance(v_i, Number) for v_i in value) if non_string_iterable else isinstance(value, Number)
+                self._is_numerical = all(isinstance(
+                    v_i, Number) for v_i in value) if non_string_iterable else isinstance(value, Number)
                 self._normalizer = None
                 self._categories = None
 
@@ -382,8 +393,8 @@ class RLData(dict):
                 else:
                     self._lower = None
                     self._upper = None
-                    self._categories = value if non_string_iterable else [value]
-
+                    self._categories = value if non_string_iterable else [
+                        value]
 
             self._normal_form = None
 
@@ -395,23 +406,23 @@ class RLData(dict):
     def __getitem__(self, key):
         try:
             return RLData(self._value[key],
-                        lower=self._lower[key],
-                        upper=self._upper[key],
-                        categories=self._categories[key],
-                        is_numerical=self._is_numerical[key],
-                        normalizer=self._normalizer[key],
-                        lazy_evaluation=self._lazy)
+                          lower=self._lower[key],
+                          upper=self._upper[key],
+                          categories=self._categories[key],
+                          is_numerical=self._is_numerical[key],
+                          normalizer=self._normalizer[key],
+                          lazy_evaluation=self._lazy)
         except (TypeError, IndexError):
             if isinstance(key, Number):
                 return self._value[key]
             else:
                 return RLData(self._value[key],
-                            lower=self._lower,
-                            upper=self._upper,
-                            categories=self._categories,
-                            is_numerical=self._is_numerical,
-                            normalizer=self._normalizer,
-                            lazy_evaluation=self._lazy)
+                              lower=self._lower,
+                              upper=self._upper,
+                              categories=self._categories,
+                              is_numerical=self._is_numerical,
+                              normalizer=self._normalizer,
+                              lazy_evaluation=self._lazy)
 
     def __delitem__(self, key):
         del self._value[key]
@@ -506,12 +517,12 @@ class RLData(dict):
     def __eq__(self, other):
         try:
             return (self.value == other.value).bool() and (
-                ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else 
-                    (self.categories == other.categories).bool())
+                ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else
+                (self.categories == other.categories).bool())
         except AttributeError:
             return (self.value == other.value) and (
-                ((self.upper == other.upper) and (self.lower == other.lower)) if self.is_numerical else 
-                    (self.categories == other.categories))
+                ((self.upper == other.upper) and (self.lower == other.lower)) if self.is_numerical else
+                (self.categories == other.categories))
 
     def __ge__(self, other):
         if isinstance(other, RLData):
@@ -582,23 +593,13 @@ class RLData(dict):
         except TypeError:
             return 1
 
-    # def __contains__(self, x):
-    #     for i in range(len(self)):
-    #         try:
-    #             if (x in self.value[i]) | (x == self.value[i]):
-    #                 return True
-    #         except TypeError:
-    #             if x == self.value[i]:
-    #                 return True
-    #     return False
-
     def __hash__(self):
         return self._value.__hash__()
 
-    # def __repr__(self):
-    #     return ''.join(['[', str(self.value), '], min=', str(self._min), ', max=', str(self._max)])
-
     def __repr__(self):
+        return f'[{str(self.value)}]\nlower={str(self._lower)}\nupper={str(self._upper)}\ncategories={str(self._categories)}'
+
+    def __str__(self):
         return str(self._value)
 
 
@@ -631,15 +632,16 @@ if __name__ == '__main__':
     print(d)
 
     d = RLData({'a': 1, 'b': 2, 'c': 3},
-                lower={'a': 0, 'b': 0},
-                upper={'a': 10, 'b': 10},
-                categories={'c': (1, 2, 3)},
-                is_numerical={'c': False})
+               lower={'a': 0, 'b': 0},
+               upper={'a': 10, 'b': 10},
+               categories={'c': (1, 2, 3)},
+               is_numerical={'c': False})
 
-    print(d+RLData({'a': 5, 'c': 1}, is_numerical={'a': True, 'c': False}, lazy_evaluation=True))
+    print(d+RLData({'a': 5, 'c': 1}, is_numerical={'a': True,
+                                                   'c': False}, lazy_evaluation=True))
 
     d1 = RLData(['a', 'b', 'c'], categories=['a', 'b', 'c'])
-    assert d1.value==['a', 'b', 'c']
+    assert d1.value == ['a', 'b', 'c']
     print(d1.value)
     print(d1.normalize())
     print(d1.as_rldata_array())
