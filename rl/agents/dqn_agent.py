@@ -179,7 +179,7 @@ class DQNAgent(Agent):
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
-        if not self._training_flag:
+        if not self.training_mode:
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
@@ -262,7 +262,7 @@ class DQNAgent(Agent):
         except TypeError:
             epsilon = self._epsilon
 
-        if (self._training_flag) & (random() < epsilon):
+        if (self.training_mode) & (random() < epsilon):
             result = possible_actions
         else:
             q_values = self._q(state, None if possible_actions == self._default_actions else possible_actions)  # None is used to avoid redundant normalization of default_actions

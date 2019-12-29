@@ -30,23 +30,24 @@ class Agent(RLBase):
     '''
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        super().set_defaults(training_flag=True)
+        super().set_defaults(ex_protocol_options={'mode': ['training', 'test']},
+            ex_protocol_current={'mode': 'training'})
         super().set_params(**kwargs)
 
     @property
     def status(self):
-        '''Return the status of the agent as 'training' or 'testing'.'''
-        if self._training_flag:
+        '''Return the status of the agent as 'training' or 'test'.'''
+        if self.training_mode:
             return 'training'
         else:
-            return 'testing'
+            return 'test'
 
     @status.setter
     def status(self, value):
         '''
-        Set the status of the agent as 'training' or 'testing'.
+        Set the status of the agent as 'training' or 'test'.
         '''
-        self._training_flag = (value == 'training')
+        self.training_mode = (value == 'training')
 
     def act(self, state, **kwargs):
         '''

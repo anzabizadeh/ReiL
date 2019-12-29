@@ -25,7 +25,7 @@ def main():
 
     action_set = ValueSet([-1, 0, 1]).as_valueset_array()
     sample_agent = PGAgent(epsilon=0.1, hidden_layer_sizes=(100,), default_actions=action_set)
-    sample_agent.status = 'training'
+    sample_agent.training_mode = True
     state = ValueSet()
     state.min = 0
     state.max = 100
@@ -143,7 +143,7 @@ class PGAgent(Agent):
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
-        if not self._training_flag:
+        if not self.training_mode:
             raise ValueError('Not in training mode!')
         X = np.array([], ndmin=2)
         y = np.array([], ndmin=2)
@@ -249,7 +249,7 @@ class PGAgent(Agent):
         action_index = np.argmax(self._sess.run(self._output, feed_dict=feed_dict))
         action = self._default_actions[action_index]
         if (action not in possible_actions) | \
-            ((self._training_flag) & (random() < self._epsilon)):
+            ((self.training_mode) & (random() < self._epsilon)):
             action = choice(possible_actions)
 
         self._previous_action = action

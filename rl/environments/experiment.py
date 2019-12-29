@@ -121,7 +121,7 @@ class Experiment(Environment):
 
         for agent_name, agent in self._agent.items():
             print(f'Agent: {agent_name}')
-            agent.status = 'testing'
+            agent.training_mode = False
 
             try:
                 subject_name, _id = self._assignment_list[agent_name]

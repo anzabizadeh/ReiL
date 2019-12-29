@@ -170,7 +170,7 @@ class ANNAgent(Agent):
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
-        if not self._training_flag:
+        if not self.training_mode:
             raise ValueError('Not in training mode!')
         try:
             history = kwargs['history']
@@ -239,7 +239,7 @@ class ANNAgent(Agent):
         except TypeError:
             epsilon = self._epsilon
 
-        if (self._training_flag) & (random() < epsilon):
+        if (self.training_mode) & (random() < epsilon):
             result = possible_actions
         else:
             q_values = self._q(state, possible_actions)

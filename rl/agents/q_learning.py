@@ -69,7 +69,7 @@ class QAgent(Agent):
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned.
         '''
-        if self._training_flag:
+        if self.training_mode:
             try:
                 return self._state_action_list[state][action][0] \
                         if self._state_action_list[state][action][1] > self._n_e else self._r_plus
@@ -132,7 +132,7 @@ class QAgent(Agent):
             else:
                 method = ''
 
-        if (self._training_flag) & \
+        if (self.training_mode) & \
            (method == 'e-greedy') & (random() < self._epsilon):
             action = choice(possible_actions)
         else:
@@ -153,7 +153,7 @@ class QAgent(Agent):
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
-        if not self._training_flag:
+        if not self.training_mode:
             raise ValueError('Not in training mode!')
         try:  # history
             history = kwargs['history']
