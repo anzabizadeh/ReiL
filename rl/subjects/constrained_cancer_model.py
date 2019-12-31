@@ -29,10 +29,10 @@ class ConstrainedCancerModel(CancerModel):
         reset: reset the state and is_terminated.
     '''
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
         self.set_defaults(drug_cap=lambda x: kwargs.get('u_max', 0))
         if 'drug_cap' in kwargs:
             self.set_params(drug_cap=kwargs['drug_cap'])
+        super().__init__(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!

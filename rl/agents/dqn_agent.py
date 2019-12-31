@@ -53,13 +53,13 @@ class DQNAgent(Agent):
         '''
         Initialize a Q-Learning agent with deep neural network Q-function approximator.
         '''
-        super().__init__(**kwargs)
-        super().set_defaults(gamma=1, epsilon=0, default_actions={},
+        self.set_defaults(gamma=1, epsilon=0, default_actions={},
                            learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1, method='forward',
                            training_x=deque(), training_y=deque(), buffer_index=-1, buffer_ready=False,
                            # np.array([], ndmin=2), training_y=np.array([], ndmin=2),
                            buffer_size=50, batch_size=10, validation_split=0.3, clear_buffer=False, tensorboard_path=None)
-        super().set_params(**kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 

@@ -58,10 +58,10 @@ class MNKGame(MNKBoard, Subject):
             k: winning criteria (default=3)
             players: number of players (default=2)
         '''
+        self.set_defaults(board_status=None)
+        self.set_params(**kwargs)
         super().__init__(**kwargs, can_recapture=False)
         super().__init__(**kwargs)
-        super().set_defaults(board_status=None)
-        super().set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!

@@ -29,10 +29,10 @@ class Agent(RLBase):
         reset: reset the agent.
     '''
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        super().set_defaults(ex_protocol_options={'mode': ['training', 'test']},
+        self.set_defaults(ex_protocol_options={'mode': ['training', 'test']},
             ex_protocol_current={'mode': 'training'})
-        super().set_params(**kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
     @property
     def status(self):

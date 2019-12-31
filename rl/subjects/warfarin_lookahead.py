@@ -6,9 +6,9 @@ class WarfarinLookAhead(WarfarinModel_v5):
     def __init__(self, **kwargs):
         self._lookahead_duration = kwargs.get('lookahead_duration', 7)
         kwargs['max_day'] = kwargs.get('max_day', 90) + self._lookahead_duration
-        super().__init__(**kwargs)
         self._INR_penalty_coef = kwargs.get('INR_penalty_coef', 1)
         self._lookahead_penalty_coef = kwargs.get('lookahead_penalty_coef', 0)
+        super().__init__(**kwargs)
 
     @property
     def is_terminated(self):

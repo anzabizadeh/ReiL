@@ -88,10 +88,11 @@ class RLBase():
         if not hasattr(self, '_defaults'):
             self._defaults = {}
         for key, value in params.items():
-            self._defaults[key] = value
-            self.__dict__['_'+key] = value
-            # if not hasattr(self, '_'+key) or self.__dict__.get('_'+key, -1) in (None, {}, []):
-            #     self.__dict__['_'+key] = value
+            # self._defaults[key] = value
+            # self.__dict__['_'+key] = value
+            if not hasattr(self, '_'+key) or self.__dict__.get('_'+key, -1) in (None, {}, []):
+                self._defaults[key] = value
+                self.__dict__['_'+key] = value
 
     def load(self, **kwargs):
         '''

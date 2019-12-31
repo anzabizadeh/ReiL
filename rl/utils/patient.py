@@ -34,9 +34,9 @@ class Patient(RLBase):
 
     def __init__(self, age=50, CYP2C9='*1/*1', VKORC1='G/A', randomized=True, max_time=24,
                  dose_interval=24, dose={}, lazy=False, **kwargs):
+        self.set_defaults(**kwargs)
+        self.set_params(**kwargs)
         super().__init__(**kwargs)
-        super().set_defaults(**kwargs)
-        super().set_params(**kwargs)
 
         self._age = age
         self._CYP2C9 = CYP2C9

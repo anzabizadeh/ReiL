@@ -74,9 +74,7 @@ class WarfarinModel_v5(Subject):
         \n   patient_counter_start: the starting value for patient filename counter (Default: 0)
         ''' 
         
-        super().__init__(**kwargs)
-
-        super().set_defaults(ex_protocol_options={'state': ['standard', 'extended'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+        self.set_defaults(ex_protocol_options={'state': ['standard', 'extended'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
                              ex_protocol_current={'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
                              patient_selection='random',
                              list_of_characteristics={'age': (71, 86),
@@ -138,7 +136,8 @@ class WarfarinModel_v5(Subject):
                 except KeyError:
                     pass
 
-        super().set_params(**kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         if False:
             self._ex_protocol_options = {}

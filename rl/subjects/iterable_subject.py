@@ -33,8 +33,7 @@ class IterableSubject(RLBase):
         reset: reset the state and is_terminated.
     '''
     def __init__(self, subject=None, **kwargs):
-        super().__init__(**kwargs)
-        super().set_defaults(subject=subject,
+        self.set_defaults(subject=subject,
                             agent_list={},
                             save_instances=False,
                             use_existing_instances=True,
@@ -46,8 +45,8 @@ class IterableSubject(RLBase):
                             end_index=0,
                             auto_rewind=False
                             )
-
-        super().set_params(subject=subject, **kwargs)
+        self.set_params(subject=subject, **kwargs)
+        super().__init__(**kwargs)
 
         if 'filename' in kwargs:
             if 'path' in kwargs:

@@ -53,9 +53,9 @@ class Risk(Subject):
         ---------
             pieces: an array containing the number of peices for players 1 and 2 (default=[3, 2])
         '''
+        self.set_defaults(pieces=[3, 2], turn=0)
+        self.set_params(**kwargs)
         super().__init__(**kwargs)
-        super().set_defaults(pieces=[3, 2], turn=0)
-        super().set_params(**kwargs)
 
         self._temp = 0
         # The following code is just to suppress debugger's undefined variable errors!

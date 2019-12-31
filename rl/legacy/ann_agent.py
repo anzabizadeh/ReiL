@@ -48,11 +48,12 @@ class ANNAgent(Agent):
         '''
         Initialize a Q-Learning agent with neural network Q-function approximator.
         '''
-        super().__init__(**kwargs)
-        super().set_defaults(gamma=1, alpha=0.1, epsilon=0, default_actions={},
+        self.set_defaults(gamma=1, alpha=0.1, epsilon=0, default_actions={},
                            learning_rate=1e-3, hidden_layer_sizes=(), input_length=1,
                            training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), buffer_size=50, batch_size=10)
-        super().set_params(**kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
+
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 

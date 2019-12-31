@@ -62,18 +62,16 @@ class Environment(RLBase):
                 'every step': learn after every move.
                 'history': learn after each episode.
         '''
+        self.set_defaults(agent={}, subject={}, assignment_list={},
+                            episodes=1, max_steps=10000, termination='any', reset='all',
+                            learning_batch_size=-1,
+                            learning_method='every step', total_experienced_episodes={})
+        self.set_params(**kwargs)
         super().__init__(**kwargs)
         if 'filename' in kwargs:
             self.load(path=kwargs.get('path', '.'),
                       filename=kwargs['filename'])
             return
-
-        super().set_defaults(agent={}, subject={}, assignment_list={},
-                            episodes=1, max_steps=10000, termination='any', reset='all',
-                            learning_batch_size=-1,
-                            learning_method='every step', total_experienced_episodes={})
-        super().set_params(**kwargs)
-
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!

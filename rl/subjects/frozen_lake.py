@@ -67,10 +67,10 @@ class FrozenLake(MNKBoard, Subject):
                ['F', 'F', 'F', 'H'],
                ['H', 'F', 'F', 'G']]
 
+        self.set_defaults(map=map, start=(0, 0), goal=(4, 4))
+        self.set_params(**kwargs)
+        self.set_params(dim=(len(map), len(map[0])))
         super().__init__(**kwargs)
-        super().set_defaults(map=map, start=(0, 0), goal=(4, 4))
-        super().set_params(**kwargs)
-        super().set_params(dim=(len(map), len(map[0])))
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!

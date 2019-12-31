@@ -47,11 +47,12 @@ class WarfarinClusterAgent(Agent):
             rule based: argument `rule_base_filename` should specify the file that contains rules.
             two phase: argument `phase_change_day` should specify the change day. During each phase, average dose for the cluster is applied.
         '''
-        super().__init__(**kwargs)
-        super().set_defaults(default_actions={}, cluster_filename=cluster_filename,
+        self.set_defaults(default_actions={}, cluster_filename=cluster_filename,
                          type='smoothed', day=0, max_day=90, previous_dose=0.0, max_dose=15.0,
                          smoothing_dose_threshold=0.0, dose_step=0.5, rule_base_filename=None, phase_change_day=0)
-        super().set_params(**kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
+
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 
