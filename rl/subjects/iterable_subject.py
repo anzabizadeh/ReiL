@@ -61,7 +61,7 @@ class IterableSubject(RLBase):
         if self._instance_counter_end[0] == -1:
             self._stop_check = lambda current, end: False
         else:
-            self._stop_check = lambda current, end: current >= end
+            self._stop_check = lambda current, end: current > end
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
