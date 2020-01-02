@@ -178,9 +178,9 @@ class WarfarinModel_v5(Subject):
             self._max_maintenance_dose_change = 15
 
         if self._ex_protocol_current['state'] == 'extended':
-            self.__state_func = self.__state_extended
+            self._state_func = self._state_extended
         else:
-            self.__state_func = self.__state_normal
+            self._state_func = self._state_normal
 
         if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
             if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
@@ -210,61 +210,9 @@ class WarfarinModel_v5(Subject):
                                                 for x in range(int(self._max_day_1_dose/self._dose_steps), -1, -1)],
                                                 lower=0, upper=self._max_dose).as_rldata_array()
 
-    def __state_extended(self):
-        return RLData({'age': self._characteristics['age'],
-                        'weight': self._characteristics['weight'],
-                        'height': self._characteristics['height'],
-                        'gender': self._characteristics['gender'],
-                        'race': self._characteristics['race'],
-                        'tobaco': self._characteristics['tobaco'],
-                        'amiodarone': self._characteristics['amiodarone'],
-                        'fluvastatin': self._characteristics['fluvastatin'],
-                        'CYP2C9': self._characteristics['CYP2C9'],
-                        'VKORC1': self._characteristics['VKORC1'],
-                        'day': self._day,
-                        'Doses': tuple(self._dose_list),
-                        'INRs': tuple(self._INR)},
-                        lower={'age': self._list_of_characteristics['age'][0],
-                                'weight': self._list_of_characteristics['weight'][0],
-                                'height': self._list_of_characteristics['height'][0],
-                                'day': 0,
-                                'Doses': 0.0,
-                                'INRs': 0.0},
-                        upper={'age': self._list_of_characteristics['age'][-1],
-                                'weight': self._list_of_characteristics['weight'][-1],
-                                'height': self._list_of_characteristics['height'][-1],
-                                'day': self._max_day,
-                                'Doses': self._max_dose,
-                                'INRs': 15.0},
-                        categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                    'VKORC1': self._list_of_characteristics['VKORC1'],
-                                    'gender': self._list_of_characteristics['gender'],
-                                    'race': self._list_of_characteristics['race'],
-                                    'tobaco': self._list_of_characteristics['tobaco'],
-                                    'amiodarone': self._list_of_characteristics['amiodarone'],
-                                    'fluvastatin': self._list_of_characteristics['fluvastatin']})
-
-    def __state_normal(self):
-        return RLData({'age': self._characteristics['age'],
-                       'CYP2C9': self._characteristics['CYP2C9'],
-                       'VKORC1': self._characteristics['VKORC1'],
-                       'Doses': tuple(self._dose_list),
-                       'INRs': tuple(self._INR),
-                       'Intervals': tuple(self._dosing_intervals)},
-                      lower={'age': self._list_of_characteristics['age'][0],
-                             'Doses': 0.0,
-                             'INRs': 0.0,
-                             'Intervals': 1},
-                      upper={'age': self._list_of_characteristics['age'][-1],
-                             'Doses': self._max_dose,
-                             'INRs': 15.0,
-                             'Intervals': self._max_day},
-                      categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                  'VKORC1': self._list_of_characteristics['VKORC1']})
-
     @property
     def state(self):
-        return self.__state_func()
+        return self._state_func()
 
     @property
     def is_terminated(self):
@@ -311,7 +259,6 @@ class WarfarinModel_v5(Subject):
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
 
-        # self._patient.dose = {self._day: self._current_dose}
         if (self._initial_phase_duration == -1 and self._therapeutic_range[0] <= self._INR[-1] <= self._therapeutic_range[1]) \
             or self._day == self._initial_phase_duration:
                 self._phase = 'maintenance'
@@ -347,56 +294,9 @@ class WarfarinModel_v5(Subject):
 
     def reset(self):
         if self._patient_selection == 'random':
-            self._characteristics['age'] = np.random.uniform(self._list_of_characteristics['age'][0],
-                                                                self._list_of_characteristics['age'][1])
-            self._characteristics['weight'] = np.random.uniform(self._list_of_characteristics['weight'][0],
-                                                                self._list_of_characteristics['weight'][1])
-            self._characteristics['height'] = np.random.uniform(self._list_of_characteristics['height'][0],
-                                                                self._list_of_characteristics['height'][1])
-            self._characteristics['gender'] = choice(
-                self._list_of_characteristics['gender'])
-            self._characteristics['race'] = choice(
-                self._list_of_characteristics['race'])
-            self._characteristics['tobaco'] = choice(
-                self._list_of_characteristics['tobaco'])
-            self._characteristics['amiodarone'] = choice(
-                self._list_of_characteristics['amiodarone'])
-            self._characteristics['fluvastatin'] = choice(
-                self._list_of_characteristics['fluvastatin'])
-            self._characteristics['CYP2C9'] = choice(
-                self._list_of_characteristics['CYP2C9'])
-            self._characteristics['VKORC1'] = choice(
-                self._list_of_characteristics['VKORC1'])
-
+            self._generate_random_patient()
         elif self._patient_selection.lower() in ['ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017']:
-            self._characteristics['age'] = min([max([np.random.normal(self._list_of_probabilities['age'][0],
-                                                                        self._list_of_probabilities['age'][1]),
-                                                        self._list_of_characteristics['age'][0]]),
-                                                self._list_of_characteristics['age'][1]])  # truncated normal distribution with 3-sigma bound
-            self._characteristics['weight'] = min([max([np.random.normal(self._list_of_probabilities['weight'][0],
-                                                                            self._list_of_probabilities['weight'][1]),
-                                                        self._list_of_characteristics['weight'][0]]),
-                                                    self._list_of_characteristics['weight'][1]])  # truncated normal distribution with 3-sigma bound
-            self._characteristics['height'] = min([max([np.random.normal(self._list_of_probabilities['height'][0],
-                                                                            self._list_of_probabilities['height'][1]),
-                                                        self._list_of_characteristics['height'][0]]),
-                                                    self._list_of_characteristics['height'][1]])  # truncated normal distribution with 3-sigma bound
-
-            self._characteristics['gender'] = np.random.choice(self._list_of_characteristics['gender'], 1,
-                                                                p=self._list_of_probabilities['gender'])[0]
-            self._characteristics['race'] = np.random.choice(self._list_of_characteristics['race'], 1,
-                                                                p=self._list_of_probabilities['race'])[0]
-            self._characteristics['tobaco'] = np.random.choice(self._list_of_characteristics['tobaco'], 1,
-                                                                p=self._list_of_probabilities['tobaco'])[0]
-            self._characteristics['amiodarone'] = np.random.choice(self._list_of_characteristics['amiodarone'], 1,
-                                                                    p=self._list_of_probabilities['amiodarone'])[0]
-            self._characteristics['fluvastatin'] = np.random.choice(self._list_of_characteristics['fluvastatin'], 1,
-                                                                    p=self._list_of_probabilities['fluvastatin'])[0]
-
-            self._characteristics['CYP2C9'] = np.random.choice(self._list_of_characteristics['CYP2C9'], 1,
-                                                                p=self._list_of_probabilities['CYP2C9'])[0]
-            self._characteristics['VKORC1'] = np.random.choice(self._list_of_characteristics['VKORC1'], 1,
-                                                                p=self._list_of_probabilities['VKORC1'])[0]
+            self._generate_ravvaz_patient()
 
         self._patient = Patient(age=self._characteristics['age'],
                                 # Not in the patient model
@@ -417,25 +317,10 @@ class WarfarinModel_v5(Subject):
                                 VKORC1=self._characteristics['VKORC1'],
                                 randomized=self._randomized, max_time=self._max_time)
 
-        current_patient = ''.join((self._patients_save_prefix, f'{self._filename_counter:06}'))
         if self._save_patients and not self._patient_save_overwrite:
             try:
-                # self._patient = Patient()
-                self._patient.load(path=self._patients_save_path, filename=current_patient)
-
-                self._characteristics['age'] = self._patient._age
-                self._characteristics['weight'] = self._patient._weight
-                self._characteristics['height'] = self._patient._height
-                self._characteristics['gender'] = self._patient._gender
-                self._characteristics['race'] = self._patient._race
-                self._characteristics['tobaco'] = self._patient._tobaco
-                self._characteristics['amiodarone'] = self._patient._amiodarone
-                self._characteristics['fluvastatin'] = self._patient._fluvastatin
-                self._characteristics['CYP2C9'] = self._patient._CYP2C9
-                self._characteristics['VKORC1'] = self._patient._VKORC1
-                self._randomized = self._patient._randomized
-                self._max_time = self._patient._max_time
-
+                current_patient = ''.join((self._patients_save_prefix, f'{self._filename_counter:06}'))
+                self._load_patient(current_patient)
             except FileNotFoundError:
                 pass
 
@@ -451,8 +336,126 @@ class WarfarinModel_v5(Subject):
 
         self._INR = deque([0.0]*(self._INR_history + 1))
         self._INR[-1] = self._patient.INR([0])[-1]
-
         self._d_current = 1
+
+    def _state_extended(self):
+        return RLData({'age': self._characteristics['age'],
+                        'weight': self._characteristics['weight'],
+                        'height': self._characteristics['height'],
+                        'gender': self._characteristics['gender'],
+                        'race': self._characteristics['race'],
+                        'tobaco': self._characteristics['tobaco'],
+                        'amiodarone': self._characteristics['amiodarone'],
+                        'fluvastatin': self._characteristics['fluvastatin'],
+                        'CYP2C9': self._characteristics['CYP2C9'],
+                        'VKORC1': self._characteristics['VKORC1'],
+                        'day': self._day,
+                        'Doses': tuple(self._dose_list),
+                        'INRs': tuple(self._INR)},
+                        lower={'age': self._list_of_characteristics['age'][0],
+                                'weight': self._list_of_characteristics['weight'][0],
+                                'height': self._list_of_characteristics['height'][0],
+                                'day': 0,
+                                'Doses': 0.0,
+                                'INRs': 0.0},
+                        upper={'age': self._list_of_characteristics['age'][-1],
+                                'weight': self._list_of_characteristics['weight'][-1],
+                                'height': self._list_of_characteristics['height'][-1],
+                                'day': self._max_day,
+                                'Doses': self._max_dose,
+                                'INRs': 15.0},
+                        categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                    'VKORC1': self._list_of_characteristics['VKORC1'],
+                                    'gender': self._list_of_characteristics['gender'],
+                                    'race': self._list_of_characteristics['race'],
+                                    'tobaco': self._list_of_characteristics['tobaco'],
+                                    'amiodarone': self._list_of_characteristics['amiodarone'],
+                                    'fluvastatin': self._list_of_characteristics['fluvastatin']})
+
+    def _state_normal(self):
+        return RLData({'age': self._characteristics['age'],
+                       'CYP2C9': self._characteristics['CYP2C9'],
+                       'VKORC1': self._characteristics['VKORC1'],
+                       'Doses': tuple(self._dose_list),
+                       'INRs': tuple(self._INR),
+                       'Intervals': tuple(self._dosing_intervals)},
+                      lower={'age': self._list_of_characteristics['age'][0],
+                             'Doses': 0.0,
+                             'INRs': 0.0,
+                             'Intervals': 1},
+                      upper={'age': self._list_of_characteristics['age'][-1],
+                             'Doses': self._max_dose,
+                             'INRs': 15.0,
+                             'Intervals': self._max_day},
+                      categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                  'VKORC1': self._list_of_characteristics['VKORC1']})
+
+    def _load_patient(self, current_patient):
+        self._patient.load(path=self._patients_save_path, filename=current_patient)
+        self._characteristics['age'] = self._patient._age
+        self._characteristics['weight'] = self._patient._weight
+        self._characteristics['height'] = self._patient._height
+        self._characteristics['gender'] = self._patient._gender
+        self._characteristics['race'] = self._patient._race
+        self._characteristics['tobaco'] = self._patient._tobaco
+        self._characteristics['amiodarone'] = self._patient._amiodarone
+        self._characteristics['fluvastatin'] = self._patient._fluvastatin
+        self._characteristics['CYP2C9'] = self._patient._CYP2C9
+        self._characteristics['VKORC1'] = self._patient._VKORC1
+        self._randomized = self._patient._randomized
+        self._max_time = self._patient._max_time
+
+    def _generate_ravvaz_patient(self):
+        self._characteristics['age'] = min([max([np.random.normal(self._list_of_probabilities['age'][0],
+                                                                    self._list_of_probabilities['age'][1]),
+                                                    self._list_of_characteristics['age'][0]]),
+                                            self._list_of_characteristics['age'][1]])  # truncated normal distribution with 3-sigma bound
+        self._characteristics['weight'] = min([max([np.random.normal(self._list_of_probabilities['weight'][0],
+                                                                        self._list_of_probabilities['weight'][1]),
+                                                    self._list_of_characteristics['weight'][0]]),
+                                                self._list_of_characteristics['weight'][1]])  # truncated normal distribution with 3-sigma bound
+        self._characteristics['height'] = min([max([np.random.normal(self._list_of_probabilities['height'][0],
+                                                                        self._list_of_probabilities['height'][1]),
+                                                    self._list_of_characteristics['height'][0]]),
+                                                self._list_of_characteristics['height'][1]])  # truncated normal distribution with 3-sigma bound
+
+        self._characteristics['gender'] = np.random.choice(self._list_of_characteristics['gender'], 1,
+                                                            p=self._list_of_probabilities['gender'])[0]
+        self._characteristics['race'] = np.random.choice(self._list_of_characteristics['race'], 1,
+                                                            p=self._list_of_probabilities['race'])[0]
+        self._characteristics['tobaco'] = np.random.choice(self._list_of_characteristics['tobaco'], 1,
+                                                            p=self._list_of_probabilities['tobaco'])[0]
+        self._characteristics['amiodarone'] = np.random.choice(self._list_of_characteristics['amiodarone'], 1,
+                                                                p=self._list_of_probabilities['amiodarone'])[0]
+        self._characteristics['fluvastatin'] = np.random.choice(self._list_of_characteristics['fluvastatin'], 1,
+                                                                p=self._list_of_probabilities['fluvastatin'])[0]
+
+        self._characteristics['CYP2C9'] = np.random.choice(self._list_of_characteristics['CYP2C9'], 1,
+                                                            p=self._list_of_probabilities['CYP2C9'])[0]
+        self._characteristics['VKORC1'] = np.random.choice(self._list_of_characteristics['VKORC1'], 1,
+                                                            p=self._list_of_probabilities['VKORC1'])[0]
+
+    def _generate_random_patient(self):
+        self._characteristics['age'] = np.random.uniform(self._list_of_characteristics['age'][0],
+                                                            self._list_of_characteristics['age'][1])
+        self._characteristics['weight'] = np.random.uniform(self._list_of_characteristics['weight'][0],
+                                                            self._list_of_characteristics['weight'][1])
+        self._characteristics['height'] = np.random.uniform(self._list_of_characteristics['height'][0],
+                                                            self._list_of_characteristics['height'][1])
+        self._characteristics['gender'] = choice(
+            self._list_of_characteristics['gender'])
+        self._characteristics['race'] = choice(
+            self._list_of_characteristics['race'])
+        self._characteristics['tobaco'] = choice(
+            self._list_of_characteristics['tobaco'])
+        self._characteristics['amiodarone'] = choice(
+            self._list_of_characteristics['amiodarone'])
+        self._characteristics['fluvastatin'] = choice(
+            self._list_of_characteristics['fluvastatin'])
+        self._characteristics['CYP2C9'] = choice(
+            self._list_of_characteristics['CYP2C9'])
+        self._characteristics['VKORC1'] = choice(
+            self._list_of_characteristics['VKORC1'])
 
     def __repr__(self):
         try:
