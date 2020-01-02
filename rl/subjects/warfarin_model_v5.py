@@ -317,15 +317,13 @@ class WarfarinModel_v5(Subject):
                                 VKORC1=self._characteristics['VKORC1'],
                                 randomized=self._randomized, max_time=self._max_time)
 
+        current_patient = ''.join((self._patients_save_prefix, f'{self._filename_counter:06}'))
         if self._save_patients and not self._patient_save_overwrite:
             try:
-                current_patient = ''.join((self._patients_save_prefix, f'{self._filename_counter:06}'))
                 self._load_patient(current_patient)
             except FileNotFoundError:
                 pass
-
         self._patient.save(path=self._patients_save_path, filename=current_patient)
-
         self._filename_counter += 1
 
         self._day = 1
