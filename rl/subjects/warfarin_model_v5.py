@@ -122,7 +122,7 @@ class WarfarinModel_v5(Subject):
                              max_day_1_dose=15,
                              max_initial_dose_change=15,
                              max_maintenance_dose_change=15
-                             )
+                            )
 
         # this makes sure that if some elements of dictionaries
         # (e.g. characteristics, list_of_...) changes by the user,
@@ -177,11 +177,6 @@ class WarfarinModel_v5(Subject):
             self._max_initial_dose_change = 15
             self._max_maintenance_dose_change = 15
 
-        if self._ex_protocol_current['state'] == 'extended':
-            self._state_func = self._state_extended
-        else:
-            self._state_func = self._state_normal
-
         if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
             if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
                     self._list_of_characteristics['VKORC1'] != ('G/G', 'G/A', 'A/A'):
@@ -212,7 +207,10 @@ class WarfarinModel_v5(Subject):
 
     @property
     def state(self):
-        return self._state_func()
+        if self._ex_protocol_current['state'] == 'extended':
+            return self._state_extended()
+        else:
+            return self._state_normal()
 
     @property
     def is_terminated(self):

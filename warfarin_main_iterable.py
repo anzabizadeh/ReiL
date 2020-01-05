@@ -25,7 +25,7 @@ import tensorflow as tf
 from rl.agents import DQNAgent  # , WarfarinQAgent
 from rl.environments import Environment
 from rl.stats import WarfarinStats
-from rl.subjects import IterableSubject, WarfarinLookAhead
+from rl.subjects import IterableSubject, WarfarinModelFixedInterval  # WarfarinLookAhead
 
 all_args = {
     'project_name': {'type': str, 'default': None},
@@ -83,6 +83,7 @@ def parse_config(arguments, config_filename='config.ini', overwrite=False):
         project_name = f'{random.randint(0, 1000000):06}'
         print(f'New project name: {project_name} created.')
     else:
+        project_name = arguments.project_name
         print(f'Project {project_name} exists.')
 
     if not Path(config_filename).is_file():
@@ -109,7 +110,7 @@ def parse_config(arguments, config_filename='config.ini', overwrite=False):
         with open(config_filename, 'w') as configfile:
             config.write(configfile)
 
-    temp = {}
+    temp = {"project_name": project_name}
     for v in vars_args:
         if v != 'project_name':
             try:
@@ -194,7 +195,7 @@ if __name__ == "__main__":
 
         # define subjects
         training_patient = \
-            WarfarinLookAhead(max_day=args["max_day"],
+            WarfarinModelFixedInterval(max_day=args["max_day"],
                 patient_selection=args["patient_selection"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
@@ -212,7 +213,7 @@ if __name__ == "__main__":
                 max_maintenance_dose_change=args["max_maintenance_dose_change"])
 
         training_patient_for_stats = \
-            WarfarinLookAhead(max_day=args["max_day"],
+            WarfarinModelFixedInterval(max_day=args["max_day"],
                 patient_selection=args["patient_selection"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
@@ -231,7 +232,7 @@ if __name__ == "__main__":
                 ex_protocol_current={'take_effect': 'no_reward'})
 
         test_patient = \
-            WarfarinLookAhead(max_day=args["max_day"],
+            WarfarinModelFixedInterval(max_day=args["max_day"],
                 patient_selection=args["patient_selection"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
@@ -301,7 +302,7 @@ if __name__ == "__main__":
                 validation_split=args["validation_split"],
                 hidden_layer_sizes=tuple(args["hidden_layer_sizes"]),
                 default_actions=subjects['training'].possible_actions,
-                tensorboard_path='temp_log',
+                tensorboard_path=filename,
                 save_instances=args["save_instances"],
                 method=args["method"])
 
@@ -311,8 +312,8 @@ if __name__ == "__main__":
             ('protocol', 'training_patient_for_stats'),
             ('protocol', 'test')])
 
-        warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR', 'dose_change', 'delta_dose'],
-                                                                'groupby': ['sensitivity']}})
+    warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR', 'dose_change', 'delta_dose'],
+                                                            'groupby': ['sensitivity']}})
 
     if args["save_runs"]:
         env_filename = lambda i: filename+f'{i:04}'

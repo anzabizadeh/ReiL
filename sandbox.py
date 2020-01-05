@@ -1,3 +1,47 @@
+#%% inheritence
+from dill import load, dump, HIGHEST_PROTOCOL
+
+class A:
+    def __init__(self, x):
+        self.__dict__ = {'_a': 2, '_b': 3}
+
+        if x=='a':
+            self._func = self.__fa
+        else:
+            self._func = self.__fb
+
+    def __fa(self):
+        return self._a
+
+    def __fb(self):
+        return self._b
+
+    @property
+    def fx(self):
+        return self._func()
+
+
+class B(A):
+    def __init__(self, x):
+        super().__init__(x)
+
+class C(B):
+    def __init__(self, x):
+        super().__init__(x)
+
+test = C('a')
+print(test.fx)
+with open('test.pkl', 'wb') as f:
+    dump(test.__dict__, f, HIGHEST_PROTOCOL)
+
+x = B('b')
+print(x.fx)
+with open('test.pkl', 'rb') as f:
+    x.__dict__ = load(f)
+
+print(test.fx)
+
+
 #%% __new__ method
 
 class test(object):
