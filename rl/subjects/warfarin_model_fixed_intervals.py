@@ -75,8 +75,9 @@ class WarfarinModelFixedInterval(WarfarinModel_v5):
         \n   interval: a list of days that INR measurement and dose change happens
         \n   interval_index: a pointer to the current index of interval
         ''' 
-        
-        self.set_defaults(interval=[3]*2 + [7]*12, interval_index=0)
+
+        interval=[3]*2 + [7]*11 + [6, 1]  # had to use 6-days in the final round to have one last state value in stats computation
+        self.set_defaults(interval=interval, interval_index=0, d_current=interval[0])
         self.set_params(**kwargs)
         super().__init__(**kwargs)
 
@@ -85,8 +86,6 @@ class WarfarinModelFixedInterval(WarfarinModel_v5):
 
     def take_effect(self, action, _id=None):
         self._current_dose = action[0]
-        self._dosing_intervals.append(self._d_current)
-        self._dosing_intervals.popleft()
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
 
@@ -94,6 +93,8 @@ class WarfarinModelFixedInterval(WarfarinModel_v5):
         self._interval_index += 1
         self._patient.dose = dict(tuple((i + self._day, self._current_dose) for i in range(self._d_current)))
 
+        self._dosing_intervals.append(self._d_current)
+        self._dosing_intervals.popleft()
         self._day += self._d_current
 
         self._INR.append(self._patient.INR(self._day)[-1])
