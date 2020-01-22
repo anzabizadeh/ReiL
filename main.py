@@ -72,7 +72,7 @@ def cancer(**kwargs):
 
         # define agents
         agents['Doctor'] = QAgent(gamma=0.7, alpha=0.2, epsilon=0.4)
-        # agents['Doctor'] = ANNAgent(gamma=0.7, alpha=0.2, epsilon=0.5, learning_rate=1e-3, batch_size=10,
+        # agents['Doctor'] = ANNAgent(gamma=0.7, alpha=0.2, epsilon=0.5, lr_initial=1e-3, batch_size=10,
         #     default_actions=subjects['Patient'].possible_actions, input_length=40, hidden_layer_sizes=(10, 5))
         # agents['Doctor'].report(items=['states action'])
         # assign agents to subjects
@@ -439,7 +439,7 @@ def warfarin(**kwargs):
             text = f'{fixed_policy_attempts:2}'
 
     elif agent_type.lower() in ['ann', 'dqn']:
-        learning_rate = kwargs.get('learning_rate', 1e-2)
+        lr_initial = kwargs.get('lr_initial', 1e-2)
         buffer_size = kwargs.get('buffer_size', 5000)
         batch_size = kwargs.get('batch_size', 1000)
         clear_buffer = kwargs.get('clear_buffer', False)
@@ -449,7 +449,7 @@ def warfarin(**kwargs):
         text = '_'.join((str(hidden_layer_sizes),
                             'g', str(gamma),
                             'e', 'func' if callable(epsilon) else str(epsilon),
-                            'lr', str(learning_rate),
+                            'lr', str(lr_initial),
                             'buff', str(buffer_size),
                             'clr', 'T' if clear_buffer else 'F',
                             'btch', str(batch_size),
@@ -530,7 +530,7 @@ def warfarin(**kwargs):
         elif agent_type.lower() == 'ann':
             agents['protocol'] = ANNAgent(gamma=gamma,
                                           epsilon=epsilon,
-                                          learning_rate=learning_rate,
+                                          lr_initial=lr_initial,
                                           buffer_size=buffer_size,
                                           batch_size=batch_size,
                                           input_length=input_length,
@@ -539,7 +539,7 @@ def warfarin(**kwargs):
         elif agent_type.lower() == 'dqn':
             agents['protocol'] = DQNAgent(gamma=gamma,
                                           epsilon=epsilon,
-                                          learning_rate=learning_rate,
+                                          lr_initial=lr_initial,
                                           buffer_size=buffer_size,
                                           clear_buffer=clear_buffer,
                                           batch_size=batch_size,
