@@ -63,7 +63,7 @@ class Environment(RLBase):
                 'history': learn after each episode.
         '''
         self.set_defaults(agent={}, subject={}, assignment_list={},
-                            episodes=1, max_steps=10000, termination='any', reset='all',
+                            episodes=1, max_steps=10000, termination='any', reset='any',
                             learning_batch_size=-1,
                             learning_method='every step', total_experienced_episodes={})
         self.set_params(**kwargs)
@@ -209,7 +209,7 @@ class Environment(RLBase):
             termination_func = lambda x, y: x | y.is_terminated
             list_of_subjects = [False] + list(self._subject.values())
 
-        reset = kwargs.get('reset', self._reset)
+        reset = kwargs.get('reset', self._reset).lower()
         learning_method = kwargs.get(
             'learning_method', self._learning_method).lower()
         reporting = kwargs.get('reporting', 'none').lower()
@@ -312,6 +312,7 @@ class Environment(RLBase):
             learning_batch_size: how many observations to collect before calling agent's `learn` method. (Default = -1)
                 -1: collect the whole sample path.
             training_mode: whether it is in training or test mode. (Default: True)
+            reset: whether to reset `agents`. 'any` resets agents who acted on a finished subject. `all` resets all agents. (Default = 'any') 
             Not implemented:
             -> reporting: what to report. (Default = 'none')
                 'all': prints every move.
@@ -328,6 +329,7 @@ class Environment(RLBase):
         learning_batch_size = kwargs.get(
             'learning_batch_size', self._learning_batch_size)
         training_mode = kwargs.get('training_mode', dict((agent, True) for agent in self._agent.values()))
+        reset = kwargs.get('reset', self._reset).lower()
         return_output = kwargs.get('return_output', False)
         return_stats = kwargs.get('return_stats', False)
         stats_func = kwargs.get('stats_func', lambda a, d: d)
@@ -384,6 +386,13 @@ class Environment(RLBase):
                     if learning_batch_size == -1:
                         for agent_name, _ in assigned_agents:
                             self._agent[agent_name].learn(history=history[agent_name])
+
+            if reset == 'all':
+                for agent in self._agent.values():
+                    agent.reset()
+            elif reset == 'any':
+                for agent_name, _ in assigned_agents:
+                    self._agent[agent_name].reset()
 
             if return_stats:
                 for agent_name, _ in assigned_agents:
