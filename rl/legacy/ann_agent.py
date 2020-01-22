@@ -29,7 +29,7 @@ class ANNAgent(Agent):
         gamma: discount factor in TD equation. (Default = 1)
         epsilon: exploration probability. (Default = 0)
         default_actions: list of default actions.
-        learning_rate: learning rate for ANN. (Default = 1e-3)
+        lr_initial: learning rate for ANN. (Default = 1e-3)
         hidden_layer_sizes: tuple containing hidden layer sizes.
         input_length: size of the input vector. (Default = 1)
         batch_size: the learning method stores inputs for batch_size iterations and then runs one ANN training. (Default = 10)
@@ -49,7 +49,7 @@ class ANNAgent(Agent):
         Initialize a Q-Learning agent with neural network Q-function approximator.
         '''
         self.set_defaults(gamma=1, alpha=0.1, epsilon=0, default_actions={},
-                           learning_rate=1e-3, hidden_layer_sizes=(), input_length=1,
+                           lr_initial=1e-3, hidden_layer_sizes=(), input_length=1,
                            training_x=np.array([], ndmin=2), training_y=np.array([], ndmin=2), buffer_size=50, batch_size=10)
         self.set_params(**kwargs)
         super().__init__(**kwargs)
@@ -65,7 +65,7 @@ class ANNAgent(Agent):
         if False:
             self._gamma, self._alpha, self._epsilon = 1, 0.1, 0
             self._default_actions = {}
-            self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (), 1
+            self._lr_initial, self._hidden_layer_sizes, self._input_length = 1e-5, (), 1
             self._batch_size, self._buffer_size, self._training_x, self._training_y = 10, 0, np.array(
                 [], ndmin=2), np.array([], ndmin=2)
 
@@ -93,11 +93,11 @@ class ANNAgent(Agent):
                 labels=self._tf['labels'], predictions=self._tf['output'])
             self._tf['global_step'] = tf.Variable(
                 0, trainable=False, name="step")
-            self._tf['train_opt'] = tf.train.AdamOptimizer(learning_rate=self._learning_rate) \
+            self._tf['train_opt'] = tf.train.AdamOptimizer(lr_initial=self._lr_initial) \
                 .minimize(self._tf['loss'], global_step=self._tf['global_step'], name='train_opt')
 
             hparam = '_'.join(('gma', str(self._gamma), 'alf', str(self._alpha), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
-                                                        'lrn', str(self._learning_rate), 'hddn', str(
+                                                        'lrn', str(self._lr_initial), 'hddn', str(
                                                             self._hidden_layer_sizes),
                                                         'btch', str(self._batch_size)))
 
