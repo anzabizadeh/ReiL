@@ -30,20 +30,20 @@ def mnk():
     gamma = [1.0]
     alpha = [0.0, 0.2, 0.6]
     epsilon = [0.0]
-    learning_rate = [1e-3]
+    lr_initial = [1e-3]
     batch_size = [10, 20, 50]
     hidden_layer_sizes = [(26,), (26, 5), (26, 10, 5)]
     input_length = [26]
     scenario = []
-    for data in product(gamma, alpha, epsilon, learning_rate, batch_size, hidden_layer_sizes, input_length):
-        scenario.append({'gamma': data[0], 'alpha': data[1], 'epsilon': data[2], 'learning_rate': data[3],
+    for data in product(gamma, alpha, epsilon, lr_initial, batch_size, hidden_layer_sizes, input_length):
+        scenario.append({'gamma': data[0], 'alpha': data[1], 'epsilon': data[2], 'lr_initial': data[3],
                         'batch_size': data[4], 'hidden_layer_sizes': data[5], 'input_length': data[6]})
 
     # gma_1.0_alf_0.1_eps_0.0_slvr_sgd_lrn_0.001_hddn_(26, 5)_itr_1_btch_10
     # gma_1.0_alf_0.3_eps_0.0_slvr_sgd_lrn_0.001_hddn_(26, 5)_itr_1_btch_20
     # gma_1.0_alf_0.3_eps_0.0_slvr_sgd_lrn_0.001_hddn_(26, 10, 5)_itr_1_btch_10
 
-    # scenario = [{'gamma': 1.0, 'alpha': 0.0, 'epsilon': 0.0, 'learning_rate': 1e-3,
+    # scenario = [{'gamma': 1.0, 'alpha': 0.0, 'epsilon': 0.0, 'lr_initial': 1e-3,
     #              'batch_size': 25, 'hidden_layer_sizes': (26,), 'input_length': 26}]
     number_of_scenarios = len(scenario)
 
