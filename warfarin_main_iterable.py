@@ -25,14 +25,15 @@ import tensorflow as tf
 from rl.agents import DQNAgent  # , WarfarinQAgent
 from rl.environments import Environment
 from rl.stats import WarfarinStats
-from rl.subjects import IterableSubject, WarfarinModelFixedInterval  # WarfarinLookAhead
+from rl.subjects import IterableSubject, WarfarinModelFixedInterval, WarfarinModel_v5, WarfarinLookAhead
 
 all_args = {
     'project_name': {'type': str, 'default': None},
-    'runs': {'type': int, 'default': 200},
-    'training_episodes': {'type': int, 'default': 250},
-    'test_episodes': {'type': int, 'default': 50},
-    'max_day': {'type': int, 'default': 90},
+    'subject': {'type': str, 'default': 'WarfarinModel_v5'},
+    'epochs': {'type': int, 'default': 200},
+    'training_size': {'type': int, 'default': 250},
+    'test_size': {'type': int, 'default': 50},
+    'max_day': {'type': int, 'default': 91},
     'dose_history': {'type': int, 'default': 10},
     'INR_history': {'type': int, 'default': 10},
     'patient_selection': {'type': str, 'default': 'ravvaz'},
@@ -40,7 +41,7 @@ all_args = {
     'dose_change_penalty_coef': {'type': float, 'default': 0.0},
     'dose_change_penalty_func': {'type': str, 'default': 'none'},
     'dose_change_penalty_days': {'type': int, 'default': 0},
-    'lookahead_duration': {'type': int, 'default': 7},
+    'lookahead_duration': {'type': int, 'default': 0},
     'lookahead_penalty_coef': {'type': float, 'default': 0.0},
     'randomized': {'type': bool, 'default': True},
     'agent_type': {'type': str, 'default': 'DQN'},
@@ -51,15 +52,24 @@ all_args = {
     'validation_split': {'type': float, 'default': 0.3},
     'hidden_layer_sizes': {'type': int, 'default': (32, 32, 32)},
     'clear_buffer': {'type': bool, 'default': False},
-    'initial_phase_duration': {'type': int, 'default': 90},
+    'initial_phase_duration': {'type': int, 'default': 1},
     'max_initial_dose_change': {'type': int, 'default': 15},
     'max_day_1_dose': {'type': int, 'default': 15},
     'maintenance_day_interval': {'type': int, 'default': 1},
     'max_maintenance_dose_change': {'type': int, 'default': 15},
     'extended_state': {'type': bool, 'default': False},
     'save_instances': {'type': bool, 'default': False},
-    'save_runs': {'type': bool, 'default': False}
+    'save_epochs': {'type': bool, 'default': False}
     }
+
+warfarin_subjects_list = {
+    'warfarinmodel': WarfarinModel_v5,
+    'warfarinmodel_v5': WarfarinModel_v5,
+    'fixedinterval': WarfarinModelFixedInterval,
+    'warfarinmodelfixedinterval': WarfarinModelFixedInterval,
+    'lookahead': WarfarinLookAhead,
+    'warfarinlookahead': WarfarinLookAhead
+}
 
 def set_seeds(seed):
     random.seed(seed)
@@ -131,27 +141,6 @@ if __name__ == "__main__":
     args = parse_config(cmd_args)
 
     epsilon = lambda n: 1/(1+n/200)
-    if args["dose_change_penalty_func"].lower() == 'none':
-        dose_change_penalty_func = lambda x: 0
-    elif args["dose_change_penalty_func"] == 'change':
-        dose_change_penalty_func = \
-            lambda x: int(max(x[-i]!=x[-i-1]
-                for i in range(1, args["dose_change_penalty_days"])))
-    elif args["dose_change_penalty_func"] == 'stdev':
-        if args["dose_change_penalty_days"] == args["dose_history"]:
-            dose_change_penalty_func = lambda x: stdev(x)
-        else:
-            dose_change_penalty_func = \
-                lambda x: stdev(list(itertools.islice(x,
-                    args["dose_history"] - args["dose_change_penalty_days"], args["dose_history"])))
-    elif args["dose_change_penalty_func"] == 'change_count':
-        if args["dose_change_penalty_days"] == args["dose_history"]:
-            dose_change_penalty_func = lambda x: (np.diff(x) != 0).sum()
-        else:
-            dose_change_penalty_func = \
-                lambda x: (np.diff(itertools.islice(x,
-                    args["dose_history"] - args["dose_change_penalty_days"],
-                    args["dose_history"])) != 0).sum()
 
     # patient_model = 'W'
 
@@ -189,13 +178,37 @@ if __name__ == "__main__":
         subjects = env._subject
     except FileNotFoundError:
         env = Environment()
-        # initialize dictionaries
         agents = {}
         subjects = {}
 
+        if args["dose_change_penalty_func"].lower() == 'none':
+            dose_change_penalty_func = lambda x: 0
+        elif args["dose_change_penalty_func"] == 'change':
+            dose_change_penalty_func = \
+                lambda x: int(max(x[-i]!=x[-i-1]
+                    for i in range(1, args["dose_change_penalty_days"])))
+        elif args["dose_change_penalty_func"] == 'stdev':
+            if args["dose_change_penalty_days"] == args["dose_history"]:
+                dose_change_penalty_func = lambda x: stdev(x)
+            else:
+                dose_change_penalty_func = \
+                    lambda x: stdev(list(itertools.islice(x,
+                        args["dose_history"] - args["dose_change_penalty_days"], args["dose_history"])))
+        elif args["dose_change_penalty_func"] == 'change_count':
+            if args["dose_change_penalty_days"] == args["dose_history"]:
+                dose_change_penalty_func = lambda x: (np.diff(x) != 0).sum()
+            else:
+                dose_change_penalty_func = \
+                    lambda x: (np.diff(itertools.islice(x,
+                        args["dose_history"] - args["dose_change_penalty_days"],
+                        args["dose_history"])) != 0).sum()
+
+
+        warfarin_subject = warfarin_subjects_list[args["subject"].lower()]
+
         # define subjects
         training_patient = \
-            WarfarinModelFixedInterval(max_day=args["max_day"],
+            warfarin_subject(max_day=args["max_day"],
                 patient_selection=args["patient_selection"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
@@ -213,7 +226,7 @@ if __name__ == "__main__":
                 max_maintenance_dose_change=args["max_maintenance_dose_change"])
 
         training_patient_for_stats = \
-            WarfarinModelFixedInterval(max_day=args["max_day"],
+            warfarin_subject(max_day=args["max_day"],
                 patient_selection=args["patient_selection"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
@@ -232,7 +245,7 @@ if __name__ == "__main__":
                 ex_protocol_current={'take_effect': 'no_reward'})
 
         test_patient = \
-            WarfarinModelFixedInterval(max_day=args["max_day"],
+            warfarin_subject(max_day=args["max_day"],
                 patient_selection=args["patient_selection"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
@@ -254,45 +267,62 @@ if __name__ == "__main__":
             IterableSubject(subject=training_patient,
                 save_instances=args["save_instances"],
                 use_existing_instances=True,
-                save_path='./iterable_training',
+                save_path='./training',
                 save_prefix='',
                 instance_counter_start=0,
                 instance_counter=0,
-                instance_counter_end=list(range(args["training_episodes"],
-                                                args["training_episodes"]*args["runs"] + 1,
-                                                args["training_episodes"]))
+                instance_counter_end=args["training_size"],
+                auto_rewind=True
+                # instance_counter_end=list(range(args["training_size"],
+                #                                 args["training_size"]*args["epochs"] + 1,
+                #                                 args["training_size"]))
                 )
 
         subjects['training_patient_for_stats'] = \
             IterableSubject(subject=training_patient_for_stats,
                 save_instances=args["save_instances"],
                 use_existing_instances=True,
-                save_path='./iterable_training',
+                save_path='./training',
                 save_prefix='',
                 instance_counter_start=0,
                 instance_counter=0,
-                instance_counter_end=list(range(args["training_episodes"],
-                                                args["training_episodes"]*args["runs"] + 1,
-                                                args["training_episodes"]))
+                instance_counter_end=args["training_size"],
+                auto_rewind=True
+                # instance_counter_end=list(range(args["training_size"],
+                #                                 args["training_size"]*args["epochs"] + 1,
+                #                                 args["training_size"]))
                 )
 
         subjects['test'] = \
             IterableSubject(subject=test_patient,
                 save_instances=True,
                 use_existing_instances=True,
-                save_path='./iterable_test',
+                save_path='./test',
                 save_prefix='test',
                 instance_counter_start=0,
                 instance_counter=0,
-                instance_counter_end=args["test_episodes"],
+                instance_counter_end=args["test_size"],
                 auto_rewind=True
                 )
 
         input_length = len(subjects['training'].state.normalize().as_list()) \
             + len(subjects['training'].possible_actions[0].normalize().as_list())
 
+        class lr_scheduler:
+            def __init__(self, min_lr= 1e-5, factor=2, step=1):
+                self._min_lr = min_lr
+                self._factor = factor
+                self._step = step
+
+            def schedule(self, epoch, lr):
+                if epoch % self._step != 0 or epoch == 0:
+                    return lr
+                else:
+                    return max(self._min_lr, lr / self._factor)
+
         agents['protocol'] = \
-            DQNAgent(learning_rate=0.001,
+            DQNAgent(lr_initial=0.01,
+                lr_scheduler=lr_scheduler().schedule,
                 gamma=args["gamma"],
                 epsilon=epsilon,
                 buffer_size=args["buffer_size"],
@@ -315,12 +345,12 @@ if __name__ == "__main__":
     warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR', 'dose_change', 'delta_dose'],
                                                             'groupby': ['sensitivity']}})
 
-    if args["save_runs"]:
+    if args["save_epochs"]:
         env_filename = lambda i: filename+f'{i:04}'
     else:
         env_filename = lambda i: filename
 
-    for i in range(args["runs"]):
+    for i in range(args["epochs"]):
         print(f'run {i: }')
         stats, output = \
             env.elapse_iterable(
@@ -331,7 +361,9 @@ if __name__ == "__main__":
                 return_stats=True,
                 return_output=True)
 
-        with open(filename+'.txt', 'a+') as f:
+        env.save(filename=f'./{filename}/{env_filename(i)}')
+
+        with open(f'./{filename}/{filename}.txt', 'a+') as f:
             for k1, v1 in stats.items():
                 for l in v1:
                     for k2, v2 in l.items():
@@ -352,6 +384,4 @@ if __name__ == "__main__":
         trajectories_df['INR'] = trajectories_df.apply(
             lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
         trajectories_df.drop('shifted_id', axis=1, inplace=True)
-        trajectories_df.to_csv(f'{filename}{i:04}.csv')
-
-        env.save(filename=env_filename(i))
+        trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
