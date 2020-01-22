@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
         input_length = len(subjects['W'].state.normalize().as_list()) + len(subjects['W'].possible_actions[0].normalize().as_list())
 
-        agents['protocol'] = DQNAgent(learning_rate=0.1,
+        agents['protocol'] = DQNAgent(lr_initial=0.1,
                                         gamma=args.gamma,
                                         epsilon=epsilon,
                                         buffer_size=args.buffer_size,
