@@ -13,15 +13,22 @@ Classes
     WarfarinModel_v2
     WarfarinModel_v3
     WarfarinModel_v4
-    Snake (Requires dependencies)
-    Risk (Not fully implemented)
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+import pip
+installed_pkgs = [pkg.key for pkg in pip.get_installed_distributions()]
+
+if 'rpy2' in installed_pkgs:
+    from .warfarin_model import WarfarinModel
+else:
+    import warnings
+    warnings.warn('Could not find dependencies of "WarfarinModel" ("rpy2"). Skipped installing the module.')
+
 from .ann_agent import ANNAgent
 from .valueset import ValueSet
-from .warfarin_model import WarfarinModel
+
 from .warfarin_model_v2 import WarfarinModel_v2
 from .warfarin_model_v3 import WarfarinModel_v3
 from .warfarin_model_v4 import WarfarinModel_v4
