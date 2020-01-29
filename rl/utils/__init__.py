@@ -19,13 +19,16 @@ Classes
 from .mnkboard import MNKBoard
 from .patient import Patient
 
-
+import warnings
 import pip
-installed_pkgs = [pkg.key for pkg in pip.get_installed_distributions()]
 
-if 'weka' in installed_pkgs:
-    from .weka_clustering import WekaClusterer
-else:
-    import warnings
-    warnings.warn('Could not find dependencies of "WekaClusterer" ("weka"). Skipped installing the module.')
+try:
+    installed_pkgs = [pkg.key for pkg in pip.get_installed_distributions()]
 
+    if 'weka' in installed_pkgs:
+        from .weka_clustering import WekaClusterer
+    else:
+        import warnings
+        warnings.warn('Could not find dependencies of "WekaClusterer" ("weka"). Skipped installing the module.')
+except AttributeError:
+    warnings.warn('Could not use pip to check the availability of dependencies of "WekaClusterer" ("weka"). Skipped installing the module.')
