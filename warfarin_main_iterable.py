@@ -367,9 +367,10 @@ if __name__ == "__main__":
             for k1, v1 in stats.items():
                 for l in v1:
                     for k2, v2 in l.items():
-                        for j in range(v2.shape[0]):
-                            print(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}')
-                            f.write(f'{i}\t{k1}\t{k2}\t{v2.index[j]}\t{v2[j]}\n')
+                        for row in range(v2.shape[0]):
+                            for col in range(v2.shape[1]):
+                                print(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
+                                f.write(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}\n')
 
         trajectories = []
         for label in output.keys():

@@ -16,7 +16,7 @@ class WarfarinStats:
             if 'groupby' not in self._agent_stat_dict[agent].keys():
                 self._agent_stat_dict[agent]['groupby'] = []
             if self._agent_stat_dict[agent]['stats'] == 'all':
-                self._agent_stat_dict[agent].update('stats', ['TTR', 'TTR>0.65', 'dose_change', 'count', 'INR', 'INR_percent_dose_change'])
+                self._agent_stat_dict[agent]['stats'] = ['TTR', 'TTR>0.65', 'dose_change', 'count', 'INR', 'INR_percent_dose_change']
 
     def stats_func(self, agent_name, history):
         def sensitivity(row):
@@ -75,27 +75,33 @@ class WarfarinStats:
         df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
 
         results = {}
-        grouped_df = df.groupby(groupby)
-
+        grouped_df = df.groupby(groupby if 'instance_id' in groupby else ['instance_id'] + groupby)
+                     
         for stat in self._agent_stat_dict[agent_name]['stats']:
             if stat == 'TTR':
-                stat_temp = grouped_df['TTR'].mean()
+                temp = grouped_df['TTR'].mean().groupby(groupby)
             elif stat[:4] == 'TTR>':
-                df.groupby(groupby +  [] if 'instance_id' in groupby else ['instance_id'])['TTR'].mean().apply(lambda x: int(x > float(stat[4:]))).groupby(groupby).mean().rename(stat)
+                temp = grouped_df['TTR'].mean().apply(lambda x: int(x > float(stat[4:]))).groupby(groupby)
             elif stat == 'dose_change':
-                stat_temp = grouped_df['dose_change'].mean().rename(stat)
+                temp = grouped_df['dose_change'].mean().groupby(groupby)
             elif stat == 'count':
-                stat_temp = grouped_df['dose_change'].count().rename(stat)
+                temp = grouped_df['dose_change'].count().groupby(groupby)
             elif stat == 'delta_dose':
-                stat_temp = grouped_df['delta_dose'].mean().rename(stat)
+                temp = grouped_df['delta_dose'].mean().groupby(groupby)
             elif stat == 'INR':
-                stat_temp = df.groupby(groupby + [] if 'instance_id' in groupby else ['instance_id'])['INR_current'].mean().rename(stat)
-            elif stat == 'INR_percent_dose_change':
-                grouped_df_temp = df.groupby(['INR_current'] + groupby + [] if 'instance_id' in groupby else ['instance_id'])
-                stat_temp = (grouped_df_temp['delta_dose'].sum() /
-                                (grouped_df_temp['dose_current'].sum()
-                                - grouped_df_temp['delta_dose'].sum())).rename(stat)
+                temp = grouped_df['INR']
+            else:
+                continue
+
+            stat_temp = pd.DataFrame([
+                temp.mean().rename(f'{stat}_mean'),
+                temp.std().rename(f'{stat}_stdev')])
+            # elif stat == 'INR_percent_dose_change':
+            #     temp = df.groupby(['INR'] + groupby if 'instance_id' in groupby else ['instance_id'] + groupby)
+            #     stat_temp = (temp['delta_dose'].sum() /
+            #                     (temp['action'].sum()
+            #                     - temp['delta_dose'].sum())).rename(stat)
 
             results[stat] = stat_temp
-        
+
         return results
