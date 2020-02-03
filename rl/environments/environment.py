@@ -313,32 +313,33 @@ class Environment(RLBase):
                 -1: collect the whole sample path.
             training_mode: whether it is in training or test mode. (Default: True)
             reset: whether to reset `agents`. 'any` resets agents who acted on a finished subject. `all` resets all agents. (Default = 'any') 
-            Not implemented:
-            -> reporting: what to report. (Default = 'none')
-                'all': prints every move.
-                'none' reports nothing.
-                'important' reports important parts only.
-            -> tally: count wins of each agent or not. (Default = 'no')
-                'yes': counts the number of wins of each agent.
-                'no': doesn't tally.
-            -> step_count: count average number of steps in each episode. (Default = 'no')
-                'yes': counts the average number of steps in each episode.
-                'no': doesn't count.
+            return_output: a dictionary that indicates whether to return the resulting outputs or not (Default: False)
+            return_stats: a dictionary that indicates whether to calculate and return the stats or not (Default: False)
+            stats_func: a dictionary that contains functions to calculate stats.
         '''
         max_steps = kwargs.get('max_steps', self._max_steps)
         learning_batch_size = kwargs.get(
             'learning_batch_size', self._learning_batch_size)
-        training_mode = kwargs.get('training_mode', dict((agent, True) for agent in self._agent.values()))
+        training_mode = kwargs.get('training_mode', dict((agent_subject, True) for agent_subject in self._assignment_list))
         reset = kwargs.get('reset', self._reset).lower()
-        return_output = kwargs.get('return_output', False)
-        return_stats = kwargs.get('return_stats', False)
-        stats_func = kwargs.get('stats_func', lambda a, d: d)
-        # reporting = kwargs.get('reporting', 'none').lower()
 
-        # tally = kwargs.get('tally', 'no').lower() == 'yes'
-        # win_count = dict((agent, 0) for agent in self._agent)
+        temp = kwargs.get('return_output', False)
+        if isinstance(temp, dict):
+            return_output = temp            
+        else:
+            return_output = dict((agent_subject, temp) for agent_subject in self._assignment_list)
 
-        # step_count = kwargs.get('step_count', 'no').lower() == 'yes'
+        temp = kwargs.get('return_stats', False)
+        if isinstance(temp, dict):
+            return_stats = temp            
+        else:
+            return_stats = dict((agent_subject, temp) for agent_subject in self._assignment_list)
+
+        temp = kwargs.get('stats_func', lambda a, d: d)
+        if isinstance(temp, dict):
+            stats_func = temp            
+        else:
+            stats_func = dict((agent_subject, temp) for agent_subject in self._assignment_list)
 
         stats = {}
         output = {}
@@ -360,7 +361,6 @@ class Environment(RLBase):
                             break
                         steps += 1
 
-                        # subject_instance.exchange_protocol = agent.requested_exchange_protocol
                         state = subject_instance.state
                         possible_actions = subject_instance.possible_actions
                         action = agent.act(state, actions=possible_actions,
@@ -370,7 +370,6 @@ class Environment(RLBase):
                         history[agent_name].append({'instance_id': instance_id, 'state': state, 'action': action, 'reward': reward})
 
                         if subject_instance.is_terminated:
-                            # win_count[agent_name] += int(reward > 0)
                             for affected_agent in self._agent.keys():
                                 if (affected_agent, subject_name) in self._assignment_list and \
                                         (affected_agent != agent_name):
@@ -394,33 +393,21 @@ class Environment(RLBase):
                 for agent_name, _ in assigned_agents:
                     self._agent[agent_name].reset()
 
-            if return_stats:
-                for agent_name, _ in assigned_agents:
-                    result = stats_func(agent_name, history[agent_name])
-                    try:
-                        stats[(agent_name, subject_name)].append(result)
-                    except KeyError:
-                        stats[(agent_name, subject_name)] = [result]
-
-            if return_output:
-                for agent_name, _ in assigned_agents:
-                    result = stats_func(agent_name, history[agent_name])
+            for agent_name, _ in assigned_agents:
+                if return_output[(agent_name, subject_name)]:
                     try:
                         output[(agent_name, subject_name)].append(history[agent_name])
                     except KeyError:
                         output[(agent_name, subject_name)] = [history[agent_name]]
 
+                if return_stats[(agent_name, subject_name)]:
+                    result = stats_func[(agent_name, subject_name)](agent_name, history[agent_name])
+                    try:
+                        stats[(agent_name, subject_name)].append(result)
+                    except KeyError:
+                        stats[(agent_name, subject_name)] = [result]
+
         return stats, output
-        #     if tally & (reporting != 'none'):
-        #         report_string += f'\n tally:'
-        #         for agent in self._agent:
-        #             report_string += f'\n {agent} {win_count[agent]}'
-
-        #     if reporting != 'none':
-        #         print(report_string)
-
-        # if tally:
-        #     return win_count
 
     def trajectory(self, **kwargs):
         '''
