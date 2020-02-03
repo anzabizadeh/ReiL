@@ -81,7 +81,7 @@ class DQNAgent(Agent):
         if False:
             self._gamma, self._epsilon = 1, lambda x: 0
             self._default_actions = {}
-            self._epoch, self._lr_initial, self._lr_scheduler = 0, 1e-3, lambda epoch, lr: lr
+            self._epoch, self._lr_initial, self._lr_scheduler = 0, 1e-3, None
             self._hidden_layer_sizes, self._input_length = (1,), 1
             self._batch_size, self._buffer_size, self._validation_split, self._clear_buffer = 10, 0, 0.3, False
             self._training_x, self._training_y, self._buffer_index, self._buffer_ready = deque(), deque(), -1, False
@@ -110,16 +110,16 @@ class DQNAgent(Agent):
 
             self._model.compile(optimizer=keras.optimizers.Adam(learning_rate=self._lr_initial), loss='mae')
 
-            if self._tensorboard_path is None:
-                self._tensorboard_path = os.path.join('logs', '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
-                                                            'lrn', str(self._lr_initial), 'hddn', str(
-                                                                self._hidden_layer_sizes),
-                                                            'btch', str(self._batch_size), 'vld', str(self._validation_split))))
-            else:
+            self._callbacks = []
+            if self._tensorboard_path is not None:
                 self._tensorboard_path = os.path.join('logs', self._tensorboard_path)
-            self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
-            self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(self._lr_scheduler, verbose=1)
+                self._tensorboard = keras.callbacks.TensorBoard(
+                    log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
+                self._callbacks.append(self._tensorboard)
+
+            if self._lr_scheduler is not None:
+                self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(self._lr_scheduler, verbose=1)
+                self._callbacks.append(self._learning_rate_scheduler)
 
     def _q(self, state, action=None):
         '''
@@ -237,7 +237,7 @@ class DQNAgent(Agent):
                     with self._graph.as_default():
                         self._model.fit(np.array(self._training_x)[index], np.array(self._training_y)[index],
                                         initial_epoch=self._epoch, epochs=self._epoch+1,
-                                        callbacks=[self._tensorboard, self._learning_rate_scheduler],
+                                        callbacks=self._callbacks,
                                         validation_split=self._validation_split,
                                         verbose=2)
 
