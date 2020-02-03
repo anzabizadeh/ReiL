@@ -47,6 +47,8 @@ all_args = {
     'agent_type': {'type': str, 'default': 'DQN'},
     'method': {'type': str, 'default': 'backward'},
     'gamma': {'type': float, 'default': 0.95},
+    'learning_rate': {'type': float, 'default': 0.01},
+    'lr_scheduler': {'type': bool, 'default': False},
     'buffer_size': {'type': int, 'default': 90*10},
     'batch_size': {'type': int, 'default': 50},
     'validation_split': {'type': float, 'default': 0.3},
@@ -59,7 +61,8 @@ all_args = {
     'max_maintenance_dose_change': {'type': int, 'default': 15},
     'extended_state': {'type': bool, 'default': False},
     'save_instances': {'type': bool, 'default': False},
-    'save_epochs': {'type': bool, 'default': False}
+    'save_epochs': {'type': bool, 'default': False},
+    'tf_log': {'type': bool, 'default': False}
     }
 
 warfarin_subjects_list = {
@@ -321,8 +324,8 @@ if __name__ == "__main__":
                     return max(self._min_lr, lr / self._factor)
 
         agents['protocol'] = \
-            DQNAgent(lr_initial=0.01,
-                lr_scheduler=lr_scheduler().schedule,
+            DQNAgent(lr_initial=args["learning_rate"],
+                lr_scheduler=lr_scheduler().schedule if args["lr_scheduler"] else None,
                 gamma=args["gamma"],
                 epsilon=epsilon,
                 buffer_size=args["buffer_size"],
@@ -332,7 +335,7 @@ if __name__ == "__main__":
                 validation_split=args["validation_split"],
                 hidden_layer_sizes=tuple(args["hidden_layer_sizes"]),
                 default_actions=subjects['training'].possible_actions,
-                tensorboard_path=filename,
+                tensorboard_path=filename if args["tf_log"] else None,
                 save_instances=args["save_instances"],
                 method=args["method"])
 
@@ -358,8 +361,12 @@ if __name__ == "__main__":
                     ('protocol', 'training_patient_for_stats'): False,
                     ('protocol', 'test'): False},
                 stats_func=warf_stats.stats_func,
-                return_stats=True,
-                return_output=True)
+                return_stats={('protocol', 'training'): False,
+                    ('protocol', 'training_patient_for_stats'): True,
+                    ('protocol', 'test'): True},
+                return_output={('protocol', 'training'): False,
+                    ('protocol', 'training_patient_for_stats'): True,
+                    ('protocol', 'test'): True})
 
         env.save(filename=f'./{filename}/{env_filename(i)}')
 

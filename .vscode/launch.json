@@ -13,10 +13,11 @@
             "program": "${file}",
             "cwd": "${workspaceFolder}",
             "args": [
-                "--dose_change_penalty_func=none",
-                "--run=1",
-                "--training_episodes=20",
-                "--test_episodes=20"
+                "--subject=fixedinterval",
+                "--epochs=20",
+                "--training_size=20",
+                "--test_size=10",
+                "--save_instances=True"
             ],
             "env": {},
             "envFile": "${workspaceFolder}/.env",
