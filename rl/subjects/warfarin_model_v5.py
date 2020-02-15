@@ -75,54 +75,54 @@ class WarfarinModel_v5(Subject):
         ''' 
         
         self.set_defaults(ex_protocol_options={'state': ['standard', 'extended'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
-                             ex_protocol_current={'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
-                             patient_selection='random',
-                             list_of_characteristics={'age': (71, 86),
-                                                      # lb
-                                                      'weight': (35, 370),
-                                                      'height': (53, 80),  # in
-                                                      'gender': ('Female', 'Male'),
-                                                      'race': ('White', 'Black', 'Asian', 'American Indian', 'Pacific Islander'),
-                                                      'tobaco': ('No', 'Yes'),
-                                                      'amiodarone': ('No', 'Yes'),
-                                                      'fluvastatin': ('No', 'Yes'),
-                                                      'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
-                                                      'VKORC1': ('G/G', 'G/A', 'A/A')},
-                             list_of_probabilities={'age': (67.3, 14.43),  # lb  - Aurora population
-                                                    'weight': (199.24, 54.71),  # in - Aurora population
-                                                    'height': (66.78, 4.31),  # Aurora population
-                                                    'gender': (0.5314, 0.4686),  # Aurora population
-                                                    'race': (0.9522, 0.0419, 0.0040, 0.0018, 1e-4),  # Aurora Avatar Population
-                                                    'tobaco': (0.9067, 0.0933),  # Aurora Avatar Population
-                                                    'amiodarone': (0.8849, 0.1151),  # Aurora Avatar Population
-                                                    'fluvastatin': (0.9998, 0.0002),  # Aurora Avatar Population
-                                                    'CYP2C9': (0.6739, 0.1486, 0.0925, 0.0651, 0.0197, 2e-4),  # Aurora Avatar Population
-                                                    'VKORC1': (0.3837, 0.4418, 0.1745)},  # Aurora Avatar Population
-                             characteristics={'age': 71, 'weight': 199.24, 'height': 66.78, 'gender': 'Male',
-                                              'race': 'White', 'tobaco': 'No', 'amiodarone': 'No', 'fluvastatin': 'No',
-                                              'CYP2C9': '*1/*1', 'VKORC1': 'A/A'},
-                             SS=0, max_time=24*90,
-                             day=1, max_day=90, INR=[0], INR_current=0,
-                             dosing_intervals=[None]*5, d_current=1, d_max=30,
-                             current_dose=0, max_dose=15, dose_steps=0.5, therapeutic_range=(2, 3),
-                             dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
-                             dose_list=[None]*5,
-                             dose_change_penalty_coef=1,
-                             dose_change_penalty_func=lambda x: int(
-                                 x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
-                             save_patients=False,
-                             patients_save_path='./patients',
-                             patients_save_prefix='warfv5',
-                             patient_save_overwrite=False,
-                             patient_use_existing=True,
-                             patient_counter_start=0,
-                             initial_phase_duration=-1,
-                             phase='initial',
-                             maintenance_day_interval=1,
-                             max_day_1_dose=15,
-                             max_initial_dose_change=15,
-                             max_maintenance_dose_change=15
-                            )
+                            ex_protocol_current={'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
+                            stats_list={'TTR', 'dose_change', 'delta_dose'},
+                            patient_selection='random',
+                            list_of_characteristics={'age': (18, 100),  # similar to the range of 10k sample from Ravvaz
+                                                    'weight': (70, 500),  # (lb) similar to the range of 10k sample from Ravvaz
+                                                    'height': (45, 85),  # (in) similar to the range of 10k sample from Ravvaz
+                                                    'gender': ('Female', 'Male'),
+                                                    'race': ('White', 'Black', 'Asian', 'American Indian', 'Pacific Islander'),
+                                                    'tobaco': ('No', 'Yes'),
+                                                    'amiodarone': ('No', 'Yes'),
+                                                    'fluvastatin': ('No', 'Yes'),
+                                                    'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
+                                                    'VKORC1': ('G/G', 'G/A', 'A/A')},
+                            list_of_probabilities={'age': (67.3, 14.43),  # lb  - Aurora population
+                                                'weight': (199.24, 54.71),  # in - Aurora population
+                                                'height': (66.78, 4.31),  # Aurora population
+                                                'gender': (0.5314, 0.4686),  # Aurora population
+                                                'race': (0.9522, 0.0419, 0.0040, 0.0018, 1e-4),  # Aurora Avatar Population
+                                                'tobaco': (0.9067, 0.0933),  # Aurora Avatar Population
+                                                'amiodarone': (0.8849, 0.1151),  # Aurora Avatar Population
+                                                'fluvastatin': (0.9998, 0.0002),  # Aurora Avatar Population
+                                                'CYP2C9': (0.6739, 0.1486, 0.0925, 0.0651, 0.0197, 2e-4),  # Aurora Avatar Population
+                                                'VKORC1': (0.3837, 0.4418, 0.1745)},  # Aurora Avatar Population
+                            characteristics={'age': 71, 'weight': 199.24, 'height': 66.78, 'gender': 'Male',
+                                            'race': 'White', 'tobaco': 'No', 'amiodarone': 'No', 'fluvastatin': 'No',
+                                            'CYP2C9': '*1/*1', 'VKORC1': 'A/A'},
+                            SS=0, max_time=24*90,
+                            day=1, max_day=90, INR=[0], INR_current=0,
+                            dosing_intervals=[None]*5, d_current=1, d_max=30,
+                            current_dose=0, max_dose=15, dose_steps=0.5, therapeutic_range=(2, 3),
+                            dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
+                            dose_list=[None]*5,
+                            dose_change_penalty_coef=1,
+                            dose_change_penalty_func=lambda x: int(
+                                x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
+                            save_patients=False,
+                            patients_save_path='./patients',
+                            patients_save_prefix='warfv5',
+                            patient_save_overwrite=False,
+                            patient_use_existing=True,
+                            patient_counter_start=0,
+                            initial_phase_duration=-1,
+                            phase='initial',
+                            maintenance_day_interval=1,
+                            max_day_1_dose=15,
+                            max_initial_dose_change=15,
+                            max_maintenance_dose_change=15
+                        )
 
         # this makes sure that if some elements of dictionaries
         # (e.g. characteristics, list_of_...) changes by the user,
@@ -289,6 +289,30 @@ class WarfarinModel_v5(Subject):
 
         # return TTR*self._d_current
         return RLData(reward, normalizer=lambda x: x)
+
+    def stats(self, stats_list):
+        if isinstance(stats_list, str):
+            stats_list = [stats_list]
+        results = {}
+        for s in stats_list:
+            if s == 'TTR':
+                INRs = self._patient.INR(list(range(self._day+1)))
+                temp = sum((1 if 2.0<=INRi<=3.0 else 0 for INRi in INRs)) / len(INRs)
+            elif s == 'dose_change':
+                temp = np.sum(np.abs(np.diff(self._patient.dose))>0)
+            elif s == 'delta_dose':
+                temp = np.sum(np.abs(np.diff(self._patient.dose)))
+
+            results[s] = temp
+        results['ID'] = RLData({'age': self._characteristics['age'],
+                                'CYP2C9': self._characteristics['CYP2C9'],
+                                'VKORC1': self._characteristics['VKORC1']},
+                                lower={'age': self._list_of_characteristics['age'][0]},
+                                upper={'age': self._list_of_characteristics['age'][-1]},
+                                categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                            'VKORC1': self._list_of_characteristics['VKORC1']})
+
+        return results
 
     def reset(self):
         if self._patient_selection == 'random':
