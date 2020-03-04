@@ -55,14 +55,6 @@ class IterableSubject(RLBase):
                 self.load(filename=kwargs['filename'])
             return
 
-        if isinstance(self._instance_counter_end, int):
-            self._instance_counter_end = [self._instance_counter_end]
-
-        if self._instance_counter_end[0] == -1:
-            self._stop_check = lambda current, end: False
-        else:
-            self._stop_check = lambda current, end: current > end
-
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
         if False:
@@ -77,6 +69,15 @@ class IterableSubject(RLBase):
             self._instance_counter_end = [1]
             self._end_index = 0
             self._auto_rewind = False
+
+
+        if isinstance(self._instance_counter_end, int):
+            self._instance_counter_end = [self._instance_counter_end]
+
+        if self._instance_counter_end[0] == -1:
+            self._stop_check = lambda current, end: False
+        else:
+            self._stop_check = lambda current, end: current > end
 
     def __iter__(self):
         return self
@@ -96,6 +97,7 @@ class IterableSubject(RLBase):
 
         if self._stop_check(self._instance_counter, end):
             self._end_index += 1
+            self._instance_counter -= 1
             raise StopIteration
         else:
             current_instance = ''.join((self._save_prefix, f'{self._instance_counter:06}'))
