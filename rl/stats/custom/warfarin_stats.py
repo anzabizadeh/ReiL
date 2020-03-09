@@ -1,35 +1,15 @@
 import numpy as np
 import pandas as pd
+from ..stats import Stats
 
-class WarfarinStats:
-    def __init__(self, agent_stat_dict, **kwargs):
-        '''
-        Attributes:
-        -----------
-            agent_stat_dict: a dictionary that determines groupby, stats, etc. per agent_name in the form of a nested dictionary.
-            Example: agent_stat_dict={'agent_1': {'stats': 'all', 'groupby': ['A/A', 'G/A', 'G/G']}}
-        '''
-        self._agent_stat_dict = agent_stat_dict
-        for agent in self._agent_stat_dict.keys():
-            if 'stats' not in self._agent_stat_dict[agent].keys():
-                self._agent_stat_dict[agent]['stats'] = []
-            if 'groupby' not in self._agent_stat_dict[agent].keys():
-                self._agent_stat_dict[agent]['groupby'] = []
-            if self._agent_stat_dict[agent]['stats'] == 'all':
-                self._agent_stat_dict[agent]['stats'] = ['TTR', 'TTR>0.65', 'dose_change', 'count', 'INR', 'INR_percent_dose_change']
+class WarfarinStats(Stats):
+    def __init__(self, active_stats='all', groupby=[], aggregators=['mean', 'std'], **kwargs):
+        super().__init__(active_stats=active_stats,
+            groupby=groupby, aggregators=aggregators,
+            all_stats=['TTR', 'TTR>0.65', 'dose_change', 'count', 'INR', 'INR_percent_dose_change'],
+            **kwargs)
 
-    def stats_func(self, agent_name, history):
-        def sensitivity(row):
-            combo = row['CYP2C9'] + row['VKORC1']
-            return (int(combo in ('*1/*1G/G', '*1/*2G/G', '*1/*1G/A')) * 1 +
-                    int(combo in ('*1/*2G/A', '*1/*3G/A', '*2/*2G/A',
-                                  '*2/*3G/G', '*1/*3G/G', '*2/*2G/G',
-                                  '*1/*2A/A', '*1/*1A/A')) * 2 +
-                    int(combo in ('*3/*3G/G',
-                                  '*3/*3G/A', '*2/*3G/A',
-                                  '*3/*3A/A', '*2/*3A/A', '*2/*2A/A', '*1/*3A/A')) * 4)
-
-        groupby = self._agent_stat_dict[agent_name]['groupby']
+    def from_history(self, name, history):
         df_from_history = pd.DataFrame(history)
         df_from_history['interval'] = df_from_history.apply(lambda row: row['state']['Intervals'][-1], axis=1)
         df_from_history['age'] = df_from_history.apply(lambda row: row['state']['age'][0], axis=1)
@@ -71,23 +51,23 @@ class WarfarinStats:
             lambda row: int(row['action'] != row['previous_action']), axis=1)
         df['TTR'] = df.INR.apply(
             lambda x: 1 if 2 <= x <= 3 else 0)
-        df['sensitivity'] = df.apply(sensitivity, axis=1)
+        df['sensitivity'] = df.apply(self._sensitivity, axis=1)
         df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
 
         results = {}
-        grouped_df = df.groupby(groupby if 'instance_id' in groupby else ['instance_id'] + groupby)
+        grouped_df = df.groupby(self._groupby if 'instance_id' in self._groupby else ['instance_id'] + self._groupby)
                      
-        for stat in self._agent_stat_dict[agent_name]['stats']:
+        for stat in self._active_stats:
             if stat == 'TTR':
-                temp = grouped_df['TTR'].mean().groupby(groupby)
+                temp = grouped_df['TTR'].mean().groupby(self._groupby)
             elif stat[:4] == 'TTR>':
-                temp = grouped_df['TTR'].mean().apply(lambda x: int(x > float(stat[4:]))).groupby(groupby)
+                temp = grouped_df['TTR'].mean().apply(lambda x: int(x > float(stat[4:]))).groupby(self._groupby)
             elif stat == 'dose_change':
-                temp = grouped_df['dose_change'].mean().groupby(groupby)
+                temp = grouped_df['dose_change'].mean().groupby(self._groupby)
             elif stat == 'count':
-                temp = grouped_df['dose_change'].count().groupby(groupby)
+                temp = grouped_df['dose_change'].count().groupby(self._groupby)
             elif stat == 'delta_dose':
-                temp = grouped_df['delta_dose'].mean().groupby(groupby)
+                temp = grouped_df['delta_dose'].mean().groupby(self._groupby)
             elif stat == 'INR':
                 temp = grouped_df['INR']
             else:
@@ -105,3 +85,56 @@ class WarfarinStats:
             results[stat] = stat_temp
 
         return results
+
+    def aggregate(self, agent_stats=None, subject_stats=None):
+        df = pd.DataFrame.from_dict(subject_stats)
+        df['age'] = df.apply(lambda row: row['ID']['age'][-1], axis=1)
+        df['CYP2C9'] = df.apply(lambda row: row['ID']['CYP2C9'][-1], axis=1)
+        df['VKORC1'] = df.apply(lambda row: row['ID']['VKORC1'][-1], axis=1)
+        df['sensitivity'] = df.apply(self._sensitivity, axis=1)
+        df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
+
+        results = {}
+        grouped_df = df.groupby(self._groupby)
+
+        for stat in self._active_stats:
+            if stat == 'TTR':
+                temp = grouped_df['TTR']
+            # elif stat[:4] == 'TTR>':
+            #     temp = grouped_df['TTR'].mean().apply(lambda x: int(x > float(stat[4:]))).groupby(self._groupby)
+            elif stat == 'dose_change':
+                temp = grouped_df['dose_change']
+            # elif stat == 'count':
+            #     temp = grouped_df['dose_change'].count().groupby(self._groupby)
+            elif stat == 'delta_dose':
+                temp = grouped_df['delta_dose']
+            # elif stat == 'INR':
+            #     temp = grouped_df['INR']
+            else:
+                continue
+
+            stat_temp = temp.agg([(f'{stat}_{func}', func) for func in self._aggregators])
+                # pd.DataFrame([
+                # temp.max().rename(f'{stat}_max'),
+                # temp.min().rename(f'{stat}_min'),
+                # temp.mean().rename(f'{stat}_mean'),
+                # temp.std().rename(f'{stat}_stdev')])
+            # elif stat == 'INR_percent_dose_change':
+            #     temp = df.groupby(['INR'] + groupby if 'instance_id' in groupby else ['instance_id'] + groupby)
+            #     stat_temp = (temp['delta_dose'].sum() /
+            #                     (temp['action'].sum()
+            #                     - temp['delta_dose'].sum())).rename(stat)
+
+            results[stat] = stat_temp
+
+        return results
+
+    def _sensitivity(self, row):
+        combo = row['CYP2C9'] + row['VKORC1']
+        return (int(combo in ('*1/*1G/G', '*1/*2G/G', '*1/*1G/A')) * 1 +
+                int(combo in ('*1/*2G/A', '*1/*3G/A', '*2/*2G/A',
+                                '*2/*3G/G', '*1/*3G/G', '*2/*2G/G',
+                                '*1/*2A/A', '*1/*1A/A')) * 2 +
+                int(combo in ('*3/*3G/G',
+                                '*3/*3G/A', '*2/*3G/A',
+                                '*3/*3A/A', '*2/*3A/A', '*2/*2A/A', '*1/*3A/A')) * 4)
