@@ -12,4 +12,5 @@ Classes
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from .stats import Stats
 from .custom.warfarin_stats import WarfarinStats
