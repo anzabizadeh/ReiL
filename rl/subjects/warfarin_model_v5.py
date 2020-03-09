@@ -310,7 +310,7 @@ class WarfarinModel_v5(Subject):
                                 lower={'age': self._list_of_characteristics['age'][0]},
                                 upper={'age': self._list_of_characteristics['age'][-1]},
                                 categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                            'VKORC1': self._list_of_characteristics['VKORC1']})
+                                            'VKORC1': self._list_of_characteristics['VKORC1']}, lazy_evaluation=True)
 
         return results
 
