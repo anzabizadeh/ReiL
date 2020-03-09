@@ -30,13 +30,15 @@ from rl.subjects import IterableSubject, WarfarinModelFixedInterval, WarfarinMod
 all_args = {
     'project_name': {'type': str, 'default': None},
     'subject': {'type': str, 'default': 'WarfarinModel_v5'},
+    'start_epoch': {'type': int, 'default': 0},
     'epochs': {'type': int, 'default': 200},
     'training_size': {'type': int, 'default': 250},
     'test_size': {'type': int, 'default': 50},
     'max_day': {'type': int, 'default': 91},
     'dose_history': {'type': int, 'default': 10},
     'INR_history': {'type': int, 'default': 10},
-    'patient_selection': {'type': str, 'default': 'ravvaz'},
+    'patient_selection_training': {'type': str, 'default': 'ravvaz'},
+    'patient_selection_test': {'type': str, 'default': 'ravvaz'},
     'INR_penalty_coef': {'type': float, 'default': 1.0},
     'dose_change_penalty_coef': {'type': float, 'default': 0.0},
     'dose_change_penalty_func': {'type': str, 'default': 'none'},
@@ -47,7 +49,7 @@ all_args = {
     'agent_type': {'type': str, 'default': 'DQN'},
     'method': {'type': str, 'default': 'backward'},
     'gamma': {'type': float, 'default': 0.95},
-    'learning_rate': {'type': float, 'default': 0.01},
+    'learning_rate': {'type': float, 'default': 0.001},
     'lr_scheduler': {'type': bool, 'default': False},
     'buffer_size': {'type': int, 'default': 90*10},
     'batch_size': {'type': int, 'default': 50},
@@ -176,7 +178,7 @@ if __name__ == "__main__":
 
     filename = args["project_name"]
     try:
-        env = Environment(filename=filename)
+        env = Environment(filename=f'./{filename}/{filename}')
         agents = env._agent
         subjects = env._subject
     except FileNotFoundError:
@@ -206,13 +208,12 @@ if __name__ == "__main__":
                         args["dose_history"] - args["dose_change_penalty_days"],
                         args["dose_history"])) != 0).sum()
 
-
         warfarin_subject = warfarin_subjects_list[args["subject"].lower()]
 
         # define subjects
         training_patient = \
             warfarin_subject(max_day=args["max_day"],
-                patient_selection=args["patient_selection"],
+                patient_selection=args["patient_selection_training"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
                 INR_penalty_coef=args["INR_penalty_coef"],
@@ -230,7 +231,7 @@ if __name__ == "__main__":
 
         training_patient_for_stats = \
             warfarin_subject(max_day=args["max_day"],
-                patient_selection=args["patient_selection"],
+                patient_selection=args["patient_selection_training"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
                 INR_penalty_coef=args["INR_penalty_coef"],
@@ -249,7 +250,7 @@ if __name__ == "__main__":
 
         test_patient = \
             warfarin_subject(max_day=args["max_day"],
-                patient_selection=args["patient_selection"],
+                patient_selection=args["patient_selection_test"],
                 dose_history=args["dose_history"],
                 INR_history=args["INR_history"],
                 INR_penalty_coef=args["INR_penalty_coef"],
@@ -270,37 +271,37 @@ if __name__ == "__main__":
             IterableSubject(subject=training_patient,
                 save_instances=args["save_instances"],
                 use_existing_instances=True,
-                save_path='./training',
+                save_path=f'./training_{args["patient_selection_training"]}',
                 save_prefix='',
                 instance_counter_start=0,
                 instance_counter=0,
-                instance_counter_end=args["training_size"],
-                auto_rewind=True
-                # instance_counter_end=list(range(args["training_size"],
-                #                                 args["training_size"]*args["epochs"] + 1,
-                #                                 args["training_size"]))
+                # instance_counter_end=args["training_size"],
+                # auto_rewind=True
+                instance_counter_end=list(range(args["training_size"],
+                                                args["training_size"]*args["epochs"] + 1,
+                                                args["training_size"]))
                 )
 
         subjects['training_patient_for_stats'] = \
             IterableSubject(subject=training_patient_for_stats,
                 save_instances=args["save_instances"],
                 use_existing_instances=True,
-                save_path='./training',
+                save_path=f'./training_{args["patient_selection_training"]}',
                 save_prefix='',
                 instance_counter_start=0,
                 instance_counter=0,
-                instance_counter_end=args["training_size"],
-                auto_rewind=True
-                # instance_counter_end=list(range(args["training_size"],
-                #                                 args["training_size"]*args["epochs"] + 1,
-                #                                 args["training_size"]))
+                # instance_counter_end=args["training_size"],
+                # auto_rewind=True
+                instance_counter_end=list(range(args["training_size"],
+                                                args["training_size"]*args["epochs"] + 1,
+                                                args["training_size"]))
                 )
 
         subjects['test'] = \
             IterableSubject(subject=test_patient,
                 save_instances=True,
                 use_existing_instances=True,
-                save_path='./test',
+                save_path=f'./test_{args["patient_selection_test"]}',
                 save_prefix='test',
                 instance_counter_start=0,
                 instance_counter=0,
@@ -325,28 +326,31 @@ if __name__ == "__main__":
 
         agents['protocol'] = \
             DQNAgent(lr_initial=args["learning_rate"],
-                lr_scheduler=lr_scheduler().schedule if args["lr_scheduler"] else None,
-                gamma=args["gamma"],
-                epsilon=epsilon,
-                buffer_size=args["buffer_size"],
-                clear_buffer=args["clear_buffer"],
-                batch_size=args["batch_size"],
-                input_length=input_length,
-                validation_split=args["validation_split"],
-                hidden_layer_sizes=tuple(args["hidden_layer_sizes"]),
-                default_actions=subjects['training'].possible_actions,
-                tensorboard_path=filename if args["tf_log"] else None,
-                save_instances=args["save_instances"],
-                method=args["method"])
+                     lr_scheduler=lr_scheduler().schedule if args["lr_scheduler"] else None,
+                     gamma=args["gamma"],
+                     epsilon=epsilon,
+                     buffer_size=args["buffer_size"],
+                     clear_buffer=args["clear_buffer"],
+                     batch_size=args["batch_size"],
+                     input_length=input_length,
+                     validation_split=args["validation_split"],
+                     hidden_layer_sizes=tuple(args["hidden_layer_sizes"]),
+                     default_actions=subjects['training'].possible_actions,
+                     tensorboard_path=filename if args["tf_log"] else None,
+                     save_instances=args["save_instances"],
+                     method=args["method"])
 
         # update environment
         env.add(agents=agents, subjects=subjects)
         env.assign([('protocol', 'training'),
-            ('protocol', 'training_patient_for_stats'),
-            ('protocol', 'test')])
+                    ('protocol', 'training_patient_for_stats'),
+                    ('protocol', 'test')])
 
-    warf_stats = WarfarinStats(agent_stat_dict={'protocol': {'stats': ['TTR', 'dose_change', 'delta_dose'],
-                                                            'groupby': ['sensitivity']}})
+    stats_to_collect = ['TTR', 'dose_change', 'delta_dose']
+    aggregators = ['min', 'max', 'mean','std', 'median']
+    warf_stats = WarfarinStats(active_stats=stats_to_collect,
+                               aggregators=aggregators,
+                               groupby=['sensitivity'])
 
     if args["save_epochs"]:
         env_filename = lambda i: filename+f'{i:04}'
@@ -358,15 +362,14 @@ if __name__ == "__main__":
         stats, output = \
             env.elapse_iterable(
                 training_mode={('protocol', 'training'): True,
-                    ('protocol', 'training_patient_for_stats'): False,
-                    ('protocol', 'test'): False},
-                stats_func=warf_stats.stats_func,
-                return_stats={('protocol', 'training'): False,
-                    ('protocol', 'training_patient_for_stats'): True,
-                    ('protocol', 'test'): True},
+                               ('protocol', 'training_patient_for_stats'): False,
+                               ('protocol', 'test'): False},
+                stats_func=warf_stats.aggregate,
+                stats={('protocol', 'training_patient_for_stats'): stats_to_collect,
+                       ('protocol', 'test'): stats_to_collect},
                 return_output={('protocol', 'training'): False,
-                    ('protocol', 'training_patient_for_stats'): True,
-                    ('protocol', 'test'): True})
+                               ('protocol', 'training_patient_for_stats'): True,
+                               ('protocol', 'test'): True})
 
         env.save(filename=f'./{filename}/{env_filename(i)}')
 
@@ -379,17 +382,17 @@ if __name__ == "__main__":
                                 print(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
                                 f.write(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}\n')
 
-        trajectories = []
-        for label in output.keys():
-            for hist in output[label]:
-                trajectories += [(i, label, h['instance_id'],
-                    h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
-                    h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
-        trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject', 'instance_id',
-                            'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action', 'reward'])
-        trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(periods=-1)
-        trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
-        trajectories_df['INR'] = trajectories_df.apply(
-            lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
-        trajectories_df.drop('shifted_id', axis=1, inplace=True)
-        trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
+        # trajectories = []
+        # for label in output.keys():
+        #     for hist in output[label]:
+        #         trajectories += [(i, label, h['instance_id'],
+        #             h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
+        #             h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
+        # trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject', 'instance_id',
+        #                     'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action', 'reward'])
+        # trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(periods=-1)
+        # trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
+        # trajectories_df['INR'] = trajectories_df.apply(
+        #     lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
+        # trajectories_df.drop('shifted_id', axis=1, inplace=True)
+        # trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
