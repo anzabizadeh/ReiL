@@ -112,13 +112,13 @@ class Environment(RLBase):
 
         Raises KeyError if the agent is not found.
         '''
-        for name in kwargs['agents']:
+        for name in kwargs.get('agents', []):
             try:
                 del self._agent[name]
             except KeyError:
                 raise KeyError(f'Agent {name} not found!')
 
-        for name in kwargs['subjects']:
+        for name in kwargs.get('subjects', []):
             try:
                 del self._subject[name]
             except KeyError:
@@ -246,7 +246,7 @@ class Environment(RLBase):
                             possible_actions = subject.possible_actions
                             action = agent.act(state, actions=possible_actions,
                                                episode=self._total_experienced_episodes[(agent_name, subject_name)])
-                            reward = RLData(subject.take_effect(action, _id))
+                            reward = subject.take_effect(action, _id)
 
                             if reporting == 'all':
                                 print(f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
@@ -329,11 +329,11 @@ class Environment(RLBase):
         else:
             return_output = dict((agent_subject, temp) for agent_subject in self._assignment_list)
 
-        temp = kwargs.get('return_stats', False)
+        temp = kwargs.get('stats', [])
         if isinstance(temp, dict):
-            return_stats = temp            
+            stats = temp            
         else:
-            return_stats = dict((agent_subject, temp) for agent_subject in self._assignment_list)
+            stats = dict((agent_subject, temp) for agent_subject in self._assignment_list)
 
         temp = kwargs.get('stats_func', lambda a, d: d)
         if isinstance(temp, dict):
@@ -341,11 +341,15 @@ class Environment(RLBase):
         else:
             stats_func = dict((agent_subject, temp) for agent_subject in self._assignment_list)
 
-        stats = {}
         output = {}
+        stats_agents = {}
+        stats_subjects = {}
+        stats_final = {}
 
         for subject_name, subject in self._subject.items():
             assigned_agents = list((k[0], v) for k, v in self._assignment_list.items() if k[1] == subject_name)
+            if assigned_agents == []:
+                continue
 
             for agent_name, _ in assigned_agents:
                 self._agent[agent_name].training_mode = training_mode[(agent_name, subject_name)]
@@ -386,6 +390,28 @@ class Environment(RLBase):
                         for agent_name, _ in assigned_agents:
                             self._agent[agent_name].learn(history=history[agent_name])
 
+                ####################################################
+                for agent_name, _ in assigned_agents:
+                    # for s in stats.get((agent_name, subject_name), []):
+                    try:
+                        stats_list = stats[(agent_name, subject_name)]
+                        result_agent = self._agent[agent_name].stats(stats_list)
+                        result_subject = subject_instance.stats(stats_list)
+
+                        if result_agent != {}:
+                            try:
+                                stats_agents[(agent_name, subject_name)].append(result_agent)
+                            except KeyError:
+                                stats_agents[(agent_name, subject_name)] = [result_agent]
+
+                        if result_subject != {}:
+                            try:
+                                stats_subjects[(agent_name, subject_name)].append(result_subject)
+                            except KeyError:
+                                stats_subjects[(agent_name, subject_name)] = [result_subject]
+                    except KeyError:
+                        pass
+
             if reset == 'all':
                 for agent in self._agent.values():
                     agent.reset()
@@ -400,14 +426,15 @@ class Environment(RLBase):
                     except KeyError:
                         output[(agent_name, subject_name)] = [history[agent_name]]
 
-                if return_stats[(agent_name, subject_name)]:
-                    result = stats_func[(agent_name, subject_name)](agent_name, history[agent_name])
+                if stats.get((agent_name, subject_name), []) != []:
+                    result = stats_func[(agent_name, subject_name)](agent_stats=stats_agents.get((agent_name, subject_name), None),
+                                                                    subject_stats=stats_subjects.get((agent_name, subject_name), None))
                     try:
-                        stats[(agent_name, subject_name)].append(result)
+                        stats_final[(agent_name, subject_name)].append(result)
                     except KeyError:
-                        stats[(agent_name, subject_name)] = [result]
+                        stats_final[(agent_name, subject_name)] = [result]
 
-        return stats, output
+        return stats_final, output
 
     def trajectory(self, **kwargs):
         '''
