@@ -36,12 +36,27 @@ class RLBase():
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
         self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
-                          ex_protocol_options={}, ex_protocol_current={}, requested_exchange_protocol={})
+                          ex_protocol_options={}, ex_protocol_current={}, requested_exchange_protocol={},
+                          stats_list=[])
         self.set_params(**kwargs)
 
         if False:
             self._name, self._version, self._path = [], [], []
             self._ex_protocol_options, self._ex_protocol_current, self._requested_exchange_protocol = {}, {}, {}
+            self._stats_list = []
+    
+    def stats(self, stats_list):
+        '''
+        Compute statistics.
+
+        Arguments
+        ---------
+            stats_list: list of statistics to compute.
+        '''
+        return {}
+
+    def has_stat(self, stat):
+        return stat in self._stats_list
 
     @property
     def exchange_protocol_options(self):
@@ -153,7 +168,14 @@ class RLBase():
         return path, filename
 
     def _report(self, **kwargs):
-        return
+        '''
+        Report statistics using `DataCollector` class. This method can be implemented if an agent/ a subject wants to use `DataCollector`.
+
+        Arguments
+        ---------
+            kwargs: data by which different statistics are computed.
+        '''
+        raise NotImplementedError
 
     def __repr__(self):
         return 'RLBase'
