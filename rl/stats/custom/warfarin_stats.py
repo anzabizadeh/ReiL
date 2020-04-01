@@ -1,6 +1,16 @@
 import numpy as np
 import pandas as pd
+import re
+import operator as op
 from ..stats import Stats
+
+conditionals = {'<=': op.le,
+                '>=': op.ge,
+                '==': op.eq,
+                '!=': op.ne,
+                '<': op.lt,
+                '>': op.gt}
+
 
 class WarfarinStats(Stats):
     def __init__(self, active_stats='all', groupby=[], aggregators=['mean', 'std'], **kwargs):
@@ -88,13 +98,22 @@ class WarfarinStats(Stats):
 
     def aggregate(self, agent_stats=None, subject_stats=None):
         df = pd.DataFrame.from_dict(subject_stats)
-        df['age'] = df.apply(lambda row: row['ID']['age'][-1], axis=1)
-        df['CYP2C9'] = df.apply(lambda row: row['ID']['CYP2C9'][-1], axis=1)
-        df['VKORC1'] = df.apply(lambda row: row['ID']['VKORC1'][-1], axis=1)
+        df['age'] = df['ID'].apply(lambda row: row['age'][-1])
+        df['CYP2C9'] = df['ID'].apply(lambda row: row['CYP2C9'][-1])
+        df['VKORC1'] = df['ID'].apply(lambda row: row['VKORC1'][-1])
         df['sensitivity'] = df.apply(self._sensitivity, axis=1)
         df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
 
         results = {}
+        for g in self._groupby:
+            g_split = re.split('(!=|<=|>=|==|<|>)', g)
+            try:
+                # use the first item in the corresponding column to convert the right-hand side into proper datatype
+                rhs = type(df[g_split[0]].iat[0])(g_split[2])
+                df[g] = df[g_split[0]].apply(lambda row: conditionals[g_split[1]](row, rhs))
+            except IndexError:
+                pass
+
         grouped_df = df.groupby(self._groupby)
 
         for stat in self._active_stats:
