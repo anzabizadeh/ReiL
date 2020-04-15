@@ -223,6 +223,10 @@ class WarfarinModel_v5(Subject):
         if self._day == 1:
             return self._day_1_possible_actions
 
+        if (self._initial_phase_duration == -1 and self._therapeutic_range[0] <= self._INR[-1] <= self._therapeutic_range[1]) \
+            or self._day == self._initial_phase_duration:
+                self._phase = 'maintenance'
+
         if self._phase == 'initial' and self._current_dose + self._max_initial_dose_change < self._max_dose:
             return self._possible_actions[ceil((self._max_dose - self._current_dose - self._max_initial_dose_change)/self._dose_steps):]
 
@@ -264,9 +268,6 @@ class WarfarinModel_v5(Subject):
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
 
-        if (self._initial_phase_duration == -1 and self._therapeutic_range[0] <= self._INR[-1] <= self._therapeutic_range[1]) \
-            or self._day == self._initial_phase_duration:
-                self._phase = 'maintenance'
         if self._phase == 'initial':
             self._d_current = 1  # action.value[1]
             self._patient.dose = {self._day: self._current_dose}
