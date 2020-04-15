@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from random import choice, seed, shuffle
+from math import ceil
 from collections import deque
 
 from ..rlbase import RLBase
@@ -222,17 +223,23 @@ class WarfarinModel_v5(Subject):
         if self._day == 1:
             return self._day_1_possible_actions
 
-        if self._phase == 'initial' and self._max_initial_dose_change != self._max_dose:
-            return RLData([x*self._dose_steps
-                           for x in range(int(self._max_dose/self._dose_steps), -1, -1)
-                           if abs(x*self._dose_steps - self._current_dose) <= self._max_initial_dose_change],
-                           lower=0, upper=self._max_dose).as_rldata_array()
+        if self._phase == 'initial' and self._current_dose + self._max_initial_dose_change < self._max_dose:
+            return self._possible_actions[ceil((self._max_dose - self._current_dose - self._max_initial_dose_change)/self._dose_steps):]
 
-        if self._phase == 'maintenance' and self._max_maintenance_dose_change != self._max_dose:
-            return RLData([x*self._dose_steps
-                           for x in range(int(self._max_dose/self._dose_steps), -1, -1)
-                           if abs(x*self._dose_steps - self._current_dose) <= self._max_maintenance_dose_change],
-                           lower=0, upper=self._max_dose).as_rldata_array()
+        if self._phase == 'maintenance' and self._current_dose + self._max_maintenance_dose_change < self._max_dose:
+            return self._possible_actions[ceil((self._max_dose - self._current_dose - self._max_maintenance_dose_change)/self._dose_steps):]
+
+        # if self._phase == 'initial' and self._max_initial_dose_change != self._max_dose:
+        #     return RLData([x*self._dose_steps
+        #                    for x in range(int(self._max_dose/self._dose_steps), -1, -1)
+        #                    if abs(x*self._dose_steps - self._current_dose) <= self._max_initial_dose_change],
+        #                    lower=0, upper=self._max_dose).as_rldata_array()
+
+        # if self._phase == 'maintenance' and self._max_maintenance_dose_change != self._max_dose:
+        #     return RLData([x*self._dose_steps
+        #                    for x in range(int(self._max_dose/self._dose_steps), -1, -1)
+        #                    if abs(x*self._dose_steps - self._current_dose) <= self._max_maintenance_dose_change],
+        #                    lower=0, upper=self._max_dose).as_rldata_array()
 
         return self._possible_actions
 
