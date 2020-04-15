@@ -57,10 +57,10 @@ all_args = {
     'hidden_layer_sizes': {'type': int, 'default': (32, 32, 32)},
     'clear_buffer': {'type': bool, 'default': False},
     'initial_phase_duration': {'type': int, 'default': 1},
-    'max_initial_dose_change': {'type': int, 'default': 15},
-    'max_day_1_dose': {'type': int, 'default': 15},
+    'max_initial_dose_change': {'type': float, 'default': 15.0},
+    'max_day_1_dose': {'type': float, 'default': 15.0},
     'maintenance_day_interval': {'type': int, 'default': 1},
-    'max_maintenance_dose_change': {'type': int, 'default': 15},
+    'max_maintenance_dose_change': {'type': float, 'default': 15.0},
     'extended_state': {'type': bool, 'default': False},
     'save_instances': {'type': bool, 'default': False},
     'save_epochs': {'type': bool, 'default': False},
@@ -181,6 +181,7 @@ if __name__ == "__main__":
         env = Environment(filename=f'./{filename}/{filename}')
         agents = env._agent
         subjects = env._subject
+        assignment_list = list((a, s) for a in agents.keys() for s in subjects.keys())
     except FileNotFoundError:
         env = Environment()
         agents = {}
@@ -348,7 +349,8 @@ if __name__ == "__main__":
         # env.assign([('protocol', 'training'),
         #             ('protocol', 'training_patient_for_stats'),
         #             ('protocol', 'test')])
-        env.assign(list((a, s) for a in agents.keys() for s in subjects.keys()))
+        assignment_list = list((a, s) for a in agents.keys() for s in subjects.keys())
+        env.assign(assignment_list)
 
     stats_to_collect = ['TTR', 'dose_change', 'delta_dose']
     aggregators = ['min', 'max', 'mean','std', 'median']
@@ -361,19 +363,23 @@ if __name__ == "__main__":
     else:
         env_filename = lambda i: filename
 
+    training_mode = dict((k, v) for k, v in {('protocol', 'training'): True,
+                    ('protocol', 'training_patient_for_stats'): False,
+                    ('protocol', 'test'): False}.items() if k in assignment_list)
+    stats = dict((k, v) for k, v in {('protocol', 'training_patient_for_stats'): stats_to_collect,
+             ('protocol', 'test'): stats_to_collect}.items() if k in assignment_list)
+    return_output = dict((k, v) for k, v in {('protocol', 'training'): False,
+                     ('protocol', 'training_patient_for_stats'): True,
+                     ('protocol', 'test'): True}.items() if k in assignment_list)
+
     for i in range(args["epochs"]):
         print(f'run {i: }')
         stats, output = \
             env.elapse_iterable(
-                training_mode={('protocol', 'training'): True,
-                               ('protocol', 'training_patient_for_stats'): False,
-                               ('protocol', 'test'): False},
+                training_mode=training_mode,
                 stats_func=warf_stats.aggregate,
-                stats={('protocol', 'training_patient_for_stats'): stats_to_collect,
-                       ('protocol', 'test'): stats_to_collect},
-                return_output={('protocol', 'training'): False,
-                               ('protocol', 'training_patient_for_stats'): True,
-                               ('protocol', 'test'): True})
+                stats=stats,
+                return_output=return_output)
 
         env.save(filename=f'./{filename}/{env_filename(i)}')
 
@@ -397,8 +403,9 @@ if __name__ == "__main__":
         #         trajectories += [(i, label, h['instance_id'],
         #             h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
         #             h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
-        # trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject', 'instance_id',
-        #                     'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action', 'reward'])
+        # trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject',
+        #                   'instance_id', 'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action',
+        #                   'reward'])
         # trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(periods=-1)
         # trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
         # trajectories_df['INR'] = trajectories_df.apply(
