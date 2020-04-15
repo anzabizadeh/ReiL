@@ -211,106 +211,109 @@ if __name__ == "__main__":
         warfarin_subject = warfarin_subjects_list[args["subject"].lower()]
 
         # define subjects
-        training_patient = \
-            warfarin_subject(max_day=args["max_day"],
-                patient_selection=args["patient_selection_training"],
-                dose_history=args["dose_history"],
-                INR_history=args["INR_history"],
-                INR_penalty_coef=args["INR_penalty_coef"],
-                dose_change_penalty_coef=args["dose_change_penalty_coef"],
-                dose_change_penalty_func=dose_change_penalty_func,
-                lookahead_penalty_coef=args["lookahead_penalty_coef"],
-                lookahead_duration=args["lookahead_duration"],
-                extended_state=args["extended_state"],
-                randomized=args["randomized"],
-                initial_phase_duration=args["initial_phase_duration"],
-                max_initial_dose_change=args["max_initial_dose_change"],
-                max_day_1_dose=args["max_day_1_dose"],
-                maintenance_day_interval=args["maintenance_day_interval"],
-                max_maintenance_dose_change=args["max_maintenance_dose_change"])
+        if args["training_size"]>0:
+            training_patient = \
+                warfarin_subject(max_day=args["max_day"],
+                    patient_selection=args["patient_selection_training"],
+                    dose_history=args["dose_history"],
+                    INR_history=args["INR_history"],
+                    INR_penalty_coef=args["INR_penalty_coef"],
+                    dose_change_penalty_coef=args["dose_change_penalty_coef"],
+                    dose_change_penalty_func=dose_change_penalty_func,
+                    lookahead_penalty_coef=args["lookahead_penalty_coef"],
+                    lookahead_duration=args["lookahead_duration"],
+                    extended_state=args["extended_state"],
+                    randomized=args["randomized"],
+                    initial_phase_duration=args["initial_phase_duration"],
+                    max_initial_dose_change=args["max_initial_dose_change"],
+                    max_day_1_dose=args["max_day_1_dose"],
+                    maintenance_day_interval=args["maintenance_day_interval"],
+                    max_maintenance_dose_change=args["max_maintenance_dose_change"])
 
-        training_patient_for_stats = \
-            warfarin_subject(max_day=args["max_day"],
-                patient_selection=args["patient_selection_training"],
-                dose_history=args["dose_history"],
-                INR_history=args["INR_history"],
-                INR_penalty_coef=args["INR_penalty_coef"],
-                dose_change_penalty_coef=args["dose_change_penalty_coef"],
-                dose_change_penalty_func=dose_change_penalty_func,
-                lookahead_penalty_coef=args["lookahead_penalty_coef"],
-                lookahead_duration=args["lookahead_duration"],
-                extended_state=args["extended_state"],
-                randomized=args["randomized"],
-                initial_phase_duration=args["initial_phase_duration"],
-                max_initial_dose_change=args["max_initial_dose_change"],
-                max_day_1_dose=args["max_day_1_dose"],
-                maintenance_day_interval=args["maintenance_day_interval"],
-                max_maintenance_dose_change=args["max_maintenance_dose_change"],
-                ex_protocol_current={'take_effect': 'no_reward'})
+            subjects['training'] = \
+                IterableSubject(subject=training_patient,
+                    save_instances=args["save_instances"],
+                    use_existing_instances=True,
+                    save_path=f'./training_{args["patient_selection_training"]}',
+                    save_prefix='',
+                    instance_counter_start=0,
+                    instance_counter=0,
+                    instance_counter_end=list(range(args["training_size"],
+                                                    args["training_size"]*args["epochs"] + 1,
+                                                    args["training_size"]))
+                    )
 
-        test_patient = \
-            warfarin_subject(max_day=args["max_day"],
-                patient_selection=args["patient_selection_test"],
-                dose_history=args["dose_history"],
-                INR_history=args["INR_history"],
-                INR_penalty_coef=args["INR_penalty_coef"],
-                dose_change_penalty_coef=args["dose_change_penalty_coef"],
-                dose_change_penalty_func=dose_change_penalty_func,
-                lookahead_penalty_coef=args["lookahead_penalty_coef"],
-                lookahead_duration=args["lookahead_duration"],
-                extended_state=args["extended_state"],
-                randomized=args["randomized"],
-                initial_phase_duration=args["initial_phase_duration"],
-                max_initial_dose_change=args["max_initial_dose_change"],
-                max_day_1_dose=args["max_day_1_dose"],
-                maintenance_day_interval=args["maintenance_day_interval"],
-                max_maintenance_dose_change=args["max_maintenance_dose_change"],
-                ex_protocol_current={'take_effect': 'no_reward'})
+            training_patient_for_stats = \
+                warfarin_subject(max_day=args["max_day"],
+                    patient_selection=args["patient_selection_training"],
+                    dose_history=args["dose_history"],
+                    INR_history=args["INR_history"],
+                    INR_penalty_coef=args["INR_penalty_coef"],
+                    dose_change_penalty_coef=args["dose_change_penalty_coef"],
+                    dose_change_penalty_func=dose_change_penalty_func,
+                    lookahead_penalty_coef=args["lookahead_penalty_coef"],
+                    lookahead_duration=args["lookahead_duration"],
+                    extended_state=args["extended_state"],
+                    randomized=args["randomized"],
+                    initial_phase_duration=args["initial_phase_duration"],
+                    max_initial_dose_change=args["max_initial_dose_change"],
+                    max_day_1_dose=args["max_day_1_dose"],
+                    maintenance_day_interval=args["maintenance_day_interval"],
+                    max_maintenance_dose_change=args["max_maintenance_dose_change"],
+                    ex_protocol_current={'take_effect': 'no_reward'})
 
-        subjects['training'] = \
-            IterableSubject(subject=training_patient,
-                save_instances=args["save_instances"],
-                use_existing_instances=True,
-                save_path=f'./training_{args["patient_selection_training"]}',
-                save_prefix='',
-                instance_counter_start=0,
-                instance_counter=0,
-                # instance_counter_end=args["training_size"],
-                # auto_rewind=True
-                instance_counter_end=list(range(args["training_size"],
-                                                args["training_size"]*args["epochs"] + 1,
-                                                args["training_size"]))
-                )
+            subjects['training_patient_for_stats'] = \
+                IterableSubject(subject=training_patient_for_stats,
+                    save_instances=args["save_instances"],
+                    use_existing_instances=True,
+                    save_path=f'./training_{args["patient_selection_training"]}',
+                    save_prefix='',
+                    instance_counter_start=0,
+                    instance_counter=0,
+                    instance_counter_end=list(range(args["training_size"],
+                                                    args["training_size"]*args["epochs"] + 1,
+                                                    args["training_size"]))
+                    )
 
-        subjects['training_patient_for_stats'] = \
-            IterableSubject(subject=training_patient_for_stats,
-                save_instances=args["save_instances"],
-                use_existing_instances=True,
-                save_path=f'./training_{args["patient_selection_training"]}',
-                save_prefix='',
-                instance_counter_start=0,
-                instance_counter=0,
-                # instance_counter_end=args["training_size"],
-                # auto_rewind=True
-                instance_counter_end=list(range(args["training_size"],
-                                                args["training_size"]*args["epochs"] + 1,
-                                                args["training_size"]))
-                )
+            input_length = len(subjects['training'].state.normalize().as_list()) \
+                + len(subjects['training'].possible_actions[0].normalize().as_list())
 
-        subjects['test'] = \
-            IterableSubject(subject=test_patient,
-                save_instances=True,
-                use_existing_instances=True,
-                save_path=f'./test_{args["patient_selection_test"]}',
-                save_prefix='test',
-                instance_counter_start=0,
-                instance_counter=0,
-                instance_counter_end=args["test_size"],
-                auto_rewind=True
-                )
 
-        input_length = len(subjects['training'].state.normalize().as_list()) \
-            + len(subjects['training'].possible_actions[0].normalize().as_list())
+        if args["test_size"]>0:
+            test_patient = \
+                warfarin_subject(max_day=args["max_day"],
+                    patient_selection=args["patient_selection_test"],
+                    dose_history=args["dose_history"],
+                    INR_history=args["INR_history"],
+                    INR_penalty_coef=args["INR_penalty_coef"],
+                    dose_change_penalty_coef=args["dose_change_penalty_coef"],
+                    dose_change_penalty_func=dose_change_penalty_func,
+                    lookahead_penalty_coef=args["lookahead_penalty_coef"],
+                    lookahead_duration=args["lookahead_duration"],
+                    extended_state=args["extended_state"],
+                    randomized=args["randomized"],
+                    initial_phase_duration=args["initial_phase_duration"],
+                    max_initial_dose_change=args["max_initial_dose_change"],
+                    max_day_1_dose=args["max_day_1_dose"],
+                    maintenance_day_interval=args["maintenance_day_interval"],
+                    max_maintenance_dose_change=args["max_maintenance_dose_change"],
+                    ex_protocol_current={'take_effect': 'no_reward'})
+
+            subjects['test'] = \
+                IterableSubject(subject=test_patient,
+                    save_instances=True,
+                    use_existing_instances=True,
+                    save_path=f'./test_{args["patient_selection_test"]}',
+                    save_prefix='test',
+                    instance_counter_start=0,
+                    instance_counter=0,
+                    instance_counter_end=args["test_size"],
+                    auto_rewind=True
+                    )
+
+            input_length = len(subjects['test'].state.normalize().as_list()) \
+                + len(subjects['test'].possible_actions[0].normalize().as_list())
+
 
         class lr_scheduler:
             def __init__(self, min_lr= 1e-5, factor=2, step=1):
@@ -342,9 +345,10 @@ if __name__ == "__main__":
 
         # update environment
         env.add(agents=agents, subjects=subjects)
-        env.assign([('protocol', 'training'),
-                    ('protocol', 'training_patient_for_stats'),
-                    ('protocol', 'test')])
+        # env.assign([('protocol', 'training'),
+        #             ('protocol', 'training_patient_for_stats'),
+        #             ('protocol', 'test')])
+        env.assign(list((a, s) for a in agents.keys() for s in subjects.keys()))
 
     stats_to_collect = ['TTR', 'dose_change', 'delta_dose']
     aggregators = ['min', 'max', 'mean','std', 'median']
@@ -373,14 +377,19 @@ if __name__ == "__main__":
 
         env.save(filename=f'./{filename}/{env_filename(i)}')
 
-        with open(f'./{filename}/{filename}.txt', 'a+') as f:
-            for k1, v1 in stats.items():
-                for l in v1:
-                    for k2, v2 in l.items():
-                        for row in range(v2.shape[0]):
-                            for col in range(v2.shape[1]):
-                                print(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
-                                f.write(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}\n')
+        try:
+            with open(f'./{filename}/{filename}.txt', 'a') as f:
+                for k1, v1 in stats.items():
+                    for l in v1:
+                        for k2, v2 in l.items():
+                            for row in range(v2.shape[0]):
+                                for col in range(v2.shape[1]):
+                                    print(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
+                                    # f.write(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}\n')
+                                    f.write(f'{i}\t{k1[0]}\t{k1[1]}\t{k2}\t{v2.columns[col]}\t{v2.index[row][0]}\t{v2.index[row][1]}\t{v2.iat[row, col]}\n')
+        except (FileExistsError, FileNotFoundError):
+            with open(f'./{filename}/{filename}.txt', 'a+') as f:
+                f.write(f'run\tagent\tsubject\tstat\taggregator\tsensitivity\tage>=65\tvalue\n')
 
         # trajectories = []
         # for label in output.keys():
