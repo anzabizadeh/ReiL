@@ -310,8 +310,12 @@ class WarfarinModel_v5(Subject):
                 temp = np.sum(np.abs(np.diff(self._patient.dose))>0)
             elif s == 'delta_dose':
                 temp = np.sum(np.abs(np.diff(self._patient.dose)))
+            else:
+                print(f'WARNING! {s} is not one of the available stats!')
+                continue
 
             results[s] = temp
+
         results['ID'] = RLData({'age': self._characteristics['age'],
                                 'CYP2C9': self._characteristics['CYP2C9'],
                                 'VKORC1': self._characteristics['VKORC1']},
