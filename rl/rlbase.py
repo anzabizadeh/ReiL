@@ -8,11 +8,13 @@ The base class for reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from dill import load, dump, HIGHEST_PROTOCOL
-from random import randrange
-import pathlib
+import logging
 import os
+import pathlib
+from random import randrange
 from time import sleep
+
+from dill import HIGHEST_PROTOCOL, dump, load
 
 from .data_collector import DataCollector
 
@@ -35,10 +37,15 @@ class RLBase():
     def __init__(self, **kwargs):
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
+
         self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
                           ex_protocol_options={}, ex_protocol_current={}, requested_exchange_protocol={},
-                          stats_list=[])
+                          stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename='log.log')
         self.set_params(**kwargs)
+
+        self._logger = logging.getLogger(self._logger_name)
+        self._logger.setLevel(self._logger_level)
+        self._logger.addHandler(logging.FileHandler(self._logger_filename))
 
         if False:
             self._name, self._version, self._path = [], [], []
@@ -123,7 +130,8 @@ class RLBase():
         try:  # filename
             filename = kwargs['filename']
         except KeyError:
-            raise ValueError('name of the output file not specified.')
+            self._logger.exception('Name of the output file not specified.')
+            raise ValueError('Name of the output file not specified.')
         path = kwargs.get('path', self._path)
 
         with open(os.path.join(path, filename + '.pkl'), 'rb') as f:
@@ -131,10 +139,12 @@ class RLBase():
                 data = load(f)
             except EOFError:
                 try:
+                    self._logger.info(f'First attempt failed to load {filename}.')
                     sleep(5)
                     data = load(f)
                 except EOFError:
-                    raise RuntimeError('Corrupted data file: '+filename)
+                    self._logger.exception(f'Corrupted or inaccessible data file: {filename}')
+                    raise RuntimeError(f'Corrupted or inaccessible data file: {filename}')
             for key, value in data.items():
                 self.__dict__[key] = value
             self.data_collector._object = self
