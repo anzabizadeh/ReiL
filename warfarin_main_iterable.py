@@ -36,7 +36,7 @@ all_args = {
     'test_size': {'type': int, 'default': 50},
     'training_save_path': {'type': str, 'default': './training'},
     'test_save_path': {'type': str, 'default': './test'},
-    'max_day': {'type': int, 'default': 91},
+    'max_day': {'type': int, 'default': 90},
     'dose_history': {'type': int, 'default': 10},
     'INR_history': {'type': int, 'default': 10},
     'patient_selection_training': {'type': str, 'default': 'ravvaz'},
@@ -149,38 +149,9 @@ if __name__ == "__main__":
 
     epsilon = lambda n: 1/(1+n/200)
 
-    # patient_model = 'W'
-
-    # text = ''.join((str(args["hidden_layer_sizes"]),
-    #                     'g', str(args["gamma"]),
-    #                     'e', 'fn' if callable(epsilon) else str(epsilon),
-    #                     'bff', str(args["buffer_size"]),
-    #                     'clr', 'T' if args["clear_buffer"] else 'F',
-    #                     'btch', str(args["batch_size"]),
-    #                     'vld', str(args["validation_split"])))
-
-    # filename = ''.join((patient_model,
-    #                     f'{args["max_day"]:2}' + 'day',
-    #                     f'd_{args["dose_history"]:2}',
-    #                     f'INR_{args["INR_history"]:2}',
-    #                     'T' if args["randomized"] else 'F',
-    #                     f'd_chg_coef_{args["dose_change_penalty_coef"]:2.2f}',
-    #                     f'func{args["dose_change_penalty_func"]}',
-    #                     f'ahead_coef_{args["lookahead_penalty_coef"]}',
-    #                     f'aheadd{args["lookahead_duration"]}',
-    #                     f'ph1_{args["initial_phase_duration"]:2}',
-    #                     f'ph1chg_{args["max_initial_dose_change"]:2}',
-    #                     f'mxd1_{args["max_day_1_dose"]:2}',
-    #                     f'ph2d_{args["maintenance_day_interval"]:2}',
-    #                     f'ph2chg_{args["max_maintenance_dose_change"]:2}',
-    #                     args["agent_type"],
-    #                     'fwd' if args["method"].lower() == 'forward' else 'bwd', text)
-    #                     ).replace(' ', '')
-
-
     filename = args["project_name"]
     try:
-        env = Environment(filename=f'./{filename}/{filename}')
+        env = Environment(filename=f'{filename}', path=f'{filename}')
         agents = env._agent
         subjects = env._subject
         assignment_list = list((a, s) for a in agents.keys() for s in subjects.keys())
@@ -348,14 +319,11 @@ if __name__ == "__main__":
 
         # update environment
         env.add(agents=agents, subjects=subjects)
-        # env.assign([('protocol', 'training'),
-        #             ('protocol', 'training_patient_for_stats'),
-        #             ('protocol', 'test')])
         assignment_list = list((a, s) for a in agents.keys() for s in subjects.keys())
         env.assign(assignment_list)
 
-    stats_to_collect = ['TTR', 'dose_change', 'delta_dose']
-    aggregators = ['min', 'max', 'mean','std', 'median']
+    stats_to_collect = ('TTR', 'dose_change', 'delta_dose')
+    aggregators = ('min', 'max', 'mean','std', 'median')
     warf_stats = WarfarinStats(active_stats=stats_to_collect,
                                aggregators=aggregators,
                                groupby=['sensitivity'])
@@ -376,7 +344,7 @@ if __name__ == "__main__":
 
     for i in range(args["epochs"]):
         print(f'run {i: }')
-        stats, output = \
+        stats_output, trajectory_output = \
             env.elapse_iterable(
                 training_mode=training_mode,
                 stats_func=warf_stats.aggregate,
@@ -387,7 +355,7 @@ if __name__ == "__main__":
 
         try:
             with open(f'./{filename}/{filename}.txt', 'a') as f:
-                for k1, v1 in stats.items():
+                for k1, v1 in stats_output.items():
                     for l in v1:
                         for k2, v2 in l.items():
                             for row in range(v2.shape[0]):
@@ -399,18 +367,18 @@ if __name__ == "__main__":
             with open(f'./{filename}/{filename}.txt', 'a+') as f:
                 f.write(f'run\tagent\tsubject\tstat\taggregator\tsensitivity\tage>=65\tvalue\n')
 
-        # trajectories = []
-        # for label in output.keys():
-        #     for hist in output[label]:
-        #         trajectories += [(i, label, h['instance_id'],
-        #             h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
-        #             h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
-        # trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject',
-        #                   'instance_id', 'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action',
-        #                   'reward'])
-        # trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(periods=-1)
-        # trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
-        # trajectories_df['INR'] = trajectories_df.apply(
-        #     lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
-        # trajectories_df.drop('shifted_id', axis=1, inplace=True)
-        # trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
+        trajectories = []
+        for label in trajectory_output.keys():
+            for hist in trajectory_output[label]:
+                trajectories += [(i, label, h['instance_id'],
+                    h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
+                    h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
+        trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject',
+                          'instance_id', 'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action',
+                          'reward'])
+        trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(periods=-1)
+        trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
+        trajectories_df['INR'] = trajectories_df.apply(
+            lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
+        trajectories_df.drop('shifted_id', axis=1, inplace=True)
+        trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
