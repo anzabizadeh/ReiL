@@ -98,11 +98,19 @@ class WarfarinStats(Stats):
 
     def aggregate(self, agent_stats=None, subject_stats=None):
         df = pd.DataFrame.from_dict(subject_stats)
-        df['age'] = df['ID'].apply(lambda row: row['age'][-1])
-        df['CYP2C9'] = df['ID'].apply(lambda row: row['CYP2C9'][-1])
-        df['VKORC1'] = df['ID'].apply(lambda row: row['VKORC1'][-1])
-        df['sensitivity'] = df.apply(self._sensitivity, axis=1)
-        df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
+
+        if 'age' in self._groupby:
+            df['age'] = df['ID'].apply(lambda row: row['age'][-1])
+        if 'CYP2C9' in self._groupby:
+            df['CYP2C9'] = df['ID'].apply(lambda row: row['CYP2C9'][-1])
+        if 'VKORC1' in self._groupby:
+            df['VKORC1'] = df['ID'].apply(lambda row: row['VKORC1'][-1])
+        if 'sensitivity' in self._groupby:
+            df['sensitivity'] = df.apply(self._sensitivity, axis=1)
+            df.replace({'sensitivity': {1: 'normal', 2: 'sensitive', 4: 'highly sensitive'}}, inplace=True)
+
+        if 'ID' in self._groupby:
+            df['ID'] = df.index  # since type(ID)=rldata and cannot be used in groupby, we replace it with row index.
 
         results = {}
         for g in self._groupby:
@@ -132,7 +140,7 @@ class WarfarinStats(Stats):
             else:
                 continue
 
-            stat_temp = temp.agg([(f'{stat}_{func}', func) for func in self._aggregators])
+            stat_temp = temp.agg([(func, func) for func in self._aggregators])
                 # pd.DataFrame([
                 # temp.max().rename(f'{stat}_max'),
                 # temp.min().rename(f'{stat}_min'),
