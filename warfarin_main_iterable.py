@@ -63,7 +63,7 @@ all_args = {
     'max_day_1_dose': {'type': float, 'default': 15.0},
     'maintenance_day_interval': {'type': int, 'default': 1},
     'max_maintenance_dose_change': {'type': float, 'default': 15.0},
-    'extended_state': {'type': bool, 'default': False},
+    'state_representation': {'type': str, 'default': 'standard'},
     'save_instances': {'type': bool, 'default': False},
     'save_epochs': {'type': bool, 'default': False},
     'tf_log': {'type': bool, 'default': False}
@@ -196,13 +196,13 @@ if __name__ == "__main__":
                     dose_change_penalty_func=dose_change_penalty_func,
                     lookahead_penalty_coef=args["lookahead_penalty_coef"],
                     lookahead_duration=args["lookahead_duration"],
-                    extended_state=args["extended_state"],
                     randomized=args["randomized"],
                     initial_phase_duration=args["initial_phase_duration"],
                     max_initial_dose_change=args["max_initial_dose_change"],
                     max_day_1_dose=args["max_day_1_dose"],
                     maintenance_day_interval=args["maintenance_day_interval"],
-                    max_maintenance_dose_change=args["max_maintenance_dose_change"])
+                    max_maintenance_dose_change=args["max_maintenance_dose_change"],
+                    ex_protocol_current={'state': args["extended_state"]})
 
             subjects['training'] = \
                 IterableSubject(subject=training_patient,
@@ -227,14 +227,13 @@ if __name__ == "__main__":
                     dose_change_penalty_func=dose_change_penalty_func,
                     lookahead_penalty_coef=args["lookahead_penalty_coef"],
                     lookahead_duration=args["lookahead_duration"],
-                    extended_state=args["extended_state"],
                     randomized=args["randomized"],
                     initial_phase_duration=args["initial_phase_duration"],
                     max_initial_dose_change=args["max_initial_dose_change"],
                     max_day_1_dose=args["max_day_1_dose"],
                     maintenance_day_interval=args["maintenance_day_interval"],
                     max_maintenance_dose_change=args["max_maintenance_dose_change"],
-                    ex_protocol_current={'take_effect': 'no_reward'})
+                    ex_protocol_current={'state': args["extended_state"], 'take_effect': 'no_reward'})
 
             subjects['training_patient_for_stats'] = \
                 IterableSubject(subject=training_patient_for_stats,
@@ -264,14 +263,13 @@ if __name__ == "__main__":
                     dose_change_penalty_func=dose_change_penalty_func,
                     lookahead_penalty_coef=args["lookahead_penalty_coef"],
                     lookahead_duration=args["lookahead_duration"],
-                    extended_state=args["extended_state"],
                     randomized=args["randomized"],
                     initial_phase_duration=args["initial_phase_duration"],
                     max_initial_dose_change=args["max_initial_dose_change"],
                     max_day_1_dose=args["max_day_1_dose"],
                     maintenance_day_interval=args["maintenance_day_interval"],
                     max_maintenance_dose_change=args["max_maintenance_dose_change"],
-                    ex_protocol_current={'take_effect': 'no_reward'})
+                    ex_protocol_current={'state': args["extended_state"], 'take_effect': 'no_reward'})
 
             subjects['test'] = \
                 IterableSubject(subject=test_patient,
@@ -353,19 +351,18 @@ if __name__ == "__main__":
 
         env.save(filename=f'./{filename}/{env_filename(i)}')
 
-        try:
-            with open(f'./{filename}/{filename}.txt', 'a') as f:
-                for k1, v1 in stats_output.items():
-                    for l in v1:
-                        for k2, v2 in l.items():
-                            for row in range(v2.shape[0]):
-                                for col in range(v2.shape[1]):
-                                    print(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
-                                    # f.write(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}\n')
-                                    f.write(f'{i}\t{k1[0]}\t{k1[1]}\t{k2}\t{v2.columns[col]}\t{v2.index[row][0]}\t{v2.index[row][1]}\t{v2.iat[row, col]}\n')
-        except (FileExistsError, FileNotFoundError):
+        if not Path(f'./{filename}/{filename}.txt').exists():
             with open(f'./{filename}/{filename}.txt', 'a+') as f:
                 f.write(f'run\tagent\tsubject\tstat\taggregator\tsensitivity\tage>=65\tvalue\n')
+        with open(f'./{filename}/{filename}.txt', 'a') as f:
+            for k1, v1 in stats_output.items():
+                for l in v1:
+                    for k2, v2 in l.items():
+                        for row in range(v2.shape[0]):
+                            for col in range(v2.shape[1]):
+                                print(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
+                                f.write(f'{i}\t{k1[0]}\t{k1[1]}\t{k2}\t{v2.columns[col]}\t{v2.index[row][0]}\t{v2.index[row][1]}\t{v2.iat[row, col]}\n')
+
 
         trajectories = []
         for label in trajectory_output.keys():
