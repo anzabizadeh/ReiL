@@ -10,7 +10,7 @@ The base class for reinforcement learning
 
 import logging
 import os
-import pathlib
+from pathlib import Path
 from random import randrange
 from time import sleep
 
@@ -40,7 +40,7 @@ class RLBase():
 
         self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
                           ex_protocol_options={}, ex_protocol_current={}, requested_exchange_protocol={},
-                          stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename='log.log')
+                          stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename=f'{__name__}.log')
         self.set_params(**kwargs)
 
         self._logger = logging.getLogger(self._logger_name)
@@ -132,15 +132,15 @@ class RLBase():
         except KeyError:
             self._logger.exception('Name of the output file not specified.')
             raise ValueError('Name of the output file not specified.')
-        path = kwargs.get('path', self._path)
+        path = Path(kwargs.get('path', self._path))
 
-        with open(os.path.join(path, filename + '.pkl'), 'rb') as f:
+        with open(path / f'{filename}.pkl', 'rb') as f:
             try:
                 data = load(f)
             except EOFError:
                 try:
                     self._logger.info(f'First attempt failed to load {filename}.')
-                    sleep(5)
+                    sleep(1)
                     data = load(f)
                 except EOFError:
                     self._logger.exception(f'Corrupted or inaccessible data file: {filename}')
@@ -161,7 +161,7 @@ class RLBase():
         '''
 
         filename = kwargs.get('filename', self._name)
-        path = kwargs.get('path', self._path)
+        path = Path(kwargs.get('path', self._path))
         try:  # data
             data = {}
             for d in kwargs['data']:
@@ -171,8 +171,8 @@ class RLBase():
         except KeyError:
             data = self.__dict__
 
-        pathlib.Path(path).mkdir(parents=True, exist_ok=True) 
-        with open(os.path.join(path, filename + '.pkl'), 'wb+') as f:
+        Path(path).mkdir(parents=True, exist_ok=True) 
+        with open(path / f'{filename}.pkl', 'wb+') as f:
             dump(data, f, HIGHEST_PROTOCOL)
 
         return path, filename

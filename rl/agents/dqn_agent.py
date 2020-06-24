@@ -10,6 +10,7 @@ A Q-learning agent with Neural Network Q-function approximator
 
 
 import os
+from pathlib import Path
 from dill import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
@@ -112,7 +113,7 @@ class DQNAgent(Agent):
 
             self._callbacks = []
             if self._tensorboard_path is not None:
-                self._tensorboard_path = os.path.join('logs', self._tensorboard_path)
+                self._tensorboard_path = Path('logs', self._tensorboard_path)
                 self._tensorboard = keras.callbacks.TensorBoard(
                     log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
                 self._callbacks.append(self._tensorboard)
@@ -301,8 +302,8 @@ class DQNAgent(Agent):
         self._graph = tf.Graph()
         with self._graph.as_default():
             self._session = keras.backend.get_session()
-            self._model = keras.models.load_model(kwargs.get(
-                'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+            self._model = keras.models.load_model(Path(kwargs.get(
+                'path', self._path), kwargs['filename'] + '.tf', kwargs['filename']))
             self._tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self._tensorboard_path)  #, histogram_freq=1)  # , write_images=True)
             self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(self._lr_scheduler)
@@ -326,15 +327,14 @@ class DQNAgent(Agent):
         try:
             with self._session.as_default():
                 with self._graph.as_default():
-                    self._model.save(kwargs.get('path', self._path) + '/' +
-                                    kwargs['filename'] + '.tf/' + kwargs['filename'])
+                    self._model.save(Path(kwargs.get('path', self._path),
+                                    kwargs['filename'] + '.tf', kwargs['filename']))
         except OSError:
-            os.makedirs(kwargs.get('path', self._path) +
-                        '/' + kwargs['filename'] + '.tf/')
+            os.makedirs(Path(kwargs.get('path', self._path), kwargs['filename'] + '.tf'))
             with self._session.as_default():
                 with self._graph.as_default():
-                    self._model.save(kwargs.get('path', self._path) + '/' +
-                                    kwargs['filename'] + '.tf/' + kwargs['filename'])
+                    self._model.save(Path(kwargs.get('path', self._path),
+                        kwargs['filename'] + '.tf', kwargs['filename']))
         return path, filename
 
     def reset(self):

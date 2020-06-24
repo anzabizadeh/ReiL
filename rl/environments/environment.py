@@ -10,7 +10,7 @@ This `environment` class provides a learning environment for any reinforcement l
 
 from dill import load, dump, HIGHEST_PROTOCOL
 from functools import reduce
-import os
+from pathlib import Path
 import sys
 import pandas as pd
 
@@ -509,20 +509,20 @@ class Environment(RLBase):
         '''
         object_name = kwargs.get('object_name', 'all')
         filename = kwargs.get('filename', self._name)
-        path = kwargs.get('path', self._path)
+        path = Path(kwargs.get('path', self._path))
 
         if object_name == 'all':
-            RLBase.load(self, filename=filename)
+            RLBase.load(self, filename=filename, path=path)
             self._agent = {}
             self._subject = {}
             for name, obj_type in self._env_data['agents']:
                 self._agent[name] = obj_type()
                 self._agent[name].load(
-                    path=os.path.join(path, filename + '.data'), filename=name)
+                    path=(path / f'{filename}.data'), filename=name)
             for name, obj_type in self._env_data['subjects']:
                 self._subject[name] = obj_type()
                 self._subject[name].load(
-                    path=os.path.join(path, filename + '.data'), filename=name)
+                    path=(path / f'{filename}.data'), filename=name)
 
             del self._env_data
 
@@ -530,11 +530,11 @@ class Environment(RLBase):
             for obj in object_name:
                 if obj in self._agent:
                     self._agent[obj].load(
-                        path=os.path.join(path, filename + '.data'), filename=obj)
+                        path=(path / f'{filename}.data'), filename=obj)
                     self._agent[obj].reset()
                 elif obj in self._subject:
                     self._subject[obj].load(
-                        path=os.path.join(path, filename + '.data'), filename=obj)
+                        path=(path / f'{filename}.data'), filename=obj)
                     self._subject[obj].reset()
 
     def save(self, **kwargs):
@@ -549,18 +549,17 @@ class Environment(RLBase):
         '''
         object_name = kwargs.get('object_name', 'all')
         filename = kwargs.get('filename', self._name)
-        path = kwargs.get('path', self._path)
+        path = Path(kwargs.get('path', self._path))
 
         if object_name == 'all':
             self._env_data = {'agents': [], 'subjects': []}
 
             for name, agent in self._agent.items():
-                _, fn = agent.save(path=os.path.join(path, filename + '.data'), filename=name)
+                _, fn = agent.save(path=path / f'{filename}.data', filename=name)
                 self._env_data['agents'].append((fn, type(agent)))
 
             for name, subject in self._subject.items():
-                _, fn = subject.save(
-                    path=os.path.join(path, filename + '.data'), filename=name)
+                _, fn = subject.save(path=path / f'{filename}.data', filename=name)
                 self._env_data['subjects'].append((fn, type(subject)))
 
             RLBase.save(self, filename=filename, path=path,
@@ -571,11 +570,9 @@ class Environment(RLBase):
         else:
             for obj in object_name:
                 if obj in self._agent:
-                    self._agent[obj].save(
-                        path=os.path.join(path, filename + '.data'), filename=obj)
+                    self._agent[obj].save(path=path / f'{filename}.data', filename=obj)
                 elif obj in self._subject:
-                    self._subject[obj].save(
-                        path=os.path.join(path, filename + '.data'), filename=obj)
+                    self._subject[obj].save(path=path / f'{filename}.data', filename=obj)
 
     def __repr__(self):
         try:
