@@ -29,18 +29,20 @@ from rl.subjects import IterableSubject, WarfarinModelFixedInterval, WarfarinMod
 
 all_args = {
     'project_name': {'type': str, 'default': None},
-    'subject': {'type': str, 'default': 'WarfarinModel_v5'},
     'start_epoch': {'type': int, 'default': 0},
     'epochs': {'type': int, 'default': 200},
     'training_size': {'type': int, 'default': 250},
-    'test_size': {'type': int, 'default': 50},
     'training_save_path': {'type': str, 'default': './training'},
-    'test_save_path': {'type': str, 'default': './test'},
+    'test_size': {'type': int, 'default': 10000},
+    'test_save_path': {'type': str, 'default': './comparison_test_set'},
     'max_day': {'type': int, 'default': 90},
-    'dose_history': {'type': int, 'default': 10},
-    'INR_history': {'type': int, 'default': 10},
+    'dose_history_length': {'type': int, 'default': 10},
+    'INR_history_length': {'type': int, 'default': 10},
+    'interval': {'type': int, 'default': (1,)},
+    'interval_max_dose': {'type': int, 'default': (15,)},
     'patient_selection_training': {'type': str, 'default': 'ravvaz'},
-    'patient_selection_test': {'type': str, 'default': 'ravvaz'},
+    'patient_selection_test': {'type': str, 'default': 'random'},
+    'action_type': {'type': str, 'default': 'dose_only'},
     'INR_penalty_coef': {'type': float, 'default': 1.0},
     'dose_change_penalty_coef': {'type': float, 'default': 0.0},
     'dose_change_penalty_func': {'type': str, 'default': 'none'},
@@ -63,7 +65,7 @@ all_args = {
     'max_day_1_dose': {'type': float, 'default': 15.0},
     'maintenance_day_interval': {'type': int, 'default': 1},
     'max_maintenance_dose_change': {'type': float, 'default': 15.0},
-    'state_representation': {'type': str, 'default': 'standard'},
+    'state_representation': {'type': str, 'default': 'extended'},
     'save_instances': {'type': bool, 'default': False},
     'save_epochs': {'type': bool, 'default': False},
     'tf_log': {'type': bool, 'default': False}
@@ -167,42 +169,40 @@ if __name__ == "__main__":
                 lambda x: int(max(x[-i]!=x[-i-1]
                     for i in range(1, args["dose_change_penalty_days"])))
         elif args["dose_change_penalty_func"] == 'stdev':
-            if args["dose_change_penalty_days"] == args["dose_history"]:
+            if args["dose_change_penalty_days"] == args["dose_history_length"]:
                 dose_change_penalty_func = lambda x: stdev(x)
             else:
                 dose_change_penalty_func = \
                     lambda x: stdev(list(itertools.islice(x,
-                        args["dose_history"] - args["dose_change_penalty_days"], args["dose_history"])))
+                        args["dose_history_length"] - args["dose_change_penalty_days"], args["dose_history_length"])))
         elif args["dose_change_penalty_func"] == 'change_count':
-            if args["dose_change_penalty_days"] == args["dose_history"]:
+            if args["dose_change_penalty_days"] == args["dose_history_length"]:
                 dose_change_penalty_func = lambda x: (np.diff(x) != 0).sum()
             else:
                 dose_change_penalty_func = \
                     lambda x: (np.diff(itertools.islice(x,
-                        args["dose_history"] - args["dose_change_penalty_days"],
-                        args["dose_history"])) != 0).sum()
+                        args["dose_history_length"] - args["dose_change_penalty_days"],
+                        args["dose_history_length"])) != 0).sum()
 
-        warfarin_subject = warfarin_subjects_list[args["subject"].lower()]
+        warfarin_subject = warfarin_subjects_list['warfarinmodel']
 
         # define subjects
         if args["training_size"]>0:
             training_patient = \
                 warfarin_subject(max_day=args["max_day"],
                     patient_selection=args["patient_selection_training"],
-                    dose_history=args["dose_history"],
-                    INR_history=args["INR_history"],
+                    dose_history_length=args["dose_history_length"],
+                    INR_history_length=args["INR_history_length"],
+                    action_type=args["action_type"],
                     INR_penalty_coef=args["INR_penalty_coef"],
                     dose_change_penalty_coef=args["dose_change_penalty_coef"],
                     dose_change_penalty_func=dose_change_penalty_func,
                     lookahead_penalty_coef=args["lookahead_penalty_coef"],
                     lookahead_duration=args["lookahead_duration"],
                     randomized=args["randomized"],
-                    initial_phase_duration=args["initial_phase_duration"],
-                    max_initial_dose_change=args["max_initial_dose_change"],
-                    max_day_1_dose=args["max_day_1_dose"],
-                    maintenance_day_interval=args["maintenance_day_interval"],
-                    max_maintenance_dose_change=args["max_maintenance_dose_change"],
-                    ex_protocol_current={'state': args["extended_state"]})
+                    interval=args["interval"],
+                    interval_max_dose=args["interval_max_dose"],
+                    ex_protocol_current={'state': args["state_representation"]})
 
             subjects['training'] = \
                 IterableSubject(subject=training_patient,
@@ -220,20 +220,18 @@ if __name__ == "__main__":
             training_patient_for_stats = \
                 warfarin_subject(max_day=args["max_day"],
                     patient_selection=args["patient_selection_training"],
-                    dose_history=args["dose_history"],
-                    INR_history=args["INR_history"],
+                    dose_history_length=args["dose_history_length"],
+                    INR_history_length=args["INR_history_length"],
+                    action_type=args["action_type"],
                     INR_penalty_coef=args["INR_penalty_coef"],
                     dose_change_penalty_coef=args["dose_change_penalty_coef"],
                     dose_change_penalty_func=dose_change_penalty_func,
                     lookahead_penalty_coef=args["lookahead_penalty_coef"],
                     lookahead_duration=args["lookahead_duration"],
                     randomized=args["randomized"],
-                    initial_phase_duration=args["initial_phase_duration"],
-                    max_initial_dose_change=args["max_initial_dose_change"],
-                    max_day_1_dose=args["max_day_1_dose"],
-                    maintenance_day_interval=args["maintenance_day_interval"],
-                    max_maintenance_dose_change=args["max_maintenance_dose_change"],
-                    ex_protocol_current={'state': args["extended_state"], 'take_effect': 'no_reward'})
+                    interval=args["interval"],
+                    interval_max_dose=args["interval_max_dose"],
+                    ex_protocol_current={'state': args["state_representation"], 'take_effect': 'no_reward'})
 
             subjects['training_patient_for_stats'] = \
                 IterableSubject(subject=training_patient_for_stats,
@@ -256,20 +254,18 @@ if __name__ == "__main__":
             test_patient = \
                 warfarin_subject(max_day=args["max_day"],
                     patient_selection=args["patient_selection_test"],
-                    dose_history=args["dose_history"],
-                    INR_history=args["INR_history"],
+                    dose_history_length=args["dose_history_length"],
+                    INR_history_length=args["INR_history_length"],
+                    action_type=args["action_type"],
                     INR_penalty_coef=args["INR_penalty_coef"],
                     dose_change_penalty_coef=args["dose_change_penalty_coef"],
                     dose_change_penalty_func=dose_change_penalty_func,
                     lookahead_penalty_coef=args["lookahead_penalty_coef"],
                     lookahead_duration=args["lookahead_duration"],
                     randomized=args["randomized"],
-                    initial_phase_duration=args["initial_phase_duration"],
-                    max_initial_dose_change=args["max_initial_dose_change"],
-                    max_day_1_dose=args["max_day_1_dose"],
-                    maintenance_day_interval=args["maintenance_day_interval"],
-                    max_maintenance_dose_change=args["max_maintenance_dose_change"],
-                    ex_protocol_current={'state': args["extended_state"], 'take_effect': 'no_reward'})
+                    interval=args["interval"],
+                    interval_max_dose=args["interval_max_dose"],
+                    ex_protocol_current={'state': args["state_representation"], 'take_effect': 'no_reward'})
 
             subjects['test'] = \
                 IterableSubject(subject=test_patient,
