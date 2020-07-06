@@ -8,8 +8,10 @@ A data type used for state and action variables.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+# from __future__ import annotations
 from numbers import Number
 from collections.abc import Iterable
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Union
 
 
 class RLData(dict):
@@ -27,7 +29,14 @@ class RLData(dict):
 
         return obj
 
-    def __init__(self, value=[0], **kwargs):
+    def __init__(self, value: Optional[Union[Sequence, dict]] = [0],
+                 lower: Optional[Union[Sequence, dict]] = None,
+                 upper: Optional[Union[Sequence, dict]] = None,
+                 categories: Optional[Union[Sequence, dict]] = None,
+                 is_numerical: Optional[Union[Sequence[bool], Dict[Any, bool]]] = None,
+                 normalizer: Optional[Union[Callable[[dict], Number], Callable[[dict], List[Number]],
+                                            Dict[Any, Callable[[dict], Number]], Dict[Any, Callable[[dict], List[Number]]]]] = None,
+                 lazy_evaluation: Optional[bool] = False) -> None:
         '''
         Create an RLData instance.
 
@@ -43,44 +52,36 @@ class RLData(dict):
 
         self.value = value
 
-        try:
-            self.is_numerical = kwargs['is_numerical']
-        except KeyError:
-            pass
+        if is_numerical is not None:
+            self.is_numerical = is_numerical
 
-        try:
-            self.lower = kwargs['lower']
-        except KeyError:
-            pass
+        if lower is not None:
+            self.lower = lower
 
-        try:
-            self.upper = kwargs['upper']
-        except KeyError:
-            pass
+        if upper is not None:
+            self.upper = upper
 
-        try:
-            self.categories = kwargs['categories']
-        except KeyError:
-            pass
+        if categories is not None:
+            self.categories = categories
 
-        try:
-            self.normalizer = kwargs['normalizer']
-        except KeyError:
-            pass
+        if normalizer is not None:
+            self.normalizer = normalizer
+
         self._normalizer_lambda_func = lambda x: (x['value']-x['lower'])/(
             x['upper']-x['lower']) if x['is_numerical'] else list(int(x_i == x['value']) for x_i in x['categories'])
 
-        self._lazy = kwargs.get('lazy_evaluation', False)
+        if lazy_evaluation is not None:
+            self._lazy = lazy_evaluation
 
         if not self._lazy:
             self._normalized = self._normalize()
 
     @property
-    def value(self):
+    def value(self) -> "RLData":
         return self._value
 
     @value.setter
-    def value(self, v):
+    def value(self, v: Union[Sequence, dict]) -> None:
         '''
         Sets the value of the RLData instance.
 
@@ -94,14 +95,14 @@ class RLData(dict):
             self.__setitem__(None, v)
 
     @property
-    def lower(self):
+    def lower(self) -> Union[list, dict]:
         '''
         Return the lower bound
         '''
         return self._lower
 
     @lower.setter
-    def lower(self, value):
+    def lower(self, value: Union[Sequence, dict]) -> None:
         '''
         Set the lower bound
 
@@ -132,14 +133,14 @@ class RLData(dict):
             self._normalized = self._normalize()
 
     @property
-    def upper(self):
+    def upper(self) -> Union[list, dict]:
         '''
         Return the upper bound
         '''
         return self._upper
 
     @upper.setter
-    def upper(self, value):
+    def upper(self, value: Union[Sequence, dict]) -> None:
         '''
         Set the upper bound
 
@@ -170,14 +171,14 @@ class RLData(dict):
             self._normalized = self._normalize()
 
     @property
-    def categories(self):
+    def categories(self) -> Union[list, dict]:
         '''
         Return the list of all categories.
         '''
         return self._categories
 
     @categories.setter
-    def categories(self, value):
+    def categories(self, value: Union[Sequence, dict]) -> None:
         '''
         Set the categories (for categorical components only)
         '''
@@ -193,14 +194,14 @@ class RLData(dict):
             self._normalized = self._normalize()
 
     @property
-    def is_numerical(self):
+    def is_numerical(self) -> Union[list, dict]:
         '''
         Return a boolean dataframe that shows if each component is numerical or not.
         '''
         return self._is_numerical
 
     @is_numerical.setter
-    def is_numerical(self, value):
+    def is_numerical(self, value: Union[Sequence, dict]) -> None:
         # If it was numerical and the user assigns numerical (True and True) then it remains numerical.
         # But if it is not numerical, then we cannot change it to numerical.
         try:
@@ -213,11 +214,11 @@ class RLData(dict):
             self._normalized = self._normalize()
 
     @property
-    def normalizer(self):
+    def normalizer(self) -> Union[list, dict]:
         return self._normalizer
 
     @normalizer.setter
-    def normalizer(self, value):
+    def normalizer(self, value: Union[Sequence, dict]) -> None:
         try:
             for i, val in value.items():
                 self._normalizer[i] = val
@@ -227,14 +228,14 @@ class RLData(dict):
         if not self._lazy:
             self._normalized = self._normalize()
 
-    def as_list(self):
+    def as_list(self) -> list:
         ''' return the value as list.'''
         try:
             return self.__remove_nestings(self._value.values())
         except AttributeError:
             return self._value
 
-    def as_rldata_array(self):
+    def as_rldata_array(self) -> List["RLData"]:
         ''' return the value as a list of RLData.'''
         try:
             array = [RLData(value=self._value[key],
@@ -253,7 +254,7 @@ class RLData(dict):
 
         return array
 
-    def __remove_nestings(self, l):
+    def __remove_nestings(self, l: list) -> list:
         output = []
         for i in l:
             if isinstance(i, (list, dict)):
@@ -263,7 +264,7 @@ class RLData(dict):
 
         return output
 
-    def _normalize(self):
+    def _normalize(self) -> list:
         temp = []
         try:
             for i in self._value.keys():
@@ -315,7 +316,7 @@ class RLData(dict):
 
         return self.__remove_nestings(temp)
 
-    def normalize(self):
+    def normalize(self) -> "RLData":
         '''
         Normalize values.
 
@@ -326,7 +327,7 @@ class RLData(dict):
         else:
             return RLData(self._normalized, lower=0, upper=1, lazy_evaluation=True)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any) -> "RLData":
         if key is None and isinstance(self._value, dict):
             self._value = []
             del self._is_numerical
@@ -403,7 +404,7 @@ class RLData(dict):
 
         return value
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Any) -> "RLData":
         try:
             return RLData(self._value[key],
                           lower=self._lower[key],
@@ -424,7 +425,7 @@ class RLData(dict):
                               normalizer=self._normalizer,
                               lazy_evaluation=self._lazy)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: Any) -> None:
         del self._value[key]
 
         try:
@@ -440,13 +441,13 @@ class RLData(dict):
         except KeyError:
             pass
 
-    def clear(self):
+    def clear(self) -> Union[list, dict]:
         return self._value.clear()
 
-    def has_key(self, k):
+    def has_key(self, k: Any) -> bool:
         return k in self._value.keys()
 
-    def update(self, kwargs):
+    def update(self, kwargs: Union["RLData", list, dict]) -> "RLData":
         try:
             if isinstance(kwargs._value, list):
                 if self.is_numerical:
@@ -466,7 +467,7 @@ class RLData(dict):
 
         return self.value
 
-    def keys(self):
+    def keys(self) -> Any:
         try:
             return self._value.keys()
         except AttributeError:
@@ -475,13 +476,13 @@ class RLData(dict):
             except TypeError:
                 return 0
 
-    def values(self):
+    def values(self) -> "RLData":
         try:
             return self._value.values()
         except AttributeError:
             return self._value
 
-    def items(self):
+    def items(self) -> enumerate:
         try:
             return self._value.items()
         except AttributeError:
@@ -490,16 +491,16 @@ class RLData(dict):
             except TypeError:
                 return enumerate([self._value])
 
-    def pop(self, *args):
+    def pop(self, *args: Any) -> "RLData":
         return self._value.pop(*args)
 
-    def __contains__(self, item):
+    def __contains__(self, item: Any) -> bool:
         return item in self._value
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         return iter(self._value)
 
-    def __add__(self, other):
+    def __add__(self, other: Union["RLData", list, dict]) -> "RLData":
         temp = RLData(value=self._value,
                       lower=self.lower,
                       upper=self.upper,
@@ -510,11 +511,11 @@ class RLData(dict):
         temp.update(other)
         return temp
 
-    def __iadd__(self, other):
+    def __iadd__(self, other: Union["RLData", list, dict]) -> "RLData":
         self.update(other)
         return self
 
-    def __eq__(self, other):
+    def __eq__(self, other: Union["RLData", list, dict]) -> bool:
         try:
             return (self.value == other.value).bool() and (
                 ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else
@@ -524,7 +525,7 @@ class RLData(dict):
                 ((self.upper == other.upper) and (self.lower == other.lower)) if self.is_numerical else
                 (self.categories == other.categories))
 
-    def __ge__(self, other):
+    def __ge__(self, other: Union["RLData", list, dict]) -> bool:
         if isinstance(other, RLData):
             other_value = other.value
         else:
@@ -535,7 +536,7 @@ class RLData(dict):
         except AttributeError:
             return (self.value >= other_value)
 
-    def __gt__(self, other):
+    def __gt__(self, other: Union["RLData", list, dict]) -> bool:
         if isinstance(other, RLData):
             other_value = other.value
         else:
@@ -546,7 +547,7 @@ class RLData(dict):
         except AttributeError:
             return (self.value > other_value)
 
-    def __le__(self, other):
+    def __le__(self, other: Union["RLData", list, dict]) -> bool:
         if isinstance(other, RLData):
             other_value = other.value
         else:
@@ -557,7 +558,7 @@ class RLData(dict):
         except AttributeError:
             return (self.value <= other_value)
 
-    def __lt__(self, other):
+    def __lt__(self, other: Union["RLData", list, dict]) -> bool:
         if isinstance(other, RLData):
             other_value = other.value
         else:
@@ -568,7 +569,7 @@ class RLData(dict):
         except AttributeError:
             return (self.value < other_value)
 
-    def __ne__(self, other):
+    def __ne__(self, other: Union["RLData", list, dict]) -> bool:
         if isinstance(other, RLData):
             other_value = other.value
         else:
@@ -579,7 +580,7 @@ class RLData(dict):
         except AttributeError:
             return (self.value != other_value)
 
-    def __format__(self, formatstr):
+    def __format__(self, formatstr: str) -> str:
         try:
             return '[' + ', '.join(format(i, formatstr) for i in self.value) + ']'
         except TypeError:
@@ -587,19 +588,19 @@ class RLData(dict):
         except AttributeError:
             return False
 
-    def __len__(self):
+    def __len__(self) -> int:
         try:
             return len(self._value)
         except TypeError:
             return 1
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._value.__hash__()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'[{str(self.value)}]\nlower={str(self._lower)}\nupper={str(self._upper)}\ncategories={str(self._categories)}'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._value)
 
 

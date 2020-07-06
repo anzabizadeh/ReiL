@@ -9,10 +9,10 @@ The base class for reinforcement learning
 '''
 
 import logging
-import os
 from pathlib import Path
 from random import randrange
 from time import sleep
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 from dill import HIGHEST_PROTOCOL, dump, load
 
@@ -39,7 +39,7 @@ class RLBase():
         self.data_collector = DataCollector(object=self)
 
         self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
-                          ex_protocol_options={}, ex_protocol_current={}, requested_exchange_protocol={},
+                          ex_protocol_options={}, ex_protocol_current={},  # requested_exchange_protocol={},
                           stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename=f'{__name__}.log')
         self.set_params(**kwargs)
 
@@ -52,7 +52,7 @@ class RLBase():
             self._ex_protocol_options, self._ex_protocol_current, self._requested_exchange_protocol = {}, {}, {}
             self._stats_list = []
     
-    def stats(self, stats_list):
+    def stats(self, stats_list: Sequence) -> Dict[str, Any]:
         '''
         Compute statistics.
 
@@ -62,23 +62,23 @@ class RLBase():
         '''
         return {}
 
-    def has_stat(self, stat):
+    def has_stat(self, stat: str) -> bool:
         return stat in self._stats_list
 
     @property
-    def exchange_protocol_options(self):
+    def exchange_protocol_options(self) -> Dict[str, Sequence[str]]:
         return self._ex_protocol_options
 
-    @property
-    def requested_exchange_protocol(self):
-        return self._requested_exchange_protocol
+    # @property
+    # def requested_exchange_protocol(self) -> Dict[str, str]:
+    #     return self._requested_exchange_protocol
 
     @property
-    def exchange_protocol(self):
+    def exchange_protocol(self) -> Dict[str, str]:
         return self._ex_protocol_current
 
     @exchange_protocol.setter
-    def exchange_protocol(self, p):
+    def exchange_protocol(self, p: Dict[str, str]) -> None:
         for k, v in p.items():
             if k in self._ex_protocol_options.keys():
                 if v in self._ex_protocol_options[k]:
@@ -86,7 +86,7 @@ class RLBase():
                 else:
                     raise KeyError(f'Protocol {k} does not have option {v}.')
 
-    def set_params(self, **params):
+    def set_params(self, **params: Dict[str, Any]) -> None:
         '''
         set parameters to values.
 
@@ -97,7 +97,7 @@ class RLBase():
         self.__dict__.update(('_'+key, params.get(key, self._defaults[key]))
                               for key in self._defaults if key in params)
 
-    def set_defaults(self, **params):
+    def set_defaults(self, **params: Dict[str, Any]) -> None:
         '''
         set parameters default values.
 
@@ -116,40 +116,34 @@ class RLBase():
                 self._defaults[key] = value
                 self.__dict__['_'+key] = value
 
-    def load(self, **kwargs):
+    def load(self, filename: str, path: Optional[str] = None) -> None:
         '''
         Load an object from a file.
 
         Arguments
         ---------
             filename: the name of the file to be loaded.
-            path: the path of the file to be loaded. (Default='.')
+            path: the path of the file to be loaded. (Object's default path will be used if not provided)
 
-        Raises ValueError if the filename is not specified.
         '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            self._logger.exception('Name of the output file not specified.')
-            raise ValueError('Name of the output file not specified.')
-        path = Path(kwargs.get('path', self._path))
+        _path = Path(path if path is not None else self._path)
 
-        with open(path / f'{filename}.pkl', 'rb') as f:
+        with open(_path / f'{filename}.pkl', 'rb') as f:
             try:
                 data = load(f)
             except EOFError:
                 try:
-                    self._logger.info(f'First attempt failed to load {filename}.')
+                    self._logger.info(f'First attempt failed to load {_path / f"{filename}.pkl"}.')
                     sleep(1)
                     data = load(f)
                 except EOFError:
-                    self._logger.exception(f'Corrupted or inaccessible data file: {filename}')
-                    raise RuntimeError(f'Corrupted or inaccessible data file: {filename}')
+                    self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
+                    raise RuntimeError(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
             for key, value in data.items():
                 self.__dict__[key] = value
             self.data_collector._object = self
 
-    def save(self, **kwargs):
+    def save(self, filename: Optional[str] = None, path: Optional[str] = None, data_to_save: Optional[Sequence[str]] = None) -> Tuple[Path, str]:
         '''
         Save the object to a file.
 
@@ -160,24 +154,25 @@ class RLBase():
             data: what to save (Default: saves everything)
         '''
 
-        filename = kwargs.get('filename', self._name)
-        path = Path(kwargs.get('path', self._path))
-        try:  # data
+        _filename: str = filename if filename is not None else self._name
+        _path: Path = Path(path if path is not None else self._path)
+
+        if data_to_save is None:
+            data = self.__dict__
+        else:
             data = {}
-            for d in kwargs['data']:
+            for d in data_to_save:
                 data[d] = self.__dict__[d]
             for key in ('_name', '_version', '_path'):  # these should be saved automatically
                 data[key] = self.__dict__[key]
-        except KeyError:
-            data = self.__dict__
 
-        Path(path).mkdir(parents=True, exist_ok=True) 
-        with open(path / f'{filename}.pkl', 'wb+') as f:
+        _path.mkdir(parents=True, exist_ok=True) 
+        with open(_path / f'{_filename}.pkl', 'wb+') as f:
             dump(data, f, HIGHEST_PROTOCOL)
 
-        return path, filename
+        return _path, _filename
 
-    def _report(self, **kwargs):
+    def _report(self, **kwargs: Any) -> Any:
         '''
         Report statistics using `DataCollector` class. This method can be implemented if an agent/ a subject wants to use `DataCollector`.
 
@@ -187,5 +182,5 @@ class RLBase():
         '''
         raise NotImplementedError
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'RLBase'
