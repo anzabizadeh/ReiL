@@ -86,15 +86,15 @@ class WarfarinModelFixedInterval(WarfarinModel_v5):
 
     def take_effect(self, action, _id=None):
         self._current_dose = action[0]
-        self._dose_list.append(self._current_dose)
-        self._dose_list.popleft()
-
         self._d_current = min(self._interval[self._interval_index], self._max_day - self._day)
         self._interval_index += 1
         self._patient.dose = dict(tuple((i + self._day, self._current_dose) for i in range(self._d_current)))
 
+        self._dose_list.append(self._current_dose)
+        self._dose_list.popleft()
         self._dosing_intervals.append(self._d_current)
         self._dosing_intervals.popleft()
+
         self._day += self._d_current
 
         self._INR.append(self._patient.INR(self._day)[-1])
@@ -113,7 +113,7 @@ class WarfarinModelFixedInterval(WarfarinModel_v5):
     def reset(self):
         super().reset()
         self._interval_index = 0
-        self._d_current = self._interval[self._interval_index]
+        # self._d_current = self._interval[self._interval_index]
 
     def __repr__(self):
         try:
