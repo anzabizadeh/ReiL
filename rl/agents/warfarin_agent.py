@@ -103,7 +103,8 @@ class WarfarinAgent(Agent):
         dose = self._precheck(state.value)
         if dose == -1:
             dose = min(self._method(state.value), 15.0)
-        return RLData(dose, lower=0.0, upper=15.0)
+        return RLData(min(dose, 15.0), lower=0.0, upper=15.0)  # Cuts out the dose if it is >15.0
+        # 20.0)  # WARNING: upper limit is changed to account for higher doses!
 
     def _precheck(self, patient):
         v = -1
@@ -524,13 +525,13 @@ class WarfarinAgent(Agent):
             return 'WarfarinAgent'
 
 if __name__ == "__main__":
-    from rl.subjects import WarfarinModel_v4
-    w = WarfarinModel_v4(age=87, CYP2C9='*1/*1', VKORC1G='G/G', extended_state=True)
+    from rl.subjects import WarfarinModel_v5
+    w = WarfarinModel_v5(age=87, CYP2C9='*1/*1', VKORC1G='G/G', extended_state=True)
     a = WarfarinAgent()
     INRs = [1, 1.1, 1.3, 1.3, 1.5, 1.3, 1.5, 1.6, 1.7, 1.7, 1.8, 1.8, 1.9, 1.9, 1.9, 1.8, 1.9, 1.9, 1.8, 1.8, 1.9, 1.9, 2, 1.8, 2, 2.1, 2, 2, 2.1, 1.9, 2.1, 2.1, 2.2, 1.9, 2, 1.9, 1.9, 2, 2, 2, 2, 1.9, 1.8, 1.9, 2.1, 1.9, 2, 2, 2.1, 2, 2, 2, 2.1, 2.2, 1.9, 2, 2.1, 2.1, 1.9, 1.9, 1.8, 2.1, 2, 2.1, 2, 2, 2.1, 2, 2, 2.1, 2.1, 2.1, 2, 2.1, 1.9, 1.8, 2, 2.1, 2, 2.1, 2.1, 2, 2, 2.3, 1.9, 2.1, 2, 1.8, 2.1]
     for i in INRs:
         action = a.act(w.state)
-        w._INR.append(i)
-        w._INR.popleft()
+        w._INR_history.append(i)
+        w._INR_history.popleft()
         w._day += 1
         print(action.value[0], w.state.value['INRs'][-1])
