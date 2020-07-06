@@ -370,8 +370,16 @@ class Environment(RLBase):
                         action = agent.act(state, actions=possible_actions,
                                             episode=self._total_experienced_episodes[(agent_name, subject_name)])
                         reward = subject_instance.take_effect(action, _id)
+                        try:
+                            complete_state = subject_instance.complete_state
+                        except NotImplementedError:
+                            complete_state = None
 
-                        history[agent_name].append({'instance_id': instance_id, 'state': state, 'action': action, 'reward': reward})
+                        history[agent_name].append({'instance_id': instance_id,
+                                                    'state': state,
+                                                    'action': action,
+                                                    'reward': reward,
+                                                    'complete_state': complete_state})
 
                         if subject_instance.is_terminated:
                             for affected_agent in self._agent.keys():
@@ -383,32 +391,30 @@ class Environment(RLBase):
                             agent.learn(history=history[agent_name])
                             history[agent_name] = []
 
-                if training_mode[(agent_name, subject_name)]:
-                    self._total_experienced_episodes[(agent_name, subject_name)] += 1
+                for agent_name, _ in assigned_agents:
+                    agent_subject_tuple = (agent_name, subject_name)
+                    if training_mode[agent_subject_tuple]:
+                        self._total_experienced_episodes[agent_subject_tuple] += 1
 
-                    if learning_batch_size == -1:
-                        for agent_name, _ in assigned_agents:
+                        if learning_batch_size == -1:
                             self._agent[agent_name].learn(history=history[agent_name])
 
-                ####################################################
-                for agent_name, _ in assigned_agents:
-                    # for s in stats.get((agent_name, subject_name), []):
                     try:
-                        stats_list = stats[(agent_name, subject_name)]
+                        stats_list = stats[agent_subject_tuple]
                         result_agent = self._agent[agent_name].stats(stats_list)
                         result_subject = subject_instance.stats(stats_list)
 
                         if result_agent != {}:
                             try:
-                                stats_agents[(agent_name, subject_name)].append(result_agent)
+                                stats_agents[agent_subject_tuple].append(result_agent)
                             except KeyError:
-                                stats_agents[(agent_name, subject_name)] = [result_agent]
+                                stats_agents[agent_subject_tuple] = [result_agent]
 
                         if result_subject != {}:
                             try:
-                                stats_subjects[(agent_name, subject_name)].append(result_subject)
+                                stats_subjects[agent_subject_tuple].append(result_subject)
                             except KeyError:
-                                stats_subjects[(agent_name, subject_name)] = [result_subject]
+                                stats_subjects[agent_subject_tuple] = [result_subject]
                     except KeyError:
                         pass
 
@@ -420,19 +426,20 @@ class Environment(RLBase):
                     self._agent[agent_name].reset()
 
             for agent_name, _ in assigned_agents:
-                if return_output[(agent_name, subject_name)]:
+                agent_subject_tuple = (agent_name, subject_name)
+                if return_output[agent_subject_tuple]:
                     try:
-                        output[(agent_name, subject_name)].append(history[agent_name])
+                        output[agent_subject_tuple].append(history[agent_name])
                     except KeyError:
-                        output[(agent_name, subject_name)] = [history[agent_name]]
+                        output[agent_subject_tuple] = [history[agent_name]]
 
-                if stats.get((agent_name, subject_name), []) != []:
-                    result = stats_func[(agent_name, subject_name)](agent_stats=stats_agents.get((agent_name, subject_name), None),
-                                                                    subject_stats=stats_subjects.get((agent_name, subject_name), None))
+                if stats.get(agent_subject_tuple, []) != []:
+                    result = stats_func[agent_subject_tuple](agent_stats=stats_agents.get(agent_subject_tuple, None),
+                                                                    subject_stats=stats_subjects.get(agent_subject_tuple, None))
                     try:
-                        stats_final[(agent_name, subject_name)].append(result)
+                        stats_final[agent_subject_tuple].append(result)
                     except KeyError:
-                        stats_final[(agent_name, subject_name)] = [result]
+                        stats_final[agent_subject_tuple] = [result]
 
         return stats_final, output
 
