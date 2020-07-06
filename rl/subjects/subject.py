@@ -46,6 +46,13 @@ class Subject(RLBase):
         raise NotImplementedError
 
     @property
+    def complete_state(self):
+        '''
+        Returns all the information that the subject can provide.
+        '''
+        raise NotImplementedError
+
+    @property
     def is_terminated(self):
         raise NotImplementedError
 
