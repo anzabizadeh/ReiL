@@ -92,7 +92,7 @@ class RLData(dict):
             for i, v_i in v.items():
                 self.__setitem__(i, v_i)
         except AttributeError:
-            self.__setitem__(None, v)
+            self.__setitem__(None, v.copy())
 
     @property
     def lower(self) -> Union[list, dict]:
@@ -264,10 +264,11 @@ class RLData(dict):
 
         return output
 
-    def _normalize(self) -> list:
+    def _normalize(self, keys: Optional[Sequence] = None) -> list:
         temp = []
         try:
-            for i in self._value.keys():
+            keys_list = keys if keys is not None else self._value.keys()
+            for i in keys_list:
                 if self._normal_form[i] is None:
                     if self._normalizer[i] is None:
                         func = self._normalizer_lambda_func
@@ -312,7 +313,7 @@ class RLData(dict):
                 except ZeroDivisionError:
                     self._normal_form = [1]
 
-                temp = self._normal_form
+            temp = self._normal_form
 
         return self.__remove_nestings(temp)
 
@@ -328,76 +329,90 @@ class RLData(dict):
             return RLData(self._normalized, lower=0, upper=1, lazy_evaluation=True)
 
     def __setitem__(self, key: Any, value: Any) -> "RLData":
-        if key is None and isinstance(self._value, dict):
-            self._value = []
-            del self._is_numerical
-        if not isinstance(value, Iterable) or isinstance(value, str):
-            value = [value]
-        try:
-            if key not in self._value.keys():
-                non_string_iterable = hasattr(
-                    value, '__iter__') and not isinstance(value, str)
-                self._value[key] = value
-                self._is_numerical[key] = all(isinstance(
-                    v_i, Number) for v_i in value) if non_string_iterable else isinstance(value, Number)
-                self._normalizer[key] = None
-                self._categories[key] = None
-
-                if self._is_numerical[key]:
-                    self._lower[key] = min(
-                        value) if non_string_iterable else value
-                    self._upper[key] = max(
-                        value) if non_string_iterable else value
-                    self._categories[key] = None
-                else:
-                    self._lower[key] = None
-                    self._upper[key] = None
-                    self._categories[key] = value if non_string_iterable else [
-                        value]
-
-            else:
-                if self._is_numerical[key]:
-                    if not all(self.lower[key] <= v <= self.upper[key] for v in value):
-                        raise ValueError(
-                            f'{value} is not in the range of {self.lower[key]} to {self.upper[key]}.')
-                elif any(v not in self.categories[key] for v in value):
-                    raise ValueError(f'{value} is not a valid category.')
-
-                self._value[key] = value
-
-            self._normal_form[key] = None
-
-        except AttributeError:
-            try:
-                if self._is_numerical:
-                    if not (self.lower <= value <= self.upper):
-                        raise ValueError(
-                            f'{value} is not in the range of {self.lower} to {self.upper}.')
-                elif value not in self.categories:
-                    raise ValueError(f'{value} is not a valid category.')
-
-                self._value = value
-
-            except AttributeError:
-                non_string_iterable = hasattr(
-                    value, '__iter__') and not isinstance(value, str)
-                self._value = value
-                self._is_numerical = all(isinstance(
-                    v_i, Number) for v_i in value) if non_string_iterable else isinstance(value, Number)
-                self._normalizer = None
+        if key is None:  # complete list
+            if isinstance(self._value, dict):  # Go from dict to list
+                self._is_numerical = None
+                self._lower = None
+                self._upper = None
                 self._categories = None
+                self._normalizer = None
 
+            old_lower = self._lower
+            old_upper = self._upper
+            old_categories = self._categories
+            old_normalizer = self._normalizer
+
+            if not hasattr(value, '__iter__') or isinstance(value, str):
+                temp = [value]
+            else:
+                temp = value
+
+            if self._categories is not None:
+                for t in temp:
+                    if t not in self._categories:
+                        self._lower = old_lower
+                        self._upper = old_upper
+                        self._categories = old_categories
+                        self._normalizer = old_normalizer
+                        raise ValueError(f'{t} is not found in {self._categories}.')
+            elif self._lower is not None:
+                for t in temp:
+                    if not (self._lower <= t <= self._upper):
+                        self._lower = old_lower
+                        self._upper = old_upper
+                        self._categories = old_categories
+                        self._normalizer = old_normalizer
+                        raise ValueError(f'{t} is outside the range [{self._lower}, {self._upper}].')
+            else:
+                self._is_numerical = all(isinstance(v_i, Number) for v_i in temp)
                 if self._is_numerical:
-                    self._lower = min(value) if non_string_iterable else value
-                    self._upper = max(value) if non_string_iterable else value
+                    self._lower = min(temp)
+                    self._upper = max(temp)
                     self._categories = None
                 else:
                     self._lower = None
                     self._upper = None
-                    self._categories = value if non_string_iterable else [
-                        value]
+                    self._categories = temp
 
+            self._value = temp
             self._normal_form = None
+
+        elif isinstance(key, slice):  # slice of a list
+            if isinstance(self._value, dict):
+                raise TypeError('Cannot use slice for a RLData instance of type dict.')
+
+            if self._categories is not None:
+                for t in value:
+                    if t not in self._categories:
+                        raise ValueError(f'{t} is not found in {self._categories}.')
+            elif self._lower is not None:
+                for t in value:
+                    if not (self._lower <= t <= self._upper):
+                        raise ValueError(f'{t} is outside the range [{self._lower}, {self._upper}].')
+            else:
+                raise RuntimeError('RLData is corrupted! No categories, lower or upper attributes found!')
+
+            self._value[key] = value
+            self._normal_form = None
+        else:
+            if isinstance(self._value, dict):
+                if self._is_numerical[key]:
+                    if not (self._lower[key] <= value <= self._upper[key]):
+                        raise ValueError(f'{value} is outside the range [{self._lower[key]}, {self._upper[key]}].')
+                elif value not in self._categories[key]:
+                    raise ValueError(f'{value} is not found in {self._categories[key]}.')
+
+                self._value[key] = value
+                self._normal_form[key] = None
+            else:
+                if self._is_numerical:
+                    if not (self._lower <= value <= self._upper):
+                        raise ValueError(f'{value} is outside the range [{self._lower}, {self._upper}].')
+                elif value not in self._categories:
+                    raise ValueError(f'{value} is not found in {self._categories}.')
+
+                self._value[key] = value
+                self._normal_form = None
 
         if not self._lazy:
             self._normalized = self._normalize()
@@ -515,7 +530,7 @@ class RLData(dict):
         self.update(other)
         return self
 
-    def __eq__(self, other: Union["RLData", list, dict]) -> bool:
+    def __eq__(self, other: "RLData") -> bool:
         try:
             return (self.value == other.value).bool() and (
                 ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else
@@ -624,8 +639,11 @@ if __name__ == '__main__':
     #     print(temp)
 
     # print(d.normalize())
-    d = RLData([1, 2, 3])
+    d = RLData([1, 2, 3], lazy_evaluation=True)
     print(d.value)
+    print(d.normalize())
+    print(d.normalize())
+    d += [1, 2, 3]
     print(d.normalize())
     print(d.as_rldata_array())
     print(d == d)
