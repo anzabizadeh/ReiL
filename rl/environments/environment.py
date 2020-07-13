@@ -365,15 +365,16 @@ class Environment(RLBase):
                             break
                         steps += 1
 
+                        try:
+                            complete_state = subject_instance.complete_state
+                        except NotImplementedError:
+                            complete_state = None
+
                         state = subject_instance.state
                         possible_actions = subject_instance.possible_actions
                         action = agent.act(state, actions=possible_actions,
                                             episode=self._total_experienced_episodes[(agent_name, subject_name)])
                         reward = subject_instance.take_effect(action, _id)
-                        try:
-                            complete_state = subject_instance.complete_state
-                        except NotImplementedError:
-                            complete_state = None
 
                         history[agent_name].append({'instance_id': instance_id,
                                                     'state': state,
