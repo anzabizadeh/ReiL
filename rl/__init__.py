@@ -25,11 +25,11 @@ submodules
 
 
 __all__ = ['agents',
+           'data_collector',
            'environments',
-           'subjects',
-           'stats',
+           'legacy',
            'rlbase',
            'rldata',
-           'data_collector',
-           'utils',
-           'legacy']
+           'stats',
+           'subjects',
+           'utils']
