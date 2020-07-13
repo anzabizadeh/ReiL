@@ -92,7 +92,7 @@ class RLData(dict):
             for i, v_i in v.items():
                 self.__setitem__(i, v_i)
         except AttributeError:
-            self.__setitem__(None, v.copy())
+            self.__setitem__(None, v)  # .copy())
 
     @property
     def lower(self) -> Union[list, dict]:
@@ -394,25 +394,49 @@ class RLData(dict):
 
             self._value[key] = value
             self._normal_form = None
-        else:
-            if isinstance(self._value, dict):
+        elif isinstance(self._value, dict):
+                if not hasattr(value, '__iter__') or isinstance(value, str):
+                    temp = [value]
+                else:
+                    temp = value
+
+                if key not in self._value.keys():
+                    self._normalizer[key] = None
+                    self._is_numerical[key] = all(isinstance(v_i, Number) for v_i in temp)
+                    if self._is_numerical[key]:
+                        self._lower[key] = min(temp)
+                        self._upper[key] = max(temp)
+                        self._categories[key] = None
+                    else:
+                        self._lower[key] = None
+                        self._upper[key] = None
+                        self._categories[key] = temp
+
                 if self._is_numerical[key]:
-                    if not (self._lower[key] <= value <= self._upper[key]):
-                        raise ValueError(f'{value} is outside the range [{self._lower[key]}, {self._upper[key]}].')
-                elif value not in self._categories[key]:
-                    raise ValueError(f'{value} is not found in {self._categories[key]}.')
+                    for v in temp:
+                        if not (self._lower[key] <= v <= self._upper[key]):
+                            raise ValueError(f'{v} is outside the range [{self._lower[key]}, {self._upper[key]}].')
+                else:
+                    if value not in self._categories[key]:
+                        for v in temp:
+                            if v not in self._categories[key]:
+                                raise ValueError(f'{value} is not found in {self._categories[key]}.')
 
                 self._value[key] = value
                 self._normal_form[key] = None
-            else:
-                if self._is_numerical:
-                    if not (self._lower <= value <= self._upper):
-                        raise ValueError(f'{value} is outside the range [{self._lower}, {self._upper}].')
-                elif value not in self._categories:
-                    raise ValueError(f'{value} is not found in {self._categories}.')
 
-                self._value[key] = value
-                self._normal_form = None
+        else:  # index of a list
+            if self._categories is not None:
+                if value not in self._categories:
+                    raise ValueError(f'{value} is not found in {self._categories}.')
+            elif self._lower is not None:
+                if not (self._lower <= value <= self._upper):
+                    raise ValueError(f'{value} is outside the range [{self._lower}, {self._upper}].')
+            else:
+                raise RuntimeError('RLData is corrupted! No categories, lower or upper attributes found!')
+
+            self._value[key] = value
+            self._normal_form = None
 
         if not self._lazy:
             self._normalized = self._normalize()
