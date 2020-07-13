@@ -1,15 +1,15 @@
-from ..rlbase import RLBase
-from ..rldata import RLData
-
-from scipy.stats import lognorm
-
 from math import exp, log, sqrt
-from random import gauss, sample
+from random import sample
+from typing import Dict, List, Union
+
 import numpy as np
 import pandas as pd
-from dill import HIGHEST_PROTOCOL, dump, load
+from scipy.stats import lognorm
 
-def rlnormRestricted(meanVal, stdev):
+from ..rlbase import RLBase
+
+
+def rlnormRestricted(meanVal: float, stdev: float) -> float:
     # capture 50% of the data.  This restricts the log values to a "reasonable" range
     quartileRange = (0.25, 0.75)
     lnorm = lognorm(stdev, scale=exp(meanVal))
@@ -25,26 +25,29 @@ class Patient(RLBase):
 
     Attributes
     ----------
-        dose: a dictionary containing with day as key and dose as value.
+        dose: a dataframe containing with day as key and dose as value.
 
     Methods
     -------
         INR: returns a list of INR values corresponding to the given list of days.
     '''
 
-    def __init__(self, age=50, CYP2C9='*1/*1', VKORC1='G/A', randomized=True, max_time=24,
-                 dose_interval=24, dose={}, lazy=False, **kwargs):
-        self.set_defaults(**kwargs)
-        self.set_params(**kwargs)
+    def __init__(self, age: float = 50.0, CYP2C9: str = '*1/*1', VKORC1: str = 'G/A',
+                 randomized: bool = True, max_time: int = 24,
+                 dose_interval: int = 24, dose: dict = {}, lazy: bool = False, **kwargs):
+        self.set_defaults(age=age, CYP2C9=CYP2C9, VKORC1=VKORC1,
+                 randomized=randomized, max_time=max_time,
+                 dose_interval=dose_interval, dose=dose, lazy=lazy, **kwargs)
+        # self.set_params(**kwargs)
         super().__init__(**kwargs)
 
         self._age = age
         self._CYP2C9 = CYP2C9
         self._VKORC1 = VKORC1
         self._randomized = randomized
-        self._MTT_1 = kwargs.get('MTT_1', rlnormRestricted(
+        self._MTT_1: float = kwargs.get('MTT_1', rlnormRestricted(
             log(11.6), sqrt(0.141)) if randomized else 11.6)
-        self._MTT_2 = kwargs.get('MTT_2', rlnormRestricted(
+        self._MTT_2: float = kwargs.get('MTT_2', rlnormRestricted(
             log(120), sqrt(1.02)) if randomized else 120)
         # EC_50 in mg/L
         self._EC_50 = kwargs.get('EC_50', None)
@@ -61,11 +64,11 @@ class Patient(RLBase):
             else:
                 raise ValueError('The VKORC1 genotype is not supported!')
 
-        self._cyp_1_1 = kwargs.get('cyp_1_1', rlnormRestricted(
+        self._cyp_1_1: float = kwargs.get('cyp_1_1', rlnormRestricted(
             log(0.314), sqrt(0.31)) if randomized else 0.314)
-        self._V1 = kwargs.get('V1', rlnormRestricted(
+        self._V1: float = kwargs.get('V1', rlnormRestricted(
             log(13.8), sqrt(0.262)) if randomized else 13.8)
-        self._V2 = kwargs.get('V2', rlnormRestricted(
+        self._V2: float = kwargs.get('V2', rlnormRestricted(
             log(6.59), sqrt(0.991)) if randomized else 6.59)
         self._Q = 0.131    # (L/h)
         self._lambda = 3.61
@@ -103,7 +106,7 @@ class Patient(RLBase):
         self._max_time = max_time  # The last hour of experiment
         self._dose_interval = dose_interval
         self._lazy = lazy
-        self._last_computed_day = 0
+        self._last_computed_day = 1
 
         # prepend time 0 to the list of times for deSolve initial conditions (remove when returning list of times)
         times = list(range(self._max_time+1))
@@ -137,10 +140,10 @@ class Patient(RLBase):
             self._exp_e_INR = np.ones(len(times))
 
         if self._lazy:
-            self._data = pd.DataFrame(columns=['dose']+times)
-            self.dose = {0: 0.0}
+            self.dose = {1: 0.0}
+            self._Cs_values = pd.DataFrame(columns=times)
         else:
-            self._data = pd.DataFrame(columns=['dose'])
+            self.dose = {1: 0.0}
             self._total_Cs = np.zeros(self._max_time + 1)
             multiplication_term = np.trim_zeros(multiplication_term, 'b')
 
@@ -149,28 +152,33 @@ class Patient(RLBase):
 
 
     @property
-    def dose(self):
-        return self._data.dose
+    def dose(self) -> pd.DataFrame:
+        return self._dose
 
     @dose.setter
-    def dose(self, dose):
+    def dose(self, dose: Dict[int, float]) -> None:
         if self._lazy:
-            for d, v in dose.items():
-                if dose != 0.0:
-                    self._data.loc[d] = np.insert(
-                        self._Cs(dose=v, t0=d*self._dose_interval), 0, v)
-                    self._last_computed_day = min(d, self._last_computed_day)
+            for day, v in dose.items():
+                if v != 0.0:
+                    try:
+                        self._Cs_values.loc[day] = self._Cs(dose=v, t0=day*self._dose_interval)
+                        self._dose[day] = v
+                        self._last_computed_day = min(day, self._last_computed_day)
+                    except ValueError:
+                        if day == 0:
+                            self._logger.warning(f'Dosing starts from day 1. Skipped the dose {v} on day 1.')
+
         else:
-            for d, v in dose.items():
-                if dose != 0.0:
-                    self._data.loc[d] = v
-                    range_start = d*self._dose_interval
+            for day, v in dose.items():
+                if v != 0.0 and day != 0:
+                    self._dose[day] = v
+                    range_start = day*self._dose_interval
                     Cs = self._Cs(dose=v, t0=range_start, zero_padding=False)
                     range_end = min(range_start + Cs.shape[0], self._max_time+1)
                     self._total_Cs[range_start:range_end] += Cs[:range_end-range_start]
-                    self._last_computed_day = min(d, self._last_computed_day)
+                    self._last_computed_day = min(day, self._last_computed_day)
 
-    def _Cs(self, dose, t0, zero_padding=True):
+    def _Cs(self, dose: float, t0: int, zero_padding: bool = True) -> np.array:
         # C_s_pred = dose * self._multiplication_term
 
         # if t0 == 0:  # non steady-state
@@ -191,22 +199,26 @@ class Patient(RLBase):
 
         return np.concatenate((np.array([0]*t0), C_s[:-t0])) if zero_padding else C_s
 
-    def INR(self, days):
+    def INR(self, days: Union[int, List[int]]) -> List[float]:
         if isinstance(days, int):
             days = [days]
 
+        if 0 in days:
+            self._logger.warning('Dosing starts from day 1. Skipped day 0 passed to this function.')
+            days.remove(0)
+
         if self._lazy:
-            Cs_gamma = np.power(np.sum(self._data[list(
-                range(int(max(days)*self._dose_interval)+1))], axis=0), self._gamma)
+            base_term = np.sum(self._Cs_values[list(range(int(max(days)*self._dose_interval)+1))], axis=0)
         else:
-            Cs_gamma = np.power(self._total_Cs[0:int(
-                max(days)*self._dose_interval)+1], self._gamma)
+            base_term = self._total_Cs[0:int(max(days)*self._dose_interval)+1]
+
+        Cs_gamma = np.power(base_term, self._gamma)
 
         start_days = sorted(
-            [0 if days[0] < self._last_computed_day else self._last_computed_day] + days[:-1])
+            [1 if days[0] < self._last_computed_day else self._last_computed_day] + days[:-1])
         end_days = sorted(days)
 
-        if start_days[0] == 0:
+        if start_days[0] == 1:
             self._A = [1]*7
             self._dA = [0]*7
 
