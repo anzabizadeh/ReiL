@@ -109,7 +109,8 @@ class Patient(RLBase):
         self._last_computed_day = 1
 
         # prepend time 0 to the list of times for deSolve initial conditions (remove when returning list of times)
-        times = list(range(self._max_time+1))
+        len_times = self._max_time + 1
+        times = list(range(len_times))
         # times also equals the time-step for deSolve
 
         k12 = self._Q / self._V1
@@ -132,19 +133,19 @@ class Patient(RLBase):
                                 self._V1) * (part_1 + part_2 + part_3).clip(min=1e-5)
 
         if self._randomized:
-            self._Cs_error = np.exp(np.random.normal(0, 0.09, len(times)))
-            self._Cs_error_ss = np.exp(np.random.normal(0, 0.30, len(times)))
-            self._exp_e_INR = np.exp(np.random.normal(0, 0.0325, len(times)))
+            self._Cs_error = np.exp(np.random.normal(0, 0.09, len_times))
+            self._Cs_error_ss = np.exp(np.random.normal(0, 0.30, len_times))
+            self._exp_e_INR = np.exp(np.random.normal(0, 0.0325, len_times))
         else:
-            self._Cs_error = self._Cs_error_ss = np.ones(len(times))
-            self._exp_e_INR = np.ones(len(times))
+            self._Cs_error = self._Cs_error_ss = np.ones(len_times)
+            self._exp_e_INR = np.ones(len_times)
 
         if self._lazy:
-            self.dose = {1: 0.0}
+            self.dose = {0: 0.0}
             self._Cs_values = pd.DataFrame(columns=times)
         else:
-            self.dose = {1: 0.0}
-            self._total_Cs = np.zeros(self._max_time + 1)
+            self.dose = {0: 0.0}
+            self._total_Cs = np.zeros(len_times)
             multiplication_term = np.trim_zeros(multiplication_term, 'b')
 
         self._multiplication_term_err = np.multiply(multiplication_term, self._Cs_error).clip(min=0)
@@ -152,7 +153,7 @@ class Patient(RLBase):
 
 
     @property
-    def dose(self) -> pd.DataFrame:
+    def dose(self) -> Dict[int, float]:
         return self._dose
 
     @dose.setter
@@ -160,21 +161,16 @@ class Patient(RLBase):
         if self._lazy:
             for day, v in dose.items():
                 if v != 0.0:
-                    try:
-                        self._Cs_values.loc[day] = self._Cs(dose=v, t0=day*self._dose_interval)
-                        self._dose[day] = v
-                        self._last_computed_day = min(day, self._last_computed_day)
-                    except ValueError:
-                        if day == 0:
-                            self._logger.warning(f'Dosing starts from day 1. Skipped the dose {v} on day 1.')
-
+                    self._Cs_values.loc[day] = self._Cs(dose=v, t0=day * self._dose_interval)
+                    self._dose[day] = v
+                    self._last_computed_day = min(day, self._last_computed_day)
         else:
             for day, v in dose.items():
-                if v != 0.0 and day != 0:
+                if v != 0.0:
                     self._dose[day] = v
-                    range_start = day*self._dose_interval
+                    range_start = day * self._dose_interval
                     Cs = self._Cs(dose=v, t0=range_start, zero_padding=False)
-                    range_end = min(range_start + Cs.shape[0], self._max_time+1)
+                    range_end = min(range_start + Cs.shape[0], self._max_time + 1)
                     self._total_Cs[range_start:range_end] += Cs[:range_end-range_start]
                     self._last_computed_day = min(day, self._last_computed_day)
 
@@ -203,10 +199,6 @@ class Patient(RLBase):
         if isinstance(days, int):
             days = [days]
 
-        if 0 in days:
-            self._logger.warning('Dosing starts from day 1. Skipped day 0 passed to this function.')
-            days.remove(0)
-
         if self._lazy:
             base_term = np.sum(self._Cs_values[list(range(int(max(days)*self._dose_interval)+1))], axis=0)
         else:
@@ -215,10 +207,10 @@ class Patient(RLBase):
         Cs_gamma = np.power(base_term, self._gamma)
 
         start_days = sorted(
-            [1 if days[0] < self._last_computed_day else self._last_computed_day] + days[:-1])
+            [0 if days[0] < self._last_computed_day else self._last_computed_day] + days[:-1])
         end_days = sorted(days)
 
-        if start_days[0] == 1:
+        if start_days[0] == 0:
             self._A = [1]*7
             self._dA = [0]*7
 
