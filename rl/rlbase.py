@@ -34,27 +34,42 @@ class RLBase():
         load: load an object from a file.
         save: save the object to a file.
     '''
-    def __init__(self, persistent_attributes: List[str] = [],
-        **kwargs):
-        self._defaults = {}
+    def __init__(self,
+                 name: str = 'rlbase',
+                 version: float = 0.5,
+                 path: str = '.',
+                 ex_protocol_options: Dict[str, List[str]] = {},
+                 ex_protocol_current: Dict[str, str] = {},
+                 stats_list: Sequence[str] = [],
+                 logger_name: str = __name__,
+                 logger_level: int = logging.WARNING,
+                 logger_filename: Optional[str] = None,
+                 persistent_attributes: List[str] = []):
+        # self._defaults = {}
+
         self.data_collector = DataCollector(object=self)
 
-        self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
-                          ex_protocol_options={}, ex_protocol_current={},  # requested_exchange_protocol={},
-                          stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename=f'{__name__}.log',
-                          persistent_attributes=persistent_attributes)
-        self.set_params(**kwargs)
+        self._name = name
+        self._version = version
+        self._path = path
+        self._ex_protocol_options = ex_protocol_options
+        self._ex_protocol_current = ex_protocol_current
+        self._stats_list = stats_list
+        self._logger_name = logger_name
+        self._logger_level = logger_level
+        self._logger_filename = logger_filename if logger_filename is not None else f'{__name__}.log'
+        self._persistent_attributes = persistent_attributes
+
+        # self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
+        #                   ex_protocol_options={}, ex_protocol_current={},  # requested_exchange_protocol={},
+        #                   stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename=f'{__name__}.log',
+        #                   persistent_attributes=persistent_attributes)
+        # self.set_params(**kwargs)
 
         self._logger = logging.getLogger(self._logger_name)
         self._logger.setLevel(self._logger_level)
         self._logger.addHandler(logging.FileHandler(self._logger_filename))
 
-        if False:
-            self._name, self._version, self._path = [], [], []
-            self._ex_protocol_options, self._ex_protocol_current, self._requested_exchange_protocol = {}, {}, {}
-            self._stats_list = []
-            self._persistent_attributes = []
-    
     def stats(self, stats_list: Sequence) -> Dict[str, Any]:
         '''
         Compute statistics.
@@ -98,8 +113,8 @@ class RLBase():
             params: a dictionary containing parameter names and their values.
         '''
         for key, value in params.items():
-            self.__dict__['_'+key] = value
-        # self.__dict__.update(('_'+key, params.get(key, self._defaults[key]))
+            self.__dict__[f'_{key}'] = value
+        # self.__dict__.update((f'_{key}', params.get(key, self._defaults[key]))
         #                       for key in self._defaults if key in params)
 
     def set_defaults(self, **params: Dict[str, Any]) -> None:
@@ -112,14 +127,15 @@ class RLBase():
 
         Note: this method overwrites all variable names.
         '''
-        if not hasattr(self, '_defaults'):
-            self._defaults = {}
-        for key, value in params.items():
-            # self._defaults[key] = value
-            # self.__dict__['_'+key] = value
-            if not hasattr(self, '_'+key) or self.__dict__.get('_'+key, -1) in (None, {}, []):
-                self._defaults[key] = value
-                self.__dict__['_'+key] = value
+        # if not hasattr(self, '_defaults'):
+        #     self._defaults = {}
+        # for key, value in params.items():
+        #     # self._defaults[key] = value
+        #     # self.__dict__[f'_{key}'] = value
+        #     if not hasattr(self, f'_{key}') or self.__dict__.get(f'_{key}', -1) in (None, {}, []):
+        #         self._defaults[key] = value
+        #         self.__dict__[f'_{key}'] = value
+        self.set_params(**params)
 
     def load(self, filename: str, path: Optional[str] = None) -> None:
         '''
