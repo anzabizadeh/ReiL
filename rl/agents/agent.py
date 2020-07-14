@@ -8,6 +8,9 @@ This `agent` class is the super class of all agent classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from logging import WARNING
+from typing import Dict, List, Optional, Sequence
+
 from ..rlbase import RLBase
 
 
@@ -28,11 +31,28 @@ class Agent(RLBase):
         learn: learn using either history or action, reward, and state.
         reset: reset the agent.
     '''
-    def __init__(self, **kwargs):
-        self.set_defaults(ex_protocol_options={'mode': ['training', 'test']},
-            ex_protocol_current={'mode': 'training'})
-        self.set_params(**kwargs)
-        super().__init__(**kwargs)
+    def __init__(self,
+                 name: str = 'agent',
+                 version: float = 0.5,
+                 path: str = '.',
+                 ex_protocol_current: Dict[str, str] = {'mode': 'training'},
+                 ex_protocol_options: Dict[str, List[str]] = {'mode': ['training', 'test']},
+                 stats_list: Sequence[str] = [],
+                 logger_name: str = __name__,
+                 logger_level: int = WARNING,
+                 logger_filename: Optional[str] = None,
+                 persistent_attributes: List[str] = []):
+
+        super().__init__(name=name,
+                         version=version,
+                         path=path,
+                         ex_protocol_current=ex_protocol_current,
+                         ex_protocol_options=ex_protocol_options,
+                         stats_list=stats_list,
+                         logger_name=logger_name,
+                         logger_level=logger_level,
+                         logger_filename=logger_filename,
+                         persistent_attributes=persistent_attributes)
 
     @property
     def status(self):

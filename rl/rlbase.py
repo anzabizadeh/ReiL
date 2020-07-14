@@ -57,7 +57,7 @@ class RLBase():
         self._stats_list = stats_list
         self._logger_name = logger_name
         self._logger_level = logger_level
-        self._logger_filename = logger_filename if logger_filename is not None else f'{__name__}.log'
+        self._logger_filename = logger_filename
         self._persistent_attributes = persistent_attributes
 
         # self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
@@ -68,7 +68,8 @@ class RLBase():
 
         self._logger = logging.getLogger(self._logger_name)
         self._logger.setLevel(self._logger_level)
-        self._logger.addHandler(logging.FileHandler(self._logger_filename))
+        if self._logger_filename is not None:
+            self._logger.addHandler(logging.FileHandler(self._logger_filename))
 
     def stats(self, stats_list: Sequence) -> Dict[str, Any]:
         '''

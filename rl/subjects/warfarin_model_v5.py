@@ -11,10 +11,11 @@ This `warfarin_model` class implements a two compartment PK/PD model for warfari
 import os
 from collections import deque
 from copy import deepcopy
+from logging import WARNING
 from numbers import Number
 from pathlib import Path
 from random import choice
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -42,6 +43,21 @@ class WarfarinModel_v5(Subject):
     '''
 
     def __init__(self,
+                 name: str = 'subject',
+                 version: float = 0.5,
+                 path: str = '.',
+                 ex_protocol_current: Dict[str, str] = {'state': 'standard',
+                                               'possible_actions': 'standard',
+                                               'take_effect': 'standard'},
+                 ex_protocol_options: Dict[str, List[str]] = {'state': ['standard', 'extended'],
+                                               'possible_actions': ['standard'],
+                                               'take_effect': ['standard', 'no_reward']},
+                 stats_list: Sequence[str] = ['TTR', 'dose_change', 'delta_dose'],
+                 logger_name: str = __name__,
+                 logger_level: int = WARNING,
+                 logger_filename: Optional[str] = None,
+                 persistent_attributes: List[str] = [],
+
                  max_day: int = 90,
                  therapeutic_range: Tuple[int, int] = (2, 3),
                  action_type: str = 'dose only',
@@ -58,7 +74,6 @@ class WarfarinModel_v5(Subject):
                  interval_max_dose: Union[Sequence[float], float] = [15.0],
                  lookahead_duration: int = 0,
                  lookahead_penalty_coef: float = 0,
-                 stats_list: Sequence[str] = ['TTR', 'dose_change', 'delta_dose'],
                  characteristics: Dict[str, Any] = {'age': 71, 'weight': 199.24, 'height': 66.78,
                                                     'CYP2C9': '*1/*1', 'VKORC1': 'A/A',
                                                     'gender': 'Male', 'race': 'White',
@@ -106,152 +121,72 @@ class WarfarinModel_v5(Subject):
         \n  patient_counter_start: the starting value for patient filename counter (Default: 0)
         '''
 
-        self.set_defaults(ex_protocol_options={'state': ['standard', 'extended'],
-                                               'possible_actions': ['standard'],
-                                               'take_effect': ['standard', 'no_reward']},
-                          ex_protocol_current={'state': 'standard',
-                                               'possible_actions': 'standard',
-                                               'take_effect': 'standard'},
-                          list_of_characteristics={'age': (18, 100),  # similar to the range of 10k sample from Ravvaz
-                                                   # (lb) similar to the range of 10k sample from Ravvaz
-                                                   'weight': (70, 500),
-                                                   # (in) similar to the range of 10k sample from Ravvaz
-                                                   'height': (45, 85),
-                                                   'gender': ('Female', 'Male'),
-                                                   'race': ('White', 'Black', 'Asian', 'American Indian', 'Pacific Islander'),
-                                                   'tobaco': ('No', 'Yes'),
-                                                   'amiodarone': ('No', 'Yes'),
-                                                   'fluvastatin': ('No', 'Yes'),
-                                                   'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
-                                                   'VKORC1': ('G/G', 'G/A', 'A/A')},
-                          list_of_probabilities={'age': (67.3, 14.43),  # lb  - Aurora population
-                                                 # in - Aurora population
-                                                 'weight': (199.24, 54.71),
-                                                 # Aurora population
-                                                 'height': (66.78, 4.31),
-                                                 # Aurora population
-                                                 'gender': (0.5314, 0.4686),
-                                                 # Aurora Avatar Population
-                                                 'race': (0.9522, 0.0419, 0.0040, 0.0018, 1e-4),
-                                                 # Aurora Avatar Population
-                                                 'tobaco': (0.9067, 0.0933),
-                                                 # Aurora Avatar Population
-                                                 'amiodarone': (0.8849, 0.1151),
-                                                 # Aurora Avatar Population
-                                                 'fluvastatin': (0.9998, 0.0002),
-                                                 # Aurora Avatar Population
-                                                 'CYP2C9': (0.6739, 0.1486, 0.0925, 0.0651, 0.0197, 2e-4),
-                                                 'VKORC1': (0.3837, 0.4418, 0.1745)},  # Aurora Avatar Population
+        super().__init__(name=name,
+                         version=version,
+                         path=path,
+                         ex_protocol_current=ex_protocol_current,
+                         ex_protocol_options=ex_protocol_options,
+                         stats_list=stats_list,
+                         logger_name=logger_name,
+                         logger_level=logger_level,
+                         logger_filename=logger_filename,
+                         persistent_attributes=persistent_attributes)
 
-                          day=0, max_day=max_day + lookahead_duration, max_time=(max_day + 1) * 24,
-                          therapeutic_range=therapeutic_range,
-                          action_type=action_type,
+        self._list_of_characteristics = {
+            'age': (18, 100),  # similar to the range of 10k sample from Ravvaz
+            # (lb) similar to the range of 10k sample from Ravvaz
+            'weight': (70, 500),
+            # (in) similar to the range of 10k sample from Ravvaz
+            'height': (45, 85),
+            'gender': ('Female', 'Male'),
+            'race': ('White', 'Black', 'Asian', 'American Indian', 'Pacific Islander'),
+            'tobaco': ('No', 'Yes'),
+            'amiodarone': ('No', 'Yes'),
+            'fluvastatin': ('No', 'Yes'),
+            'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
+            'VKORC1': ('G/G', 'G/A', 'A/A')}
 
-                          full_INR_history=[0.0]*max_day, full_dose_history=[0.0]*max_day,
+        self._list_of_probabilities = {
+            'age': (67.3, 14.43),  # lb  - Aurora population
+            # in - Aurora population
+            'weight': (199.24, 54.71),
+            # Aurora population
+            'height': (66.78, 4.31),
+            # Aurora population
+            'gender': (0.5314, 0.4686),
+            # Aurora Avatar Population
+            'race': (0.9522, 0.0419, 0.0040, 0.0018, 1e-4),
+            # Aurora Avatar Population
+            'tobaco': (0.9067, 0.0933),
+            # Aurora Avatar Population
+            'amiodarone': (0.8849, 0.1151),
+            # Aurora Avatar Population
+            'fluvastatin': (0.9998, 0.0002),
+            # Aurora Avatar Population
+            'CYP2C9': (0.6739, 0.1486, 0.0925, 0.0651, 0.0197, 2e-4),
+            'VKORC1': (0.3837, 0.4418, 0.1745)}  # Aurora Avatar Population
 
-                          INR_history_length=INR_history_length, INR_history=[0]*INR_history_length,
-                          INR_penalty_coef=INR_penalty_coef,
+        self._max_day = max_day + lookahead_duration
+        self._max_time = (max_day + 1) * 24
+        self._therapeutic_range = therapeutic_range
+        self._action_type = action_type
 
-                          dose_history_length=dose_history_length, dose_history=[0]*dose_history_length,
-                          intervals_history=[1]*dose_history_length,
-                          max_dose=max_dose, dose_steps=dose_steps,
-                          dose_change_penalty_coef=dose_change_penalty_coef,
-                          dose_change_penalty_func=dose_change_penalty_func,
+        self._INR_history_length = INR_history_length
+        self._INR_penalty_coef = INR_penalty_coef
 
-                          interval=[x if x != 0 else 1 for x in interval],
-                          max_interval=max_day if max_interval is None else max_interval,
-                          interval_max_dose=interval_max_dose, interval_index=0,
+        self._dose_history_length = dose_history_length
+        self._doservals_history = [1]*dose_history_length
+        self._max_dose = max_dose
+        self._dose_steps = dose_steps
+        self._dose_change_penalty_coef = dose_change_penalty_coef
+        self._dose_change_penalty_func = dose_change_penalty_func
 
-                          lookahead_duration=lookahead_duration,
-                          lookahead_penalty_coef=lookahead_penalty_coef,
-
-                          stats_list=stats_list,
-                          characteristics=characteristics,
-                          patient_selection=patient_selection,
-                          randomized=randomized,
-                          save_patients=save_patients,
-                          patients_save_path=patients_save_path,
-                          patients_save_prefix=patients_save_prefix,
-                          patient_save_overwrite=patient_save_overwrite,
-                          patient_use_existing=patient_use_existing,
-                          patient_counter_start=patient_counter_start
-                          )
-
-        # this makes sure that if some elements of dictionaries
-        # (e.g. characteristics, list_of_...) changes by the user,
-        # other elements of the dictionary remain intact.
-        for key, value in kwargs.items():
-            if isinstance(value, dict):
-                try:
-                    temp = self._defaults[key]
-                    temp.update(kwargs[key])
-                    kwargs[key] = temp
-                except KeyError:
-                    pass
-
-        self.set_params(**kwargs)
-        super().__init__(**kwargs)
-
-        if False:
-            self._ex_protocol_options = {}
-            self._ex_protocol_current = {}
-            self._list_of_characteristics = {}
-            self._list_of_probabilities = {}  # Aurora Avatar Population
-
-            self._day = 0
-            self._max_day = max_day + lookahead_duration
-            self._max_time = (max_day + 1) * 24
-            self._therapeutic_range = therapeutic_range
-            self._action_type = action_type
-
-            self._full_INR_history = [0.0] * max_day
-            self._full_dose_history = [0.0] * max_day
-
-            self._INR_history_length = INR_history_length
-            self._INR_history = [0]*INR_history_length
-            self._INR_penalty_coef = INR_penalty_coef
-
-            self._dose_history_length = dose_history_length
-            self._dose_history = [0]*dose_history_length
-            self._intervals_history = [0]*dose_history_length
-            self._max_dose = max_dose
-            self._dose_steps = dose_steps
-            self._dose_change_penalty_coef = dose_change_penalty_coef
-            self._dose_change_penalty_func = dose_change_penalty_func
-
-            self._interval = interval
-            self._interval_max_dose = interval_max_dose
-            self._interval_index = 0
-            self._max_interval = None
-
-            self._lookahead_duration = lookahead_duration
-            self._lookahead_penalty_coef = lookahead_penalty_coef
-
-            self._stats_list = stats_list
-            self._characteristics = characteristics
-            self._patient_selection = patient_selection
-            self._randomized = randomized
-            self._save_patients = save_patients
-            self._patients_save_path = patients_save_path
-            self._patients_save_prefix = patients_save_prefix
-            self._patient_save_overwrite = patient_save_overwrite
-            self._patient_use_existing = patient_use_existing
-            self._patient_counter_start = patient_counter_start
-
+        self._interval = [x if x != 0 else 1 for x in interval]
         if self._interval != interval:
             self._logger.warning('Replaced zero-day intervals with 1.')
 
-        if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
-            if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
-                    self._list_of_characteristics['VKORC1'] != ('G/G', 'G/A', 'A/A'):
-                raise ValueError('For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
-
-        self._filename_counter = self._patient_counter_start
-        if self._save_patients:
-            if not self._patient_save_overwrite and not self._patient_use_existing:
-                while os.path.exists(os.path.join(self._patients_save_path,
-                                                  ''.join((self._patients_save_prefix, f'{self._filename_counter:06}')))):
-                    self._filename_counter += 1
+        self._max_interval = max_day if max_interval is None else max_interval
+        self._interval_max_dose = interval_max_dose
 
         if isinstance(self._interval_max_dose, Number):
             self._interval_max_dose = [self._interval_max_dose] * len(self._interval)
@@ -260,6 +195,44 @@ class WarfarinModel_v5(Subject):
         elif len(self._interval_max_dose) != len(self._interval):
             self._logger.warning(
                 'interval_max_dose does not match "interval" in length. max_dose will be used for intervals without interval_max_dose values.')
+
+        self._lookahead_duration = lookahead_duration
+        self._lookahead_penalty_coef = lookahead_penalty_coef
+
+        self._stats_list = stats_list
+        self._characteristics = characteristics
+        self._patient_selection = patient_selection
+        if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
+            if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
+                    self._list_of_characteristics['VKORC1'] != ('G/G', 'G/A', 'A/A'):
+                raise ValueError('For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
+
+        self._randomized = randomized
+        self._save_patients = save_patients
+        self._patients_save_path = patients_save_path
+        self._patients_save_prefix = patients_save_prefix
+        self._patient_save_overwrite = patient_save_overwrite
+        self._patient_use_existing = patient_use_existing
+        self._patient_counter_start = patient_counter_start
+        self._filename_counter = self._patient_counter_start
+
+        # this makes sure that if some elements of dictionaries
+        # (e.g. characteristics, list_of_...) changes by the user,
+        # other elements of the dictionary remain intact.
+        # for key, value in kwargs.items():
+        #     if isinstance(value, dict):
+        #         try:
+        #             temp = self._defaults[key]
+        #             temp.update(kwargs[key])
+        #             kwargs[key] = temp
+        #         except KeyError:
+        #             pass
+
+        if self._save_patients:
+            if not self._patient_save_overwrite and not self._patient_use_existing:
+                while os.path.exists(os.path.join(self._patients_save_path,
+                                                  f'{self._patients_save_prefix}{self._filename_counter:06}')):
+                    self._filename_counter += 1
 
         self.reset()
 

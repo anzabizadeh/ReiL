@@ -8,8 +8,11 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from logging import WARNING
+from typing import Any, Dict, List, Optional, Sequence
+
 from build.lib.rl.rldata import RLData
-from typing import Any, Dict, List, Optional
+
 from ..rlbase import RLBase
 
 
@@ -29,23 +32,31 @@ class Subject(RLBase):
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
     '''
-    def __init__(self, agent_list: Dict[str, "Subject"] = {},
-            ex_protocol_current: Dict[str, str] = {'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
-            ex_protocol_options: Dict[str, List[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
-            **kwargs):
-        self.set_defaults(agent_list=agent_list,
-            ex_protocol_options=ex_protocol_options,
-            ex_protocol_current=ex_protocol_current,
-            )
-        self.set_params(**kwargs)
-        super().__init__(**kwargs)
+    def __init__(self,
+                 name: str = 'subject',
+                 version: float = 0.5,
+                 path: str = '.',
+                 ex_protocol_current: Dict[str, str] = {'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
+                 ex_protocol_options: Dict[str, List[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+                 stats_list: Sequence[str] = [],
+                 logger_name: str = __name__,
+                 logger_level: int = WARNING,
+                 logger_filename: Optional[str] = None,
+                 persistent_attributes: List[str] = [],
+                 agent_list: Dict[str, "Subject"] = {}):
 
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._agent_list = {}
-            self._ex_protocol_options = {}
-            self._ex_protocol_current = {}
+        super().__init__(name=name,
+                         version=version,
+                         path=path,
+                         ex_protocol_current=ex_protocol_current,
+                         ex_protocol_options=ex_protocol_options,
+                         stats_list=stats_list,
+                         logger_name=logger_name,
+                         logger_level=logger_level,
+                         logger_filename=logger_filename,
+                         persistent_attributes=persistent_attributes)
+
+        self._agent_list = agent_list
 
     @property
     def state(self) -> None:
