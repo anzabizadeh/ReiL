@@ -8,19 +8,16 @@ A Q-learning agent with Neural Network Q-function approximator
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-
 import os
 from collections import deque
+from logging import WARNING
 from pathlib import Path
 from random import choice, random
-from time import time
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
 from dill import HIGHEST_PROTOCOL, dump, load
-from tensorflow.python.ops.gen_math_ops import Any
-from rl.rlbase import RLBase
 from tensorflow import keras
 
 from ..rldata import RLData
@@ -56,8 +53,8 @@ class DQNAgent(Agent):
     def __init__(self,
                  filename: Optional[str] = None,
                  path: Optional[Union[str, Path]] = None,
-                 gamma: float = 1.0, epsilon: float = 0.0,
-                 default_actions: Sequence[RLBase] = [],
+                 gamma: float = 1.0, epsilon: Union[Callable, float] = 0.0,
+                 default_actions: Sequence[RLData] = [],
                  lr_initial: float = 1e-3,
                  lr_scheduler: Callable[[int, float], float] = lambda epoch, lr: lr,
                  hidden_layer_sizes: Sequence[int] = (1,),
@@ -70,7 +67,6 @@ class DQNAgent(Agent):
                  tensorboard_path: Optional[Union[str, Path]] = None,
                  name: str = 'DQN_agent',
                  version: float = 0.5,
-                 path: str = '.',
                  ex_protocol_current: Dict[str, str] = {'mode': 'training'},
                  ex_protocol_options: Dict[str, List[str]] = {'mode': ['training', 'test']},
                  stats_list: Sequence[str] = [],
@@ -101,6 +97,7 @@ class DQNAgent(Agent):
                          persistent_attributes=persistent_attributes)
 
         self._gamma = min(gamma, 1.0)
+        self._epsilon = epsilon
         self._default_actions = default_actions
         self._normalized_action_list = [a.normalize().as_list() for a in self._default_actions]
 

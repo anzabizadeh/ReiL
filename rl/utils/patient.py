@@ -1,6 +1,7 @@
+from logging import WARNING
 from math import exp, log, sqrt
 from random import sample
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -34,12 +35,18 @@ class Patient(RLBase):
 
     def __init__(self, age: float = 50.0, CYP2C9: str = '*1/*1', VKORC1: str = 'G/A',
                  randomized: bool = True, max_time: int = 24,
-                 dose_interval: int = 24, dose: dict = {}, lazy: bool = False, **kwargs):
-        self.set_defaults(age=age, CYP2C9=CYP2C9, VKORC1=VKORC1,
-                 randomized=randomized, max_time=max_time,
-                 dose_interval=dose_interval, dose=dose, lazy=lazy, **kwargs)
-        # self.set_params(**kwargs)
-        super().__init__(**kwargs)
+                 dose_interval: int = 24, dose: dict = {}, lazy: bool = False,
+                 name: str = 'patient',
+                 version: float = 0.5,
+                 logger_name: str = __name__,
+                 logger_level: int = WARNING,
+                 logger_filename: Optional[str] = None):
+
+        super().__init__(name=name,
+                         version=version,
+                         logger_name=logger_name,
+                         logger_level=logger_level,
+                         logger_filename=logger_filename)
 
         self._age = age
         self._CYP2C9 = CYP2C9
