@@ -40,13 +40,16 @@ class Patient(RLBase):
                  version: float = 0.5,
                  logger_name: str = __name__,
                  logger_level: int = WARNING,
-                 logger_filename: Optional[str] = None):
+                 logger_filename: Optional[str] = None,
+                 **kwargs):
 
         super().__init__(name=name,
                          version=version,
                          logger_name=logger_name,
                          logger_level=logger_level,
                          logger_filename=logger_filename)
+
+        self.set_params(**kwargs)
 
         self._age = age
         self._CYP2C9 = CYP2C9
