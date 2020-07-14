@@ -16,6 +16,11 @@ class testRLData(unittest.TestCase):
         for i in range(len(data)):
             self.assertEqual(rl_value[i], data[i])
 
+        index = randint(0, len(data))
+        self.assertEqual(rl_value[index],
+                         data[index],
+                         f'index for {index}')
+
         slice_from, slice_to = sorted([randint(0, len(data)),
                                randint(0, len(data))])
         self.assertEqual(rl_value[slice_from:slice_to].value,
@@ -76,17 +81,17 @@ class testRLData(unittest.TestCase):
         with self.assertRaises(TypeError):
             rl_value_categorical['x'] = rl_value_categorical[-1]
 
-
     def test_numerical_list_normalizer(self):
         data = [randint(-100, 100) for _ in range(10)]
         rl_value = RLData(data)
         lower = min(data)
-        values_range = max(data) - lower
+        upper = max(data)
+        values_range = upper - lower
         expected_output = [(i - lower) / values_range for i in data]
         self.assertEqual(rl_value.normalize(), RLData(expected_output))
 
         # slice of a list - numerical
-        new_value = [randint(-100, 100) for _ in range(2)]
+        new_value = [randint(lower, upper) for _ in range(2)]
         result = rl_value[:2].value + new_value + rl_value[4:].value
         expected_output = [(i - lower) / values_range for i in result]
         rl_value[2:4] = new_value
@@ -94,6 +99,21 @@ class testRLData(unittest.TestCase):
 
     def test_categorical_list_normalizer(self):
         raise NotImplementedError
+
+    def test_categorical_dict_modification(self):
+        # slice of a list - categorical
+        # Normal
+        data_categorical = dict(zip(sample(list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 10), (randint(-100, 100) for _ in range(10))))
+        rl_value_categorical = RLData(data_categorical)
+        index = sample(rl_value_categorical.keys(), 1)[0]
+        
+        rl_value_categorical._lower[index] = -100
+        rl_value_categorical._upper[index] = 100
+        rl_value_categorical[index] = 12.5
+        self.assertEqual(rl_value_categorical[index].value, [12.5])
+
+
+
 
 
 if __name__ == "__main__":
