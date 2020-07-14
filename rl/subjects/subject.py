@@ -8,6 +8,8 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from build.lib.rl.rldata import RLData
+from typing import Any, Dict, List, Optional
 from ..rlbase import RLBase
 
 
@@ -27,10 +29,14 @@ class Subject(RLBase):
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
     '''
-    def __init__(self, **kwargs):
-        self.set_defaults(agent_list={},
-            ex_protocol_options={'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
-            ex_protocol_current={'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'})
+    def __init__(self, agent_list: Dict[str, "Subject"] = {},
+            ex_protocol_current: Dict[str, str] = {'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
+            ex_protocol_options: Dict[str, List[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+            **kwargs):
+        self.set_defaults(agent_list=agent_list,
+            ex_protocol_options=ex_protocol_options,
+            ex_protocol_current=ex_protocol_current,
+            )
         self.set_params(**kwargs)
         super().__init__(**kwargs)
 
@@ -42,25 +48,25 @@ class Subject(RLBase):
             self._ex_protocol_current = {}
 
     @property
-    def state(self):
+    def state(self) -> None:
         raise NotImplementedError
 
     @property
-    def complete_state(self):
+    def complete_state(self) -> None:
         '''
         Returns all the information that the subject can provide.
         '''
         raise NotImplementedError
 
     @property
-    def is_terminated(self):
+    def is_terminated(self) -> bool:
         raise NotImplementedError
 
     @property
-    def possible_actions(self):
+    def possible_actions(self) -> List[RLData]:
         pass
 
-    def register(self, agent_name):
+    def register(self, agent_name: str) -> int:
         '''
         Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
         \nArguments:
@@ -77,7 +83,7 @@ class Subject(RLBase):
             self._agent_list[agent_name] = _id
             return _id
 
-    def deregister(self, agent_name):
+    def deregister(self, agent_name: str) -> None:
         '''
         Deegisters an agent given its name.
         \nArguments:
@@ -85,11 +91,11 @@ class Subject(RLBase):
         '''
         self._agent_list.pop(agent_name)
 
-    def take_effect(self, action, _id=None):
+    def take_effect(self, action: RLData, _id: Optional[int] = None) -> float:
         raise NotImplementedError
 
-    def reset(self):
+    def reset(self) -> None:
         raise NotImplementedError
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Subject'
