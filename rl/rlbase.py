@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from random import randrange
 from time import sleep
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from dill import HIGHEST_PROTOCOL, dump, load
 
@@ -34,13 +34,15 @@ class RLBase():
         load: load an object from a file.
         save: save the object to a file.
     '''
-    def __init__(self, **kwargs):
+    def __init__(self, persistent_attributes: List[str] = [],
+        **kwargs):
         self._defaults = {}
         self.data_collector = DataCollector(object=self)
 
         self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
                           ex_protocol_options={}, ex_protocol_current={},  # requested_exchange_protocol={},
-                          stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename=f'{__name__}.log')
+                          stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename=f'{__name__}.log',
+                          persistent_attributes=persistent_attributes)
         self.set_params(**kwargs)
 
         self._logger = logging.getLogger(self._logger_name)
@@ -51,6 +53,7 @@ class RLBase():
             self._name, self._version, self._path = [], [], []
             self._ex_protocol_options, self._ex_protocol_current, self._requested_exchange_protocol = {}, {}, {}
             self._stats_list = []
+            self._persistent_attributes = []
     
     def stats(self, stats_list: Sequence) -> Dict[str, Any]:
         '''
@@ -94,8 +97,10 @@ class RLBase():
         ---------
             params: a dictionary containing parameter names and their values.
         '''
-        self.__dict__.update(('_'+key, params.get(key, self._defaults[key]))
-                              for key in self._defaults if key in params)
+        for key, value in params.items():
+            self.__dict__['_'+key] = value
+        # self.__dict__.update(('_'+key, params.get(key, self._defaults[key]))
+        #                       for key in self._defaults if key in params)
 
     def set_defaults(self, **params: Dict[str, Any]) -> None:
         '''
@@ -139,8 +144,19 @@ class RLBase():
                 except EOFError:
                     self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
                     raise RuntimeError(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
+            
+            self._logger.info(f'Changing the logger from {self._logger_name} to {data["_logger_name"]}.')
+
+            persistent_attributes = self._persistent_attributes + ['_persistent_attributes']
             for key, value in data.items():
-                self.__dict__[key] = value
+                if key[1:] not in persistent_attributes:
+                    self.__dict__[key] = value
+
+            self._logger.removeHandler(logging.FileHandler(self._logger_filename))
+            self._logger = logging.getLogger(self._logger_name)
+            self._logger.setLevel(self._logger_level)
+            self._logger.addHandler(logging.FileHandler(self._logger_filename))
+
             self.data_collector._object = self
 
     def save(self, filename: Optional[str] = None, path: Optional[str] = None, data_to_save: Optional[Sequence[str]] = None) -> Tuple[Path, str]:
@@ -166,7 +182,8 @@ class RLBase():
             for key in ('_name', '_version', '_path'):  # these should be saved automatically
                 data[key] = self.__dict__[key]
 
-        _path.mkdir(parents=True, exist_ok=True) 
+        _path.mkdir(parents=True, exist_ok=True)
+        data.pop('_logger')
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
             dump(data, f, HIGHEST_PROTOCOL)
 
