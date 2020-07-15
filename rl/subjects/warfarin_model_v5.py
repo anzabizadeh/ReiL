@@ -484,7 +484,7 @@ class WarfarinModel_v5(Subject):
                       upper={'age': self._list_of_characteristics['age'][-1],
                              'weight': self._list_of_characteristics['weight'][-1],
                              'height': self._list_of_characteristics['height'][-1],
-                             'day': self._max_day,
+                             'day': self._max_day - 1,
                              'Doses': self._max_dose,
                              'INRs': 15.0,
                              'Intervals': self._max_interval},
