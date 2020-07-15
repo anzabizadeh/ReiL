@@ -8,18 +8,13 @@ An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-
-import os
-from dill import HIGHEST_PROTOCOL, dump, load
-from random import choice, random
-from time import time
-
+from logging import WARNING
 from math import exp, log, sqrt
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-
-from .agent import Agent
 from ..rldata import RLData
+from .agent import Agent
+
 
 class WarfarinAgent(Agent):
     '''
@@ -37,29 +32,41 @@ class WarfarinAgent(Agent):
         reset: Resets the dosing algorithm to day 1.
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, study_arm: str = 'AAA',
+                 name: str = 'warfarin_agent',
+                 version: float = 0.5,
+                 path: str = '.',
+                 logger_name: str = __name__,
+                 logger_level: int = WARNING,
+                 logger_filename: Optional[str] = None):
         '''
         Initialize a warfarin agent.
+
+        Arguments:
+        \n  study_arm: one of available study arms: AAA, CAA, PGAA, PGPGI, PGPGA
         '''
-        self.set_defaults(study_arm='', method=lambda x: -1, day=1, retest_day=2,
-                          skip_dose=0, dose=0, weekly_dose=0,
-                          red_flag=False,  # used in aurora maintenance algorithm
-                          lenzini_on_day_4=False,  # used in lenzini adjustment algorithm
-                          number_of_stable_days=0  # used in aurora maintenance algorithm
-                          )
-        self.set_params(**kwargs)
-        super().__init__(**kwargs)
+        super().__init__(name=name,
+                         version=version,
+                         path=path,
+                         logger_name=logger_name,
+                         logger_level=logger_level,
+                         logger_filename=logger_filename)
+
+        self._study_arm = study_arm
+        self._method = lambda x: -1
+        self._day = 1
+        self._retest_day = 2
+        self._skip_dose = 0
+        self._dose = 0
+        self._weekly_dose = 0
+        self._red_flag = False  # used in aurora maintenance algorithm
+        self._lenzini_on_day_4 = False  # used in lenzini adjustment algorithm
+        self._number_of_stable_days = 0  # used in aurora maintenance algorithm
 
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._method = lambda x: -1
-            self._study_arm = ''
-
-    def learn(self, **kwargs):
+    def learn(self, history: List[Dict[str, Any]]) -> None:
         '''
         Learn based on history.
 
@@ -67,7 +74,7 @@ class WarfarinAgent(Agent):
         '''
         pass
 
-    def act(self, state, **kwargs):
+    def act(self, state: RLData, actions: Optional[List[RLData]] = None, episode: Optional[int] = 0) -> RLData:
         '''
         return the best action for a given state.
 
@@ -106,7 +113,7 @@ class WarfarinAgent(Agent):
         return RLData(min(dose, 15.0), lower=0.0, upper=15.0)  # Cuts out the dose if it is >15.0
         # 20.0)  # WARNING: upper limit is changed to account for higher doses!
 
-    def _precheck(self, patient):
+    def _precheck(self, patient: Dict[str, Any]) -> float:
         v = -1
         if patient['day'][0] <= 1:
             self.reset()
@@ -120,7 +127,7 @@ class WarfarinAgent(Agent):
             
         return v
 
-    def _aurora(self, patient):
+    def _aurora(self, patient: Dict[str, Any]) -> float:
         if self._red_flag:
             if self._retest_day > patient['day'][0]:
                 return 0.0
@@ -154,7 +161,7 @@ class WarfarinAgent(Agent):
         else:
             return 0.0
 
-    def _aurora_dosing_table(self, current_INR, dose):
+    def _aurora_dosing_table(self, current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
         skip_dose = 0
         red_flag = False
         if current_INR < 1.50:
@@ -185,7 +192,7 @@ class WarfarinAgent(Agent):
         
         return dose, next_test, skip_dose, red_flag
 
-    def _aurora_retesting_table(self, current_INR, number_of_stable_days):
+    def _aurora_retesting_table(self, current_INR: float, number_of_stable_days: int) -> Tuple[int, int]:
         next_test = {0: 1, 1: 1, 2: 5, 7: 7, 14: 14, 28: 28}
         if 2.0 <= current_INR <= 3.0:
             number_of_stable_days = min(number_of_stable_days + next_test[number_of_stable_days], 28)
@@ -194,7 +201,7 @@ class WarfarinAgent(Agent):
 
         return number_of_stable_days, next_test[number_of_stable_days]
 
-    def _iwpc_clinical(self, patient):  # only the initial dose (day <= 3)
+    def _iwpc_clinical(self, patient: Dict[str, Any]) -> float:  # only the initial dose (day <= 3)
         if self._weekly_dose == 0:
             self._weekly_dose = (4.0376
                         - 0.2546 * patient['age'][0] / 10
@@ -212,7 +219,7 @@ class WarfarinAgent(Agent):
     
         return self._dose
 
-    def _iwpc_pg(self, patient):  # only the initial dose (day <= 3)
+    def _iwpc_pg(self, patient: Dict[str, Any]) -> float:  # only the initial dose (day <= 3)
         if self._weekly_dose == 0:
             self._weekly_dose = (5.6044
                         - 0.02614 * patient['age'][0] / 10  # Based on EU-PACT report page 18 (Ravvaz has a typo!)
@@ -239,7 +246,7 @@ class WarfarinAgent(Agent):
 
         return self._dose
 
-    def _modified_iwpc_pg(self, patient):
+    def _modified_iwpc_pg(self, patient: Dict[str, Any]) -> float:
         if self._weekly_dose == 0:
             self._weekly_dose = (5.6044
                         - 0.02614 * patient['age'][0] / 10  # Based on EU-PACT report page 18 (Ravvaz has a typo!)
@@ -275,7 +282,7 @@ class WarfarinAgent(Agent):
 
         return self._dose
 
-    def _lenzini_pg(self, patient):
+    def _lenzini_pg(self, patient: Dict[str, Any]) -> float:
         if self._lenzini_on_day_4:
             self._lenzini_on_day_4 = False
             return self._dose
@@ -299,10 +306,10 @@ class WarfarinAgent(Agent):
 
         return self._dose
 
-    def _intermountain(self, patient):
+    def _intermountain(self, patient: Dict[str, Any]) -> float:
         raise NotImplementedError
 
-    def _action(self, method, state):
+    def _action(self, method: str, state: RLData) -> float:
         '''
         This method will be depricated. Now each dosing protocol is a separate function.
         '''
@@ -452,7 +459,7 @@ class WarfarinAgent(Agent):
 
         return self._dose
 
-    def reset(self):
+    def reset(self) -> None:
         self._retest_day = 1
         self._red_flag = False
         self._lenzini_on_day_4 = False
@@ -506,19 +513,7 @@ class WarfarinAgent(Agent):
     #                          kwargs['filename'] + '.tf/' + kwargs['filename'])
     #     return path, filename
 
-    def _report(self, **kwargs):
-        '''
-        generate and return the requested report.
-
-        Arguments
-        ---------
-            statistic: the list of items to report.
-
-        Note: this function is not implemented!
-        '''
-        raise NotImplementedError
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         try:
             return f'WarfarinAgent: arm: {self._study_arm} day: {self._day}'
         except NameError:
