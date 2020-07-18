@@ -1,7 +1,8 @@
 import unittest
+from random import randint, sample
 
 from rl.rldata import RLData
-from random import randint, sample
+
 
 class testRLData(unittest.TestCase):
     def test_numerical_list_creation(self):
@@ -22,7 +23,7 @@ class testRLData(unittest.TestCase):
                          f'index for {index}')
 
         slice_from, slice_to = sorted([randint(0, len(data)),
-                               randint(0, len(data))])
+                                       randint(0, len(data))])
         self.assertEqual(rl_value[slice_from:slice_to].value,
                          data[slice_from:slice_to],
                          f'slicing for {slice_from}:{slice_to}')
@@ -34,13 +35,15 @@ class testRLData(unittest.TestCase):
         # slice of a list - numerical
         # Normal
         new_value = [randint(-100, 100) for _ in range(2)]
-        result = rl_value_numerical[:2].value + new_value + rl_value_numerical[4:].value
+        result = rl_value_numerical[:2].value + \
+            new_value + rl_value_numerical[4:].value
         rl_value_numerical[2:4] = new_value
         self.assertEqual(rl_value_numerical.value, result)
 
         # Exception due to range
         new_value = [randint(-150, -100) for _ in range(2)]
-        result = rl_value_numerical[:2].value + new_value + rl_value_numerical[4:].value
+        result = rl_value_numerical[:2].value + \
+            new_value + rl_value_numerical[4:].value
         with self.assertRaises(ValueError):
             rl_value_numerical[2:4] = new_value
 
@@ -65,13 +68,15 @@ class testRLData(unittest.TestCase):
         data_categorical = sample(list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 10)
         rl_value_categorical = RLData(data_categorical)
         new_value = sample(rl_value_categorical.categories, 2)
-        result = rl_value_categorical[:2].value + new_value + rl_value_categorical[4:].value
+        result = rl_value_categorical[:2].value + \
+            new_value + rl_value_categorical[4:].value
         rl_value_categorical[2:4] = new_value
         self.assertEqual(rl_value_categorical.value, result)
 
         # Exception due to category
         new_value = sample(list('abcd'), 2)
-        result = rl_value_categorical[:2].value + new_value + rl_value_categorical[4:].value
+        result = rl_value_categorical[:2].value + \
+            new_value + rl_value_categorical[4:].value
         with self.assertRaises(ValueError):
             rl_value_categorical[2:4] = new_value
 
@@ -103,17 +108,15 @@ class testRLData(unittest.TestCase):
     def test_categorical_dict_modification(self):
         # slice of a list - categorical
         # Normal
-        data_categorical = dict(zip(sample(list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 10), (randint(-100, 100) for _ in range(10))))
+        data_categorical = dict(zip(sample(list(
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 10), (randint(-100, 100) for _ in range(10))))
         rl_value_categorical = RLData(data_categorical)
         index = sample(rl_value_categorical.keys(), 1)[0]
-        
+
         rl_value_categorical._lower[index] = -100
         rl_value_categorical._upper[index] = 100
         rl_value_categorical[index] = 12.5
         self.assertEqual(rl_value_categorical[index].value, [12.5])
-
-
-
 
 
 if __name__ == "__main__":
