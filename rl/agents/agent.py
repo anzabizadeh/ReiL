@@ -8,19 +8,15 @@ This `agent` class is the super class of all agent classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from logging import WARNING
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional
 
-from ..rlbase import RLBase
+from rl import rlbase
 
 
-def main():
-    pass
-
-class Agent(RLBase):
+class Agent(rlbase.RLBase):
     '''
     Super class of all agent classes.
-    
+
     Attributes
     ----------
         status: return the status of the agent
@@ -31,28 +27,17 @@ class Agent(RLBase):
         learn: learn using either history or action, reward, and state.
         reset: reset the agent.
     '''
+
     def __init__(self,
-                 name: str = 'agent',
-                 version: float = 0.5,
-                 path: str = '.',
                  ex_protocol_current: Dict[str, str] = {'mode': 'training'},
                  ex_protocol_options: Dict[str, List[str]] = {'mode': ['training', 'test']},
-                 stats_list: Sequence[str] = [],
-                 logger_name: str = __name__,
-                 logger_level: int = WARNING,
-                 logger_filename: Optional[str] = None,
-                 persistent_attributes: List[str] = []):
+                 **kwargs):
 
-        super().__init__(name=name,
-                         version=version,
-                         path=path,
+        super().__init__(name=kwargs.get('name', __name__),
+                         logger_name=kwargs.get('logger_name', __name__),
                          ex_protocol_current=ex_protocol_current,
                          ex_protocol_options=ex_protocol_options,
-                         stats_list=stats_list,
-                         logger_name=logger_name,
-                         logger_level=logger_level,
-                         logger_filename=logger_filename,
-                         persistent_attributes=persistent_attributes)
+                         **kwargs)
 
     @property
     def status(self):
@@ -82,12 +67,13 @@ class Agent(RLBase):
         '''
         pass
 
-    def learn(self, **kwargs):
-        '''Learn using either history or action, reward, and state.''' 
+    def learn(self, observation: Optional[rlbase.Observation] = None,
+              history: Optional[rlbase.History] = None):
+        '''Learn using either history or action, reward, and state.'''
         pass
 
     def reset(self):
-        '''Reset the agent at the end of a learning episode.''' 
+        '''Reset the agent at the end of a learning episode.'''
         pass
 
     def __repr__(self):

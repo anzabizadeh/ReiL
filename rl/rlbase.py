@@ -8,16 +8,19 @@ The base class for reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from collections import namedtuple
 import logging
-from pathlib import Path
-from random import randrange
-from time import sleep
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+import pathlib
+import time
+import numbers
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from dill import HIGHEST_PROTOCOL, dump, load
+import dill
+from rl import data_collector
+from rl import rldata
 
-from .data_collector import DataCollector
-
+Observation = Dict[str, Union[numbers.Number, rldata.RLData]]
+History = List[Observation]
 
 class RLBase():
     '''
@@ -44,32 +47,31 @@ class RLBase():
                  logger_name: str = __name__,
                  logger_level: int = logging.WARNING,
                  logger_filename: Optional[str] = None,
-                 persistent_attributes: List[str] = []):
+                 persistent_attributes: List[str] = [],
+                 **kwargs):
         # self._defaults = {}
 
-        self.data_collector = DataCollector(object=self)
+        self.data_collector = data_collector.DataCollector(object=self)
 
         self._name = name
         self._version = version
         self._path = path
+
         self._ex_protocol_options = ex_protocol_options
         self._ex_protocol_current = ex_protocol_current
         self._stats_list = stats_list
+
         self._logger_name = logger_name
         self._logger_level = logger_level
         self._logger_filename = logger_filename
         self._persistent_attributes = persistent_attributes
 
-        # self.set_defaults(name=self.__repr__() + f'-{str(randrange(1, 1000000)):0<7}', version=0.3, path='.',
-        #                   ex_protocol_options={}, ex_protocol_current={},  # requested_exchange_protocol={},
-        #                   stats_list=[], logger_name=__name__, logger_level=logging.WARNING, logger_filename=f'{__name__}.log',
-        #                   persistent_attributes=persistent_attributes)
-        # self.set_params(**kwargs)
-
         self._logger = logging.getLogger(self._logger_name)
         self._logger.setLevel(self._logger_level)
         if self._logger_filename is not None:
             self._logger.addHandler(logging.FileHandler(self._logger_filename))
+
+        self.set_params(**kwargs)
 
     def stats(self, stats_list: Sequence) -> Dict[str, Any]:
         '''
@@ -87,10 +89,6 @@ class RLBase():
     @property
     def exchange_protocol_options(self) -> Dict[str, Sequence[str]]:
         return self._ex_protocol_options
-
-    # @property
-    # def requested_exchange_protocol(self) -> Dict[str, str]:
-    #     return self._requested_exchange_protocol
 
     @property
     def exchange_protocol(self) -> Dict[str, str]:
@@ -148,16 +146,16 @@ class RLBase():
             path: the path of the file to be loaded. (Object's default path will be used if not provided)
 
         '''
-        _path = Path(path if path is not None else self._path)
+        _path = pathlib.Path(path if path is not None else self._path)
 
         with open(_path / f'{filename}.pkl', 'rb') as f:
             try:
-                data = load(f)
+                data = dill.load(f)
             except EOFError:
                 try:
                     self._logger.info(f'First attempt failed to load {_path / f"{filename}.pkl"}.')
-                    sleep(1)
-                    data = load(f)
+                    time.sleep(1)
+                    data = dill.load(f)
                 except EOFError:
                     self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
                     raise RuntimeError(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
@@ -169,14 +167,17 @@ class RLBase():
                 if key[1:] not in persistent_attributes:
                     self.__dict__[key] = value
 
-            self._logger.removeHandler(logging.FileHandler(self._logger_filename))
             self._logger = logging.getLogger(self._logger_name)
             self._logger.setLevel(self._logger_level)
-            self._logger.addHandler(logging.FileHandler(self._logger_filename))
+            if self._logger_filename is not None:
+                self._logger.addHandler(logging.FileHandler(self._logger_filename))
 
             self.data_collector._object = self
 
-    def save(self, filename: Optional[str] = None, path: Optional[str] = None, data_to_save: Optional[Sequence[str]] = None) -> Tuple[Path, str]:
+    def save(self,
+             filename: Optional[str] = None,
+             path: Optional[str] = None,
+             data_to_save: Optional[Sequence[str]] = None) -> Tuple[pathlib.Path, str]:
         '''
         Save the object to a file.
 
@@ -188,7 +189,7 @@ class RLBase():
         '''
 
         _filename: str = filename if filename is not None else self._name
-        _path: Path = Path(path if path is not None else self._path)
+        _path: pathlib.Path = pathlib.Path(path if path is not None else self._path)
 
         if data_to_save is None:
             data = self.__dict__
@@ -202,7 +203,7 @@ class RLBase():
         _path.mkdir(parents=True, exist_ok=True)
         data.pop('_logger')
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
-            dump(data, f, HIGHEST_PROTOCOL)
+            dill.dump(data, f, dill.HIGHEST_PROTOCOL)
 
         return _path, _filename
 

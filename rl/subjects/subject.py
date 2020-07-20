@@ -8,18 +8,15 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from logging import WARNING
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Dict, List, Optional
 
-from build.lib.rl.rldata import RLData
-
-from ..rlbase import RLBase
+from rl import rlbase, rldata
 
 
-class Subject(RLBase):
+class Subject(rlbase.RLBase):
     '''
     Super class of all subject classes.
-    
+
     Attributes
     ----------
         state: the state of the subject as a ValueSet.
@@ -32,38 +29,27 @@ class Subject(RLBase):
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
     '''
+
     def __init__(self,
-                 name: str = 'subject',
-                 version: float = 0.5,
-                 path: str = '.',
+                 agent_list: Dict[str, "Subject"] = {},
                  ex_protocol_current: Dict[str, str] = {'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
                  ex_protocol_options: Dict[str, List[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
-                 stats_list: Sequence[str] = [],
-                 logger_name: str = __name__,
-                 logger_level: int = WARNING,
-                 logger_filename: Optional[str] = None,
-                 persistent_attributes: List[str] = [],
-                 agent_list: Dict[str, "Subject"] = {}):
+                 **kwargs):
 
-        super().__init__(name=name,
-                         version=version,
-                         path=path,
+        super().__init__(name=kwargs.get('name', __name__),
+                         logger_name=kwargs.get('logger_name', __name__),
                          ex_protocol_current=ex_protocol_current,
                          ex_protocol_options=ex_protocol_options,
-                         stats_list=stats_list,
-                         logger_name=logger_name,
-                         logger_level=logger_level,
-                         logger_filename=logger_filename,
-                         persistent_attributes=persistent_attributes)
+                         **kwargs)
 
         self._agent_list = agent_list
 
     @property
-    def state(self) -> None:
+    def state(self) -> rldata.RLData:
         raise NotImplementedError
 
     @property
-    def complete_state(self) -> None:
+    def complete_state(self) -> rldata.RLData:
         '''
         Returns all the information that the subject can provide.
         '''
@@ -74,7 +60,7 @@ class Subject(RLBase):
         raise NotImplementedError
 
     @property
-    def possible_actions(self) -> List[RLData]:
+    def possible_actions(self) -> List[rldata.RLData]:
         pass
 
     def register(self, agent_name: str) -> int:
@@ -102,7 +88,7 @@ class Subject(RLBase):
         '''
         self._agent_list.pop(agent_name)
 
-    def take_effect(self, action: RLData, _id: Optional[int] = None) -> float:
+    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> float:
         raise NotImplementedError
 
     def reset(self) -> None:

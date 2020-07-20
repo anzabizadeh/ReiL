@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-  pylint: disable=undefined-variable
 '''
 warfarin_model class
 ==================
@@ -8,24 +8,19 @@ This `warfarin_model` class implements a two compartment PK/PD model for warfari
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+import collections
+import copy
+import numbers
 import os
-from collections import deque
-from copy import deepcopy
-from logging import WARNING
-from numbers import Number
-from pathlib import Path
-from random import choice
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+import pathlib
+import random
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
-import pandas as pd
-
-from ..rldata import RLData
-from ..subjects import Subject
-from ..utils import Patient
+from rl import rldata, subjects, utils
 
 
-class WarfarinModel_v5(Subject):
+class WarfarinModel_v5(subjects.Subject):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model for wafarin.
 
@@ -43,20 +38,7 @@ class WarfarinModel_v5(Subject):
     '''
 
     def __init__(self,
-                 name: str = 'subject',
-                 version: float = 0.5,
-                 path: str = '.',
-                 ex_protocol_current: Dict[str, str] = {'state': 'standard',
-                                               'possible_actions': 'standard',
-                                               'take_effect': 'standard'},
-                 ex_protocol_options: Dict[str, List[str]] = {'state': ['standard', 'extended'],
-                                               'possible_actions': ['standard'],
-                                               'take_effect': ['standard', 'no_reward']},
                  stats_list: Sequence[str] = ['TTR', 'dose_change', 'delta_dose'],
-                 logger_name: str = __name__,
-                 logger_level: int = WARNING,
-                 logger_filename: Optional[str] = None,
-                 persistent_attributes: List[str] = [],
 
                  max_day: int = 90,
                  therapeutic_range: Tuple[int, int] = (2, 3),
@@ -67,8 +49,8 @@ class WarfarinModel_v5(Subject):
                  max_dose: float = 15.0,
                  dose_steps: float = 0.5,
                  dose_change_penalty_coef: float = 1.0,
-                 dose_change_penalty_func: Callable[[Sequence[float]], float] = \
-                     lambda x: int(x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
+                 dose_change_penalty_func: Callable[[Sequence[float]], float] =
+                 lambda x: int(x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
                  interval: Sequence[int] = [1],
                  max_interval: Optional[int] = None,
                  interval_max_dose: Union[Sequence[float], float] = [15.0],
@@ -82,7 +64,7 @@ class WarfarinModel_v5(Subject):
                  patient_selection: str = 'random',
                  randomized: bool = True,
                  save_patients: bool = False,
-                 patients_save_path: Union[str, Path] = './patients',
+                 patients_save_path: Union[str, pathlib.Path] = './patients',
                  patients_save_prefix: str = 'warfv5',
                  patient_save_overwrite: bool = False,
                  patient_use_existing: bool = True,
@@ -121,16 +103,10 @@ class WarfarinModel_v5(Subject):
         \n  patient_counter_start: the starting value for patient filename counter (Default: 0)
         '''
 
-        super().__init__(name=name,
-                         version=version,
-                         path=path,
-                         ex_protocol_current=ex_protocol_current,
-                         ex_protocol_options=ex_protocol_options,
+        super().__init__(name=kwargs.get('name', __name__),
+                         logger_name=kwargs.get('logger_name', __name__),
                          stats_list=stats_list,
-                         logger_name=logger_name,
-                         logger_level=logger_level,
-                         logger_filename=logger_filename,
-                         persistent_attributes=persistent_attributes)
+                         **kwargs)
 
         self._list_of_characteristics = {
             'age': (18, 100),  # similar to the range of 10k sample from Ravvaz
@@ -175,7 +151,7 @@ class WarfarinModel_v5(Subject):
         self._INR_penalty_coef = INR_penalty_coef
 
         self._dose_history_length = dose_history_length
-        self._doservals_history = [1]*dose_history_length
+        self._dose_history = [1]*dose_history_length
         self._max_dose = max_dose
         self._dose_steps = dose_steps
         self._dose_change_penalty_coef = dose_change_penalty_coef
@@ -188,10 +164,12 @@ class WarfarinModel_v5(Subject):
         self._max_interval = max_day if max_interval is None else max_interval
         self._interval_max_dose = interval_max_dose
 
-        if isinstance(self._interval_max_dose, Number):
-            self._interval_max_dose = [self._interval_max_dose] * len(self._interval)
+        if isinstance(self._interval_max_dose, numbers.Number):
+            self._interval_max_dose = [
+                self._interval_max_dose] * len(self._interval)
         elif len(self._interval_max_dose) == 1:
-            self._interval_max_dose = self._interval_max_dose * len(self._interval)
+            self._interval_max_dose = self._interval_max_dose * \
+                len(self._interval)
         elif len(self._interval_max_dose) != len(self._interval):
             self._logger.warning(
                 'interval_max_dose does not match "interval" in length. max_dose will be used for intervals without interval_max_dose values.')
@@ -205,7 +183,8 @@ class WarfarinModel_v5(Subject):
         if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
             if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
                     self._list_of_characteristics['VKORC1'] != ('G/G', 'G/A', 'A/A'):
-                raise ValueError('For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
+                raise ValueError(
+                    'For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
 
         self._randomized = randomized
         self._save_patients = save_patients
@@ -236,80 +215,82 @@ class WarfarinModel_v5(Subject):
 
         self.reset()
 
-        self._INR_mid = (self._therapeutic_range[1] + self._therapeutic_range[0]) / 2
+        self._INR_mid = (
+            self._therapeutic_range[1] + self._therapeutic_range[0]) / 2
         self._INR_range = self._therapeutic_range[1] - self._therapeutic_range[0]
 
         if self._action_type.lower() in ('dose', 'dose only', 'dose_only', 'only dose', 'only_dose'):
-            self._possible_actions = RLData([x*self._dose_steps
-                                             for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
-                                            lower=0, upper=self._max_dose).as_rldata_array()
+            self._possible_actions = rldata.RLData([x*self._dose_steps
+                                                    for x in range(int(self._max_dose/self._dose_steps), -1, -1)],
+                                                   lower=0, upper=self._max_dose).as_rldata_array()
         elif self._action_type.lower() in ('interval', 'interval only', 'interval_only', 'only interval', 'only_interval'):
-            self._possible_actions = RLData(list(range(1, self._max_interval + 1)),
-                                            lower=1, upper=self._max_interval).as_rldata_array()
+            self._possible_actions = rldata.RLData(list(range(1, self._max_interval + 1)),
+                                                   lower=1, upper=self._max_interval).as_rldata_array()
         else:
-            self._possible_actions = RLData([(x*self._dose_steps, i)
-                                             for x in range(int(self._max_dose/self._dose_steps), -1, -1)
-                                             for i in range(1, self._max_interval + 1)],
-                                            lower=(0, 1), upper=(self._max_dose, self._max_interval)).as_rldata_array()
+            self._possible_actions = rldata.RLData([(x*self._dose_steps, i)
+                                                    for x in range(int(self._max_dose/self._dose_steps), -1, -1)
+                                                    for i in range(1, self._max_interval + 1)],
+                                                   lower=(0, 1), upper=(self._max_dose, self._max_interval)).as_rldata_array()
 
     @property
-    def state(self) -> RLData:
+    def state(self) -> rldata.RLData:
         if self._ex_protocol_current['state'] == 'extended':
             return self._state_extended()
         else:
             return self._state_normal()
 
     @property
-    def complete_state(self) -> RLData:
-        return RLData({'age': self._characteristics['age'],
-                       'weight': self._characteristics['weight'],
-                       'height': self._characteristics['height'],
-                       'gender': self._characteristics['gender'],
-                       'race': self._characteristics['race'],
-                       'tobaco': self._characteristics['tobaco'],
-                       'amiodarone': self._characteristics['amiodarone'],
-                       'fluvastatin': self._characteristics['fluvastatin'],
-                       'CYP2C9': self._characteristics['CYP2C9'],
-                       'VKORC1': self._characteristics['VKORC1'],
-                       'day': self._day,
-                       'Doses': tuple(self._full_dose_history),
-                       'INRs': tuple(self._full_INR_history),
-                       'Intervals': tuple(self._intervals_history)},
-                      lower={'age': self._list_of_characteristics['age'][0],
-                             'weight': self._list_of_characteristics['weight'][0],
-                             'height': self._list_of_characteristics['height'][0],
-                             'day': 0,
-                             'Doses': 0.0,
-                             'INRs': 0.0,
-                             'Intervals': 1},
-                      upper={'age': self._list_of_characteristics['age'][-1],
-                             'weight': self._list_of_characteristics['weight'][-1],
-                             'height': self._list_of_characteristics['height'][-1],
-                             'day': self._max_day,
-                             'Doses': self._max_dose,
-                             'INRs': 15.0,
-                             'Intervals': self._max_interval},
-                      categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                  'VKORC1': self._list_of_characteristics['VKORC1'],
-                                  'gender': self._list_of_characteristics['gender'],
-                                  'race': self._list_of_characteristics['race'],
-                                  'tobaco': self._list_of_characteristics['tobaco'],
-                                  'amiodarone': self._list_of_characteristics['amiodarone'],
-                                  'fluvastatin': self._list_of_characteristics['fluvastatin']},
-                      lazy_evaluation=True
-                     )
+    def complete_state(self) -> rldata.RLData:
+        return rldata.RLData({'age': self._characteristics['age'],
+                              'weight': self._characteristics['weight'],
+                              'height': self._characteristics['height'],
+                              'gender': self._characteristics['gender'],
+                              'race': self._characteristics['race'],
+                              'tobaco': self._characteristics['tobaco'],
+                              'amiodarone': self._characteristics['amiodarone'],
+                              'fluvastatin': self._characteristics['fluvastatin'],
+                              'CYP2C9': self._characteristics['CYP2C9'],
+                              'VKORC1': self._characteristics['VKORC1'],
+                              'day': self._day,
+                              'Doses': tuple(self._full_dose_history),
+                              'INRs': tuple(self._full_INR_history),
+                              'Intervals': tuple(self._intervals_history)},
+                             lower={'age': self._list_of_characteristics['age'][0],
+                                    'weight': self._list_of_characteristics['weight'][0],
+                                    'height': self._list_of_characteristics['height'][0],
+                                    'day': 0,
+                                    'Doses': 0.0,
+                                    'INRs': 0.0,
+                                    'Intervals': 1},
+                             upper={'age': self._list_of_characteristics['age'][-1],
+                                    'weight': self._list_of_characteristics['weight'][-1],
+                                    'height': self._list_of_characteristics['height'][-1],
+                                    'day': self._max_day,
+                                    'Doses': self._max_dose,
+                                    'INRs': 15.0,
+                                    'Intervals': self._max_interval},
+                             categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                         'VKORC1': self._list_of_characteristics['VKORC1'],
+                                         'gender': self._list_of_characteristics['gender'],
+                                         'race': self._list_of_characteristics['race'],
+                                         'tobaco': self._list_of_characteristics['tobaco'],
+                                         'amiodarone': self._list_of_characteristics['amiodarone'],
+                                         'fluvastatin': self._list_of_characteristics['fluvastatin']},
+                             lazy_evaluation=True
+                             )
+
     @property
     def is_terminated(self) -> bool:
         return self._day >= self._max_day - self._lookahead_duration
 
     @property
     # only considers the dose
-    def possible_actions(self) -> RLData:
+    def possible_actions(self) -> rldata.RLData:
         try:
             if self._interval_max_dose[self._interval_index] < self._max_dose:
-                return RLData([x*self._dose_steps
-                               for x in range(int(self._interval_max_dose[self._interval_index]/self._dose_steps), -1, -1)],
-                              lower=0, upper=self._max_dose).as_rldata_array()
+                return rldata.RLData([x*self._dose_steps
+                                      for x in range(int(self._interval_max_dose[self._interval_index]/self._dose_steps), -1, -1)],
+                                     lower=0, upper=self._max_dose).as_rldata_array()
         except IndexError:
             # When self._interval_index >= len(self._interval_max_dose), use self._max_dose instead of self._interval_max_dose[self._interval_index]
             pass
@@ -330,14 +311,16 @@ class WarfarinModel_v5(Subject):
             self._agent_list[agent_name] = 1
             return 1
 
-    def take_effect(self, action: RLData, _id: Optional[int] = None) -> RLData:
+    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> rldata.RLData:
         current_dose = action[0]
         try:  # use the provided action, otherwise the interval
             current_interval = min(action[1], self._max_day - self._day)
         except IndexError:
-            current_interval = min(self._get_next_interval(), self._max_day - self._day)
+            current_interval = min(
+                self._get_next_interval(), self._max_day - self._day)
 
-        self._patient.dose = dict(tuple((i + self._day, current_dose) for i in range(current_interval)))
+        self._patient.dose = dict(
+            tuple((i + self._day, current_dose) for i in range(current_interval)))
 
         self._dose_history.append(current_dose)
         self._dose_history.popleft()
@@ -347,8 +330,10 @@ class WarfarinModel_v5(Subject):
         day_temp = self._day
         self._day += current_interval
 
-        self._full_dose_history[day_temp:self._day] = [current_dose] * current_interval
-        self._full_INR_history[day_temp + 1:self._day + 1] = self._patient.INR(list(range(day_temp + 1, self._day + 1)))
+        self._full_dose_history[day_temp:self._day] = [
+            current_dose] * current_interval
+        self._full_INR_history[day_temp + 1:self._day +
+                               1] = self._patient.INR(list(range(day_temp + 1, self._day + 1)))
 
         self._INR_history.append(self._full_INR_history[self._day])
         self._INR_history.popleft()
@@ -356,7 +341,7 @@ class WarfarinModel_v5(Subject):
         try:
             if self.exchange_protocol['take_effect'] == 'standard':
                 if self._lookahead_duration > 0:
-                    temp_patient = deepcopy(self._patient)
+                    temp_patient = copy.deepcopy(self._patient)
                     temp_patient.dose = dict(tuple(
                         (i + day_temp, current_dose) for i in range(1, self._lookahead_duration + 1)))
                     lookahead_penalty = -sum(((2 / self._INR_range * (self._INR_mid - INRi)) ** 2
@@ -366,28 +351,31 @@ class WarfarinModel_v5(Subject):
 
                 INR_penalty = -sum(((2 / self._INR_range * (self._INR_mid - self._INR_history[-2] - (self._INR_history[-1]-self._INR_history[-2])/current_interval*j)) ** 2
                                     for j in range(1, current_interval + 1)))  # negative squared distance as reward (used *2/range to normalize)
-                dose_change_penalty = - self._dose_change_penalty_func(self._dose_history)
+                dose_change_penalty = - \
+                    self._dose_change_penalty_func(self._dose_history)
                 reward = self._INR_penalty_coef * INR_penalty \
                     + self._dose_change_penalty_coef * dose_change_penalty \
                     + self._lookahead_penalty_coef * lookahead_penalty
             elif self.exchange_protocol['take_effect'] == 'no_reward':
                 reward = 0
             else:
-                raise ValueError(f'exchange_protocol for "take_effect" should be "standard" or "no_reward". Got {self.exchange_protocol["take_effect"]}.')
+                raise ValueError(
+                    f'exchange_protocol for "take_effect" should be "standard" or "no_reward". Got {self.exchange_protocol["take_effect"]}.')
 
         except TypeError:
             reward = 0
 
-        return RLData(reward, normalizer=lambda x: x)
+        return rldata.RLData(reward, normalizer=lambda x: x)
 
-    def stats(self, stats_list: Union[Sequence[str], str]) -> Dict[str, Union[RLData, Number]]:
+    def stats(self, stats_list: Union[Sequence[str], str]) -> Dict[str, Union[rldata.RLData, numbers.Number]]:
         if isinstance(stats_list, str):
             stats_list = [stats_list]
         results = {}
         for s in stats_list:
             if s == 'TTR':
                 INRs = self._patient.INR(list(range(self._day+1)))
-                temp = sum((1 if 2.0 <= INRi <= 3.0 else 0 for INRi in INRs)) / len(INRs)
+                temp = sum(
+                    (1 if 2.0 <= INRi <= 3.0 else 0 for INRi in INRs)) / len(INRs)
             elif s == 'dose_change':
                 temp = np.sum(np.abs(np.diff(self._patient.dose)) > 0)
             elif s == 'delta_dose':
@@ -398,14 +386,16 @@ class WarfarinModel_v5(Subject):
 
             results[s] = temp
 
-        results['ID'] = RLData({'age': self._characteristics['age'],
-                                'CYP2C9': self._characteristics['CYP2C9'],
-                                'VKORC1': self._characteristics['VKORC1']},
-                               lower={'age': self._list_of_characteristics['age'][0]},
-                               upper={'age': self._list_of_characteristics['age'][-1]},
-                               categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                           'VKORC1': self._list_of_characteristics['VKORC1']},
-                               lazy_evaluation=True)
+        results['ID'] = rldata.RLData({'age': self._characteristics['age'],
+                                       'CYP2C9': self._characteristics['CYP2C9'],
+                                       'VKORC1': self._characteristics['VKORC1']},
+                                      lower={
+                                          'age': self._list_of_characteristics['age'][0]},
+                                      upper={
+                                          'age': self._list_of_characteristics['age'][-1]},
+                                      categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                                  'VKORC1': self._list_of_characteristics['VKORC1']},
+                                      lazy_evaluation=True)
 
         return results
 
@@ -415,106 +405,111 @@ class WarfarinModel_v5(Subject):
         elif self._patient_selection.lower() in ['ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017']:
             self._generate_ravvaz_patient()
 
-        self._patient = Patient(age=self._characteristics['age'],
-                                # Not in the patient model
-                                weight=self._characteristics['weight'],
-                                # Not in the patient model
-                                height=self._characteristics['height'],
-                                # Not in the patient model
-                                gender=self._characteristics['gender'],
-                                # Not in the patient model
-                                race=self._characteristics['race'],
-                                # Not in the patient model
-                                tobaco=self._characteristics['tobaco'],
-                                # Not in the patient model
-                                amiodarone=self._characteristics['amiodarone'],
-                                # Not in the patient model
-                                fluvastatin=self._characteristics['fluvastatin'],
-                                CYP2C9=self._characteristics['CYP2C9'],
-                                VKORC1=self._characteristics['VKORC1'],
-                                randomized=self._randomized, max_time=self._max_time)
+        self._patient = utils.Patient(age=self._characteristics['age'],
+                                      # Not in the patient model
+                                      weight=self._characteristics['weight'],
+                                      # Not in the patient model
+                                      height=self._characteristics['height'],
+                                      # Not in the patient model
+                                      gender=self._characteristics['gender'],
+                                      # Not in the patient model
+                                      race=self._characteristics['race'],
+                                      # Not in the patient model
+                                      tobaco=self._characteristics['tobaco'],
+                                      # Not in the patient model
+                                      amiodarone=self._characteristics['amiodarone'],
+                                      # Not in the patient model
+                                      fluvastatin=self._characteristics['fluvastatin'],
+                                      CYP2C9=self._characteristics['CYP2C9'],
+                                      VKORC1=self._characteristics['VKORC1'],
+                                      randomized=self._randomized, max_time=self._max_time)
 
-        current_patient = ''.join((self._patients_save_prefix, f'{self._filename_counter:06}'))
+        current_patient = ''.join(
+            (self._patients_save_prefix, f'{self._filename_counter:06}'))
         if self._save_patients:
             if self._patient_save_overwrite:
-                self._patient.save(path=self._patients_save_path, filename=current_patient)
+                self._patient.save(
+                    path=self._patients_save_path, filename=current_patient)
             else:
                 try:
                     self._load_patient(current_patient)
                 except FileNotFoundError:
-                    self._patient.save(path=self._patients_save_path, filename=current_patient)
+                    self._patient.save(
+                        path=self._patients_save_path, filename=current_patient)
 
         self._filename_counter += 1
 
         self._day = 0
-        self._dose_history = deque([0.0]*self._dose_history_length)
-        self._intervals_history = deque([1]*self._dose_history_length)
+        self._dose_history = collections.deque([0.0]*self._dose_history_length)
+        self._intervals_history = collections.deque(
+            [1]*self._dose_history_length)
 
         self._full_INR_history = [0.0] * self._max_day
         self._full_dose_history = [0.0] * self._max_day
 
         # The latest INR is also stored in self._INR_history
-        self._INR_history = deque([0.0]*(self._INR_history_length + 1))
+        self._INR_history = collections.deque(
+            [0.0]*(self._INR_history_length + 1))
         self._full_INR_history[0] = self._patient.INR([0])[-1]
         self._INR_history[-1] = self._full_INR_history[0]
         self._interval_index = 0
 
-    def _state_extended(self) -> RLData:
-        return RLData({'age': self._characteristics['age'],
-                       'weight': self._characteristics['weight'],
-                       'height': self._characteristics['height'],
-                       'gender': self._characteristics['gender'],
-                       'race': self._characteristics['race'],
-                       'tobaco': self._characteristics['tobaco'],
-                       'amiodarone': self._characteristics['amiodarone'],
-                       'fluvastatin': self._characteristics['fluvastatin'],
-                       'CYP2C9': self._characteristics['CYP2C9'],
-                       'VKORC1': self._characteristics['VKORC1'],
-                       'day': self._day,
-                       'Doses': tuple(self._dose_history),
-                       'INRs': tuple(self._INR_history),
-                       'Intervals': tuple(self._intervals_history)},
-                      lower={'age': self._list_of_characteristics['age'][0],
-                             'weight': self._list_of_characteristics['weight'][0],
-                             'height': self._list_of_characteristics['height'][0],
-                             'day': 0,
-                             'Doses': 0.0,
-                             'INRs': 0.0,
-                             'Intervals': 1},
-                      upper={'age': self._list_of_characteristics['age'][-1],
-                             'weight': self._list_of_characteristics['weight'][-1],
-                             'height': self._list_of_characteristics['height'][-1],
-                             'day': self._max_day - 1,
-                             'Doses': self._max_dose,
-                             'INRs': 15.0,
-                             'Intervals': self._max_interval},
-                      categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                  'VKORC1': self._list_of_characteristics['VKORC1'],
-                                  'gender': self._list_of_characteristics['gender'],
-                                  'race': self._list_of_characteristics['race'],
-                                  'tobaco': self._list_of_characteristics['tobaco'],
-                                  'amiodarone': self._list_of_characteristics['amiodarone'],
-                                  'fluvastatin': self._list_of_characteristics['fluvastatin']},
-                      lazy_evaluation=True)
+    def _state_extended(self) -> rldata.RLData:
+        return rldata.RLData({'age': self._characteristics['age'],
+                              'weight': self._characteristics['weight'],
+                              'height': self._characteristics['height'],
+                              'gender': self._characteristics['gender'],
+                              'race': self._characteristics['race'],
+                              'tobaco': self._characteristics['tobaco'],
+                              'amiodarone': self._characteristics['amiodarone'],
+                              'fluvastatin': self._characteristics['fluvastatin'],
+                              'CYP2C9': self._characteristics['CYP2C9'],
+                              'VKORC1': self._characteristics['VKORC1'],
+                              'day': self._day,
+                              'Doses': tuple(self._dose_history),
+                              'INRs': tuple(self._INR_history),
+                              'Intervals': tuple(self._intervals_history)},
+                             lower={'age': self._list_of_characteristics['age'][0],
+                                    'weight': self._list_of_characteristics['weight'][0],
+                                    'height': self._list_of_characteristics['height'][0],
+                                    'day': 0,
+                                    'Doses': 0.0,
+                                    'INRs': 0.0,
+                                    'Intervals': 1},
+                             upper={'age': self._list_of_characteristics['age'][-1],
+                                    'weight': self._list_of_characteristics['weight'][-1],
+                                    'height': self._list_of_characteristics['height'][-1],
+                                    'day': self._max_day - 1,
+                                    'Doses': self._max_dose,
+                                    'INRs': 15.0,
+                                    'Intervals': self._max_interval},
+                             categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                         'VKORC1': self._list_of_characteristics['VKORC1'],
+                                         'gender': self._list_of_characteristics['gender'],
+                                         'race': self._list_of_characteristics['race'],
+                                         'tobaco': self._list_of_characteristics['tobaco'],
+                                         'amiodarone': self._list_of_characteristics['amiodarone'],
+                                         'fluvastatin': self._list_of_characteristics['fluvastatin']},
+                             lazy_evaluation=True)
 
-    def _state_normal(self) -> RLData:
-        return RLData({'age': self._characteristics['age'],
-                       'CYP2C9': self._characteristics['CYP2C9'],
-                       'VKORC1': self._characteristics['VKORC1'],
-                       'Doses': tuple(self._dose_history),
-                       'INRs': tuple(self._INR_history),
-                       'Intervals': tuple(self._intervals_history)},
-                      lower={'age': self._list_of_characteristics['age'][0],
-                             'Doses': 0.0,
-                             'INRs': 0.0,
-                             'Intervals': 1},
-                      upper={'age': self._list_of_characteristics['age'][-1],
-                             'Doses': self._max_dose,
-                             'INRs': 15.0,
-                             'Intervals': self._max_interval},
-                      categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
-                                  'VKORC1': self._list_of_characteristics['VKORC1']},
-                      lazy_evaluation=True)
+    def _state_normal(self) -> rldata.RLData:
+        return rldata.RLData({'age': self._characteristics['age'],
+                              'CYP2C9': self._characteristics['CYP2C9'],
+                              'VKORC1': self._characteristics['VKORC1'],
+                              'Doses': tuple(self._dose_history),
+                              'INRs': tuple(self._INR_history),
+                              'Intervals': tuple(self._intervals_history)},
+                             lower={'age': self._list_of_characteristics['age'][0],
+                                    'Doses': 0.0,
+                                    'INRs': 0.0,
+                                    'Intervals': 1},
+                             upper={'age': self._list_of_characteristics['age'][-1],
+                                    'Doses': self._max_dose,
+                                    'INRs': 15.0,
+                                    'Intervals': self._max_interval},
+                             categories={'CYP2C9': self._list_of_characteristics['CYP2C9'],
+                                         'VKORC1': self._list_of_characteristics['VKORC1']},
+                             lazy_evaluation=True)
 
     def _get_next_interval(self) -> int:
         if self._interval[self._interval_index] < 0:
@@ -533,13 +528,13 @@ class WarfarinModel_v5(Subject):
         self._patient.load(path=self._patients_save_path,
                            filename=current_patient)
         self._characteristics['age'] = self._patient._age
-        self._characteristics['weight'] = self._patient._weight
-        self._characteristics['height'] = self._patient._height
-        self._characteristics['gender'] = self._patient._gender
-        self._characteristics['race'] = self._patient._race
-        self._characteristics['tobaco'] = self._patient._tobaco
-        self._characteristics['amiodarone'] = self._patient._amiodarone
-        self._characteristics['fluvastatin'] = self._patient._fluvastatin
+        self._characteristics['weight'] = self._patient._weight  # pylint: disable=no-member
+        self._characteristics['height'] = self._patient._height  # pylint: disable=no-member
+        self._characteristics['gender'] = self._patient._gender  # pylint: disable=no-member
+        self._characteristics['race'] = self._patient._race  # pylint: disable=no-member
+        self._characteristics['tobaco'] = self._patient._tobaco  # pylint: disable=no-member
+        self._characteristics['amiodarone'] = self._patient._amiodarone  # pylint: disable=no-member
+        self._characteristics['fluvastatin'] = self._patient._fluvastatin  # pylint: disable=no-member
         self._characteristics['CYP2C9'] = self._patient._CYP2C9
         self._characteristics['VKORC1'] = self._patient._VKORC1
         self._randomized = self._patient._randomized
@@ -582,19 +577,19 @@ class WarfarinModel_v5(Subject):
                                                             self._list_of_characteristics['weight'][1])
         self._characteristics['height'] = np.random.uniform(self._list_of_characteristics['height'][0],
                                                             self._list_of_characteristics['height'][1])
-        self._characteristics['gender'] = choice(
+        self._characteristics['gender'] = random.choice(
             self._list_of_characteristics['gender'])
-        self._characteristics['race'] = choice(
+        self._characteristics['race'] = random.choice(
             self._list_of_characteristics['race'])
-        self._characteristics['tobaco'] = choice(
+        self._characteristics['tobaco'] = random.choice(
             self._list_of_characteristics['tobaco'])
-        self._characteristics['amiodarone'] = choice(
+        self._characteristics['amiodarone'] = random.choice(
             self._list_of_characteristics['amiodarone'])
-        self._characteristics['fluvastatin'] = choice(
+        self._characteristics['fluvastatin'] = random.choice(
             self._list_of_characteristics['fluvastatin'])
-        self._characteristics['CYP2C9'] = choice(
+        self._characteristics['CYP2C9'] = random.choice(
             self._list_of_characteristics['CYP2C9'])
-        self._characteristics['VKORC1'] = choice(
+        self._characteristics['VKORC1'] = random.choice(
             self._list_of_characteristics['VKORC1'])
 
     def __repr__(self) -> str:
