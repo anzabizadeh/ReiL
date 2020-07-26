@@ -56,14 +56,14 @@ class testWarfarinAgent(unittest.TestCase):
         for filename in output_files:
             df = pd.read_csv(Path(self._dataset_path, filename), delimiter='|')
             # agent_name = re.match('\S+ahc_avatars_(\w+)_algorithm_\d+.txt$', filename).group(1)
-            counter_indexes = list(int(re.findall('\d+$' ,col)[0]) for col in df.filter(regex=f'ID\.(\d+)$').columns)
+            counter_indexes = list(int(re.findall(r'\d+$' ,col)[0]) for col in df.filter(regex=r'ID\.(\d+)$').columns)
             counter_start = min(counter_indexes)
             counter_end = max(counter_indexes) + 1
             ID_list = dict((counter, df.filter(regex=f'ID\.{counter}$').iat[0, 0]) for counter in range(counter_start, counter_end))
 
             for counter in range(counter_start, counter_end):
                 patient_info = self._patient_profiles.loc[ID_list[counter]]  # , ['AGE', 'CYP2C9', 'VKORC1']]
-                dose_info = df.filter(regex=f'(INR|Dose|Check)\.{counter}$').rename(columns=lambda x: re.findall('^\w+' ,x)[0])
+                dose_info = df.filter(regex=f'(INR|Dose|Check)\.{counter}$').rename(columns=lambda x: re.findall(r'^\w+' ,x)[0])
 
                 # print(f'Patient ID: {patient_info.name}')
 
@@ -101,7 +101,8 @@ class testWarfarinAgent(unittest.TestCase):
                         self.assertEqual(round(action[0], self._rounding_precision[arm]), round(dose_info['Dose'][i], self._rounding_precision[arm]),
                             msg=f'\nPatient ID: {patient_info.name}\tday: {w._day}')
                     except AssertionError as e:
-                        if abs(round(action[0], self._rounding_precision[arm]) - round(dose_info['Dose'][i], self._rounding_precision[arm])) > 1e-2:
+                        if abs(round(action[0], self._rounding_precision[arm]) - round(dose_info['Dose'][i], self._rounding_precision[arm])) > 2e-2 \
+                            or dose_info['INR'][i] >= 5.0:
                             print(str(e))
                             # if dose_info['Check'][i-1] > 0 or dose_info['Check'][i+1] > 0:
                             #     a._dose = dose_info["Dose"][i]
