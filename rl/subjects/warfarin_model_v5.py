@@ -103,10 +103,10 @@ class WarfarinModel_v5(subjects.Subject):
         \n  patient_counter_start: the starting value for patient filename counter (Default: 0)
         '''
 
-        super().__init__(name=kwargs.get('name', __name__),
-                         logger_name=kwargs.get('logger_name', __name__),
-                         stats_list=stats_list,
-                         **kwargs)
+        kwargs['name'] = kwargs.get('name', __name__)
+        kwargs['logger_name'] = kwargs.get('logger_name', __name__)
+
+        super().__init__(stats_list=stats_list, **kwargs)
 
         self._list_of_characteristics = {
             'age': (18, 100),  # similar to the range of 10k sample from Ravvaz
