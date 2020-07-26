@@ -36,9 +36,10 @@ class Subject(rlbase.RLBase):
                  ex_protocol_options: Dict[str, List[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
                  **kwargs):
 
-        super().__init__(name=kwargs.get('name', __name__),
-                         logger_name=kwargs.get('logger_name', __name__),
-                         ex_protocol_current=ex_protocol_current,
+        kwargs['name'] = kwargs.get('name', __name__)
+        kwargs['logger_name'] = kwargs.get('logger_name', __name__)
+
+        super().__init__(ex_protocol_current=ex_protocol_current,
                          ex_protocol_options=ex_protocol_options,
                          **kwargs)
 
