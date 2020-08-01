@@ -4,28 +4,32 @@ Created on Mon Feb 19 15:47:46 2018
 
 @author: Sadjad
 """
+
 # Disable GPU before loading tensorflow
-import os
+disable_gpu = True
 
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
+if disable_gpu:
+    import os
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 import argparse
 import configparser
 import itertools
+import logging
+import pathlib
 import random
-from statistics import stdev
-from pathlib import Path
+import statistics
 from ast import literal_eval as make_tuple
+from typing import Any, Callable, Dict, Sequence
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from rl.agents import DQNAgent  # , WarfarinQAgent
-from rl.environments import Environment
-from rl.stats import WarfarinStats
-from rl.subjects import IterableSubject, WarfarinModelFixedInterval, WarfarinModel_v5, WarfarinLookAhead
+
+from rl import agents as rlagents
+from rl import environments, stats
+from rl import subjects as rlsubjects
 
 all_args = {
     'project_name': {'type': str, 'default': None},
@@ -69,43 +73,46 @@ all_args = {
     'save_instances': {'type': bool, 'default': False},
     'save_epochs': {'type': bool, 'default': False},
     'tf_log': {'type': bool, 'default': False}
-    }
-
-warfarin_subjects_list = {
-    'warfarinmodel': WarfarinModel_v5,
-    'warfarinmodel_v5': WarfarinModel_v5,
-    'fixedinterval': WarfarinModelFixedInterval,
-    'warfarinmodelfixedinterval': WarfarinModelFixedInterval,
-    'lookahead': WarfarinLookAhead,
-    'warfarinlookahead': WarfarinLookAhead
 }
 
-def set_seeds(seed):
+
+def set_seeds(seed: int) -> None:
+    '''Set seed value of random functions.'''
     random.seed(seed)
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
-def parse_args():
+
+def parse_args() -> argparse.Namespace:
+    '''Create a parse_args object from `all_args` dictionary.'''
     parser = argparse.ArgumentParser()
     for arg, info in all_args.items():
         if isinstance(info['default'], (list, tuple)):
-            parser.add_argument(f'--{arg}', nargs='+', type=info['type'], default=info['default'])
+            parser.add_argument(f'--{arg}', nargs='+',
+                                type=info['type'], default=info['default'])
         else:
-            parser.add_argument(f'--{arg}', type=info['type'], default=info['default'])
+            parser.add_argument(
+                f'--{arg}', type=info['type'], default=info['default'])
 
     args = parser.parse_args()
 
     return args
 
-def parse_config(arguments, config_filename='config.ini', overwrite=False):
+
+def parse_config(arguments: argparse.Namespace,
+                 config_filename: str = 'config.ini',
+                 overwrite: bool = False) -> Dict[str, Any]:
+    '''
+    Read/write configurations from/to a config file.
+    '''
     if arguments.project_name is None:
         project_name = f'{random.randint(0, 1000000):06}'
-        print(f'New project name: {project_name} created.')
+        logging.info(f'New project name: {project_name} created.')
     else:
         project_name = arguments.project_name
-        print(f'Project {project_name} exists.')
+        logging.info(f'Project {project_name} exists.')
 
-    if not Path(config_filename).is_file():
+    if not pathlib.Path(config_filename).is_file():
         config = configparser.ConfigParser()
         config['DEFAULT'] = {}
         for arg, info in all_args.items():
@@ -129,7 +136,7 @@ def parse_config(arguments, config_filename='config.ini', overwrite=False):
         with open(config_filename, 'w') as configfile:
             config.write(configfile)
 
-    temp = {"project_name": project_name}
+    temp = {'project_name': project_name}
     for v in vars_args:
         if v != 'project_name':
             try:
@@ -144,147 +151,175 @@ def parse_config(arguments, config_filename='config.ini', overwrite=False):
 
     return temp
 
+
+def dose_change_fn(args: Dict[str, Any]) -> Callable[[Sequence], float]:
+    fn_name = args["dose_change_penalty_func"].lower()
+
+    if fn_name == 'change':
+        def fn(x): return int(max(x[-i] != x[-i-1]
+                                  for i in range(1, args["dose_change_penalty_days"])))
+
+    elif fn_name == 'stdev':
+        if args["dose_change_penalty_days"] == args["dose_history_length"]:
+            def fn(x): return statistics.stdev(x)
+        else:
+            def fn(x): return statistics.stdev(list(itertools.islice(x,
+                                                                     args["dose_history_length"] - args["dose_change_penalty_days"], args["dose_history_length"])))
+
+    elif fn_name == 'change_count':
+        if args["dose_change_penalty_days"] == args["dose_history_length"]:
+            def fn(x): return (np.diff(x) != 0).sum()
+        else:
+            def fn(x): return (np.diff(itertools.islice(x,
+                                                        args["dose_history_length"] -
+                                                        args["dose_change_penalty_days"],
+                                                        args["dose_history_length"])) != 0).sum()
+    else:
+        def fn(_): return 0
+
+    return fn
+
+
+def write_stats_output(filename: str, stats_output: Dict[str, list]) -> None:
+    '''Write stats to file.'''
+    if not pathlib.Path(f'./{filename}/{filename}.txt').exists():
+        with open(f'./{filename}/{filename}.txt', 'a+') as f:
+            f.write(
+                f'run\tagent\tsubject\tstat\taggregator\tsensitivity\tage>=65\tvalue\n')
+    with open(f'./{filename}/{filename}.txt', 'a') as f:
+        for k1, v1 in stats_output.items():
+            for l in v1:
+                for k2, v2 in l.items():
+                    for row in range(v2.shape[0]):
+                        for col in range(v2.shape[1]):
+                            print(
+                                f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
+                            f.write(
+                                f'{i}\t{k1[0]}\t{k1[1]}\t{k2}\t{v2.columns[col]}\t{v2.index[row][0]}\t{v2.index[row][1]}\t{v2.iat[row, col]}\n')
+
+
+def write_trajectories_output(filename: str, trajectory_output: Dict[str, list]) -> None:
+    trajectories = []
+    for label in trajectory_output.keys():
+        for hist in trajectory_output[label]:
+            trajectories += [(i, label, h['instance_id'],
+                              h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
+                              h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
+    trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject',
+                                                          'instance_id', 'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action',
+                                                          'reward'])
+    trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(
+        periods=-1)
+    trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
+    trajectories_df['INR'] = trajectories_df.apply(
+        lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
+    trajectories_df.drop('shifted_id', axis=1, inplace=True)
+    trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
+
+
 if __name__ == "__main__":
     set_seeds(1234)
     cmd_args = parse_args()
     args = parse_config(cmd_args)
 
-    epsilon = lambda n: 1/(1+n/200)
+    def epsilon(n): return 1/(1+n/200)
 
     filename = args["project_name"]
     try:
-        env = Environment(filename=f'{filename}', path=f'{filename}')
-        agents = env._agent
-        subjects = env._subject
-        assignment_list = list((a, s) for a in agents.keys() for s in subjects.keys())
+        env = environments.Environment(
+            filename=f'{filename}', path=f'{filename}')
+        agents = env._agents
+        subjects = env._subjects
+        assignment_list = list((a, s) for a in agents.keys()
+                               for s in subjects.keys())
     except FileNotFoundError:
-        env = Environment()
+        env = environments.Environment()
         agents = {}
         subjects = {}
 
-        if args["dose_change_penalty_func"].lower() == 'none':
-            dose_change_penalty_func = lambda x: 0
-        elif args["dose_change_penalty_func"] == 'change':
-            dose_change_penalty_func = \
-                lambda x: int(max(x[-i]!=x[-i-1]
-                    for i in range(1, args["dose_change_penalty_days"])))
-        elif args["dose_change_penalty_func"] == 'stdev':
-            if args["dose_change_penalty_days"] == args["dose_history_length"]:
-                dose_change_penalty_func = lambda x: stdev(x)
-            else:
-                dose_change_penalty_func = \
-                    lambda x: stdev(list(itertools.islice(x,
-                        args["dose_history_length"] - args["dose_change_penalty_days"], args["dose_history_length"])))
-        elif args["dose_change_penalty_func"] == 'change_count':
-            if args["dose_change_penalty_days"] == args["dose_history_length"]:
-                dose_change_penalty_func = lambda x: (np.diff(x) != 0).sum()
-            else:
-                dose_change_penalty_func = \
-                    lambda x: (np.diff(itertools.islice(x,
-                        args["dose_history_length"] - args["dose_change_penalty_days"],
-                        args["dose_history_length"])) != 0).sum()
-
-        warfarin_subject = warfarin_subjects_list['warfarinmodel']
+        dose_change_penalty_func = dose_change_fn(args)
 
         # define subjects
-        if args["training_size"]>0:
-            training_patient = \
-                warfarin_subject(max_day=args["max_day"],
-                    patient_selection=args["patient_selection_training"],
-                    dose_history_length=args["dose_history_length"],
-                    INR_history_length=args["INR_history_length"],
-                    action_type=args["action_type"],
-                    INR_penalty_coef=args["INR_penalty_coef"],
-                    dose_change_penalty_coef=args["dose_change_penalty_coef"],
-                    dose_change_penalty_func=dose_change_penalty_func,
-                    lookahead_penalty_coef=args["lookahead_penalty_coef"],
-                    lookahead_duration=args["lookahead_duration"],
-                    randomized=args["randomized"],
-                    interval=args["interval"],
-                    interval_max_dose=args["interval_max_dose"],
-                    ex_protocol_current={'state': args["state_representation"]})
+        shared_subjects_properties = dict(
+            max_day=args["max_day"],
+            dose_history_length=args["dose_history_length"],
+            INR_history_length=args["INR_history_length"],
+            action_type=args["action_type"],
+            INR_penalty_coef=args["INR_penalty_coef"],
+            dose_change_penalty_coef=args["dose_change_penalty_coef"],
+            dose_change_penalty_func=dose_change_penalty_func,
+            lookahead_penalty_coef=args["lookahead_penalty_coef"],
+            lookahead_duration=args["lookahead_duration"],
+            randomized=args["randomized"],
+            interval=args["interval"],
+            interval_max_dose=args["interval_max_dose"])
 
-            subjects['training'] = \
-                IterableSubject(subject=training_patient,
-                    save_instances=args["save_instances"],
-                    use_existing_instances=True,
-                    save_path= args["training_save_path"],  # f'./training_{args["patient_selection_training"]}',
-                    save_prefix='',
-                    instance_counter_start=0,
-                    instance_counter=0,
-                    instance_counter_end=list(range(args["training_size"],
-                                                    args["training_size"]*args["epochs"] + 1,
-                                                    args["training_size"]))
-                    )
+        shared_training_iterable_properties = dict(
+            save_instances=args["save_instances"],
+            use_existing_instances=True,
+            # f'./training_{args["patient_selection_training"]}',
+            save_path=args["training_save_path"],
+            save_prefix='',
+            instance_counter_start=0,
+            instance_counter=0,
+            instance_counter_end=list(range(args["training_size"],
+                                            args["training_size"] * \
+                                            args["epochs"] + 1,
+                                            args["training_size"])))
 
-            training_patient_for_stats = \
-                warfarin_subject(max_day=args["max_day"],
-                    patient_selection=args["patient_selection_training"],
-                    dose_history_length=args["dose_history_length"],
-                    INR_history_length=args["INR_history_length"],
-                    action_type=args["action_type"],
-                    INR_penalty_coef=args["INR_penalty_coef"],
-                    dose_change_penalty_coef=args["dose_change_penalty_coef"],
-                    dose_change_penalty_func=dose_change_penalty_func,
-                    lookahead_penalty_coef=args["lookahead_penalty_coef"],
-                    lookahead_duration=args["lookahead_duration"],
-                    randomized=args["randomized"],
-                    interval=args["interval"],
-                    interval_max_dose=args["interval_max_dose"],
-                    ex_protocol_current={'state': args["state_representation"], 'take_effect': 'no_reward'})
+        if args["training_size"] > 0:
+            training_patient = rlsubjects.WarfarinModel_v5(
+                patient_selection=args["patient_selection_training"],
+                ex_protocol_current={'state': args["state_representation"]},
+                **shared_subjects_properties)
 
-            subjects['training_patient_for_stats'] = \
-                IterableSubject(subject=training_patient_for_stats,
-                    save_instances=args["save_instances"],
-                    use_existing_instances=True,
-                    save_path= args["training_save_path"],  # f'./training_{args["patient_selection_training"]}',
-                    save_prefix='',
-                    instance_counter_start=0,
-                    instance_counter=0,
-                    instance_counter_end=list(range(args["training_size"],
-                                                    args["training_size"]*args["epochs"] + 1,
-                                                    args["training_size"]))
-                    )
+            subjects['training'] = rlsubjects.IterableSubject(
+                subject=training_patient,
+                **shared_training_iterable_properties)
 
-            input_length = len(subjects['training'].state.normalize().as_list()) \
-                + len(subjects['training'].possible_actions[0].normalize().as_list())
+            training_patient_for_stats = rlsubjects.WarfarinModel_v5(
+                patient_selection=args["patient_selection_training"],
+                ex_protocol_current={'state': args["state_representation"], 'take_effect': 'no_reward'})
 
+            subjects['training_patient_for_stats'] = rlsubjects.IterableSubject(
+                subject=training_patient_for_stats,
+                **shared_training_iterable_properties)
 
-        if args["test_size"]>0:
-            test_patient = \
-                warfarin_subject(max_day=args["max_day"],
-                    patient_selection=args["patient_selection_test"],
-                    dose_history_length=args["dose_history_length"],
-                    INR_history_length=args["INR_history_length"],
-                    action_type=args["action_type"],
-                    INR_penalty_coef=args["INR_penalty_coef"],
-                    dose_change_penalty_coef=args["dose_change_penalty_coef"],
-                    dose_change_penalty_func=dose_change_penalty_func,
-                    lookahead_penalty_coef=args["lookahead_penalty_coef"],
-                    lookahead_duration=args["lookahead_duration"],
-                    randomized=args["randomized"],
-                    interval=args["interval"],
-                    interval_max_dose=args["interval_max_dose"],
-                    ex_protocol_current={'state': args["state_representation"], 'take_effect': 'no_reward'})
+        if args["test_size"] > 0:
+            test_patient = rlsubjects.WarfarinModel_v5(
+                patient_selection=args["patient_selection_test"],
+                ex_protocol_current={
+                    'state': args["state_representation"], 'take_effect': 'no_reward'},
+                **shared_subjects_properties)
 
             subjects['test'] = \
-                IterableSubject(subject=test_patient,
-                    save_instances=True,
-                    use_existing_instances=True,
-                    save_path= args["test_save_path"],  # save_path=f'./test_{args["patient_selection_test"]}',
-                    save_prefix='test',
-                    instance_counter_start=0,
-                    instance_counter=0,
-                    instance_counter_end=args["test_size"],
-                    auto_rewind=True
-                    )
+                rlsubjects.IterableSubject(subject=test_patient,
+                                           save_instances=True,
+                                           use_existing_instances=True,
+                                           # save_path=f'./test_{args["patient_selection_test"]}',
+                                           save_path=args["test_save_path"],
+                                           save_prefix='test',
+                                           instance_counter_start=0,
+                                           instance_counter=0,
+                                           instance_counter_end=args["test_size"],
+                                           auto_rewind=True
+                                           )
 
-            input_length = len(subjects['test'].state.normalize().as_list()) \
-                + len(subjects['test'].possible_actions[0].normalize().as_list())
+        state_length = len(subjects['training'].state.normalized.flatten())
+        try:
+            # since RLData is not a list, we should get one instance of possible_actions,
+            # normalize it and check its length!
+            if args["training_size"] > 0:
+                action_length = len(subjects['training'].possible_actions[0].normalized.flatten())
+            else:
+                action_length = len(subjects['test'].possible_actions[0].normalized.flatten())
+        except TypeError:
+            action_length = 1
 
+        input_length = state_length + action_length
 
         class lr_scheduler:
-            def __init__(self, min_lr= 1e-5, factor=2, step=1):
+            def __init__(self, min_lr=1e-5, factor=2, step=1):
                 self._min_lr = min_lr
                 self._factor = factor
                 self._step = step
@@ -296,82 +331,57 @@ if __name__ == "__main__":
                     return max(self._min_lr, lr / self._factor)
 
         agents['protocol'] = \
-            DQNAgent(lr_initial=args["learning_rate"],
-                     lr_scheduler=lr_scheduler().schedule if args["lr_scheduler"] else None,
-                     gamma=args["gamma"],
-                     epsilon=epsilon,
-                     buffer_size=args["buffer_size"],
-                     clear_buffer=args["clear_buffer"],
-                     batch_size=args["batch_size"],
-                     input_length=input_length,
-                     validation_split=args["validation_split"],
-                     hidden_layer_sizes=tuple(args["hidden_layer_sizes"]),
-                     default_actions=subjects['training'].possible_actions,
-                     tensorboard_path=filename if args["tf_log"] else None,
-                     save_instances=args["save_instances"],
-                     method=args["method"])
+            rlagents.DQNAgent(lr_initial=args["learning_rate"],
+                              lr_scheduler=lr_scheduler(
+            ).schedule if args["lr_scheduler"] else None,
+            gamma=args["gamma"],
+            epsilon=epsilon,
+            buffer_size=args["buffer_size"],
+            clear_buffer=args["clear_buffer"],
+            batch_size=args["batch_size"],
+            input_length=input_length,
+            validation_split=args["validation_split"],
+            hidden_layer_sizes=tuple(
+                                  args["hidden_layer_sizes"]),
+            default_actions=subjects['training'].possible_actions,
+            tensorboard_path=filename if args["tf_log"] else None,
+            # save_instances=args["save_instances"],
+            method=args["method"])
 
         # update environment
         env.add(agents=agents, subjects=subjects)
-        assignment_list = list((a, s) for a in agents.keys() for s in subjects.keys())
+        assignment_list = list((a, s) for a in agents.keys()
+                               for s in subjects.keys())
         env.assign(assignment_list)
 
     stats_to_collect = ('TTR', 'dose_change', 'delta_dose')
-    aggregators = ('min', 'max', 'mean','std', 'median')
-    warf_stats = WarfarinStats(active_stats=stats_to_collect,
-                               aggregators=aggregators,
-                               groupby=['sensitivity'])
+    aggregators = ('min', 'max', 'mean', 'std', 'median')
+    warf_stats = stats.WarfarinStats(active_stats=stats_to_collect,
+                                     aggregators=aggregators,
+                                     groupby=['sensitivity'])
 
     if args["save_epochs"]:
-        env_filename = lambda i: filename+f'{i:04}'
+        def env_filename(i): return filename+f'{i:04}'
     else:
-        env_filename = lambda i: filename
+        def env_filename(i): return filename
 
     training_mode = dict((k, v) for k, v in {('protocol', 'training'): True,
-                    ('protocol', 'training_patient_for_stats'): False,
-                    ('protocol', 'test'): False}.items() if k in assignment_list)
+                                             ('protocol', 'training_patient_for_stats'): False,
+                                             ('protocol', 'test'): False}.items() if k in assignment_list)
     stats = dict((k, v) for k, v in {('protocol', 'training_patient_for_stats'): stats_to_collect,
-             ('protocol', 'test'): stats_to_collect}.items() if k in assignment_list)
+                                     ('protocol', 'test'): stats_to_collect}.items() if k in assignment_list)
     return_output = dict((k, v) for k, v in {('protocol', 'training'): False,
-                     ('protocol', 'training_patient_for_stats'): True,
-                     ('protocol', 'test'): True}.items() if k in assignment_list)
+                                             ('protocol', 'training_patient_for_stats'): True,
+                                             ('protocol', 'test'): True}.items() if k in assignment_list)
 
     for i in range(args["epochs"]):
         print(f'run {i: }')
-        stats_output, trajectory_output = \
-            env.elapse_iterable(
-                training_mode=training_mode,
-                stats_func=warf_stats.aggregate,
-                stats=stats,
-                return_output=return_output)
+        stats_output, trajectory_output = env.elapse_iterable(
+            training_mode=training_mode,
+            stats_func=warf_stats.aggregate,
+            stats=stats,
+            return_output=return_output)
 
         env.save(filename=f'./{filename}/{env_filename(i)}')
-
-        if not Path(f'./{filename}/{filename}.txt').exists():
-            with open(f'./{filename}/{filename}.txt', 'a+') as f:
-                f.write(f'run\tagent\tsubject\tstat\taggregator\tsensitivity\tage>=65\tvalue\n')
-        with open(f'./{filename}/{filename}.txt', 'a') as f:
-            for k1, v1 in stats_output.items():
-                for l in v1:
-                    for k2, v2 in l.items():
-                        for row in range(v2.shape[0]):
-                            for col in range(v2.shape[1]):
-                                print(f'{i}\t{k1}\t{k2}\t{v2.columns[col]}\t{v2.index[row]}\t{v2.iat[row, col]}')
-                                f.write(f'{i}\t{k1[0]}\t{k1[1]}\t{k2}\t{v2.columns[col]}\t{v2.index[row][0]}\t{v2.index[row][1]}\t{v2.iat[row, col]}\n')
-
-
-        trajectories = []
-        for label in trajectory_output.keys():
-            for hist in trajectory_output[label]:
-                trajectories += [(i, label, h['instance_id'],
-                    h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
-                    h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
-        trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject',
-                          'instance_id', 'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action',
-                          'reward'])
-        trajectories_df['shifted_id'] = trajectories_df['instance_id'].shift(periods=-1)
-        trajectories_df['INR'] = trajectories_df['INR_prev'].shift(periods=-1)
-        trajectories_df['INR'] = trajectories_df.apply(
-            lambda x: x['INR'] if x['instance_id'] == x['shifted_id'] else None, axis=1)
-        trajectories_df.drop('shifted_id', axis=1, inplace=True)
-        trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
+        write_stats_output(filename, stats_output)
+        write_trajectories_output(filename, trajectory_output)
