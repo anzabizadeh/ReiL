@@ -1,16 +1,26 @@
+from __future__ import annotations
+
+import itertools
 import operator
-from collections import defaultdict
-from collections.abc import MutableMapping
+from collections.abc import MutableSequence
 from numbers import Number
-from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
+from typing import (Any, Callable, Dict, Generator, Iterable, Iterator, List,
+                    Mapping, Optional, Sequence, Type, Union)
 
 
 class BaseRLData:
-    __slots__ = ['_name', '_value', '_normalized', '_normalizer', '_lazy']
+    __slots__ = ['_name', '_value', '_categorical',
+                 '_normalized', '_normalizer', '_lazy']
 
-    def __init__(self, name, value, normalizer, lazy_evaluation):
+    def __init__(self,
+                 name: str,
+                 value: Any,
+                 categorical: bool,
+                 normalizer: Callable[["BaseRLData"], Union[Number, Sequence[Number]]],
+                 lazy_evaluation: bool):
         self._name = name
         self._value = value
+        self._categorical = categorical
         self._normalizer = normalizer
         self._lazy = lazy_evaluation
         self._normalize()
@@ -37,6 +47,10 @@ class BaseRLData:
     def value(self, v):
         self._value = v
         self._normalize()
+
+    @property
+    def categorical(self):
+        return self._categorical
 
     @property
     def normalizer(self):
@@ -84,11 +98,18 @@ class BaseRLData:
 class CategoricalData(BaseRLData):
     __slots__ = ['_categories']
 
-    def __init__(self, name, value, categories, normalizer=None, lazy_evaluation=False):
+    def __init__(self,
+                 name: str,
+                 value: Any,
+                 categories: Sequence,
+                 normalizer: Optional[Callable[["BaseRLData"], Union[Number, Sequence[Number]]]] = None,
+                 lazy_evaluation: bool = False):
+
         super().__init__(name=name,
                          value=value,
+                         categorical=True,
                          normalizer=normalizer if normalizer is not None else self._default_normalizer,
-                         lazy_evaluation=True)
+                         lazy_evaluation=True)  # Do not evaluate before assigning categories.
 
         self._categories = categories
         self.lazy_evaluation = lazy_evaluation
@@ -148,11 +169,19 @@ class CategoricalData(BaseRLData):
 class NumericalData(BaseRLData):
     __slots__ = ['_lower', '_upper']
 
-    def __init__(self, name, value, lower, upper, normalizer=None, lazy_evaluation=False):
+    def __init__(self,
+                 name: str,
+                 value: Union[Number, Sequence[Number]],
+                 lower: Number,
+                 upper: Number,
+                 normalizer: Optional[Callable[["BaseRLData"], Union[Number, Sequence[Number]]]] = None,
+                 lazy_evaluation: bool = False):
+
         super().__init__(name=name,
                          value=value,
+                         categorical=False,
                          normalizer=normalizer if normalizer is not None else self._default_normalizer,
-                         lazy_evaluation=True)
+                         lazy_evaluation=True)  # Do not evaluate before assigning lower and upper.
         self.lower = lower
         self.upper = upper
         self.lazy_evaluation = lazy_evaluation
@@ -254,24 +283,101 @@ class NumericalData(BaseRLData):
 
 
 class RangedData:
-    def __new__(cls, name, categorical, value, **kwargs):
+    def __new__(cls,
+                name: str,
+                categorical: bool,
+                value: Any,
+                **kwargs) -> Union[CategoricalData, NumericalData]:
         if categorical:
-            cls = CategoricalData(name, value, kwargs.get('categories'))
+            cls = CategoricalData(name=name, value=value,
+                                  categories=kwargs.get('categories'),
+                                  normalizer=kwargs.get('normalizer'),
+                                  lazy_evaluation=kwargs.get('lazy_evaluation'))
         else:
-            cls = NumericalData(name, value, kwargs.get(
-                'lower'), kwargs.get('upper'))
+            cls = NumericalData(name=name, value=value,
+                                lower=kwargs.get('lower'),
+                                upper=kwargs.get('upper'),
+                                normalizer=kwargs.get('normalizer'),
+                                lazy_evaluation=kwargs.get('lazy_evaluation'))
 
         return cls
 
 
-class RLData(MutableMapping):
-    def __init__(self, value: dict = {},
-                 categorical: Dict[Any, bool] = {},
-                 lower: Dict[Any, Number] = {},
-                 upper: Dict[Any, Number] = {},
-                 categories: dict = {},
-                 normalizer: Dict[Any, Callable[[RangedData], Number]] = {},
-                 lazy_evaluation: Optional[bool] = False) -> None:
+class RLData(MutableSequence):
+    def __init__(self, data: Union[Mapping, Sequence], lazy_evaluation: Optional[bool] = None) -> None:
+        '''
+        Create an RLData instance.
+
+        Attributes:
+            data: data is either a sequence of dict-like objects that include 'name'
+                  or a mapping whose keys are names of variables.
+                  Other attributes are optional. If the class cannot find 'categorical',
+                  it attemps to find 'categories'. If fails, the object is assumed numerical.
+            lazy_evaluation: whether to store normalized values or compute on-demand.
+                             If not provided, class looks for 'lazy evaluation' in
+                             each object. If fails, True is assumed.
+        '''
+        self._data = []
+
+        def _from_tuple(d: tuple):
+            return RangedData(
+                    name=d[0],
+                    value=d[1].get('value'),
+                    # if categorical is not available, check if categories is available.
+                    categorical=d[1].get('categorical', d[1].get(
+                        'categories') is not None),
+                    **{'categories': d[1].get('categories'),
+                        'lower': d[1].get('lower'),
+                        'upper': d[1].get('upper'),
+                        'normalizer': d[1].get('normalizer'),
+                        'lazy_evaluation': lazy_evaluation if lazy_evaluation is not None
+                            else d[1].get('lazy_evaluation', True)})
+
+        def _from_dict(val: dict):
+            v = val.as_dict() if isinstance(val, BaseRLData) else val
+
+            return RangedData(
+                    name=v['name'],
+                    value=v.get('value'),
+                    # if categorical is not available, check if categories is available.
+                    categorical=v.get('categorical', v.get(
+                        'categories') is not None),
+                    **{'categories': v.get('categories'),
+                        'lower': v.get('lower'),
+                        'upper': v.get('upper'),
+                        'normalizer': v.get('normalizer'),
+                        'lazy_evaluation': lazy_evaluation if lazy_evaluation is not None
+                            else v.get('lazy_evaluation', True)})
+
+        if isinstance(data, Sequence):  # a sequence of dict, RLData, BaseRLData, etc.
+            self._data.extend(_from_dict(v) for v in data)  # each item in the sequence is dict-like
+
+        elif isinstance(data, Mapping):  # dict, RLData, BaseRLData, etc.
+            if isinstance(list(data.values())[0], dict):
+                self._data.extend(_from_tuple(d) for d in data.items())
+            else:
+                self._data.append(_from_dict(data))
+
+        elif isinstance(data, Generator):
+            for v in data:
+                if isinstance(v, Mapping):
+                    self._data.append(_from_dict(v))
+                elif isinstance(v, tuple):
+                    self._data.append(_from_tuple(v))
+                else:
+                    raise TypeError('Type is not recognized!')
+        else:
+            raise TypeError('Type is not recognized!')
+
+    @classmethod
+    def from_sparse_data(cls,
+                        value: dict = {},
+                        categorical: Dict[Any, bool] = {},
+                        lower: Dict[Any, Number] = {},
+                        upper: Dict[Any, Number] = {},
+                        categories: dict = {},
+                        normalizer: Dict[Any, Callable[[RangedData], Number]] = {},
+                        lazy_evaluation: Optional[bool] = None) -> None:
         '''
         Create an RLData instance.
 
@@ -284,121 +390,157 @@ class RLData(MutableMapping):
             normalizer: a function that normalizes the respective component
             lazy_evaluation: whether to store normalized values or compute on-demand (Default: False)
         '''
-        self._data = {}
+
+        temp = {}
         for k, v in value.items():
-            self._data[k] = RangedData(name=k,
-                                       categorical=categorical[k],
-                                       value=v,
-                                       **{'categories': categories.get(k),
-                                          'lower': lower.get(k),
-                                          'upper': upper.get(k),
-                                          'normalizer': normalizer.get(k), 'lazy_evaluation': lazy_evaluation})
+            temp[k] = dict(name=k,
+                           categorical=categorical[k],
+                           value=v,
+                           **{'categories': categories.get(k),
+                               'lower': lower.get(k),
+                               'upper': upper.get(k),
+                               'normalizer': normalizer.get(k), 'lazy_evaluation': lazy_evaluation})
 
-    @classmethod
-    def from_dict(cls, _dict: dict = {},
-                  lazy_evaluation: Optional[bool] = False) -> None:
-        '''
-        Create an RLData instance.
+        return cls(temp)
 
-        Attributes:
-            _dict: a dictionary with mandatory keys 'name', 'categorical', 'value', and optional keys 'upper', 'lower', 'categories' and 'normalizer'
-            lazy_evaluation: whether to store normalized values or compute on-demand (Default: False)
-        '''
-        return RLData(value={_dict['name']: _dict.get('value')},
-                      lower={_dict['name']: _dict.get('lower')},
-                      upper={_dict['name']: _dict.get('upper')},
-                      categories={_dict['name']: _dict.get('categories')},
-                      categorical={_dict['name']: _dict.get('categorical')},
-                      normalizer={_dict['name']: _dict.get('normalizer')},
-                      lazy_evaluation=lazy_evaluation)
+    def index(self, value: Any, start: int = 0, stop: Optional[int] = None) -> int:
+        _stop = stop if stop is not None else len(self._data)
+        if isinstance(value, BaseRLData):
+            for i in range(start, _stop):
+                if self._data[i] == value:
+                    return i
+
+            raise ValueError(f'{value} is not on the list.')
+
+        elif isinstance(value, type(self._data[0].name)):
+            for i in range(start, _stop):
+                if self._data[i].name == value:
+                    return i
+
+            raise ValueError(f'{value} is not on the list.')
+
+        else:
+            raise ValueError(f'{value} is not on the list.')
 
     @property
     def value(self):
         '''Returns a dictionary of (name, RangedData) form.'''
-        return dict((v.name, v.value) for v in self._data.values())
+        return dict((v.name, v.value) for v in self._data)
 
     @value.setter
     def value(self, v: dict):
         for key, val in v.items():
-            self._data[key].value = val
+            self._data[self.index(key)].value = val
 
     @property
     def lower(self):
-        return dict((v.name, v.lower) for v in self._data.values() if hasattr(v, 'lower'))
+        return dict((v.name, v.lower) for v in self._data if hasattr(v, 'lower'))
 
     @lower.setter
     def lower(self, value: dict) -> None:
-        for k, v in value.items():
-            self._data[k].lower = v
+        for key, val in value.items():
+            self._data[self.index(key)].lower = val
 
     @property
     def upper(self):
-        return dict((v.name, v.upper) for v in self._data.values() if hasattr(v, 'upper'))
+        return dict((v.name, v.upper) for v in self._data if hasattr(v, 'upper'))
 
     @upper.setter
     def upper(self, value: dict) -> None:
-        for k, v in value.items():
-            self._data[k].upper = v
+        for key, val in value.items():
+            self._data[self.index(key)].upper = val
 
     @property
     def categories(self):
-        return dict((v.name, v.categories) for v in self._data.values() if hasattr(v, 'categories'))
+        return dict((v.name, v.categories) for v in self._data if hasattr(v, 'categories'))
 
     @categories.setter
     def categories(self, value: dict) -> None:
-        for k, v in value.items():
-            self._data[k].categories = v
+        for key, val in value.items():
+            self._data[self.index(key)].categories = val
 
     @property
-    def is_categorical(self):
-        return dict((v.name, True if isinstance(v, CategoricalData) else False) for v in self._data.values())
+    def categorical(self):
+        return dict((v.name, v.categorical) for v in self._data)
 
     @property
     def normalized(self):
-        return dict((v.name, v.normalized) for v in self._data.values())
+        return RLData({'name': v.name, 'categorical': v.categorical,
+                       'value': v.normalized, 'lower': 0, 'upper': 1, 'lazy_evaluation': True} for v in self._data)
 
-    @property
-    def normalized_list(self):
-        return list(v.normalized for v in self._data.values())
+    def flatten(self) -> list:
+        def make_iterable(x):
+            return x if isinstance(x, Iterable) else [x]
 
-    def as_list(self) -> list:
-        return self.value
+        return list(itertools.chain(*[make_iterable(sublist)
+            for sublist in self.value.values()]))
 
-    def __getitem__(self, k):
-        return self._data.__getitem__(k)
+    def split(self) -> List[RLData]:  #, name_suffix: Optional[str] = None):
+        if len(self) == 1:
+            value_of_object = self.value
+            if isinstance(value_of_object, Sequence):
+                name = self._data[0].name
+                categorical = self._data[0].categorical
+                lower = self._data[0].lower if not self._data[0].categorical else None
+                upper = self._data[0].upper if not self._data[0].categorical else None
+                categories = self._data[0].categories if self._data[0].categorical else None
+                normalizer = self._data[0].normalizer
+                lazy_evaluation = self._data[0].lazy_evaluation
 
-    def __setitem__(self, k, v):
-        if not isinstance(v, BaseRLData):
+                splitted_list = [RLData({
+                        'name': name,
+                        'value': v,
+                        'categorical': categorical,
+                        'lower': lower,
+                        'upper': upper,
+                        'categories': categories,
+                        'normalizer': normalizer,
+                        'lazy_evaluation': lazy_evaluation})
+                        for v in value_of_object]
+
+            else:
+                splitted_list = RLData(self._data)
+
+        else:
+            splitted_list = [RLData({
+                    'name': d.name,
+                    'value': d.value,
+                    'categorical': d.categorical,
+                    'upper': d.upper if not d.categorical else None,
+                    'lower': d.lower if not d.categorical else None,
+                    'categories': d.categories if d.categorical else None,
+                    'normalizer': d.normalizer,
+                    'lazy_evaluation': d.lazy_evaluation})
+                    for d in self._data]
+
+        return splitted_list
+
+    def __getitem__(self, i: Union[int, slice]):
+        return self._data.__getitem__(i)
+
+    def __setitem__(self, i: Union[int, slice], o: Union[Any, Iterable[Any]]):
+        # TODO: I should somehow check the iterable to make sure it has proper data,
+        # but currently I have no idea how!
+        if not isinstance(o, (BaseRLData, Iterable)):
             raise TypeError(
                 'Only variables of type BaseRLData and subclasses are acceptable.')
 
-        return self._data.__setitem__(k, v)
+        return self._data.__setitem__(i, o)
 
-    def __delitem__(self, key: Any) -> None:
-        del self._data[key]
+    def __delitem__(self, i: Union[int, slice]) -> None:
+        self._data.__delitem__(i)
 
-    def __iter__(self) -> Iterator:
-        return iter(self._data)
+    def insert(self, index: int, value: Any) -> None:
+        if not isinstance(value, BaseRLData):
+            raise TypeError(
+                'Only variables of type BaseRLData and subclasses are acceptable.')
+
+        self._data.insert(index, value)
 
     def __len__(self) -> int:
         return self._data.__len__()
 
-    def has_key(self, k: Any) -> bool:
-        return k in self._data
-
-    def keys(self) -> Any:
-        return self._data.keys()
-
-    def values(self) -> "RLData":
-        return self._data.values()
-
-    def items(self) -> enumerate:
-        return self._data.items()
-
-    def __contains__(self, item: Any) -> bool:
-        return item in self._data
-
-    def __add__(self, other: "RLData") -> "RLData":
+    def __add__(self, other: RLData) -> RLData:
         if not isinstance(other, (RLData, BaseRLData)):
             raise TypeError(
                 f'Concatenation of type RLData and {type(other)} not implemented!')
@@ -415,66 +557,65 @@ class RLData(MutableMapping):
                     raise ValueError(
                         'Cannot have items with same names. Use update() if you need to update an item.')
 
-            new_dict = {k: v.as_dict() for k, v in other.items()}
+            new_dict = {v.name: v.as_dict() for v in other}
 
-        temp = {k: v.as_dict() for k, v in self._data.items()}
+        temp = {v.name: v.as_dict() for v in self._data}
         temp.update(new_dict)
 
-        # reshape the data to have a format acceptable by RLData
-        return_value = defaultdict(dict)
-        generator_temp = ((k, {w: v})
-                          for w, z in temp.items()
-                          for k, v in z.items()
-                          if k != 'name')
-
-        for key, val in generator_temp:
-            return_value[key].update(val)
-
-        #  value: dict = {},
-        #  categorical: Dict[Any, bool] = {},
-        #  lower: Dict[Any, Number] = {},
-        #  upper: Dict[Any, Number] = {},
-        #  categories: dict = {},
-        #  normalizer: Dict[Any, Callable[[RangedData], Number]] = {},
-        #  lazy_evaluation: Optional[bool] = False
-
-        return RLData(**return_value)
+        return RLData(temp)
 
     def __repr__(self) -> str:
         return f'[{super().__repr__()} -> {self._data}'
 
     def __str__(self) -> str:
-        return str(self._data)
+        return '[' + ', '.join((d.__str__() for d in self._data)) + ']'
+
+
+    # # Mixin methods
+    # def append(self, value: _T) -> None: ...
+    # def clear(self) -> None: ...
+    # def extend(self, values: Iterable[_T]) -> None: ...
+    # def reverse(self) -> None: ...
+    # def pop(self, index: int = ...) -> _T: ...
+    # def remove(self, value: _T) -> None: ...
+    # def __iadd__(self, x: Iterable[_T]) -> MutableSequence[_T]: ...
+
+    # # Sequence Mixin methods
+    # def index(self, value: Any, start: int = ..., stop: int = ...) -> int: ...
+    # def count(self, value: Any) -> int: ...
+    # def __contains__(self, x: object) -> bool: ...
+    # def __iter__(self) -> Iterator[_T_co]: ...
+    # def __reversed__(self) -> Iterator[_T_co]: ...
 
 
 if __name__ == "__main__":
     from timeit import timeit
-    from rl.rldata import RLData
 
-    def f1(): return RLData({'test A': 'a', 'test B': [10, 20]},
-                            is_numerical={'test A': False, 'test B': True},
-                            categories={'test A': ['a', 'b']},
-                            lower={'test B': 0},
-                            upper={'test B': 100}) + \
-        RLData({'A': 'a', 'B': [10, 20]},
-               is_numerical={'A': False, 'B': True},
-               categories={'A': ['a', 'b']},
-               lower={'B': 0},
-               upper={'B': 100})
+    def f1():
+        t1 = RLData.from_sparse_data({'test A': ['a', 'b']},
+                    categorical={'test A': True},
+                    categories={'test A': ['a', 'b']},
+                    # lower={'test B': 0},
+                    # upper={'test B': 100}
+                    )
+        return t1
 
-    def f2(): return RLData({'test A': 'a', 'test B': [10, 20]},
-                            categorical={'test A': True, 'test B': False},
-                            categories={'test A': ['a', 'b']},
-                            lower={'test B': 0},
-                            upper={'test B': 100}) + \
-        RLData({'A': 'a', 'B': [10, 20]},
-               categorical={'A': True, 'B': False},
-               categories={'A': ['a', 'b']},
-               lower={'B': 0},
-               upper={'B': 100})
+    def f2():
+        t2 = RLData(({'name': x, 'value': x, 'categories': list('abcdefghijklmnopqrstuvwxyz')}
+            for x in 'abcdefghijklmnopqrstuvwxyz'), lazy_evaluation=True)
+        return t2.normalized.flatten()
 
-    # print(timeit(f1, number=100))
+    def f3():
+        t2 = RLData([{'name': 'A', 'value': 'a', 'categories': ['a', 'b']},
+            {'name': 'B', 'value': [10, 20], 'lower': 0, 'upper': 100}], lazy_evaluation=True)
+        return t2
+
+    test = f1().split()
+    print(test)
+    # print(timeit(f1, number=1000))
     print(timeit(f2, number=100))
+    # print(timeit(f3, number=1000))
+    # print(f2().normalized.as_list())
     # print(a.values)
     # print(a.lower)
     # print(a.categories)
