@@ -242,8 +242,9 @@ class WarfarinModel_v5(subjects.Subject):
 
     @property
     def _INR_history(self):
-        return [0]*(self._dose_history_length-self._decision_points_index) \
-            + self._decision_points_INR_history[:self._decision_points_index][-self._dose_history_length:]
+        # INR has one more value (initial INR) compared to dose.
+        return [0]*(self._dose_history_length - self._decision_points_index - 1) \
+            + self._decision_points_INR_history[:self._decision_points_index + 1][-self._dose_history_length - 1:]
 
     @property
     def _dose_history(self):
@@ -298,11 +299,11 @@ class WarfarinModel_v5(subjects.Subject):
              'lower': 0,
              'upper': self._max_day - 1},
             {'name': 'Doses',
-             'value': tuple(self._dose_history),
+             'value': tuple(self._full_dose_history),
              'lower': 0.0,
              'upper': self._max_dose},
             {'name': 'INRs',
-             'value': tuple(self._INR_history),
+             'value': tuple(self._full_INR_history),
              'lower': 0.0,
              'upper': 15.0},
             {'name': 'Intervals',
