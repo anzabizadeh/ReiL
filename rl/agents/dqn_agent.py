@@ -99,7 +99,7 @@ class DQNAgent(Agent):
         self._gamma = min(gamma, 1.0)
         self._epsilon = epsilon
         self._default_actions = default_actions
-        self._normalized_action_list = [a.normalize().as_list() for a in self._default_actions]
+        self._normalized_action_list = [action.normalized.flatten() for action in self._default_actions]
 
         self._lr_initial = lr_initial
         self._lr_scheduler = lr_scheduler
@@ -180,7 +180,7 @@ class DQNAgent(Agent):
         '''
         if isinstance(state, RLData):
             state = [state]
-        state_list = [s.normalize().as_list() for s in state]
+        state_list = [s.normalized.flatten() for s in state]
         len_state = len(state)
 
         if action is None:
@@ -188,7 +188,7 @@ class DQNAgent(Agent):
         else:
             if isinstance(action, RLData):
                 action = [action]
-            action_list = [a.normalize().as_list() for a in action]
+            action_list = [a.normalized.flatten() for a in action]
         len_action = len(action_list)
 
         if len_state == len_action:
@@ -238,7 +238,7 @@ class DQNAgent(Agent):
                 for i in range(len(history)):
                     state = history[i]['state']
                     action = history[i]['action']
-                    reward = history[i]['reward'][0]
+                    reward = history[i]['reward'][0].value
                     try:
                         max_q = self._max_q(history[i+1]['state'])
                         new_q = reward + self._gamma*max_q
@@ -247,11 +247,11 @@ class DQNAgent(Agent):
 
                     try:
                         self._buffer_index += 1
-                        self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[self._buffer_index] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[self._buffer_index] = [new_q]
                     except IndexError:
                         self._buffer_ready = True
-                        self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[0] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[0] = [new_q]
                         self._buffer_index = 1
             
@@ -260,7 +260,7 @@ class DQNAgent(Agent):
                 for i in range(len(history)-1, -1, -1):
                     state = history[i]['state']
                     action = history[i]['action']
-                    reward = history[i]['reward'][0]
+                    reward = history[i]['reward'][0].value
                     try:
                         new_q = reward + self._gamma*q_list[i+1]
                     except IndexError:
@@ -269,11 +269,11 @@ class DQNAgent(Agent):
 
                     try:
                         self._buffer_index += 1
-                        self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[self._buffer_index] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[self._buffer_index] = [new_q]
                     except IndexError:
                         self._buffer_ready = True
-                        self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[0] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[0] = [new_q]
                         self._buffer_index = 1
 
@@ -339,7 +339,7 @@ class DQNAgent(Agent):
 
         # To resolve a compatibility issue
         if not hasattr(self, '_normalized_action_list'):
-            self._normalized_action_list = [a.normalize().as_list() for a in self._default_actions]
+            self._normalized_action_list = [a.normalized.flatten() for a in self._default_actions]
 
         self._graph = tf.Graph()
         with self._graph.as_default():
