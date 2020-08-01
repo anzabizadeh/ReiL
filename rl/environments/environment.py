@@ -113,13 +113,13 @@ class Environment(rlbase.RLBase):
             self._subjects.update(subjects)
         # try:
         #     for name, agent in kwargs['agents'].items():
-        #         self._agent[name] = agent
+        #         self._agents[name] = agent
         # except (IndexError, KeyError):
         #     pass
 
         # try:
         #     for name, subject in kwargs['subjects'].items():
-        #         self._subject[name] = subject
+        #         self._subjects[name] = subject
         # except (IndexError, KeyError):
         #     pass
 
@@ -139,14 +139,14 @@ class Environment(rlbase.RLBase):
         if agents is not None:
             for name in agents:
                 try:
-                    del self._agent[name]
+                    del self._agents[name]
                 except KeyError:
                     raise KeyError(f'Agent {name} not found!')
 
         if subjects is not None:
             for name in subjects:
                 try:
-                    del self._subject[name]
+                    del self._subjects[name]
                 except KeyError:
                     raise KeyError(f'Subject {name} not found!')
 
@@ -381,24 +381,24 @@ class Environment(rlbase.RLBase):
         stats_subjects = defaultdict(list)
         stats_final = defaultdict(list)
 
-        for subject_name, subject in self._subject.items():
+        for subject_name, subject in self._subjects.items():
             assigned_agents = list(
                 (k[0], v) for k, v in self._assignment_list.items() if k[1] == subject_name)
             if assigned_agents == []:
                 continue
 
             for agent_name, _ in assigned_agents:
-                self._agent[agent_name].training_mode = training_mode[(
+                self._agents[agent_name].training_mode = _training_mode[(
                     agent_name, subject_name)]
 
             history = defaultdict(list)
             for instance_id, subject_instance in subject:
                 steps = 0
                 # for agent_name, _ in assigned_agents:
-                #     self._agent[agent_name].exchange_protocol = subject_instance.requested_exchange_protocol
+                #     self._agents[agent_name].exchange_protocol = subject_instance.requested_exchange_protocol
                 while not subject_instance.is_terminated:
                     for agent_name, _id in assigned_agents:
-                        agent = self._agent[agent_name]
+                        agent = self._agents[agent_name]
                         if subject_instance.is_terminated or steps >= _max_steps:
                             break
                         steps += 1
@@ -421,7 +421,7 @@ class Environment(rlbase.RLBase):
                                                     'complete_state': complete_state})
 
                         if subject_instance.is_terminated:
-                            for affected_agent in self._agent:
+                            for affected_agent in self._agents:
                                 if (affected_agent, subject_name) in self._assignment_list and \
                                         (affected_agent != agent_name):
                                     history[affected_agent][-1]['reward'] = -reward
@@ -438,12 +438,12 @@ class Environment(rlbase.RLBase):
                         self._total_experienced_episodes[agent_subject_tuple] += 1
 
                         if self._learning_batch_size == -1:
-                            self._agent[agent_name].learn(
+                            self._agents[agent_name].learn(
                                 history=history[agent_name])
 
                     try:
                         stats_list = stats[agent_subject_tuple]
-                        result_agent = self._agent[agent_name].stats(
+                        result_agent = self._agents[agent_name].stats(
                             stats_list)
                         result_subject = subject_instance.stats(stats_list)
 
@@ -457,21 +457,21 @@ class Environment(rlbase.RLBase):
                     except KeyError:
                         pass
 
-            if reset == 'all':
-                for agent in self._agent.values():
+            if _reset == 'all':
+                for agent in self._agents.values():
                     agent.reset()
-            elif reset == 'any':
+            elif _reset == 'any':
                 for agent_name, _ in assigned_agents:
-                    self._agent[agent_name].reset()
+                    self._agents[agent_name].reset()
 
             for agent_name, _ in assigned_agents:
                 agent_subject_tuple = (agent_name, subject_name)
-                if return_output[agent_subject_tuple]:
+                if _return_output[agent_subject_tuple]:
                     output[agent_subject_tuple].append(history[agent_name])
 
                 # TODO: check if this condition is necessary!
-                if stats.get(agent_subject_tuple, []) != []:
-                    result = stats_func[agent_subject_tuple](agent_stats=stats_agents.get(agent_subject_tuple, None),
+                if _stats.get(agent_subject_tuple, []) != []:
+                    result = _stats_func[agent_subject_tuple](agent_stats=stats_agents.get(agent_subject_tuple, None),
                                                              subject_stats=stats_subjects.get(agent_subject_tuple, None))
                     stats_final[agent_subject_tuple].append(result)
 
@@ -495,15 +495,15 @@ class Environment(rlbase.RLBase):
 
         if kwargs.get('termination', self._termination).lower() == 'all':
             def termination_func(x, y): return x & y.is_terminated
-            list_of_subjects = [True] + list(self._subject.values())
+            list_of_subjects = [True] + list(self._subjects.values())
         else:
             def termination_func(x, y): return x | y.is_terminated
-            list_of_subjects = [False] + list(self._subject.values())
+            list_of_subjects = [False] + list(self._subjects.values())
 
-        for agent in self._agent.values():
+        for agent in self._agents.values():
             agent.training_mode = False
 
-        for subject in self._subject.values():
+        for subject in self._subjects.values():
             subject.reset()
 
         history = dict((agent_subject, [])
@@ -518,8 +518,8 @@ class Environment(rlbase.RLBase):
             for agent_name, subject_name in self._assignment_list:
                 if not done:
                     _id = self._assignment_list[(agent_name, subject_name)]
-                    agent = self._agent[agent_name]
-                    subject = self._subject[subject_name]
+                    agent = self._agents[agent_name]
+                    subject = self._subjects[subject_name]
                     if not subject.is_terminated:
                         state = subject.state
                         possible_actions = subject.possible_actions
@@ -530,7 +530,7 @@ class Environment(rlbase.RLBase):
                         history[(agent_name, subject_name)].append(
                             {'state': state, 'action': action, 'q': q, 'reward': reward})
                         if subject.is_terminated:
-                            for affected_agent in self._agent.keys():
+                            for affected_agent in self._agents.keys():
                                 if ((affected_agent, subject) in self._assignment_list.keys()) & \
                                         (affected_agent != agent_name):
                                     history[(affected_agent, subject)
@@ -538,7 +538,7 @@ class Environment(rlbase.RLBase):
 
                 done = functools.reduce(termination_func, list_of_subjects)
 
-        for sub in self._subject.values():
+        for sub in self._subjects.values():
             sub.reset()
 
         return history
@@ -560,29 +560,29 @@ class Environment(rlbase.RLBase):
 
         if object_name == 'all':
             super().load(filename=_filename, path=_path)
-            self._agent = {}
-            self._subject = {}
+            self._agents = {}
+            self._subjects = {}
             for name, obj_type in self._env_data['agents']:
-                self._agent[name] = obj_type()
-                self._agent[name].load(
+                self._agents[name] = obj_type()
+                self._agents[name].load(
                     path=(_path / f'{_filename}.data'), filename=name)
             for name, obj_type in self._env_data['subjects']:
-                self._subject[name] = obj_type()
-                self._subject[name].load(
+                self._subjects[name] = obj_type()
+                self._subjects[name].load(
                     path=(_path / f'{_filename}.data'), filename=name)
 
             del self._env_data
 
         else:
             for obj in object_name:
-                if obj in self._agent:
-                    self._agent[obj].load(
+                if obj in self._agents:
+                    self._agents[obj].load(
                         path=(_path / f'{_filename}.data'), filename=obj)
-                    self._agent[obj].reset()
-                elif obj in self._subject:
-                    self._subject[obj].load(
+                    self._agents[obj].reset()
+                elif obj in self._subjects:
+                    self._subjects[obj].load(
                         path=(_path / f'{_filename}.data'), filename=obj)
-                    self._subject[obj].reset()
+                    self._subjects[obj].reset()
 
     def save(self,
              object_name: Optional[List[str]] = 'all',
@@ -603,12 +603,12 @@ class Environment(rlbase.RLBase):
         if object_name == 'all':
             self._env_data = defaultdict(list)
 
-            for name, agent in self._agent.items():
+            for name, agent in self._agents.items():
                 _, fn = agent.save(
                     path=_path / f'{_filename}.data', filename=name)
                 self._env_data['agents'].append((fn, type(agent)))
 
-            for name, subject in self._subject.items():
+            for name, subject in self._subjects.items():
                 _, fn = subject.save(
                     path=_path / f'{_filename}.data', filename=name)
                 self._env_data['subjects'].append((fn, type(subject)))
@@ -622,11 +622,11 @@ class Environment(rlbase.RLBase):
             del self._env_data
         else:
             for obj in object_name:
-                if obj in self._agent:
-                    self._agent[obj].save(
+                if obj in self._agents:
+                    self._agents[obj].save(
                         path=_path / f'{_filename}.data', filename=obj)
-                elif obj in self._subject:
-                    self._subject[obj].save(
+                elif obj in self._subjects:
+                    self._subjects[obj].save(
                         path=_path / f'{_filename}.data', filename=obj)
 
         return _path, _filename
@@ -634,8 +634,8 @@ class Environment(rlbase.RLBase):
     def __repr__(self) -> str:
         try:
             return 'Env: \n Agents:\n' + \
-                '\n\t'.join((a.__repr__() for a in self._agent.values())) + \
+                '\n\t'.join((a.__repr__() for a in self._agents.values())) + \
                 '\nSubjects:\n' + \
-                '\n\t'.join((s.__repr__() for s in self._subject.values()))
+                '\n\t'.join((s.__repr__() for s in self._subjects.values()))
         except AttributeError:
             return 'Environment: New'
