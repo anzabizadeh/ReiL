@@ -373,8 +373,14 @@ class Environment(rlbase.RLBase):
         _return_output = get_argument(return_output, defaultdict(bool))
         _stats = get_argument(stats, defaultdict(list))
 
-        # TODO: stats_func should be functions, not empty list!
-        _stats_func = get_argument(stats_func, defaultdict(list))
+        if stats_func is None and stats is not None:
+            self._logger.exception('stats are provided, but no stats_func is provided.')
+            raise ValueError('stats are provided, but no stats_func is provided.')
+        temp = get_argument(stats_func, lambda _: None)
+        if isinstance(temp, Callable):
+            _stats_func = dict((agent_subject_tuple, temp) for agent_subject_tuple in self._assignment_list)
+        else:
+            _stats_func = temp
 
         output = defaultdict(list)
         stats_agents = defaultdict(list)
