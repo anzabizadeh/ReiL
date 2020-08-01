@@ -37,9 +37,9 @@ class RLBase():
         load: load an object from a file.
         save: save the object to a file.
     '''
+    version: str = "0.5"
     def __init__(self,
                  name: str = 'rlbase',
-                 version: float = 0.5,
                  path: str = '.',
                  ex_protocol_options: Dict[str, List[str]] = {},
                  ex_protocol_current: Dict[str, str] = {},
@@ -54,11 +54,11 @@ class RLBase():
         self.data_collector = data_collector.DataCollector(object=self)
 
         self._name = name
-        self._version = version
         self._path = path
 
         self._ex_protocol_options = ex_protocol_options
-        self._ex_protocol_current = ex_protocol_current
+        self._ex_protocol_current = dict((protocol, ex_protocol_current.get(protocol, value[0]))
+                                        for protocol, value in self._ex_protocol_options.items())
         self._stats_list = stats_list
 
         self._logger_name = logger_name
@@ -201,7 +201,8 @@ class RLBase():
                 data[key] = self.__dict__[key]
 
         _path.mkdir(parents=True, exist_ok=True)
-        data.pop('_logger')
+        if '_logger' in data:
+            data.pop('_logger')
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
             dill.dump(data, f, dill.HIGHEST_PROTOCOL)
 
