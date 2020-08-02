@@ -64,7 +64,7 @@ class RLBase():
         self._logger_name = logger_name
         self._logger_level = logger_level
         self._logger_filename = logger_filename
-        self._persistent_attributes = persistent_attributes
+        self._persistent_attributes = ['_'+p for p in persistent_attributes]
 
         self._logger = logging.getLogger(self._logger_name)
         self._logger.setLevel(self._logger_level)
@@ -162,10 +162,13 @@ class RLBase():
             
             self._logger.info(f'Changing the logger from {self._logger_name} to {data["_logger_name"]}.')
 
-            persistent_attributes = self._persistent_attributes + ['_persistent_attributes']
+            persistent_attributes = self._persistent_attributes + ['_persistent_attributes', 'version']
             for key, value in data.items():
-                if key[1:] not in persistent_attributes:
+                if key not in persistent_attributes:
                     self.__dict__[key] = value
+
+            # TODO: classes should use `loaded_version` to compare old vs new and modify attributes if necessary.
+            self.loaded_version = data.get('version')
 
             self._logger = logging.getLogger(self._logger_name)
             self._logger.setLevel(self._logger_level)
@@ -197,8 +200,9 @@ class RLBase():
             data = {}
             for d in data_to_save:
                 data[d] = self.__dict__[d]
-            for key in ('_name', '_version', '_path'):  # these should be saved automatically
+            for key in ('_name', '_path'):  # these should be saved automatically
                 data[key] = self.__dict__[key]
+        data['version'] = self.version
 
         _path.mkdir(parents=True, exist_ok=True)
         if '_logger' in data:
