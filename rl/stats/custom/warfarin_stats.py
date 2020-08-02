@@ -14,7 +14,7 @@ conditionals = {'<=': op.le,
 
 
 def sensitivity(row):
-    combo = row['CYP2C9'] + row['VKORC1']
+    combo = row.ID.value['CYP2C9'] + row.ID.value['VKORC1']
     return (int(combo in ('*1/*1G/G', '*1/*2G/G', '*1/*1G/A')) * 1 +
             int(combo in ('*1/*2G/A', '*1/*3G/A', '*2/*2G/A',
                           '*2/*3G/G', '*1/*3G/G', '*2/*2G/G',

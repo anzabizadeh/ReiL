@@ -203,8 +203,8 @@ def write_trajectories_output(filename: str, trajectory_output: Dict[str, list])
     for label in trajectory_output.keys():
         for hist in trajectory_output[label]:
             trajectories += [(i, label, h['instance_id'],
-                              h['state']['age'][0], h['state']['CYP2C9'][0], h['state']['VKORC1'][0],
-                              h['state']['INRs'][-1], h['action'][0], h['reward'][0]) for h in hist]
+                              h['state'].value['age'], h['state'].value['CYP2C9'], h['state'].value['VKORC1'],
+                              h['state'].value['INRs'][-1], h['action'].flatten()[0], h['reward'].flatten()[0]) for h in hist]
     trajectories_df = pd.DataFrame(trajectories, columns=['run', 'agent/subject',
                                                           'instance_id', 'age', 'CYP2C9', 'VKORC1', 'INR_prev', 'action',
                                                           'reward'])
@@ -271,6 +271,7 @@ if __name__ == "__main__":
             training_patient = rlsubjects.WarfarinModel_v5(
                 patient_selection=args["patient_selection_training"],
                 ex_protocol_current={'state': args["state_representation"]},
+                persistent_attributes=['dose_history_length', 'INR_history_length'],
                 **shared_subjects_properties)
 
             subjects['training'] = rlsubjects.IterableSubject(
