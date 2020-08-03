@@ -217,6 +217,10 @@ def write_trajectories_output(filename: str, trajectory_output: Dict[str, list])
     trajectories_df.to_csv(f'./{filename}/{filename}{i:04}.csv')
 
 
+def start_test_process(filename: str, stats_output: Dict[str, list], trajectory_output: Dict[str, list]) -> None:
+    pass
+
+
 if __name__ == "__main__":
     set_seeds(1234)
     cmd_args = parse_args()
@@ -252,7 +256,8 @@ if __name__ == "__main__":
             lookahead_duration=args["lookahead_duration"],
             randomized=args["randomized"],
             interval=args["interval"],
-            interval_max_dose=args["interval_max_dose"])
+            interval_max_dose=args["interval_max_dose"],
+            persistent_attributes=['dose_history_length', 'INR_history_length'])
 
         shared_training_iterable_properties = dict(
             save_instances=args["save_instances"],
@@ -271,7 +276,6 @@ if __name__ == "__main__":
             training_patient = rlsubjects.WarfarinModel_v5(
                 patient_selection=args["patient_selection_training"],
                 ex_protocol_current={'state': args["state_representation"]},
-                persistent_attributes=['dose_history_length', 'INR_history_length'],
                 **shared_subjects_properties)
 
             subjects['training'] = rlsubjects.IterableSubject(
@@ -280,7 +284,8 @@ if __name__ == "__main__":
 
             training_patient_for_stats = rlsubjects.WarfarinModel_v5(
                 patient_selection=args["patient_selection_training"],
-                ex_protocol_current={'state': args["state_representation"], 'take_effect': 'no_reward'})
+                ex_protocol_current={'state': args["state_representation"], 'take_effect': 'no_reward'},
+                **shared_subjects_properties)
 
             subjects['training_patient_for_stats'] = rlsubjects.IterableSubject(
                 subject=training_patient_for_stats,
@@ -351,8 +356,8 @@ if __name__ == "__main__":
 
         # update environment
         env.add(agents=agents, subjects=subjects)
-        assignment_list = list((a, s) for a in agents.keys()
-                               for s in subjects.keys())
+        assignment_list = list((a, s) for a in agents
+                               for s in subjects)
         env.assign(assignment_list)
 
     stats_to_collect = ('TTR', 'dose_change', 'delta_dose')
