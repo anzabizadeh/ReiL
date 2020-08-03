@@ -252,6 +252,11 @@ class WarfarinModel_v5(subjects.Subject):
             + self._decision_points_dose_history[:self._decision_points_index][-self._dose_history_length:]
 
     @property
+    def _interval_history(self):
+        return [0]*(self._interval_history_length-self._decision_points_index) \
+            + self._decision_points_interval_history[:self._decision_points_index][-self._interval_history_length:]
+
+    @property
     def state(self) -> rldata.RLData:
         if self._ex_protocol_current['state'] == 'extended':
             return self._state_extended()
@@ -307,8 +312,8 @@ class WarfarinModel_v5(subjects.Subject):
              'lower': 0.0,
              'upper': 15.0},
             {'name': 'Intervals',
-             'value': tuple(self._intervals_history),
-             'lower': 1,
+             'value': tuple(self._decision_points_interval_history[:self._decision_points_index]),
+             'lower': 0,
              'upper': self._max_interval}],
             lazy_evaluation=True)
 
@@ -359,10 +364,8 @@ class WarfarinModel_v5(subjects.Subject):
             tuple((i + self._day, current_dose) for i in range(current_interval)))
 
         self._decision_points_dose_history[self._decision_points_index] = current_dose
+        self._decision_points_interval_history[self._decision_points_index] = current_interval
         self._decision_points_index += 1
-
-        self._intervals_history.append(current_interval)
-        self._intervals_history.popleft()
 
         day_temp = self._day
         self._day += current_interval
@@ -479,13 +482,12 @@ class WarfarinModel_v5(subjects.Subject):
         self._filename_counter += 1
 
         self._day = 0
-        self._intervals_history = collections.deque(
-            [1]*self._dose_history_length)
-
+        self._interval_history_length = max(self._dose_history_length, self._INR_history_length)
         self._full_INR_history = [0.0] * self._max_day
         self._full_dose_history = [0.0] * self._max_day
         self._decision_points_INR_history = [0.0] * (self._max_day + 1)
         self._decision_points_dose_history = [0.0] * self._max_day
+        self._decision_points_interval_history = [0.0] * self._max_day
         self._decision_points_index = 0
 
         # The latest INR is also stored in self._INR_history
@@ -543,8 +545,8 @@ class WarfarinModel_v5(subjects.Subject):
              'lower': 0.0,
              'upper': 15.0},
             {'name': 'Intervals',
-             'value': tuple(self._intervals_history),
-             'lower': 1,
+             'value': tuple(self._interval_history),
+             'lower': 0,
              'upper': self._max_interval}],
             lazy_evaluation=True) 
 
@@ -569,8 +571,8 @@ class WarfarinModel_v5(subjects.Subject):
              'lower': 0.0,
              'upper': 15.0},
             {'name': 'Intervals',
-             'value': tuple(self._intervals_history),
-             'lower': 1,
+             'value': tuple(self._interval_history),
+             'lower': 0,
              'upper': self._max_interval}],
             lazy_evaluation=True)
 
@@ -658,6 +660,6 @@ class WarfarinModel_v5(subjects.Subject):
     def __repr__(self) -> str:
         try:
             return f"WarfarinModel: {[' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()]}, " \
-                   f"INR: {self._INR_history}, intervals: {self._intervals_history}, doses: {self._dose_history}"
+                   f"INR: {self._INR_history}, intervals: {self._interval_history}, doses: {self._dose_history}"
         except:
             return 'WarfarinModel'
