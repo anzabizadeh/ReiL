@@ -8,13 +8,16 @@ This `iterable subject` class takes any `subject` object and returns an iterator
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from ..rlbase import RLBase
+from typing import List, Optional, Tuple, Union
+
+import rl.subjects as rlsubjects
+from rl import rlbase, rldata
 
 
-class IterableSubject(RLBase):
+class IterableSubject(rlbase.RLBase):
     '''
     Makes any subject an iterable.
-    
+
     Attributes
     ----------
         subject: 
@@ -32,44 +35,33 @@ class IterableSubject(RLBase):
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
     '''
-    def __init__(self, subject=None, **kwargs):
-        self.set_defaults(subject=subject,
-                            agent_list={},
-                            save_instances=False,
-                            use_existing_instances=True,
-                            save_path='./',
-                            save_prefix='',
-                            instance_counter_start=0,
-                            instance_counter=-1,
-                            instance_counter_end=[1],  # -1: infinite
-                            end_index=0,
-                            auto_rewind=False
-                            )
-        self.set_params(subject=subject, **kwargs)
+
+    def __init__(self,
+                 subject: rlsubjects.Subject,
+                 save_instances: bool = False,
+                 use_existing_instances: bool = True,
+                 save_path: str = '',
+                 save_prefix: str = '',
+                 instance_counter_start: int = 0,
+                 instance_counter: int = -1,
+                 instance_counter_end: Union[int, list] = -1,  # -1: infinite
+                 end_index: int = 0,
+                 auto_rewind: bool = False,
+                 **kwargs) -> None:
+
+        self._subject = subject
+        self._agent_list = {}
+        self._save_instances = save_instances
+        self._use_existing_instances = use_existing_instances
+        self._save_path = save_path
+        self._save_prefix = save_prefix
+        self._instance_counter_start = instance_counter_start
+        self._instance_counter = instance_counter
+        self._instance_counter_end = instance_counter_end
+        self._end_index = end_index
+        self._auto_rewind = auto_rewind
+
         super().__init__(**kwargs)
-
-        if 'filename' in kwargs:
-            if 'path' in kwargs:
-                self.load(filename=kwargs['filename'], path=kwargs['path'])
-            else:
-                self.load(filename=kwargs['filename'])
-            return
-
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._subject = None
-            self._agent_list = {}
-            self._save_instances = False
-            self._use_existing_instances = True
-            self._save_path = './'
-            self._save_prefix = ''
-            self._instance_counter_start = 0
-            self._instance_counter = -1
-            self._instance_counter_end = [1]
-            self._end_index = 0
-            self._auto_rewind = False
-
 
         if isinstance(self._instance_counter_end, int):
             self._instance_counter_end = [self._instance_counter_end]
@@ -79,10 +71,16 @@ class IterableSubject(RLBase):
         else:
             self._stop_check = lambda current, end: current > end
 
+    @classmethod
+    def from_file(cls, filename: str, path: Optional[str] = None):
+        instance = cls(None)
+        instance.load(filename=filename, path=path)
+        return instance
+
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def __next__(self) -> Tuple[int, rlsubjects.Subject]:
         self._instance_counter += 1
 
         try:
@@ -100,11 +98,13 @@ class IterableSubject(RLBase):
             self._instance_counter -= 1
             raise StopIteration
         else:
-            current_instance = ''.join((self._save_prefix, f'{self._instance_counter:06}'))
+            current_instance = ''.join(
+                (self._save_prefix, f'{self._instance_counter:06}'))
             new_instance = True
             if self._use_existing_instances:
                 try:
-                    self._subject.load(path=self._save_path, filename=current_instance)
+                    self._subject.load(path=self._save_path,
+                                       filename=current_instance)
                     new_instance = False
                 except FileNotFoundError:
                     self._subject.reset()
@@ -112,26 +112,27 @@ class IterableSubject(RLBase):
                 self._subject.reset()
 
             if self._save_instances and new_instance:
-                self._subject.save(path=self._save_path, filename=current_instance)
+                self._subject.save(path=self._save_path,
+                                   filename=current_instance)
 
         return (self._instance_counter, self._subject)
 
     @property
-    def state(self):
+    def state(self) -> rldata.RLData:
         return self._subject.state
 
     @property
-    def is_terminated(self):
+    def is_terminated(self) -> bool:
         return self._subject.is_terminated
 
     @property
-    def possible_actions(self):
+    def possible_actions(self) -> List[rldata.RLData]:
         return self._subject.possible_actions
 
-    def take_effect(self, action, _id=None):
+    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None):
         return self._subject.take_effect(action, _id)
 
-    def reset(self):
+    def reset(self) -> None:
         '''
         Reset the subject.
         This function allows non-iterable use of the defined subject. (e.g. in `env.trajectory()`).
@@ -139,13 +140,13 @@ class IterableSubject(RLBase):
         '''
         self._subject.reset()
 
-    def rewind(self):
+    def rewind(self) -> None:
         '''
         Rewind the iterator object.
         '''
         self._instance_counter = self._instance_counter_start - 1
 
-    def register(self, agent_name):
+    def register(self, agent_name: str) -> int:
         '''
         Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
         \nArguments:
@@ -162,7 +163,7 @@ class IterableSubject(RLBase):
             self._agent_list[agent_name] = _id
             return _id
 
-    def deregister(self, agent_name):
+    def deregister(self, agent_name: str) -> int:
         '''
         Deegisters an agent given its name.
         \nArguments:
@@ -170,7 +171,7 @@ class IterableSubject(RLBase):
         '''
         self._agent_list.pop(agent_name)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         try:
             return self._subject.__repr__()
         except AttributeError:
