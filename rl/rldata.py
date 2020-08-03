@@ -130,7 +130,7 @@ class CategoricalData(BaseRLData):
 
     @categories.setter
     def categories(self, cat):
-        if cat is None:
+        if cat is None or self.value in (None, (), []):
             self._categories = cat
             self._normalized = None
         elif not isinstance(cat, (list, tuple)):
@@ -223,7 +223,7 @@ class NumericalData(BaseRLData):
 
     @lower.setter
     def lower(self, l):
-        if l is None:
+        if l is None or self.value in (None, (), []):
             self._lower = l
             self._normalized = None
         elif not isinstance(l, Number):
@@ -242,7 +242,7 @@ class NumericalData(BaseRLData):
 
     @upper.setter
     def upper(self, u):
-        if u is None:
+        if u is None or self.value in (None, (), []):
             self._upper = u
             self._normalized = None
         elif not isinstance(u, Number):
