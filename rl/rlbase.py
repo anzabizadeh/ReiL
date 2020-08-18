@@ -8,18 +8,17 @@ The base class for reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from collections import namedtuple
 import logging
+import numbers
 import pathlib
 import time
-import numbers
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-import dill
-from rl import data_collector
-from rl import rldata
+import dill  # type: ignore
 
-Observation = Dict[str, Union[numbers.Number, rldata.RLData]]
+from rl import data_collector, rldata
+
+Observation = Dict[str, Union[rldata.RLData, numbers.Number]]
 History = List[Observation]
 
 class RLBase():
@@ -39,16 +38,16 @@ class RLBase():
     '''
     version: str = "0.5"
     def __init__(self,
-                 name: str = 'rlbase',
+                 name: Optional[str] = 'rlbase',
                  path: str = '.',
-                 ex_protocol_options: Dict[str, List[str]] = {},
+                 ex_protocol_options: Dict[str, Sequence[str]] = {},
                  ex_protocol_current: Dict[str, str] = {},
-                 stats_list: Sequence[str] = [],
+                 stats_list: Sequence[str] = (),
                  logger_name: str = __name__,
                  logger_level: int = logging.WARNING,
                  logger_filename: Optional[str] = None,
-                 persistent_attributes: List[str] = [],
-                 **kwargs):
+                 persistent_attributes: Sequence[str] = (),
+                 **kwargs: Any):
         # self._defaults = {}
 
         self.data_collector = data_collector.DataCollector(object=self)
@@ -73,7 +72,13 @@ class RLBase():
 
         self.set_params(**kwargs)
 
-    def stats(self, stats_list: Sequence) -> Dict[str, Any]:
+    @classmethod
+    def from_file(cls, filename: str, path: Optional[Union[pathlib.Path, str]] = None):
+        instance = cls()
+        instance.load(filename=filename, path=path)
+        return instance
+
+    def stats(self, stats_list: Sequence[str]) -> Dict[str, Any]:
         '''
         Compute statistics.
 
@@ -136,7 +141,7 @@ class RLBase():
         #         self.__dict__[f'_{key}'] = value
         self.set_params(**params)
 
-    def load(self, filename: str, path: Optional[str] = None) -> None:
+    def load(self, filename: str, path: Optional[Union[str, pathlib.Path]] = None) -> None:
         '''
         Load an object from a file.
 
@@ -150,12 +155,12 @@ class RLBase():
 
         with open(_path / f'{filename}.pkl', 'rb') as f:
             try:
-                data = dill.load(f)
+                data = dill.load(f)  #type: ignore
             except EOFError:
                 try:
                     self._logger.info(f'First attempt failed to load {_path / f"{filename}.pkl"}.')
                     time.sleep(1)
-                    data = dill.load(f)
+                    data = dill.load(f)  #type: ignore
                 except EOFError:
                     self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
                     raise RuntimeError(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
@@ -175,11 +180,11 @@ class RLBase():
             if self._logger_filename is not None:
                 self._logger.addHandler(logging.FileHandler(self._logger_filename))
 
-            self.data_collector._object = self
+            self.data_collector.object = self
 
     def save(self,
              filename: Optional[str] = None,
-             path: Optional[str] = None,
+             path: Optional[Union[str, pathlib.Path]] = None,
              data_to_save: Optional[Sequence[str]] = None) -> Tuple[pathlib.Path, str]:
         '''
         Save the object to a file.
@@ -191,7 +196,7 @@ class RLBase():
             data: what to save (Default: saves everything)
         '''
 
-        _filename: str = filename if filename is not None else self._name
+        _filename = filename if filename is not None else self._name
         _path: pathlib.Path = pathlib.Path(path if path is not None else self._path)
 
         if data_to_save is None:
@@ -208,9 +213,13 @@ class RLBase():
         if '_logger' in data:
             data.pop('_logger')
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
-            dill.dump(data, f, dill.HIGHEST_PROTOCOL)
+            dill.dump(data, f, dill.HIGHEST_PROTOCOL)  # type: ignore
 
-        return _path, _filename
+        return _path, _filename  # type: ignore
+
+    @staticmethod
+    def get_argument(x: Any, y: Any) -> Any:
+        return x if x is not None else y
 
     def _report(self, **kwargs: Any) -> Any:
         '''

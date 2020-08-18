@@ -15,16 +15,15 @@ from pathlib import Path
 from random import choice, random
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-import numpy as np
-import tensorflow as tf
-from dill import HIGHEST_PROTOCOL, dump, load
-from tensorflow import keras
+import numpy as np  # type: ignore
+import tensorflow as tf  # type: ignore
+from tensorflow import keras  # type: ignore
 
-from ..rldata import RLData
-from .agent import Agent
+from rl import rldata
+from rl import agents
 
 
-class DQNAgent(Agent):
+class DQNAgent(agents.Agent):
     '''
     A Q-learning agent with deep neural network Q-function approximator.
 
@@ -51,10 +50,8 @@ class DQNAgent(Agent):
     '''
 
     def __init__(self,
-                 filename: Optional[str] = None,
-                 path: Optional[Union[str, Path]] = None,
-                 gamma: float = 1.0, epsilon: Union[Callable, float] = 0.0,
-                 default_actions: Sequence[RLData] = [],
+                 gamma: float = 1.0, epsilon: Union[Callable[[int], float], float] = 0.0,
+                 default_actions: Sequence[rldata.RLData] = [],
                  lr_initial: float = 1e-3,
                  lr_scheduler: Callable[[int, float], float] = lambda epoch, lr: lr,
                  hidden_layer_sizes: Sequence[int] = (1,),
@@ -65,11 +62,11 @@ class DQNAgent(Agent):
                  validation_split: float = 0.3,
                  clear_buffer: bool = False,
                  tensorboard_path: Optional[Union[str, Path]] = None,
-                 name: str = 'DQN_agent',
-                 version: float = 0.5,
                  ex_protocol_current: Dict[str, str] = {'mode': 'training'},
-                 ex_protocol_options: Dict[str, List[str]] = {'mode': ['training', 'test']},
+                 ex_protocol_options: Dict[str, Sequence[str]] = {'mode': ['training', 'test']},
                  stats_list: Sequence[str] = [],
+                 name: str = __name__,
+                 path: Optional[Union[str, Path]] = None,
                  logger_name: str = __name__,
                  logger_level: int = WARNING,
                  logger_filename: Optional[str] = None,
@@ -78,15 +75,7 @@ class DQNAgent(Agent):
         Initialize a Q-Learning agent with deep neural network Q-function approximator.
         '''
 
-        if filename is not None:
-            if path is not None:
-                self.load(filename=filename, path=path)
-            else:
-                self.load(filename=filename)
-            return
-
         super().__init__(name=name,
-                         version=version,
                          path=path,
                          ex_protocol_current=ex_protocol_current,
                          ex_protocol_options=ex_protocol_options,
@@ -105,10 +94,6 @@ class DQNAgent(Agent):
         self._lr_scheduler = lr_scheduler
 
         self._hidden_layer_sizes = hidden_layer_sizes
-
-        if input_length is None:
-            raise ValueError('input_length is not specified.')
-        self._input_length = input_length
 
         if method not in ('backward', 'forward'):
             self._logger.warning(f'method {method} is not acceptable. Should be either "forward" or "backward". Will use "backward".')
@@ -131,7 +116,10 @@ class DQNAgent(Agent):
 
         self._training_x = deque([0.0]*self._buffer_size)
         self._training_y = deque([0.0]*self._buffer_size)
-        self._generate_network()
+
+        if input_length is not None:
+            self._input_length = input_length
+            self._generate_network()
 
         self._epoch = 0
         self._buffer_index = -1
@@ -169,7 +157,7 @@ class DQNAgent(Agent):
                 self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(self._lr_scheduler, verbose=1)
                 self._callbacks.append(self._learning_rate_scheduler)
 
-    def _q(self, state: Union[List[RLData], RLData], action: Optional[Union[List[RLData], RLData]] = None) -> float:
+    def _q(self, state: Union[List[rldata.RLData], rldata.RLData], action: Optional[Union[List[rldata.RLData], rldata.RLData]] = None) -> float:
         '''
         Return the Q-value of a state action pair.
 
@@ -178,7 +166,7 @@ class DQNAgent(Agent):
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned. 'None' uses default_actions.
         '''
-        if isinstance(state, RLData):
+        if isinstance(state, rldata.RLData):
             state = [state]
         state_list = [s.normalized.flatten() for s in state]
         len_state = len(state)
@@ -186,7 +174,7 @@ class DQNAgent(Agent):
         if action is None:
             action_list = self._normalized_action_list
         else:
-            if isinstance(action, RLData):
+            if isinstance(action, rldata.RLData):
                 action = [action]
             action_list = [a.normalized.flatten() for a in action]
         len_action = len(action_list)
@@ -205,7 +193,7 @@ class DQNAgent(Agent):
                 result = self._model.predict(X)
         return result
 
-    def _max_q(self, state: Union[List[RLData], RLData]) -> float:
+    def _max_q(self, state: Union[List[rldata.RLData], rldata.RLData]) -> float:
         '''
         Return MAX(Q) of a state.
 
@@ -294,7 +282,7 @@ class DQNAgent(Agent):
         except KeyError:
             raise RuntimeError('DQNAgent only works using \'history\'')
 
-    def act(self, state: RLData, actions: Optional[List[RLData]] = None, episode: Optional[int] = 0) -> RLData:
+    def act(self, state: rldata.RLData, actions: Optional[List[rldata.RLData]] = None, episode: Optional[int] = 0) -> rldata.RLData:
         '''
         return the best action for a given state.
 
@@ -335,7 +323,7 @@ class DQNAgent(Agent):
 
         Raises ValueError if the filename is not specified.
         '''
-        Agent.load(self, filename, path)
+        super().load(filename, path)
 
         # To resolve a compatibility issue
         if not hasattr(self, '_normalized_action_list'):
@@ -365,7 +353,7 @@ class DQNAgent(Agent):
 
         pickle_data = tuple(key for key in self.__dict__ if key not in [
                             '_graph', '_session', '_model', '_tensorboard', '_learning_rate_scheduler', 'data_collector'])
-        _path, filename = Agent.save(self, filename, path, data_to_save=pickle_data)
+        _path, filename = super().save(filename, path, data_to_save=pickle_data)
         try:
             with self._session.as_default():
                 with self._graph.as_default():

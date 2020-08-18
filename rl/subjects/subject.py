@@ -8,7 +8,7 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, Optional, Sequence
 
 from rl import rlbase, rldata
 
@@ -31,10 +31,9 @@ class Subject(rlbase.RLBase):
     '''
 
     def __init__(self,
-                 agent_list: Dict[str, "Subject"] = {},
                  ex_protocol_current: Dict[str, str] = {'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
-                 ex_protocol_options: Dict[str, List[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
-                 **kwargs):
+                 ex_protocol_options: Dict[str, Sequence[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+                 **kwargs: Any):
 
         kwargs['name'] = kwargs.get('name', __name__)
         kwargs['logger_name'] = kwargs.get('logger_name', __name__)
@@ -43,7 +42,7 @@ class Subject(rlbase.RLBase):
                          ex_protocol_options=ex_protocol_options,
                          **kwargs)
 
-        self._agent_list = agent_list
+        self._agent_list: Dict[str, int] = {}
 
     @property
     def state(self) -> rldata.RLData:
@@ -61,8 +60,8 @@ class Subject(rlbase.RLBase):
         raise NotImplementedError
 
     @property
-    def possible_actions(self) -> List[rldata.RLData]:
-        pass
+    def possible_actions(self) -> Sequence[rldata.RLData]:
+        return [rldata.RLData({'default_action': {'value': None}})]
 
     def register(self, agent_name: str) -> int:
         '''
@@ -89,7 +88,7 @@ class Subject(rlbase.RLBase):
         '''
         self._agent_list.pop(agent_name)
 
-    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> float:
+    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> rldata.RLData:
         raise NotImplementedError
 
     def reset(self) -> None:

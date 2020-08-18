@@ -8,7 +8,8 @@ This `iterable subject` class takes any `subject` object and returns an iterator
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from typing import List, Optional, Tuple, Union
+import pathlib
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import rl.subjects as rlsubjects
 from rl import rlbase, rldata
@@ -37,17 +38,18 @@ class IterableSubject(rlbase.RLBase):
     '''
 
     def __init__(self,
-                 subject: rlsubjects.Subject,
+                 subject: rlsubjects.Subject = rlsubjects.Subject(),
                  save_instances: bool = False,
                  use_existing_instances: bool = True,
-                 save_path: str = '',
+                 save_path: Union[pathlib.Path, str] = '',
                  save_prefix: str = '',
                  instance_counter_start: int = 0,
                  instance_counter: int = -1,
-                 instance_counter_end: Union[int, list] = -1,  # -1: infinite
+                 # -1: infinite
+                 instance_counter_end: Union[int, List[int]] = -1,
                  end_index: int = 0,
                  auto_rewind: bool = False,
-                 **kwargs) -> None:
+                 **kwargs: Any) -> None:
 
         self._subject = subject
         self._agent_list = {}
@@ -57,25 +59,20 @@ class IterableSubject(rlbase.RLBase):
         self._save_prefix = save_prefix
         self._instance_counter_start = instance_counter_start
         self._instance_counter = instance_counter
-        self._instance_counter_end = instance_counter_end
         self._end_index = end_index
         self._auto_rewind = auto_rewind
 
         super().__init__(**kwargs)
 
-        if isinstance(self._instance_counter_end, int):
-            self._instance_counter_end = [self._instance_counter_end]
+        if isinstance(instance_counter_end, int):
+            self._instance_counter_end = [instance_counter_end]
+        else:
+            self._instance_counter_end = instance_counter_end
 
         if self._instance_counter_end[0] == -1:
-            self._stop_check = lambda current, end: False
+            self._stop_check: Callable[[int, int], bool] = lambda current, end: False
         else:
-            self._stop_check = lambda current, end: current > end
-
-    @classmethod
-    def from_file(cls, filename: str, path: Optional[str] = None):
-        instance = cls(None)
-        instance.load(filename=filename, path=path)
-        return instance
+            self._stop_check: Callable[[int, int], bool] = lambda current, end: current > end
 
     def __iter__(self):
         return self
@@ -126,7 +123,7 @@ class IterableSubject(rlbase.RLBase):
         return self._subject.is_terminated
 
     @property
-    def possible_actions(self) -> List[rldata.RLData]:
+    def possible_actions(self) -> Sequence[rldata.RLData]:
         return self._subject.possible_actions
 
     def take_effect(self, action: rldata.RLData, _id: Optional[int] = None):
@@ -163,7 +160,7 @@ class IterableSubject(rlbase.RLBase):
             self._agent_list[agent_name] = _id
             return _id
 
-    def deregister(self, agent_name: str) -> int:
+    def deregister(self, agent_name: str) -> None:
         '''
         Deegisters an agent given its name.
         \nArguments:

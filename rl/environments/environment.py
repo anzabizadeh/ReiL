@@ -11,10 +11,11 @@ This `environment` class provides a learning environment for any reinforcement l
 import functools
 import pathlib
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from rl.subjects.subject import Subject
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from rl import agents as rlagents
-from rl import rlbase
+from rl import rlbase, rldata
 from rl import subjects as rlsubjects
 
 AgentSubjectTuple = Tuple[str, str]
@@ -43,25 +44,21 @@ class Environment(rlbase.RLBase):
     '''
 
     def __init__(self,
-                 filename: Optional[str] = None,
-                 path: Optional[str] = None,
                  agents: Optional[Dict[str, rlagents.Agent]] = None,
                  subjects: Optional[Dict[str, rlsubjects.Subject]] = None,
-                 assignment_list: Optional[Dict[AgentSubjectTuple, int]] = None,
+                 assignment_list: Optional[Sequence[AgentSubjectTuple]] = None,
                  episodes: int = 1,
                  max_steps: int = 10000,
                  termination: str = 'any',
                  reset: str = 'any',
                  learning_batch_size: int = -1,
                  learning_method: str = 'every step',
-                 **kwargs):
+                 **kwargs: Any):
         '''
         Create a new environment.
 
         Arguments
         ---------
-            filename: if given, Environment attempts to open a saved environment by openning the file. This argument cannot be used along other arguments.
-            path: path of the file to be loaded (should be used with filename)
             name: the name of the environment
             episodes: number of episodes of run. (Default = 1)
             termination: when to terminate one episode. (Default = 'any')
@@ -74,19 +71,13 @@ class Environment(rlbase.RLBase):
                 'every step': learn after every move.
                 'history': learn after each episode.
         '''
-
-        if filename is not None:
-            self.load(filename=filename, path=path)
-            return
-
         super().__init__(name=kwargs.get('name', __name__),
                          logger_name=kwargs.get('logger_name', __name__),
                          **kwargs)
 
-        self._agents = agents if agents is not None else {}
-        self._subjects = subjects if subjects is not None else {}
-        self._assignment_list = assignment_list if assignment_list is not None else {}
-
+        self._agents = {}
+        self._subjects = {}
+        self._assignment_list = {}
         self._episodes = episodes
         self._total_experienced_episodes = {}
         self._max_steps = max_steps
@@ -94,6 +85,14 @@ class Environment(rlbase.RLBase):
         self._reset = reset
         self._learning_batch_size = learning_batch_size
         self._learning_method = learning_method
+
+        if agents is not None:
+            self.add(agents=agents)
+        if subjects is not None:
+            self.add(subjects=subjects)
+        if assignment_list is not None:
+            self.assign(assignment_list)
+
 
     def add(self,
             agents: Optional[Dict[str, rlagents.Agent]] = None,
@@ -124,8 +123,8 @@ class Environment(rlbase.RLBase):
         #     pass
 
     def remove(self,
-               agents: Optional[Dict[str, rlagents.Agent]] = None,
-               subjects: Optional[Dict[str, rlsubjects.Subject]] = None) -> None:
+               agents: Optional[List[str]] = None,
+               subjects: Optional[List[str]] = None) -> None:
         '''
         Remove agents or subjects from the environment.
 
@@ -150,7 +149,7 @@ class Environment(rlbase.RLBase):
                 except KeyError:
                     raise KeyError(f'Subject {name} not found!')
 
-    def assign(self, agent_subject_names: List[AgentSubjectTuple]) -> None:
+    def assign(self, agent_subject_names: Sequence[AgentSubjectTuple]) -> None:
         '''
         Assign agents to subjects.
 
@@ -235,25 +234,29 @@ class Environment(rlbase.RLBase):
                 'yes': counts the average number of steps in each episode.
                 'no': doesn't count.
         '''
-        def get_argument(x, y): return x if x is not None else y
-        _episodes = get_argument(episodes, self._episodes)
-        _max_steps = get_argument(max_steps, self._max_steps)
-        if get_argument(termination, self._termination).lower() == 'all':
-            def termination_func(x, y): return x & y.is_terminated
-            list_of_subjects = [True] + list(self._subjects.values())
+        _episodes = self.get_argument(episodes, self._episodes)
+        _max_steps = self.get_argument(max_steps, self._max_steps)
+        if self.get_argument(termination, self._termination).lower() == 'all':
+            def termination_func(x: bool, y: rlsubjects.Subject) -> bool:
+                return x & y.is_terminated
+            list_of_subjects: List[Subject] = list(self._subjects.values())
+            reduce_initial_val = True
+
         else:
-            def termination_func(x, y): return x | y.is_terminated
-            list_of_subjects = [False] + list(self._subjects.values())
+            def termination_func(x: bool, y: rlsubjects.Subject) -> bool:
+                return x | y.is_terminated
+            list_of_subjects: List[Subject] = list(self._subjects.values())
+            reduce_initial_val = False
 
-        _reset = get_argument(reset, self._reset).lower()
-        _learning_method = get_argument(
+        _reset = self.get_argument(reset, self._reset).lower()
+        _learning_method = self.get_argument(
             learning_method, self._learning_method).lower()
-        _reporting = get_argument(reporting, 'none').lower()
+        _reporting = self.get_argument(reporting, 'none').lower()
 
-        _tally = get_argument(tally, 'no').lower() == 'yes'
-        win_count = dict((agent, 0) for agent in self._agents)
+        _tally = self.get_argument(tally, 'no').lower() == 'yes'
+        win_count: Dict[str, int] = dict((agent, 0) for agent in self._agents)
 
-        _step_count = get_argument(step_count, 'no').lower() == 'yes'
+        _step_count = self.get_argument(step_count, 'no').lower() == 'yes'
 
         if _learning_method == 'none':
             for agent in self._agents.values():
@@ -268,7 +271,7 @@ class Environment(rlbase.RLBase):
             if _reporting != 'none':
                 report_string = f'episode: {episode + 1}'
             # history = dict((agent_name, []) for agent_name in self._agents)
-            history = defaultdict(list)
+            history: Dict[str, List[Dict[str, rldata.RLData]]] = defaultdict(list)
             done = False
             stopping_criterion = _max_steps * (episode + 1)
             while not done:
@@ -291,22 +294,23 @@ class Environment(rlbase.RLBase):
                                     f'step: {steps: 4} episode: {episode:2} state: {state} action: {action} by:{agent_name}')
 
                             history[agent_name].append(
-                                {'state': state, 'action': action, 'reward': action})
+                                {'state': state, 'action': action, 'reward': reward})
 
                             if subject.is_terminated:
-                                win_count[agent_name] += int(reward > 0)
+                                win_count[agent_name] += int(reward[0].value > 0)
                                 for affected_agent in self._agents:
                                     if (self._assignment_list[affected_agent][0] == subject_name) & \
                                             (affected_agent != agent_name):
                                         history[affected_agent][-1]['reward'] = -reward
 
-                    done = functools.reduce(termination_func, list_of_subjects)
+                    done = functools.reduce(termination_func, list_of_subjects, reduce_initial_val)
 
                 if _learning_method == 'every step':
-                    for agent_name, agent in self._agents.items():
-                        agent.learn(state=self._subjects[self._assignment_list[agent_name][0]].state,
-                                    reward=history[agent_name][-1]['reward'])
-                        history[agent_name] = []
+                    raise NotImplemented
+                    # for agent_name, agent in self._agents.items():
+                    #     agent.learn(state=self._subjects[self._assignment_list[agent_name][0]].state,
+                    #                 reward=history[agent_name][-1]['reward'])
+                    #     history[agent_name] = []
 
             if _learning_method == 'history':
                 for agent_name, agent in self._agents.items():
@@ -343,13 +347,13 @@ class Environment(rlbase.RLBase):
 
     def elapse_iterable(self,
                         max_steps: Optional[int] = None,
-                        training_mode: Optional[Dict[AgentSubjectTuple, bool]] = None,
-                        reset: Optional[str] = None,
-                        return_output: Optional[Dict[AgentSubjectTuple, bool]] = None,
-                        stats: Optional[Dict[AgentSubjectTuple, Sequence]] = None,
+                        test_mode: Sequence[AgentSubjectTuple] = (),
+                        reset: str = 'any',
+                        return_output: Sequence[AgentSubjectTuple] = (),
+                        stats: Optional[Dict[AgentSubjectTuple, Sequence[str]]] = None,
                         stats_func: Optional[Dict[AgentSubjectTuple,
-                                                  Callable]] = None
-                        ) -> Tuple[Dict[str, list], Dict[str, list]]:
+                                                  Callable[[Any], Any]]] = None
+                        ) -> Tuple[Dict[AgentSubjectTuple, List[Any]], Dict[AgentSubjectTuple, List[Any]]]:
         '''
         Move forward in time until IterableSubject is consumed.
 
@@ -364,19 +368,28 @@ class Environment(rlbase.RLBase):
             stats: a dictionary that contains stats for each agent-subject pair
             stats_func: a dictionary that contains functions to calculate stats.
         '''
-        def get_argument(x, y): return x if x is not None else y
 
-        _max_steps = get_argument(max_steps, self._max_steps)
-        _training_mode = get_argument(training_mode, defaultdict(lambda: True))
-        _reset = get_argument(reset, self._reset).lower()
+        _max_steps = self.get_argument(max_steps, self._max_steps)
+        _training_mode = defaultdict(lambda: True)
+        for a_s_tuple in test_mode:
+            _training_mode[a_s_tuple] = False
 
-        _return_output = get_argument(return_output, defaultdict(bool))
-        _stats = get_argument(stats, defaultdict(list))
+        if reset.lower() not in ('any', 'all'):
+            self._logger.warning(f'reset argument should be either "any" or "all". Received {reset}. "any" is assumed.')
+            _reset = 'any'
+        else:
+            _reset = reset.lower()
+
+        _return_output = defaultdict(bool)
+        for a_s_tuple in return_output:
+            _return_output[a_s_tuple] = True
+
+        _stats = self.get_argument(stats, defaultdict(list))
 
         if stats_func is None and stats is not None:
             self._logger.exception('stats are provided, but no stats_func is provided.')
             raise ValueError('stats are provided, but no stats_func is provided.')
-        temp = get_argument(stats_func, lambda _: None)
+        temp = self.get_argument(stats_func, lambda _: None)
         if isinstance(temp, Callable):
             _stats_func = dict((agent_subject_tuple, temp) for agent_subject_tuple in self._assignment_list)
         else:
@@ -388,8 +401,10 @@ class Environment(rlbase.RLBase):
         stats_final = defaultdict(list)
 
         for subject_name, subject in self._subjects.items():
-            assigned_agents = list(
-                (k[0], v) for k, v in self._assignment_list.items() if k[1] == subject_name)
+            assigned_agents = list((k[0], v)
+                for k, v in self._assignment_list.items()
+                if k[1] == subject_name)
+
             if assigned_agents == []:
                 continue
 
@@ -397,7 +412,7 @@ class Environment(rlbase.RLBase):
                 self._agents[agent_name].training_mode = _training_mode[(
                     agent_name, subject_name)]
 
-            history = defaultdict(list)
+            history: Dict[str, List[Dict[str, rldata.RLData]]] = defaultdict(list)
             for instance_id, subject_instance in subject:
                 steps = 0
                 # for agent_name, _ in assigned_agents:
@@ -432,7 +447,7 @@ class Environment(rlbase.RLBase):
                                         (affected_agent != agent_name):
                                     history[affected_agent][-1]['reward'] = -reward
 
-                        if training_mode[(agent_name, subject_name)] \
+                        if _training_mode[(agent_name, subject_name)] \
                                 and self._learning_batch_size != -1 \
                                 and len(history[agent_name]) >= self._learning_batch_size:
                             agent.learn(history=history[agent_name])
@@ -440,7 +455,7 @@ class Environment(rlbase.RLBase):
 
                 for agent_name, _ in assigned_agents:
                     agent_subject_tuple = (agent_name, subject_name)
-                    if training_mode[agent_subject_tuple]:
+                    if _training_mode[agent_subject_tuple]:
                         self._total_experienced_episodes[agent_subject_tuple] += 1
 
                         if self._learning_batch_size == -1:
@@ -475,8 +490,7 @@ class Environment(rlbase.RLBase):
                 if _return_output[agent_subject_tuple]:
                     output[agent_subject_tuple].append(history[agent_name])
 
-                # TODO: check if this condition is necessary!
-                if _stats.get(agent_subject_tuple, []) != []:
+                if _stats.get(agent_subject_tuple, []):
                     result = _stats_func[agent_subject_tuple](agent_stats=stats_agents.get(agent_subject_tuple, None),
                                                              subject_stats=stats_subjects.get(agent_subject_tuple, None))
                     stats_final[agent_subject_tuple].append(result)
@@ -484,7 +498,7 @@ class Environment(rlbase.RLBase):
         return stats_final, output
 
     # TODO: Make arguments explicit + type annotation
-    def trajectory(self, **kwargs):
+    def trajectory(self, **kwargs: Any):
         '''
         Extract (state, action, reward) trajectory.
 
@@ -500,11 +514,15 @@ class Environment(rlbase.RLBase):
         max_steps = kwargs.get('max_steps', self._max_steps)
 
         if kwargs.get('termination', self._termination).lower() == 'all':
-            def termination_func(x, y): return x & y.is_terminated
-            list_of_subjects = [True] + list(self._subjects.values())
+            def termination_func(x: bool, y: rlsubjects.Subject) -> bool:
+                return x & y.is_terminated
+            list_of_subjects = list(self._subjects.values())
+            reduce_initial_val = True
         else:
-            def termination_func(x, y): return x | y.is_terminated
-            list_of_subjects = [False] + list(self._subjects.values())
+            def termination_func(x: bool, y: rlsubjects.Subject) -> bool:
+                return x | y.is_terminated
+            list_of_subjects = list(self._subjects.values())
+            reduce_initial_val = False
 
         for agent in self._agents.values():
             agent.training_mode = False
@@ -542,7 +560,7 @@ class Environment(rlbase.RLBase):
                                     history[(affected_agent, subject)
                                             ][-1]['reward'] = -reward
 
-                done = functools.reduce(termination_func, list_of_subjects)
+                done = functools.reduce(termination_func, list_of_subjects, reduce_initial_val)
 
         for sub in self._subjects.values():
             sub.reset()
@@ -550,9 +568,9 @@ class Environment(rlbase.RLBase):
         return history
 
     def load(self,
-             object_name: Optional[List[str]] = 'all',
+             object_name: Union[List[str], str] = 'all',
              filename: Optional[str] = None,
-             path: Optional[str] = None) -> None:
+             path: Optional[Union[pathlib.Path, str]] = None) -> None:
         '''
         Load an object or an environment from a file.
         Arguments
@@ -561,23 +579,21 @@ class Environment(rlbase.RLBase):
             object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. (Default = 'all')
         Raises ValueError if the filename is not specified.
         '''
-        _filename = filename if filename is not None else self._name
+        _filename: str = self.get_argument(filename, self._name)
         _path = pathlib.Path(path if path is not None else self._path)
 
         if object_name == 'all':
             super().load(filename=_filename, path=_path)
-            self._agents = {}
-            self._subjects = {}
-            for name, obj_type in self._env_data['agents']:
-                self._agents[name] = obj_type()
-                self._agents[name].load(
+            self._agents: Dict[str, rlagents.Agent] = {}
+            self._subjects: Dict[str, rlsubjects.Subject] = {}
+            for name, obj_type in self._env_data['agents']:  # type: ignore
+                self._agents[name] = obj_type.from_file(  # type: ignore
                     path=(_path / f'{_filename}.data'), filename=name)
-            for name, obj_type in self._env_data['subjects']:
-                self._subjects[name] = obj_type()
-                self._subjects[name].load(
+            for name, obj_type in self._env_data['subjects']:  # type: ignore
+                self._subjects[name] = obj_type.from_file(  # type: ignore
                     path=(_path / f'{_filename}.data'), filename=name)
 
-            del self._env_data
+            del self._env_data  # type: ignore
 
         else:
             for obj in object_name:
@@ -591,9 +607,9 @@ class Environment(rlbase.RLBase):
                     self._subjects[obj].reset()
 
     def save(self,
-             object_name: Optional[List[str]] = 'all',
              filename: Optional[str] = None,
-             path: Optional[str] = None) -> Tuple[pathlib.Path, str]:
+             path: Optional[Union[pathlib.Path, str]] = None,
+             data_to_save: Union[List[str], str] = 'all') -> Tuple[pathlib.Path, str]:
         '''
         Save an object or the environment to a file.
         Arguments
@@ -603,11 +619,11 @@ class Environment(rlbase.RLBase):
             object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. (Default = 'all')
         Raises ValueError if the filename is not specified.
         '''
-        _filename = filename if filename is not None else self._name
+        _filename = self.get_argument(filename, self._name)
         _path = pathlib.Path(path if path is not None else self._path)
 
-        if object_name == 'all':
-            self._env_data = defaultdict(list)
+        if data_to_save == 'all':
+            self._env_data: Dict[str, List[Any]] = defaultdict(list)
 
             for name, agent in self._agents.items():
                 _, fn = agent.save(
@@ -620,14 +636,12 @@ class Environment(rlbase.RLBase):
                 self._env_data['subjects'].append((fn, type(subject)))
 
             super().save(filename=_filename, path=_path,
-                         data_to_save=['_env_data', '_episodes', '_max_steps',
-                                       '_termination', '_reset',
-                                       '_learning_method', '_assignment_list',
-                                       '_total_experienced_episodes'])
+                         data_to_save=[v for v in self.__dict__
+                            if v not in ('_agents', '_subjects', 'data_collector')])
 
             del self._env_data
         else:
-            for obj in object_name:
+            for obj in data_to_save:
                 if obj in self._agents:
                     self._agents[obj].save(
                         path=_path / f'{_filename}.data', filename=obj)

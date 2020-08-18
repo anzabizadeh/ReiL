@@ -8,7 +8,8 @@ This `agent` class is the super class of all agent classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from typing import Dict, List, Optional
+from rl import rldata
+from typing import Any, Dict, Optional, Sequence
 
 from rl import rlbase
 
@@ -30,18 +31,20 @@ class Agent(rlbase.RLBase):
 
     def __init__(self,
                  ex_protocol_current: Dict[str, str] = {'mode': 'training'},
-                 ex_protocol_options: Dict[str, List[str]] = {'mode': ['training', 'test']},
-                 **kwargs):
+                 ex_protocol_options: Dict[str, Sequence[str]] = {'mode': ['training', 'test']},
+                 **kwargs: Any):
 
         kwargs['name'] = kwargs.get('name', __name__)
         kwargs['logger_name'] = kwargs.get('logger_name', __name__)
+
+        self.training_mode: bool = kwargs.get('training_mode', False)
 
         super().__init__(ex_protocol_current=ex_protocol_current,
                          ex_protocol_options=ex_protocol_options,
                          **kwargs)
 
     @property
-    def status(self):
+    def status(self) -> str:
         '''Return the status of the agent as 'training' or 'test'.'''
         if self.training_mode:
             return 'training'
@@ -49,13 +52,16 @@ class Agent(rlbase.RLBase):
             return 'test'
 
     @status.setter
-    def status(self, value):
+    def status(self, value: str) -> None:
         '''
         Set the status of the agent as 'training' or 'test'.
         '''
         self.training_mode = (value == 'training')
 
-    def act(self, state, **kwargs):
+    def act(self,
+        state: rldata.RLData,
+        actions: Optional[Sequence[rldata.RLData]] = None,
+        episode: Optional[int] = 0) -> rldata.RLData:
         '''
         Return an action based on the given state.
 
@@ -66,10 +72,10 @@ class Agent(rlbase.RLBase):
 
         Note: If state is 'training' (_training_flag=false), then this function should not return any random move due to exploration.
         '''
-        pass
+        return rldata.RLData({'reward': {'value': 0.0}})
 
-    def learn(self, observation: Optional[rlbase.Observation] = None,
-              history: Optional[rlbase.History] = None):
+    def learn(self, history: Optional[rlbase.History] = None,
+        observation: Optional[rlbase.Observation] = None) -> None:
         '''Learn using either history or action, reward, and state.'''
         pass
 

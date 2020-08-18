@@ -4,52 +4,44 @@ import itertools
 import operator
 from collections.abc import MutableSequence
 from numbers import Number
-from typing import (Any, Callable, Dict, Generator, Iterable, Iterator, List,
-                    Mapping, Optional, Sequence, Type, Union)
+from typing import (Any, Callable, Dict, Generator, Iterable, List,
+                    Mapping, Optional, Sequence, Tuple, Union)
 
 
 class BaseRLData:
-    __slots__ = ['_name', '_value', '_categorical',
-                 '_normalized', '_normalizer', '_lazy']
+    __slots__ = ['name', '_value', '_categorical',
+                 '_normalized', '_normalizer', '_lazy_evaluation']
 
     def __init__(self,
                  name: str,
                  value: Any,
                  categorical: bool,
-                 normalizer: Callable[["BaseRLData"], Union[Number, Sequence[Number]]],
+                 normalizer: Callable[[BaseRLData], Union[Number, Sequence[Number], None]],
                  lazy_evaluation: bool):
-        self._name = name
+        self.name = name
         self._value = value
         self._categorical = categorical
         self._normalizer = normalizer
-        self._lazy = lazy_evaluation
+        self._lazy_evaluation = lazy_evaluation
         self._normalize()
 
     def _normalize(self):
-        if self._lazy:
+        if self._lazy_evaluation:
             self._normalized = None
         else:
             self._normalized = self._normalizer(self)
 
     @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        self._name = name
-
-    @property
-    def value(self):
+    def value(self) -> Any:
         return self._value
 
     @value.setter
-    def value(self, v):
+    def value(self, v: Any):
         self._value = v
         self._normalize()
 
     @property
-    def categorical(self):
+    def categorical(self) -> bool:
         return self._categorical
 
     @property
@@ -57,7 +49,7 @@ class BaseRLData:
         return self._normalizer
 
     @normalizer.setter
-    def normalizer(self, func):
+    def normalizer(self, func: Callable[[BaseRLData], Union[Number, Sequence[Number], None]]):
         if callable(func):
             self._normalizer = func
             self._normalize()
@@ -65,21 +57,13 @@ class BaseRLData:
             raise TypeError('Callable argument expected.')
 
     @property
-    def lazy(self):
-        return self._lazy
-
-    @lazy.setter
-    def lazy(self, lazy):
-        self._lazy = lazy
-        self._normalize()
-
-    @property
-    def lazy_evaluation(self):
-        return self._lazy
+    def lazy_evaluation(self) -> bool:
+        return self._lazy_evaluation
 
     @lazy_evaluation.setter
-    def lazy_evaluation(self, lazy):
-        self.lazy = lazy
+    def lazy_evaluation(self, lazy_evaluation: bool):
+        self._lazy_evaluation = lazy_evaluation
+        self._normalize()
 
     @property
     def normalized(self):
@@ -88,7 +72,7 @@ class BaseRLData:
 
         return self._normalized
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> Dict[str, Any]:
         return {'name': self.name, 'value': self.value}
 
     def __str__(self) -> str:
@@ -101,8 +85,8 @@ class CategoricalData(BaseRLData):
     def __init__(self,
                  name: str,
                  value: Any,
-                 categories: Sequence,
-                 normalizer: Optional[Callable[["BaseRLData"], Union[Number, Sequence[Number]]]] = None,
+                 categories: Sequence[Any],
+                 normalizer: Optional[Callable[[CategoricalData], Union[Number, Sequence[Number], None]]] = None,
                  lazy_evaluation: bool = False):
 
         super().__init__(name=name,
@@ -115,7 +99,7 @@ class CategoricalData(BaseRLData):
         self.lazy_evaluation = lazy_evaluation
 
     @staticmethod
-    def _default_normalizer(x):
+    def _default_normalizer(x: CategoricalData) -> Union[Number, Sequence[Number], None]:
         if x.categories is None:  # categories are not defined
             return None
 
@@ -125,11 +109,11 @@ class CategoricalData(BaseRLData):
             return list(int(x_i == v) for v in x.value for x_i in x.categories)
 
     @property
-    def categories(self):
+    def categories(self) -> Sequence[Any]:
         return self._categories
 
     @categories.setter
-    def categories(self, cat):
+    def categories(self, cat: Optional[Sequence[Any]]):
         if cat is None or self.value in (None, (), []):
             self._categories = cat
             self._normalized = None
@@ -163,7 +147,7 @@ class CategoricalData(BaseRLData):
         return temp_dict
 
     def __str__(self):
-        return f'{self._name}: {self._value} from {self._categories}'
+        return f'{self.name}: {self._value} from {self._categories}'
 
 
 class NumericalData(BaseRLData):
@@ -187,7 +171,7 @@ class NumericalData(BaseRLData):
         self.lazy_evaluation = lazy_evaluation
 
     @staticmethod
-    def _default_normalizer(x):
+    def _default_normalizer(x: NumericalData) -> Union[Number, Sequence[Number], None]:
         try:
             denominator = x.upper - x.lower
         except TypeError:  # upper or lower are not defined
@@ -202,7 +186,7 @@ class NumericalData(BaseRLData):
             return [1] * len*x.value if isinstance(x.value, (list, tuple)) else 1
 
     @staticmethod
-    def _check_new_bound(value: Union[Number, Sequence],
+    def _check_new_bound(value: Union[Number, Sequence[Number]],
                          new_bound: Number,
                          bound_type: str = 'lower'):
         if bound_type == 'lower':
@@ -304,7 +288,11 @@ class RangedData:
 
 
 class RLData(MutableSequence):
-    def __init__(self, data: Union[Mapping, Sequence], lazy_evaluation: Optional[bool] = None) -> None:
+    def __init__(self,
+        data: Union[Mapping[str, Any],
+                    Sequence[Union[Dict[str, Any], BaseRLData]],
+                    Generator[Any, Any, Any]],
+        lazy_evaluation: Optional[bool] = None) -> None:
         '''
         Create an RLData instance.
 
@@ -319,7 +307,7 @@ class RLData(MutableSequence):
         '''
         self._data = []
 
-        def _from_tuple(d: tuple):
+        def _from_tuple(d: Tuple[str, Mapping[str, Any]]) -> RangedData:
             return RangedData(
                     name=d[0],
                     value=d[1].get('value'),
@@ -333,7 +321,7 @@ class RLData(MutableSequence):
                         'lazy_evaluation': lazy_evaluation if lazy_evaluation is not None
                             else d[1].get('lazy_evaluation', True)})
 
-        def _from_dict(val: dict):
+        def _from_dict(val: Union[BaseRLData, Mapping[str, Any]]) -> RangedData:
             v = val.as_dict() if isinstance(val, BaseRLData) else val
 
             return RangedData(
@@ -358,12 +346,12 @@ class RLData(MutableSequence):
             else:
                 self._data.append(_from_dict(data))
 
-        elif isinstance(data, Generator):
+        elif isinstance(data, Generator):  # type: ignore
             for v in data:
                 if isinstance(v, Mapping):
-                    self._data.append(_from_dict(v))
+                    self._data.append(_from_dict(v))  # type: ignore
                 elif isinstance(v, tuple):
-                    self._data.append(_from_tuple(v))
+                    self._data.append(_from_tuple(v))  # type: ignore
                 else:
                     raise TypeError('Type is not recognized!')
         else:
@@ -423,69 +411,70 @@ class RLData(MutableSequence):
             raise ValueError(f'{value} is not on the list.')
 
     @property
-    def value(self):
+    def value(self) -> Dict[str, Any]:
         '''Returns a dictionary of (name, RangedData) form.'''
         return dict((v.name, v.value) for v in self._data)
 
     @value.setter
-    def value(self, v: dict):
+    def value(self, v: Dict[str, Any]):
         for key, val in v.items():
             self._data[self.index(key)].value = val
 
     @property
-    def lower(self):
+    def lower(self) -> Dict[str, Number]:
         return dict((v.name, v.lower) for v in self._data if hasattr(v, 'lower'))
 
     @lower.setter
-    def lower(self, value: dict) -> None:
+    def lower(self, value: Dict[str, Number]) -> None:
         for key, val in value.items():
             self._data[self.index(key)].lower = val
 
     @property
-    def upper(self):
+    def upper(self) -> Dict[str, Number]:
         return dict((v.name, v.upper) for v in self._data if hasattr(v, 'upper'))
 
     @upper.setter
-    def upper(self, value: dict) -> None:
+    def upper(self, value: Dict[str, Number]) -> None:
         for key, val in value.items():
             self._data[self.index(key)].upper = val
 
     @property
-    def categories(self):
+    def categories(self) -> Dict[str, Sequence[Any]]:
         return dict((v.name, v.categories) for v in self._data if hasattr(v, 'categories'))
 
     @categories.setter
-    def categories(self, value: dict) -> None:
+    def categories(self, value: Dict[str, Sequence[Any]]) -> None:
         for key, val in value.items():
             self._data[self.index(key)].categories = val
 
     @property
-    def categorical(self):
+    def categorical(self) -> Dict[str, Sequence[bool]]:
         return dict((v.name, v.categorical) for v in self._data)
 
     @property
-    def normalized(self):
+    def normalized(self) -> RLData:
         return RLData({'name': v.name, 'categorical': v.categorical,
                        'value': v.normalized, 'lower': 0, 'upper': 1, 'lazy_evaluation': True} for v in self._data)
 
-    def flatten(self) -> list:
-        def make_iterable(x):
+    def flatten(self) -> List[Any]:
+        def make_iterable(x: Any) -> Iterable[Any]:
             return x if isinstance(x, Iterable) else [x]
 
         return list(itertools.chain(*[make_iterable(sublist)
             for sublist in self.value.values()]))
 
-    def split(self) -> List[RLData]:  #, name_suffix: Optional[str] = None):
+    def split(self) -> Union[RLData, List[RLData]]:  #, name_suffix: Optional[str] = None):
         if len(self) == 1:
-            value_of_object = self.value
-            if isinstance(value_of_object, Sequence):
-                name = self._data[0].name
-                categorical = self._data[0].categorical
-                lower = self._data[0].lower if not self._data[0].categorical else None
-                upper = self._data[0].upper if not self._data[0].categorical else None
-                categories = self._data[0].categories if self._data[0].categorical else None
-                normalizer = self._data[0].normalizer
-                lazy_evaluation = self._data[0].lazy_evaluation
+            d = self._data[0]
+            if isinstance(d.value, Sequence):
+                val: Sequence[Any] = d.value
+                name = d.name
+                categorical = d.categorical
+                lower = d.lower if not d.categorical else None
+                upper = d.upper if not d.categorical else None
+                categories = d.categories if d.categorical else None
+                normalizer = d.normalizer
+                lazy_evaluation = d.lazy_evaluation
 
                 splitted_list = [RLData({
                         'name': name,
@@ -496,7 +485,7 @@ class RLData(MutableSequence):
                         'categories': categories,
                         'normalizer': normalizer,
                         'lazy_evaluation': lazy_evaluation})
-                        for v in value_of_object]
+                        for v in val]
 
             else:
                 splitted_list = RLData(self._data)
@@ -561,6 +550,12 @@ class RLData(MutableSequence):
 
         temp = {v.name: v.as_dict() for v in self._data}
         temp.update(new_dict)
+
+        return RLData(temp)
+
+    def __neg__(self) -> RLData:
+        temp = {v.name: v.as_dict() for v in self._data}
+        temp['value'] = -temp['value']
 
         return RLData(temp)
 
