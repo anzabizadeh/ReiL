@@ -1,21 +1,17 @@
 from setuptools import setup
 
-setup(name='rl',
+with open('README.md') as f:
+    readme = f.read()
+
+with open('LICENSE') as f:
+    license = f.read()
+
+setup(name='Reinforcement Learning',
       version='0.5',
       description='The reinforcement learning module for Python',
+      long_description=readme,
       url='https://research-git.uiowa.edu/sanzabizadeh/Reinforcement-Learning',
       author='Sadjad Anzabi Zadeh',
       author_email='sadjad-anzabizadeh@uiowa.edu',
-      license='CC BY-NC-SA 4.0',
-      packages=['rl'],
-      zip_safe=False)
-
-setup(name='hpc',
-      version='0.1',
-      description='Tools to work with HPC at the University of Iowa',
-      url='https://research-git.uiowa.edu/sanzabizadeh/HPC',
-      author='Sadjad Anzabi Zadeh',
-      author_email='sadjad-anzabizadeh@uiowa.edu',
-      license='CC BY-NC-SA 4.0',
-      packages=['hpc'],
-      zip_safe=False)
+      license=license,
+      packages=find_packages(exclude=('tests', 'docs'))

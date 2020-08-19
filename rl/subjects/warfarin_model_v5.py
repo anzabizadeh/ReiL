@@ -8,15 +8,14 @@ This `warfarin_model` class implements a two compartment PK/PD model for warfari
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-import collections
 import copy
 import numbers
 import os
 import pathlib
 import random
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-import numpy as np
+import numpy as np  # type: ignore
 from rl import rldata, subjects, utils
 
 
@@ -51,9 +50,9 @@ class WarfarinModel_v5(subjects.Subject):
                  dose_change_penalty_coef: float = 1.0,
                  dose_change_penalty_func: Callable[[Sequence[float]], float] =
                  lambda x: int(x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
-                 interval: Sequence[int] = [1],
+                 interval: Sequence[int] = (1,),
                  max_interval: Optional[int] = None,
-                 interval_max_dose: Union[Sequence[float], float] = [15.0],
+                 interval_max_dose: Union[Sequence[float], float] = (15.0,),
                  lookahead_duration: int = 0,
                  lookahead_penalty_coef: float = 0,
                  characteristics: Dict[str, Any] = {'age': 71, 'weight': 199.24, 'height': 66.78,
@@ -69,7 +68,7 @@ class WarfarinModel_v5(subjects.Subject):
                  patient_save_overwrite: bool = False,
                  patient_use_existing: bool = True,
                  patient_counter_start: int = 0,
-                 **kwargs):
+                 **kwargs: Any):
         '''
         Create a warfarin model.
         \nArguments:
@@ -122,7 +121,7 @@ class WarfarinModel_v5(subjects.Subject):
             'CYP2C9': ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
             'VKORC1': ('G/G', 'G/A', 'A/A')}
 
-        self._list_of_probabilities = {
+        self._list_of_probabilities: Dict[str, Sequence[float]] = {
             'age': (67.3, 14.43),  # lb  - Aurora population
             # in - Aurora population
             'weight': (199.24, 54.71),
@@ -161,15 +160,13 @@ class WarfarinModel_v5(subjects.Subject):
             self._logger.warning('Replaced zero-day intervals with 1.')
 
         self._max_interval = max_day if max_interval is None else max_interval
-        self._interval_max_dose = interval_max_dose
 
-        if isinstance(self._interval_max_dose, numbers.Number):
-            self._interval_max_dose = [
-                self._interval_max_dose] * len(self._interval)
-        elif len(self._interval_max_dose) == 1:
-            self._interval_max_dose = self._interval_max_dose * \
+        if not isinstance(interval_max_dose, Sequence):
+            self._interval_max_dose = [interval_max_dose] * len(self._interval)
+        elif len(interval_max_dose) == 1:
+            self._interval_max_dose = list(interval_max_dose) * \
                 len(self._interval)
-        elif len(self._interval_max_dose) != len(self._interval):
+        elif len(interval_max_dose) != len(self._interval):
             self._logger.warning(
                 'interval_max_dose does not match "interval" in length. max_dose will be used for intervals without interval_max_dose values.')
 
@@ -241,20 +238,24 @@ class WarfarinModel_v5(subjects.Subject):
                 for i in range(1, self._max_interval + 1))).split()  # TODO: needs a normalizer
 
     @property
-    def _INR_history(self):
+    def _INR_history(self) -> List[float]:
         # INR has one more value (initial INR) compared to dose.
-        return [0]*(self._INR_history_length - self._decision_points_index) \
+        return [0.0]*(self._INR_history_length - self._decision_points_index) \
             + self._decision_points_INR_history[:self._decision_points_index + 1][-self._INR_history_length - 1:]
 
     @property
-    def _dose_history(self):
-        return [0]*(self._dose_history_length-self._decision_points_index) \
+    def _dose_history(self) -> List[float]:
+        return [0.0]*(self._dose_history_length-self._decision_points_index) \
             + self._decision_points_dose_history[:self._decision_points_index][-self._dose_history_length:]
 
     @property
-    def _interval_history(self):
+    def _interval_history(self) -> List[int]:
         return [0]*(self._interval_history_length-self._decision_points_index) \
             + self._decision_points_interval_history[:self._decision_points_index][-self._interval_history_length:]
+
+    @property
+    def _interval_history_length(self) -> int:
+        return max(self._dose_history_length, self._INR_history_length)
 
     @property
     def state(self) -> rldata.RLData:
@@ -323,7 +324,7 @@ class WarfarinModel_v5(subjects.Subject):
 
     @property
     # only considers the dose
-    def possible_actions(self) -> rldata.RLData:
+    def possible_actions(self) -> List[rldata.RLData]:
         try:
             if self._interval_max_dose[self._interval_index] < self._max_dose:
                 return rldata.RLData(({
@@ -338,7 +339,7 @@ class WarfarinModel_v5(subjects.Subject):
 
         return self._possible_actions
 
-    def register(self, agent_name) -> int:
+    def register(self, agent_name: str) -> int:
         '''
         Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
         \nArguments:
@@ -353,9 +354,9 @@ class WarfarinModel_v5(subjects.Subject):
             return 1
 
     def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> rldata.RLData:
-        current_dose = action[0].value
+        current_dose: float = action[0].value  # type: ignore
         try:  # use the provided action, otherwise the interval
-            current_interval = min(action[1].value, self._max_day - self._day)
+            current_interval = min(action[1].value, self._max_day - self._day)  # type: ignore
         except IndexError:
             current_interval = min(
                 self._get_next_interval(), self._max_day - self._day)
@@ -482,12 +483,11 @@ class WarfarinModel_v5(subjects.Subject):
         self._filename_counter += 1
 
         self._day = 0
-        self._interval_history_length = max(self._dose_history_length, self._INR_history_length)
         self._full_INR_history = [0.0] * self._max_day
         self._full_dose_history = [0.0] * self._max_day
         self._decision_points_INR_history = [0.0] * (self._max_day + 1)
         self._decision_points_dose_history = [0.0] * self._max_day
-        self._decision_points_interval_history = [0.0] * self._max_day
+        self._decision_points_interval_history: List[int] = [0] * self._max_day
         self._decision_points_index = 0
 
         # The latest INR is also stored in self._INR_history
@@ -592,18 +592,18 @@ class WarfarinModel_v5(subjects.Subject):
     def _load_patient(self, current_patient: str) -> None:
         self._patient.load(path=self._patients_save_path,
                            filename=current_patient)
-        self._characteristics['age'] = self._patient._age
-        self._characteristics['weight'] = self._patient._weight  # pylint: disable=no-member
-        self._characteristics['height'] = self._patient._height  # pylint: disable=no-member
-        self._characteristics['gender'] = self._patient._gender  # pylint: disable=no-member
-        self._characteristics['race'] = self._patient._race  # pylint: disable=no-member
-        self._characteristics['tobaco'] = self._patient._tobaco  # pylint: disable=no-member
-        self._characteristics['amiodarone'] = self._patient._amiodarone  # pylint: disable=no-member
-        self._characteristics['fluvastatin'] = self._patient._fluvastatin  # pylint: disable=no-member
-        self._characteristics['CYP2C9'] = self._patient._CYP2C9
-        self._characteristics['VKORC1'] = self._patient._VKORC1
-        self._randomized = self._patient._randomized
-        self._max_time = self._patient._max_time
+        self._characteristics['age'] = self._patient._age  # type: ignore
+        self._characteristics['weight'] = self._patient._weight  # type: ignore pylint: disable=no-member
+        self._characteristics['height'] = self._patient._height  # type: ignore pylint: disable=no-member
+        self._characteristics['gender'] = self._patient._gender  # type: ignore pylint: disable=no-member
+        self._characteristics['race'] = self._patient._race  # type: ignore pylint: disable=no-member
+        self._characteristics['tobaco'] = self._patient._tobaco  # type: ignore pylint: disable=no-member
+        self._characteristics['amiodarone'] = self._patient._amiodarone  # type: ignore pylint: disable=no-member
+        self._characteristics['fluvastatin'] = self._patient._fluvastatin  # type: ignore pylint: disable=no-member
+        self._characteristics['CYP2C9'] = self._patient._CYP2C9  # type: ignore
+        self._characteristics['VKORC1'] = self._patient._VKORC1  # type: ignore
+        self._randomized: bool = self._patient._randomized  # type: ignore
+        self._max_time: int = self._patient._max_time  # type: ignore
 
     def _generate_ravvaz_patient(self) -> None:
         self._characteristics['age'] = min([max([np.random.normal(self._list_of_probabilities['age'][0],

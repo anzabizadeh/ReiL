@@ -10,13 +10,12 @@ An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 
 from logging import WARNING
 from math import exp, log, sqrt
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from ..rldata import RLData
-from .agent import Agent
+from rl import rlbase, rldata, agents
 
 
-class WarfarinAgent(Agent):
+class WarfarinAgent(agents.Agent):
     '''
     An agent for warfarin modeling based on the doses defined in Ravvaz et al (2017).
 
@@ -53,20 +52,22 @@ class WarfarinAgent(Agent):
                          logger_filename=logger_filename)
 
         self._study_arm = study_arm
-        self._method = lambda x: -1
+        self._method: Callable[[Dict[str, Any]], float] = lambda x: -1  # type: ignore
         self._day = 1
-        self._retest_day = 2
+        self._retest_day: int = 2
         self._skip_dose = 0
-        self._dose = 0
-        self._weekly_dose = 0
+        self._dose: float = 0.0
+        self._weekly_dose: float = 0.0
         self._red_flag = False  # used in aurora maintenance algorithm
         self._lenzini_on_day_4 = False  # used in lenzini adjustment algorithm
         self._number_of_stable_days = 0  # used in aurora maintenance algorithm
+        self._visited_range = 0.0  # used in intermountain maintenance algorithm
 
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 
-    def learn(self, history: List[Dict[str, Any]]) -> None:
+    def learn(self, history: List[Dict[str, Any]],
+        observation: Optional[rlbase.Observation] = None) -> None:
         '''
         Learn based on history.
 
@@ -74,7 +75,10 @@ class WarfarinAgent(Agent):
         '''
         pass
 
-    def act(self, state: RLData, actions: Optional[List[RLData]] = None, episode: Optional[int] = 0) -> RLData:
+    def act(self,
+        state: rldata.RLData,
+        actions: Optional[Sequence[rldata.RLData]] = None,
+        episode: Optional[int] = 0) -> rldata.RLData:
         '''
         return the best action for a given state.
 
@@ -83,24 +87,33 @@ class WarfarinAgent(Agent):
             state: the state for which an action is chosen.
         '''
         study_arm = self._study_arm.lower()
-        patient = state.value
+        patient: Dict[str, Any] = state.value
         patient['day'] += 1
         today = patient['day']
 
         if study_arm in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
             self._method = self._aurora
+
         elif study_arm in ['caa', 'ravvaz caa', 'ravvaz_caa']:
             if today <= 2:
                 self._method = self._iwpc_clinical
             else:
                 self._method = self._aurora
+
         elif study_arm in ['pgaa', 'ravvaz pgaa', 'ravvaz_pgaa']:
             if today <= 2:
                 self._method = self._iwpc_pg
             else:
                 self._method = self._aurora
+
         elif study_arm in ['pgpgi', 'ravvaz pgpgi', 'ravvaz_pgpgi']:
-            raise NotImplementedError('This arm contains Intermountain dosing algorithm that has not been implemented.')
+            if today <= 3:
+                self._method = self._modified_iwpc_pg
+            elif today <= 5:
+                self._method = self._lenzini_pg
+            else:
+                self._method = self._intermountain
+
         elif study_arm in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
             if today <= 3:
                 self._method = self._modified_iwpc_pg
@@ -109,13 +122,13 @@ class WarfarinAgent(Agent):
             else:
                 self._method = self._aurora
 
-        # r = RLData(min(self._action(self._method, state), 15.0), lower=0.0, upper=15.0)
         dose = self._precheck(patient)
         if dose == -1:
             # print('* ', end='')
             dose = round(self._method(patient), 9)
-        return RLData(min(dose, 15.0), lower=0.0, upper=15.0)  # Cuts out the dose if it is >15.0
-        # 20.0)  # WARNING: upper limit is changed to account for higher doses!
+
+        # Cuts out the dose if it is >15.0
+        return rldata.RLData({'dose': {'value': min(dose, 15.0), 'lower': 0.0, 'upper': 15.0}})
 
     def _precheck(self, patient: Dict[str, Any]) -> float:
         v = -1
@@ -134,14 +147,15 @@ class WarfarinAgent(Agent):
     def _aurora(self, patient: Dict[str, Any]) -> float:
         if self._red_flag:
             if self._retest_day > patient['day']:
-                return 0.0
+                return_value = 0.0
             elif patient['INRs'][-1] > 3.0:
                 self._retest_day = patient['day'] + 2
-                return 0.0
+                return_value = 0.0
             else:
                 self._red_flag = False
                 self._retest_day = patient['day'] + 7
-                return self._dose
+                return_value = self._dose
+            return return_value
 
         next_test = 2
         if patient['day'] == 1:
@@ -170,10 +184,7 @@ class WarfarinAgent(Agent):
 
         self._retest_day = patient['day'] + next_test
 
-        if self._skip_dose == 0:
-            return self._dose
-        else:
-            return 0.0
+        return self._dose if self._skip_dose == 0 else 0.0
 
     def _aurora_dosing_table(self, current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
         skip_dose = 0
@@ -251,13 +262,13 @@ class WarfarinAgent(Agent):
                         + 0.0128 * patient['weight'] * 0.454  # lb to kg
                         - 0.8677 * (patient['VKORC1'] == 'G/A')
                         - 1.6974 * (patient['VKORC1'] == 'A/A')
-                        - 0.4854 * (patient['VKORC1'] not in  ['G/A', 'A/A', 'G/G'])  # Not in EU-PACT ?!!
+                        - 0.4854 * int(patient['VKORC1'] not in  ['G/A', 'A/A', 'G/G'])  # Not in EU-PACT ?!!
                         - 0.5211 * (patient['CYP2C9'] == '*1/*2')
                         - 0.9357 * (patient['CYP2C9'] == '*1/*3')
                         - 1.0616 * (patient['CYP2C9'] == '*2/*2')
                         - 1.9206 * (patient['CYP2C9'] == '*2/*3')
                         - 2.3312 * (patient['CYP2C9'] == '*3/*3')
-                        - 0.2188 * (patient['CYP2C9'] not in ['*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', '*1/*1'])  # Not in EU-PACT
+                        - 0.2188 * int(patient['CYP2C9'] not in ['*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', '*1/*1'])  # Not in EU-PACT
                         - 0.1092 * (patient['race'] == 'Asian')  # Not in EU-PACT
                         - 0.2760 * (patient['race'] == 'Black')  # Not in EU-PACT
                         # - 1.0320 * (patient['race'] not in  [...])  # missing or mixed race - Not in EU-PACT
@@ -273,7 +284,7 @@ class WarfarinAgent(Agent):
     def _modified_iwpc_pg(self, patient: Dict[str, Any]) -> float:
         if self._weekly_dose == 0:
             self._weekly_dose = (5.6044
-                        - 0.2614 * (patient['age'] // 10)  # Based on Ravvaz (EU-PACT (page 18) uses year, Ravvaz (page 10 of annex) uses decades!
+                        - 0.2614 * (patient['age'] / 10)  # Based on Ravvaz (EU-PACT (page 18) uses year, Ravvaz (page 10 of annex) uses decades!
                         + 0.0087 * patient['height'] * 2.54  # in to cm
                         + 0.0128 * patient['weight'] * 0.454  # lb to kg
                         - 0.8677 * (patient['VKORC1'] == 'G/A')
@@ -296,11 +307,11 @@ class WarfarinAgent(Agent):
         # The following dose calculation is based on EU-PACT report page 19
         # Ravvaz uses the same formula, but uses weekly dose. However, EU-PACT explicitly mentions "predicted daily dose (D)" 
         if patient['day'] == 1:
-            self._dose = 1.5 * LD3 - 0.5 * self._weekly_dose / 7
+            self._dose = (1.5 * LD3 - 0.5 * self._weekly_dose) / 7
         elif patient['day'] == 2:
-            self._dose = LD3
+            self._dose = LD3 / 7
         elif patient['day'] == 3:
-            self._dose = 0.5 * LD3 + 0.5 * self._weekly_dose / 7
+            self._dose = (0.5 * LD3 + 0.5 * self._weekly_dose) / 7
         else:
             self._logger.warning('_modified_iwpc_pg is called on a day > 3.')
 
@@ -314,12 +325,15 @@ class WarfarinAgent(Agent):
         if patient['day'] == 4:
             self._lenzini_on_day_4 = True
 
-        self._dose = exp(3.10894
+        self._dose = exp(3.10894 
                         - 0.00767 * patient['age']
-                        - 0.51611 * log(patient['INRs'][-1])
-                        - 0.23032 * (patient['VKORC1'] == 'G/A')
-                        - 0.14745 * (patient['CYP2C9'] in ['*1/*2', '*2/*2'])
-                        - 0.30770 * (patient['CYP2C9'] in ['*1/*3', '*2/*3', '*3/*3'])
+                        - 0.51611 * log(patient['INRs'][-1])  # Natural log
+                        - 0.23032 * (1 * (patient['VKORC1'] == 'G/A')  # Heterozygous
+                                   + 2 * (patient['VKORC1'] == 'A/A'))  # Homozygous
+                        - 0.14745 * (1 * (patient['CYP2C9'] in ['*1/*2', '*2/*3'])  # Heterozygous
+                                   + 2 * (patient['CYP2C9'] == '*2/*2'))  # Homozygous
+                        - 0.30770 * (1 * (patient['CYP2C9'] in ['*1/*3', '*2/*3'])  # Heterozygous
+                                   + 2 * (patient['CYP2C9'] == '*3/*3'))  # Homozygous
                         + 0.24597 * sqrt(patient['height'] * 2.54 * patient['weight'] * 0.454 / 3600)  # BSA
                         + 0.26729 * 2.5  # target INR
                         - 0.10350 * (patient['amiodarone'] == 'Yes')
@@ -330,10 +344,77 @@ class WarfarinAgent(Agent):
 
         return self._dose
 
-    def _intermountain(self, patient: Dict[str, Any]) -> float:
-        raise NotImplementedError
+    def _intermountain(self, patient: Dict[str, Any]) -> float:  # only maintenance dose (day >= 6)
+        current_INR = patient['INRs'][-1]
+        # if patient['day'] < 8:
+        #     pass
+        if self._red_flag:
+            if self._retest_day > patient['day']:
+                return_value = 0.0
+            elif current_INR > 3.0:
+                self._retest_day = patient['day'] + 2
+                return_value = 0.0
+            else:
+                self._red_flag = False
+                self._retest_day = patient['day'] + 7  # second dosing interval (14 days) happens automatically
+                return_value = self._dose
 
-    def _action(self, method: str, state: RLData) -> float:
+        else:
+            self._dose, next_test, self._skip_dose, self._red_flag, today_dose = \
+                self._intermountain_dosing_table(current_INR, self._dose)
+
+            if patient['day'] <= 8 and 2.0 <= current_INR <= 3.0:
+                next_test = 14
+
+            self._retest_day = patient['day'] + next_test
+
+            if today_dose is not None:
+                return_value = today_dose
+            elif self._skip_dose == 0:
+                return_value = self._dose
+            else:
+                return_value = 0.0
+
+        return return_value
+
+    def _intermountain_dosing_table(self,
+        current_INR: float, dose: float)-> Tuple[float, int, int, bool, Union[float, None]]:
+
+        skip_dose: int = 0
+        today_dose: Union[float, None] = None
+        red_flag: bool = False
+        if current_INR < 1.60:
+            today_dose = dose  # this should be average 5-7 for day 8
+            dose = dose * 1.10
+            next_test = 5 if self._visited_range != 1.60 else 14
+            self._visited_range = 1.60
+        elif current_INR < 1.80:
+            today_dose = dose * 0.5 # this should be average 5-7 for day 8
+            dose = dose * 1.05
+            next_test = 7 if self._visited_range != 1.80 else 14
+            self._visited_range = 1.80
+        elif current_INR < 2.00:
+            dose = dose * 1.05
+            next_test = 28  # for day<8, I change next_test to 14 in _intermountain()
+        elif current_INR <= 3.00:
+            next_test = 14
+        elif current_INR < 3.40:
+            dose = dose * 0.95
+            next_test = 14
+        elif current_INR < 5.00:
+            today_dose = dose * 0.5 if current_INR < 4 else 0.0
+            dose = dose * 0.90
+            next_test = 7 if self._visited_range != 5.00 else 14
+            self._visited_range = 5.00
+        else:
+            red_flag = True
+            skip_dose = 1
+            next_test = 2
+            dose = dose * 0.85
+
+        return dose, next_test, skip_dose, red_flag, today_dose
+
+    def _action(self, method: str, state: rldata.RLData) -> float:
         '''
         This method will be depricated. Now each dosing protocol is a separate function.
         '''
@@ -394,7 +475,7 @@ class WarfarinAgent(Agent):
                             + 0.0134 * patient['weight'] * 0.454  # lb to kg
                             - 0.6752 * (patient['race'] == 'Asian')
                             + 0.4060 * (patient['race'] == 'Black')
-                            + 0.0443 * (patient['race'] not in  ['Asian', 'Black'])
+                            + 0.0443 * int(patient['race'] not in  ['Asian', 'Black'])
                             + 1.2799 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
                             - 0.5695 * (patient['amiodarone'] == 'Yes')) ** 2
                 self._dose = self._weekly_dose / 7
@@ -410,16 +491,16 @@ class WarfarinAgent(Agent):
                             + 0.0128 * patient['weight'] * 0.454  # lb to kg
                             - 0.8677 * (patient['VKORC1'] == 'G/A')
                             - 1.6974 * (patient['VKORC1'] == 'A/A')
-                            - 0.4854 * (patient['VKORC1'] not in  ['G/A', 'A/A', 'G/G'])  # Not in EU-PACT ?!!
+                            - 0.4854 * int(patient['VKORC1'] not in  ['G/A', 'A/A', 'G/G'])  # Not in EU-PACT ?!!
                             - 0.5211 * (patient['CYP2C9'] == '*1/*2')
                             - 0.9357 * (patient['CYP2C9'] == '*1/*3')
                             - 1.0616 * (patient['CYP2C9'] == '*2/*2')
                             - 1.9206 * (patient['CYP2C9'] == '*2/*3')
                             - 2.3312 * (patient['CYP2C9'] == '*3/*3')
-                            - 0.2188 * (patient['CYP2C9'] not in ['*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', '*1/*1'])  # Not in EU-PACT
+                            - 0.2188 * int(patient['CYP2C9'] not in ['*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', '*1/*1'])  # Not in EU-PACT
                             - 0.1092 * (patient['race'] == 'Asian')  # Not in EU-PACT
                             - 0.2760 * (patient['race'] == 'Black')  # Not in EU-PACT
-                            - 1.0320 * (patient['race'] not in  ['Asian', 'Black'])  # Not in EU-PACT
+                            - 1.0320 * int(patient['race'] not in  ['Asian', 'Black'])  # Not in EU-PACT
                             + 1.1816 * 0  # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
                             - 0.5503 * (patient['amiodarone'] == 'Yes')) ** 2
                 self._dose = self._weekly_dose / 7
@@ -471,8 +552,8 @@ class WarfarinAgent(Agent):
                             - 0.00767 * patient['age']
                             - 0.51611 * log(patient['INRs'][-1])
                             - 0.23032 * (patient['VKORC1'] == 'G/A')
-                            - 0.14745 * (patient['CYP2C9'] in ['*1/*2', '*2/*2'])
-                            - 0.30770 * (patient['CYP2C9'] in ['*1/*3', '*2/*3', '*3/*3'])
+                            - 0.14745 * int(patient['CYP2C9'] in ['*1/*2', '*2/*2'])
+                            - 0.30770 * int(patient['CYP2C9'] in ['*1/*3', '*2/*3', '*3/*3'])
                             + 0.24597 * sqrt(patient['height'] * 2.54 * patient['weight'] * 0.454 / 3600)  # BSA
                             + 0.26729 * 2.5  # target INR
                             - 0.10350 * (patient['amiodarone'] == 'Yes')
@@ -543,15 +624,3 @@ class WarfarinAgent(Agent):
             return f'WarfarinAgent: arm: {self._study_arm} day: {self._day}'
         except NameError:
             return 'WarfarinAgent'
-
-if __name__ == "__main__":
-    from rl.subjects import WarfarinModel_v5
-    w = WarfarinModel_v5(age=87, CYP2C9='*1/*1', VKORC1G='G/G', extended_state=True)
-    a = WarfarinAgent()
-    INRs = [1, 1.1, 1.3, 1.3, 1.5, 1.3, 1.5, 1.6, 1.7, 1.7, 1.8, 1.8, 1.9, 1.9, 1.9, 1.8, 1.9, 1.9, 1.8, 1.8, 1.9, 1.9, 2, 1.8, 2, 2.1, 2, 2, 2.1, 1.9, 2.1, 2.1, 2.2, 1.9, 2, 1.9, 1.9, 2, 2, 2, 2, 1.9, 1.8, 1.9, 2.1, 1.9, 2, 2, 2.1, 2, 2, 2, 2.1, 2.2, 1.9, 2, 2.1, 2.1, 1.9, 1.9, 1.8, 2.1, 2, 2.1, 2, 2, 2.1, 2, 2, 2.1, 2.1, 2.1, 2, 2.1, 1.9, 1.8, 2, 2.1, 2, 2.1, 2.1, 2, 2, 2.3, 1.9, 2.1, 2, 1.8, 2.1]
-    for i in INRs:
-        action = a.act(w.state)
-        w._INR_history.append(i)
-        w._INR_history.popleft()
-        w._day += 1
-        print(action.value[0], w.state.value['INRs'][-1])
