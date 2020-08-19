@@ -8,8 +8,10 @@ The base class for data collection in reinforcement learning
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from pickle import load, dump, HIGHEST_PROTOCOL
-from copy import deepcopy
+import pathlib
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
+import dill
+import copy
 
 
 def main():
@@ -48,16 +50,17 @@ class DataCollector():
         report: create a report on all or the specified statistics
         load: load collected data from a file.
         save: save the collected data to a file.
-        set_params: set parameters.
-        set_defaults: set default values for parameters.
     '''
-    def __init__(self, **kwargs):
-        self.set_defaults(available_statistics={}, active_statistics={}, data={}, is_active=False, object=None)
-        self.set_params(**kwargs)
+    def __init__(self,
+        object: Any,
+        available_statistics: Dict[str, Tuple[bool, Callable[[Any], Any], str]] = {},
+        active_statistics: Sequence[str] = ()) -> None:
 
-        if False:
-            self._available_statistics, self._active_statistics, self._data = {}, {}, {}
-            self._is_active, self._object = False, None
+        self._available_statistics = available_statistics
+        self._active_statistics = active_statistics
+        self._data = {}
+        self._is_active = False
+        self.object = object
 
     @property
     def is_active(self):
@@ -65,12 +68,13 @@ class DataCollector():
         return self._is_active
 
     @property
-    def available_statistics(self):
+    def available_statistics(self) -> Dict[str, Tuple[bool, Callable[[Any], Any], str]]:
         '''Return the dictionary of available statistics.'''
         return self._available_statistics
 
     @available_statistics.setter
-    def available_statistics(self, statistics):
+    def available_statistics(self,
+        statistics: Dict[str, Tuple[bool, Callable[[Any], Any], str]]) -> None:
         '''
         Set the dictionary of available statistics.
 
@@ -87,26 +91,26 @@ class DataCollector():
         if self._is_active:
             raise RuntimeError('Data collector should be stopped before assignment.')
         for s, args in statistics.items():
-            if not isinstance(s, str):
-                raise TypeError('Statistic\'s name should be of type str ({}).'.format(s))
-            if not isinstance(args[0], bool):
-                raise TypeError('Statistic\'s first item should be of type bool ({}).'.format(args[0]))
+            if not isinstance(s, str):  # type: ignore
+                raise TypeError(f'Statistic\'s name should be of type str ({s}).')
+            if not isinstance(args[0], bool):  # type: ignore
+                raise TypeError(f'Statistic\'s first item should be of type bool ({args[0]}).')
             if not callable(args[1]):
-                raise TypeError('Statistic\'s second item should be a function ({}).'.format(args[1]))
+                raise TypeError(f'Statistic\'s second item should be a function ({args[1]}).')
             if len(args) < 3:
                 raise ValueError('A statistic should have at least one variable name.')
             for i in range(2,len(args)):
                 if not isinstance(args[i], str):
-                    raise TypeError('Variable\'s name should be of type str ({}).'.format(args[i]))
+                    raise TypeError(f'Variable\'s name should be of type str ({args[i]}).')
         self._available_statistics = statistics
 
     @property
-    def active_statistics(self):
+    def active_statistics(self) -> Sequence[str]:
         '''Return the list of active statistics.'''
-        return self._available_statistics
+        return self._active_statistics
 
     @active_statistics.setter
-    def active_statistics(self, statistics):
+    def active_statistics(self, statistics: Sequence[str]):
         '''
         Set the list of active statistics.
             
@@ -115,16 +119,16 @@ class DataCollector():
         if self._is_active:
             raise RuntimeError('Data collector should be stopped before assignment.')
         if statistics == 'all':
-            self._active_statistics = self._available_statistics.keys()
+            self._active_statistics = list(self._available_statistics.keys())
             return
         for s in statistics:
-            if not isinstance(s, str):
-                raise TypeError('Statistic\'s name should be of type str ({}).'.format(s))
+            if not isinstance(s, str):  # type: ignore
+                raise TypeError(f'Statistic\'s name should be of type str ({s}).')
             if not s in self._available_statistics:
-                raise ValueError('Requested statistic is not available ({}).'.format(s))
+                raise ValueError(f'Requested statistic is not available ({s}).')
         self._active_statistics = statistics
 
-    def start(self, flush=False):
+    def start(self, flush: bool = False) -> None:
         '''
         Start the data collector.
 
@@ -142,7 +146,7 @@ class DataCollector():
             self._data = {}
         self._is_active = True
 
-    def stop(self, flush=False):
+    def stop(self, flush: bool = False) -> None:
         '''
         Stop the data collector.
 
@@ -154,7 +158,7 @@ class DataCollector():
             self._data = {}
         self._is_active = False
 
-    def collect(self, **kwargs):  # data should be a dictionary
+    def collect(self, **kwargs: Any) -> None:  # data should be a dictionary
         '''
         Collect data.
 
@@ -185,22 +189,22 @@ class DataCollector():
             # if self._available_statistics[statistic][0]:  # if it should be collected
             self._data[s] = {}  # enabling '.' notation
             for variable in self._available_statistics[s][2:]:
-                arguments = variable.split('.')
-                temp = self._object
+                arguments: str = variable.split('.')
+                temp = self.object
                 for arg in arguments:
-                    temp = deepcopy(temp.__dict__[arg])
+                    temp = copy.deepcopy(temp.__dict__[arg])
                 try:
-                    self._data[s][variable] = deepcopy(temp)
-                    # self._data[s] = dict((variable, self._object.__dict__[variable].copy()) 
+                    self._data[s][variable] = copy.deepcopy(temp)
+                    # self._data[s] = dict((variable, self.object.__dict__[variable].copy()) 
                     #                                 for variable in self._available_statistics[s][2:])
                 except AttributeError:
-                    self._data[s][variable] = deepcopy(temp)
-                    # self._data[s] = dict((variable, self._object.__dict__[variable]) 
+                    self._data[s][variable] = copy.deepcopy(temp)
+                    # self._data[s] = dict((variable, self.object.__dict__[variable]) 
                     #                                 for variable in self._available_statistics[s][2:])
                 except KeyError:
-                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
+                    raise RuntimeError(f'Object doesn\'t have the attribute provided for {s}.')
 
-    def retrieve(self, **kwargs):
+    def retrieve(self, **kwargs: Any) -> None:
         '''
         Retrieve the requested data.
 
@@ -233,7 +237,7 @@ class DataCollector():
 
         return data
 
-    def report(self, **kwargs):
+    def report(self, **kwargs: Any) -> None:
         '''
         Report the requested statistics.
 
@@ -267,7 +271,7 @@ class DataCollector():
             except KeyError:
                 update_data = False
 
-        old_data = deepcopy(self._data)
+        old_data = copy.deepcopy(self._data)
         self.collect(statistics=stats)
 
         results = {}
@@ -276,7 +280,7 @@ class DataCollector():
                 try:
                     results[s] = self._available_statistics[s][1](new=self._data[s], old=old_data[s], statistic=s)
                 except KeyError:
-                    raise RuntimeError('Object doesn\'t have the attribute provided for {}.'.format(s))
+                    raise RuntimeError(f'Object doesn\'t have the attribute provided for {s}.')
             else:
                 results[s] = self._available_statistics[s][1](data=self._data[s], statistic=s)
         
@@ -285,67 +289,38 @@ class DataCollector():
 
         return results
 
-    def load(self, **kwargs):
+    def load(self, filename: str, path: Optional[str] = None) -> None:
         '''
         Load an object from a file.
 
         Arguments
         ---------
             filename: the name of the file to be loaded.
+            path: the path of the file to be loaded. (Object's default path will be used if not provided)
 
-        Raises ValueError if the filename is not specified.
         '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
-        with open(filename + '.pkl', 'rb') as f:
-            self.__dict__ = load(f)
+        _path = pathlib.Path(path if path is not None else '.')
 
-    def save(self, **kwargs):
+        with open(_path / f'{filename}.pkl', 'rb') as f:
+                self.__dict__ = dill.load(f)  #type: ignore
+
+    def save(self,
+             filename: str,
+             path: Optional[str] = None) -> None:
         '''
         Save the object to a file.
 
         Arguments
         ---------
-            filename: the name of the file to be saved.
-
-        Raises ValueError if the filename is not specified.
+            filename: the name of the object (Default=self._name)
+            path: the path of the file to be loaded. (Default='.')
+            data: what to save (Default: saves everything)
         '''
-        try:  # filename
-            filename = kwargs['filename']
-        except KeyError:
-            raise ValueError('name of the output file not specified.')
-        with open(filename + '.pkl', 'wb+') as f:
-            dump(self.__dict__, f, HIGHEST_PROTOCOL)
 
-    def set_params(self, **params):
-        '''
-        set parameters to values.
+        _path: pathlib.Path = pathlib.Path(path if path is not None else '.')
 
-        Arguments
-        ---------
-            params: a dictionary containing parameter names and their values.
-        '''
-        self.__dict__.update(('_'+key, params.get(key, self._defaults[key]))
-                              for key in self._defaults if key in params)
-
-    def set_defaults(self, **params):
-        '''
-        set parameters default values.
-
-        Arguments
-        ---------
-            params: a dictionary containing parameter names and their default values.
-
-        Note: this method overwrites all variable names.
-        '''
-        if not hasattr(self, '_defaults'):
-            self._defaults = {}
-        for key, value in params.items():
-            self._defaults[key] = value
-            if not hasattr(self, '_'+key):
-                self.__dict__['_'+key] = value
+        with open(_path / f'{filename}.pkl', 'wb+') as f:
+            dill.dump(self.__dict__, f, dill.HIGHEST_PROTOCOL)  # type: ignore
 
     def __repr__(self):
         if len(self._available_statistics) == 0:

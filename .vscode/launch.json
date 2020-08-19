@@ -8,15 +8,22 @@
             "name": "Python",
             "type": "python",
             "request": "launch",
-            "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            // "stopOnEntry": true,
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${file}",
             "cwd": "${workspaceFolder}",
+            "args": [
+                "--project_name=debugging_config"
+                // "--env_filename=debugging_config0005",
+                // "--mode=test",
+                // "--start_epoch=6"
+            ],
             "env": {},
             "envFile": "${workspaceFolder}/.env",
             "debugOptions": [
                 "RedirectOutput"
-            ]
+            ],
+            "justMyCode": false
         },
         {
             "name": "Python: Attach",
@@ -33,7 +40,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${file}",
             "cwd": "",
             "console": "integratedTerminal",
@@ -46,7 +53,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${file}",
             "cwd": "",
             "console": "externalTerminal",
@@ -59,7 +66,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${workspaceFolder}/manage.py",
             "cwd": "${workspaceFolder}",
             "args": [
@@ -79,7 +86,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "fully qualified path fo 'flask' executable. Generally located along with python interpreter",
             "cwd": "${workspaceFolder}",
             "env": {
@@ -100,7 +107,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${workspaceFolder}/run.py",
             "cwd": "${workspaceFolder}",
             "args": [],
@@ -137,7 +144,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "module": "module.name",
             "cwd": "${workspaceFolder}",
             "env": {},
@@ -151,7 +158,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "cwd": "${workspaceFolder}",
             "env": {},
             "envFile": "${workspaceFolder}/.env",
@@ -168,7 +175,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${workspaceFolder}/console.py",
             "cwd": "${workspaceFolder}",
             "args": [

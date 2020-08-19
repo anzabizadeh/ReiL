@@ -45,9 +45,9 @@ class Snake(MNKBoard, Subject):
             m: number of rows (default=10)
             n: number of columns (default=10)
         '''
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, m=10, n=10)
-        Subject.set_params(self, **kwargs)
+        self.set_defaults(m=10, n=10)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -55,7 +55,7 @@ class Snake(MNKBoard, Subject):
             self._m = 10
             self._n = 10
 
-        MNKBoard.__init__(self, m=self._m, n=self._n, players=2)  # player 1 is the snake, player 2 is the fruit!
+        # super().__init__(m=self._m, n=self._n, players=2)  # player 1 is the snake, player 2 is the fruit!
         self.reset()
 
     @property
@@ -68,13 +68,13 @@ class Snake(MNKBoard, Subject):
         '''Return the moves as ValueSet (left, none, right).'''
         return ValueSet(['left', 'none', 'right'])
 
-    def take_effect(self, _id, action):
+    def take_effect(self, action, _id=None):
         '''
         Move the snake on the board.
 
         Arguments
         ---------
-            id_: ID of the player. (Not used in the code)
+            _id: ID of the player. (Not used in the code)
             action: one of three possible actions: left, none, right.
         ''' 
         self._win.border(0)
@@ -154,7 +154,7 @@ class Snake(MNKBoard, Subject):
                        [self._m // 2, self._n // 2 - 1]]                                     # Initial snake co-ordinates
         self._food = [self._m // 2 + 1, self._n // 2]                                                     # First food co-ordinates
         self._win.addch(self._food[0], self._food[1], '*')                       # Prints the food
-        Subject.__init__(self)
+        super().__init__(self)
         for location in self._snake:
             self.set_piece(1, row=location[0], column=location[1])
         self.set_piece(2, row=self._food[0], column=self._food[1])

@@ -10,37 +10,6 @@ The legacy data type used for state and action variables.
 
 import numpy as np
 
-
-def main():
-    # create an empty ValueSet and print it with different formats:
-    e = ValueSet()
-    print(e.value, e.to_list(), e.to_nparray())
-    # create a ValueSet with data and print binary representation and normalized versions:
-    s = ValueSet([1, 7, 10, 3], min=0, max=15)
-    print('{}'.format(s))
-    print([10, 3] in s)
-    print('{}'.format(s.binary_representation()))
-    print('{:2.2} {}'.format(s.normalizer(0, 1), s.to_nparray()))
-    directions = ['U', 'D', 'L', 'R']
-    t = ValueSet(directions, binary=lambda x: (
-        directions.index(x), len(directions)))
-    print('{}, {}'.format(t, t.binary_representation()))
-
-    def convert(x, directions=['U', 'D', 'L', 'R']):
-        bin_rep = [0]*(len(directions)-1)
-        for value in x:
-            index = directions.index(value)
-            if index != 0:
-                bin_rep[index-1] = 1
-        return bin_rep
-
-    t = ValueSet(directions, binary=convert)
-    print('{}, {}'.format(t, t.binary_representation()))
-    array = s.as_valueset_array()
-    for a in array:
-        print(a.value, a.max, a.min)
-
-
 class ValueSet():
     '''
     Provide a data type for state and action in reinforcement learning.
@@ -366,3 +335,33 @@ class ValueSet():
 
     def __repr__(self):
         return ''.join(['[', str(self.value), '], min=', str(self._min), ', max=', str(self._max)])
+
+
+if __name__ == "__main__":
+    # create an empty ValueSet and print it with different formats:
+    e = ValueSet()
+    print(e.value, e.to_list(), e.to_nparray())
+    # create a ValueSet with data and print binary representation and normalized versions:
+    s = ValueSet([1, 7, 10, 3], min=0, max=15)
+    print(f'{s}')
+    print([10, 3] in s)
+    print(f'{s.binary_representation()}')
+    print(f'{s.normalizer(0, 1):2.2} {s.to_nparray()}')
+    directions = ['U', 'D', 'L', 'R']
+    t = ValueSet(directions, binary=lambda x: (
+        directions.index(x), len(directions)))
+    print(f'{t}, {t.binary_representation()}')
+
+    def convert(x, directions=['U', 'D', 'L', 'R']):
+        bin_rep = [0]*(len(directions)-1)
+        for value in x:
+            index = directions.index(value)
+            if index != 0:
+                bin_rep[index-1] = 1
+        return bin_rep
+
+    t = ValueSet(directions, binary=convert)
+    print(f'{t}, {t.binary_representation()}')
+    array = s.as_valueset_array()
+    for a in array:
+        print(a.value, a.max, a.min)

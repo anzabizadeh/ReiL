@@ -8,13 +8,15 @@ This `subject` class is the super class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from ..rlbase import RLBase
+from typing import Any, Dict, Optional, Sequence
+
+from rl import rlbase, rldata
 
 
-class Subject(RLBase):
+class Subject(rlbase.RLBase):
     '''
     Super class of all subject classes.
-    
+
     Attributes
     ----------
         state: the state of the subject as a ValueSet.
@@ -26,31 +28,42 @@ class Subject(RLBase):
         register: register a new agent and return its ID or return ID of an existing agent.
         take_effect: get an action and change the state accordingly.
         reset: reset the state and is_terminated.
-        printable: return a readable format of subject's state
     '''
-    def __init__(self, **kwargs):
-        RLBase.__init__(self, **kwargs)
-        RLBase.set_defaults(self, agent_list={})
-        RLBase.set_params(self, **kwargs)
 
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._agent_list = {}
+    def __init__(self,
+                 ex_protocol_current: Dict[str, str] = {'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
+                 ex_protocol_options: Dict[str, Sequence[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+                 **kwargs: Any):
+
+        kwargs['name'] = kwargs.get('name', __name__)
+        kwargs['logger_name'] = kwargs.get('logger_name', __name__)
+
+        super().__init__(ex_protocol_current=ex_protocol_current,
+                         ex_protocol_options=ex_protocol_options,
+                         **kwargs)
+
+        self._agent_list: Dict[str, int] = {}
 
     @property
-    def state(self):
+    def state(self) -> rldata.RLData:
         raise NotImplementedError
 
     @property
-    def is_terminated(self):
+    def complete_state(self) -> rldata.RLData:
+        '''
+        Returns all the information that the subject can provide.
+        '''
         raise NotImplementedError
 
     @property
-    def possible_actions(self):
-        pass
+    def is_terminated(self) -> bool:
+        raise NotImplementedError
 
-    def register(self, agent_name):
+    @property
+    def possible_actions(self) -> Sequence[rldata.RLData]:
+        return [rldata.RLData({'default_action': {'value': None}})]
+
+    def register(self, agent_name: str) -> int:
         '''
         Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
         \nArguments:
@@ -59,11 +72,15 @@ class Subject(RLBase):
         try:
             return self._agent_list[agent_name]
         except KeyError:
-            _id = max(self._agent_list.values()) + 1
+            try:
+                _id = max(self._agent_list.values()) + 1
+            except ValueError:
+                _id = 1
+
             self._agent_list[agent_name] = _id
             return _id
 
-    def deregister(self, agent_name):
+    def deregister(self, agent_name: str) -> None:
         '''
         Deegisters an agent given its name.
         \nArguments:
@@ -71,14 +88,11 @@ class Subject(RLBase):
         '''
         self._agent_list.pop(agent_name)
 
-    def take_effect(self, _id, action):
+    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> rldata.RLData:
         raise NotImplementedError
 
-    def reset(self):
+    def reset(self) -> None:
         raise NotImplementedError
 
-    def printable(self):
-        pass
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Subject'

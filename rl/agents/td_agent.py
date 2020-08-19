@@ -10,7 +10,7 @@ A basic temporal difference agent
 
 from random import choice, random
 
-from ..legacy import ValueSet
+from ..legacy.valueset import ValueSet
 from .agent import Agent
 
 
@@ -39,9 +39,9 @@ class TD0Agent(Agent):
             default_actions: list of default actions. (Default = empty ValueSet)
             state_action_list: state action list from a previous training. (Default = {}})
         '''
-        Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, default_actions=ValueSet(), state_action_list={})
-        Agent.set_params(self, **kwargs)
+        self.set_defaults(gamma=1, alpha=1, epsilon=0, default_actions=ValueSet(), state_action_list={})
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         self.data_collector.available_statistics = {'states q': [False, self._report, '_state_action_list'],
                                                     'states action': [False, self._report, '_state_action_list'],
@@ -106,13 +106,13 @@ class TD0Agent(Agent):
         '''
         try:  # history
             history = kwargs['history']
-            previous_state = history[0]
-            for i in range(1, len(history), 3):
-                previous_action = history[i]
-                reward = history[i+1]
+            previous_state = history[0]['state']
+            for i in range(1, len(history)):
+                previous_action = history[i]['action']
+                reward = history[i]['reward']
                 try:
-                    state = history[i+2]
-                    action = history[i+3]
+                    state = history[i+1]['state']
+                    action = history[i+1]['action']
                 except IndexError:
                     state = None
                     action = None

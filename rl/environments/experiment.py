@@ -57,10 +57,10 @@ class Experiment(Environment):
                       filename=kwargs['filename'])
             return
 
-        Environment.set_defaults(self, agent={}, subject={}, assignment_list={},
+        self.set_defaults(agent={}, subject={}, assignment_list={},
                             number_of_subjects=1, max_steps=10000, save_subjects=True,
                             file_index_generator=None)
-        Environment.set_params(self, **kwargs)
+        self.set_params(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -92,7 +92,7 @@ class Experiment(Environment):
                 print(file_index)
                 filename = subject_name + file_index
                 if os.path.exists(os.path.join(subjects_path, filename + '.pkl')):
-                    print('{} already exists! Skipping the file!'.format(filename))
+                    print(f'{filename} already exists! Skipping the file!')
                 else:
                     subject.save(filename=filename, path=subjects_path)
                     subject.reset()
@@ -120,8 +120,8 @@ class Experiment(Environment):
         output_dir.mkdir(parents=True, exist_ok=True)
 
         for agent_name, agent in self._agent.items():
-            print('Agent: {}'.format(agent_name))
-            agent.status = 'testing'
+            print(f'Agent: {agent_name}')
+            agent.training_mode = False
 
             try:
                 subject_name, _id = self._assignment_list[agent_name]
@@ -135,7 +135,7 @@ class Experiment(Environment):
                 history = pd.DataFrame(columns=['state', 'action', 'q', 'reward'])
 
                 filename = subject_name + file_index
-                print('Subject: {}'.format(filename))
+                print(f'Subject: {filename}')
                 temp_agent_list = subject._agent_list
                 # THIs SHOULD BE subject.load(...), I ADDED ._patient TEMPORARILY! ALSO,
                 # DELETE subject.reset()
@@ -154,7 +154,7 @@ class Experiment(Environment):
                         q = agent._q(state, action)
                     except AttributeError:
                         q = np.nan
-                    reward = subject.take_effect(_id, action)
+                    reward = subject.take_effect(action, _id)
 
                     history.loc[len(history.index)] = [state, action, q, reward]
 

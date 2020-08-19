@@ -28,3 +28,6 @@ from .windy_gridworld import WindyGridworld
 from .cancer_model import CancerModel
 from .constrained_cancer_model import ConstrainedCancerModel
 from .warfarin_model_v5 import WarfarinModel_v5
+from .iterable_subject import IterableSubject
+from .warfarin_lookahead import WarfarinLookAhead
+from .warfarin_model_fixed_intervals import WarfarinModelFixedInterval

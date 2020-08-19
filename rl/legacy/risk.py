@@ -53,9 +53,9 @@ class Risk(Subject):
         ---------
             pieces: an array containing the number of peices for players 1 and 2 (default=[3, 2])
         '''
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, pieces=[3, 2], turn=0)
-        Subject.set_params(self, **kwargs)
+        self.set_defaults(pieces=[3, 2], turn=0)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         self._temp = 0
         # The following code is just to suppress debugger's undefined variable errors!
@@ -97,13 +97,13 @@ class Risk(Subject):
         if len(self._agent_list)<2:
             return Subject.register(self, player_name)
 
-    def take_effect(self, id_, action):
+    def take_effect(self, action, _id=None):
         '''
         Set a piece for the given player on the board.
 
         Arguments
         ---------
-            id_: ID of the player who sets the piece.
+            _id: ID of the player who sets the piece.
             action: the location in which the piece is set. Can be either in index format or row column format.
         '''
         if self._turn == 0:

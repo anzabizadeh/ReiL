@@ -8,22 +8,22 @@ A Q-learning agent with Neural Network Q-function approximator
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-
 import os
-from pickle import HIGHEST_PROTOCOL, dump, load
-from random import choice, random
-from time import time
-
 from collections import deque
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
+from logging import WARNING
+from pathlib import Path
+from random import choice, random
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from .agent import Agent
-from ..rldata import RLData
+import numpy as np  # type: ignore
+import tensorflow as tf  # type: ignore
+from tensorflow import keras  # type: ignore
+
+from rl import rldata
+from rl import agents
 
 
-class DQNAgent(Agent):
+class DQNAgent(agents.Agent):
     '''
     A Q-learning agent with deep neural network Q-function approximator.
 
@@ -32,7 +32,7 @@ class DQNAgent(Agent):
         gamma: discount factor in TD equation. (Default = 1)
         epsilon: exploration probability. (Default = 0)
         default_actions: list of default actions.
-        learning_rate: learning rate for ANN. (Default = 1e-3)
+        lr_initial: learning rate for ANN. (Default = 1e-3)
         hidden_layer_sizes: tuple containing hidden layer sizes.
         input_length: size of the input vector. (Default = 1)
         buffer_size: DQN stores buffer_size observations and samples from it for training. (Default = 50)
@@ -49,44 +49,83 @@ class DQNAgent(Agent):
         reset: Not Implemented Yet!
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 gamma: float = 1.0, epsilon: Union[Callable[[int], float], float] = 0.0,
+                 default_actions: Sequence[rldata.RLData] = [],
+                 lr_initial: float = 1e-3,
+                 lr_scheduler: Callable[[int, float], float] = lambda epoch, lr: lr,
+                 hidden_layer_sizes: Sequence[int] = (1,),
+                 input_length: Optional[int] = None,
+                 method: str = 'backward',
+                 buffer_size: int = 50,
+                 batch_size: int = 10,
+                 validation_split: float = 0.3,
+                 clear_buffer: bool = False,
+                 tensorboard_path: Optional[Union[str, Path]] = None,
+                 ex_protocol_current: Dict[str, str] = {'mode': 'training'},
+                 ex_protocol_options: Dict[str, Sequence[str]] = {'mode': ['training', 'test']},
+                 stats_list: Sequence[str] = [],
+                 name: str = __name__,
+                 path: Optional[Union[str, Path]] = None,
+                 logger_name: str = __name__,
+                 logger_level: int = WARNING,
+                 logger_filename: Optional[str] = None,
+                 persistent_attributes: List[str] = []):
         '''
         Initialize a Q-Learning agent with deep neural network Q-function approximator.
         '''
-        Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, gamma=1, epsilon=0, default_actions={},
-                           learning_rate=1e-3, hidden_layer_sizes=(1,), input_length=1, method='forward',
-                           training_x=deque(), training_y=deque(), buffer_index=-1, buffer_ready=False,
-                           # np.array([], ndmin=2), training_y=np.array([], ndmin=2),
-                           buffer_size=50, batch_size=10, validation_split=0.3, clear_buffer=False, tensorboard_path=None)
-        Agent.set_params(self, **kwargs)
+
+        super().__init__(name=name,
+                         path=path,
+                         ex_protocol_current=ex_protocol_current,
+                         ex_protocol_options=ex_protocol_options,
+                         stats_list=stats_list,
+                         logger_name=logger_name,
+                         logger_level=logger_level,
+                         logger_filename=logger_filename,
+                         persistent_attributes=persistent_attributes)
+
+        self._gamma = min(gamma, 1.0)
+        self._epsilon = epsilon
+        self._default_actions = default_actions
+        self._normalized_action_list = [action.normalized.flatten() for action in self._default_actions]
+
+        self._lr_initial = lr_initial
+        self._lr_scheduler = lr_scheduler
+
+        self._hidden_layer_sizes = hidden_layer_sizes
+
+        if method not in ('backward', 'forward'):
+            self._logger.warning(f'method {method} is not acceptable. Should be either "forward" or "backward". Will use "backward".')
+            self._method = 'backward'
+        else:
+            self._method = method.lower()
+
+        self._buffer_size = max(buffer_size, 1)  # at least size 1
+        self._batch_size = min(batch_size, buffer_size)  # at most as much as buffer_size
+
+        if not 0.0 < validation_split < 1.0:
+            raise ValueError('validation split should be in (0.0, 1.0).')
+        self._validation_split = validation_split
+
+        self._clear_buffer = clear_buffer
+        self._tensorboard_path = tensorboard_path
+
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 
-        if 'filename' in kwargs:
-            if 'path' in kwargs:
-                self.load(filename=kwargs['filename'], path=kwargs['path'])
-            else:
-                self.load(filename=kwargs['filename'])
-            return
-
         self._training_x = deque([0.0]*self._buffer_size)
         self._training_y = deque([0.0]*self._buffer_size)
-        self._generate_network()
 
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._gamma, self._epsilon = 1, lambda x: 0
-            self._default_actions = {}
-            self._learning_rate, self._hidden_layer_sizes, self._input_length = 1e-5, (1,), 1
-            self._batch_size, self._buffer_size, self._validation_split, self._clear_buffer = 10, 0, 0.3, False
-            self._training_x, self._training_y, self._buffer_index, self._buffer_ready = deque(), deque(), -1, False
-            self._tensorboard_path = None
+        if input_length is not None:
+            self._input_length = input_length
+            self._generate_network()
 
-        self._normalized_action_list = [a.normalize().as_list() for a in self._default_actions]
+        self._epoch = 0
+        self._buffer_index = -1
+        self._buffer_ready = False
 
-    def _generate_network(self):
+    def _generate_network(self) -> None:
         '''
         Generate a tensorflow ANN network.
         '''
@@ -100,24 +139,25 @@ class DQNAgent(Agent):
                 self._hidden_layer_sizes[0], activation='relu', name='layer_01', input_shape=(self._input_length,)))
             for i, v in enumerate(self._hidden_layer_sizes[1:]):
                 self._model.add(keras.layers.Dense(
-                    v, activation='relu', name='layer_{:0>2}'.format(i+2)))
+                    v, activation='relu', name=f'layer_{i+2:0>2}'))
 
             self._model.add(keras.layers.Dense(
                 1, name='output'))
 
-            self._model.compile(optimizer='adam', loss='mae')
+            self._model.compile(optimizer=keras.optimizers.Adam(learning_rate=self._lr_initial), loss='mae')
 
-            if self._tensorboard_path is None:
-                self._tensorboard_path = os.path.join('logs', '_'.join(('gma', str(self._gamma), 'eps', 'func' if callable(self._epsilon) else str(self._epsilon),
-                                                            'lrn', str(self._learning_rate), 'hddn', str(
-                                                                self._hidden_layer_sizes),
-                                                            'btch', str(self._batch_size), 'vld', str(self._validation_split))))
-            else:
-                self._tensorboard_path = os.path.join('logs', self._tensorboard_path)
-            self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
+            self._callbacks = []
+            if self._tensorboard_path is not None:
+                self._tensorboard_path = Path('logs', self._tensorboard_path)
+                self._tensorboard = keras.callbacks.TensorBoard(
+                    log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
+                self._callbacks.append(self._tensorboard)
 
-    def _q(self, state, action=None):
+            if self._lr_scheduler is not None:
+                self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(self._lr_scheduler, verbose=1)
+                self._callbacks.append(self._learning_rate_scheduler)
+
+    def _q(self, state: Union[List[rldata.RLData], rldata.RLData], action: Optional[Union[List[rldata.RLData], rldata.RLData]] = None) -> float:
         '''
         Return the Q-value of a state action pair.
 
@@ -126,17 +166,17 @@ class DQNAgent(Agent):
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned. 'None' uses default_actions.
         '''
-        if isinstance(state, RLData):
+        if isinstance(state, rldata.RLData):
             state = [state]
-        state_list = [s.normalize().as_list() for s in state]
+        state_list = [s.normalized.flatten() for s in state]
         len_state = len(state)
 
         if action is None:
             action_list = self._normalized_action_list
         else:
-            if isinstance(action, RLData):
+            if isinstance(action, rldata.RLData):
                 action = [action]
-            action_list = [a.normalize().as_list() for a in action]
+            action_list = [a.normalized.flatten() for a in action]
         len_action = len(action_list)
 
         if len_state == len_action:
@@ -153,7 +193,7 @@ class DQNAgent(Agent):
                 result = self._model.predict(X)
         return result
 
-    def _max_q(self, state):
+    def _max_q(self, state: Union[List[rldata.RLData], rldata.RLData]) -> float:
         '''
         Return MAX(Q) of a state.
 
@@ -168,7 +208,7 @@ class DQNAgent(Agent):
             max_q = 0
         return max_q
 
-    def learn(self, **kwargs):
+    def learn(self, history: List[Dict[str, Any]]) -> None:
         '''
         Learn based on history.
 
@@ -179,53 +219,49 @@ class DQNAgent(Agent):
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
-        if not self._training_flag:
+        if not self.training_mode:
             raise ValueError('Not in training mode!')
         try:
-            history = kwargs['history']
-
             if self._method == 'forward':
-                for i in range(len(history.index)):
-                    state = history.at[i, 'state']
-                    action = history.at[i, 'action']
-                    reward = history.at[i, 'reward']
+                for i in range(len(history)):
+                    state = history[i]['state']
+                    action = history[i]['action']
+                    reward = history[i]['reward'][0].value
                     try:
-                        max_q = self._max_q(history.at[i+1, 'state'])
+                        max_q = self._max_q(history[i+1]['state'])
                         new_q = reward + self._gamma*max_q
-                    except KeyError:
+                    except IndexError:
                         new_q = reward
 
                     try:
                         self._buffer_index += 1
-                        self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[self._buffer_index] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[self._buffer_index] = [new_q]
                     except IndexError:
                         self._buffer_ready = True
-                        self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[0] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[0] = [new_q]
                         self._buffer_index = 1
             
             else:  # backward
-                q_list = [0] * len(history.index)
-                for i in range(len(history.index)-1, -1, -1):
-                    state = history.at[i, 'state']
-                    action = history.at[i, 'action']
-                    reward = history.at[i, 'reward']
+                q_list = [0] * len(history)
+                for i in range(len(history)-1, -1, -1):
+                    state = history[i]['state']
+                    action = history[i]['action']
+                    reward = history[i]['reward'][0].value
                     try:
                         new_q = reward + self._gamma*q_list[i+1]
-                        # max_q = self._max_q(history.at[i+1, 'state'])
-                        # new_q_2 = reward + self._gamma*max_q
                     except IndexError:
                         new_q = reward
                     q_list[i] = new_q
 
                     try:
                         self._buffer_index += 1
-                        self._training_x[self._buffer_index] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[self._buffer_index] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[self._buffer_index] = [new_q]
                     except IndexError:
                         self._buffer_ready = True
-                        self._training_x[0] = state.normalize().as_list() + action.normalize().as_list()
+                        self._training_x[0] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[0] = [new_q]
                         self._buffer_index = 1
 
@@ -234,18 +270,19 @@ class DQNAgent(Agent):
                 with self._session.as_default():
                     with self._graph.as_default():
                         self._model.fit(np.array(self._training_x)[index], np.array(self._training_y)[index],
-                                        epochs=1, callbacks=[self._tensorboard], validation_split=self._validation_split)
+                                        initial_epoch=self._epoch, epochs=self._epoch+1,
+                                        callbacks=self._callbacks,
+                                        validation_split=self._validation_split,
+                                        verbose=2)
 
                 if self._clear_buffer:
                     self._buffer_index = 0
                     self._buffer_ready = False
 
-            return
-
         except KeyError:
             raise RuntimeError('DQNAgent only works using \'history\'')
 
-    def act(self, state, **kwargs):
+    def act(self, state: rldata.RLData, actions: Optional[List[rldata.RLData]] = None, episode: Optional[int] = 0) -> rldata.RLData:
         '''
         return the best action for a given state.
 
@@ -257,14 +294,13 @@ class DQNAgent(Agent):
         Note: If in 'training', the action is chosen randomly with probability of epsilon. In in 'test', the action is greedy.
         '''
         self._previous_state = state
-        possible_actions = kwargs.get('actions', self._default_actions)
-        episode = kwargs.get('episode', 0)
+        possible_actions = actions
         try:
             epsilon = self._epsilon(episode)
         except TypeError:
             epsilon = self._epsilon
 
-        if (self._training_flag) & (random() < epsilon):
+        if (self.training_mode) & (random() < epsilon):
             result = possible_actions
         else:
             q_values = self._q(state, None if possible_actions == self._default_actions else possible_actions)  # None is used to avoid redundant normalization of default_actions
@@ -273,10 +309,9 @@ class DQNAgent(Agent):
 
         action = choice(result)
 
-        self._previous_action = action
         return action
 
-    def load(self, **kwargs):
+    def load(self, filename: str, path: Optional[str] = None) -> None:
         '''
         Load an object from a file.
 
@@ -288,21 +323,22 @@ class DQNAgent(Agent):
 
         Raises ValueError if the filename is not specified.
         '''
-        Agent.load(self, **kwargs)
+        super().load(filename, path)
 
         # To resolve a compatibility issue
         if not hasattr(self, '_normalized_action_list'):
-            self._normalized_action_list = [a.normalize().as_list() for a in self._default_actions]
+            self._normalized_action_list = [a.normalized.flatten() for a in self._default_actions]
 
         self._graph = tf.Graph()
         with self._graph.as_default():
             self._session = keras.backend.get_session()
-            self._model = keras.models.load_model(kwargs.get(
-                'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
+            self._model = keras.models.load_model(Path(path if path is not None else self._path,
+                f'{filename}.tf', filename))
             self._tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self._tensorboard_path)  #, histogram_freq=1)  # , write_images=True)
+            self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(self._lr_scheduler)
 
-    def save(self, **kwargs):
+    def save(self, filename: Optional[str] = None, path: Optional[str] = None, data_to_save: Optional[Sequence[str]] = None) -> Tuple[Union[str, Path], str]:
         '''
         Save the object to a file.
 
@@ -316,23 +352,27 @@ class DQNAgent(Agent):
         '''
 
         pickle_data = tuple(key for key in self.__dict__ if key not in [
-                            '_graph', '_session', '_model', '_tensorboard', 'data_collector'])
-        path, filename = Agent.save(self, **kwargs, data=pickle_data)
+                            '_graph', '_session', '_model', '_tensorboard', '_learning_rate_scheduler', 'data_collector'])
+        _path, filename = super().save(filename, path, data_to_save=pickle_data)
         try:
             with self._session.as_default():
                 with self._graph.as_default():
-                    self._model.save(kwargs.get('path', self._path) + '/' +
-                                    kwargs['filename'] + '.tf/' + kwargs['filename'])
+                    self._model.save(Path(_path, f'{filename}.tf', filename))
         except OSError:
-            os.makedirs(kwargs.get('path', self._path) +
-                        '/' + kwargs['filename'] + '.tf/')
+            os.makedirs(Path(_path, f'{filename}.tf'))
             with self._session.as_default():
                 with self._graph.as_default():
-                    self._model.save(kwargs.get('path', self._path) + '/' +
-                                    kwargs['filename'] + '.tf/' + kwargs['filename'])
-        return path, filename
+                    self._model.save(Path(_path, f'{filename}.tf', filename))
 
-    def _report(self, **kwargs):
+        return _path, filename
+
+    def reset(self) -> None:
+        if self.training_mode:
+            self._buffer_index = 0
+            self._buffer_ready = False
+            self._epoch += 1
+
+    def _report(self, **kwargs) -> None:
         '''
         generate and return the requested report.
 
@@ -344,5 +384,5 @@ class DQNAgent(Agent):
         '''
         raise NotImplementedError
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'DQNAgent'

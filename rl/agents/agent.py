@@ -8,16 +8,16 @@ This `agent` class is the super class of all agent classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from ..rlbase import RLBase
+from rl import rldata
+from typing import Any, Dict, Optional, Sequence
+
+from rl import rlbase
 
 
-def main():
-    pass
-
-class Agent(RLBase):
+class Agent(rlbase.RLBase):
     '''
     Super class of all agent classes.
-    
+
     Attributes
     ----------
         status: return the status of the agent
@@ -28,27 +28,40 @@ class Agent(RLBase):
         learn: learn using either history or action, reward, and state.
         reset: reset the agent.
     '''
-    def __init__(self, **kwargs):
-        RLBase.__init__(self, **kwargs)
-        RLBase.set_defaults(self, training_flag=True)
-        RLBase.set_params(self, **kwargs)
+
+    def __init__(self,
+                 ex_protocol_current: Dict[str, str] = {'mode': 'training'},
+                 ex_protocol_options: Dict[str, Sequence[str]] = {'mode': ['training', 'test']},
+                 **kwargs: Any):
+
+        kwargs['name'] = kwargs.get('name', __name__)
+        kwargs['logger_name'] = kwargs.get('logger_name', __name__)
+
+        self.training_mode: bool = kwargs.get('training_mode', False)
+
+        super().__init__(ex_protocol_current=ex_protocol_current,
+                         ex_protocol_options=ex_protocol_options,
+                         **kwargs)
 
     @property
-    def status(self):
-        '''Return the status of the agent as 'training' or 'testing'.'''
-        if self._training_flag:
+    def status(self) -> str:
+        '''Return the status of the agent as 'training' or 'test'.'''
+        if self.training_mode:
             return 'training'
         else:
-            return 'testing'
+            return 'test'
 
     @status.setter
-    def status(self, value):
+    def status(self, value: str) -> None:
         '''
-        Set the status of the agent as 'training' or 'testing'.
+        Set the status of the agent as 'training' or 'test'.
         '''
-        self._training_flag = (value == 'training')
+        self.training_mode = (value == 'training')
 
-    def act(self, state, **kwargs):
+    def act(self,
+        state: rldata.RLData,
+        actions: Optional[Sequence[rldata.RLData]] = None,
+        episode: Optional[int] = 0) -> rldata.RLData:
         '''
         Return an action based on the given state.
 
@@ -59,14 +72,15 @@ class Agent(RLBase):
 
         Note: If state is 'training' (_training_flag=false), then this function should not return any random move due to exploration.
         '''
-        pass
+        return rldata.RLData({'reward': {'value': 0.0}})
 
-    def learn(self, **kwargs):
-        '''Learn using either history or action, reward, and state.''' 
+    def learn(self, history: Optional[rlbase.History] = None,
+        observation: Optional[rlbase.Observation] = None) -> None:
+        '''Learn using either history or action, reward, and state.'''
         pass
 
     def reset(self):
-        '''Reset the agent at the end of a learning episode.''' 
+        '''Reset the agent at the end of a learning episode.'''
         pass
 
     def __repr__(self):

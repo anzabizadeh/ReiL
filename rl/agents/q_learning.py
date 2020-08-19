@@ -10,7 +10,7 @@ A Q-learning agent
 
 from random import choice, random
 
-from ..legacy import ValueSet
+from ..legacy.valueset import ValueSet
 from .agent import Agent
 
 
@@ -42,10 +42,10 @@ class QAgent(Agent):
             default_actions: list of default actions. (Default = empty ValueSet)
             state_action_list: state action list from a previous training. (Default = {}})
         '''
-        Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, gamma=1, alpha=1, epsilon=0, r_plus=0, n_e=0,
+        self.set_defaults(gamma=1, alpha=1, epsilon=0, r_plus=0, n_e=0,
                            default_actions=ValueSet(), state_action_list={})
-        Agent.set_params(self, **kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
         self.data_collector.available_statistics = {'states q': [False, self._report, '_state_action_list'],
                                                     'states action': [False, self._report, '_state_action_list'],
                                                     'state-actions q': [False, self._report, '_state_action_list'],
@@ -69,7 +69,7 @@ class QAgent(Agent):
             state: the state for which Q-value is returned.
             action: the action for which Q-value is returned.
         '''
-        if self._training_flag:
+        if self.training_mode:
             try:
                 return self._state_action_list[state][action][0] \
                         if self._state_action_list[state][action][1] > self._n_e else self._r_plus
@@ -132,7 +132,7 @@ class QAgent(Agent):
             else:
                 method = ''
 
-        if (self._training_flag) & \
+        if (self.training_mode) & \
            (method == 'e-greedy') & (random() < self._epsilon):
             action = choice(possible_actions)
         else:
@@ -153,16 +153,16 @@ class QAgent(Agent):
 
         Raises ValueError if the agent is not in 'training' mode.
         '''
-        if not self._training_flag:
+        if not self.training_mode:
             raise ValueError('Not in training mode!')
         try:  # history
             history = kwargs['history']
-            previous_state = history[0]
-            for i in range(1, len(history), 3):
-                previous_action = history[i]
-                reward = history[i+1]
+            previous_state = history[0]['state']
+            for i in range(len(history)):
+                previous_action = history[i]['action']
+                reward = history[i]['reward']
                 try:
-                    state = history[i+2]
+                    state = history[i+1]['state']
                 except IndexError:
                     state = None
                 q_sa = self._q(previous_state, previous_action)

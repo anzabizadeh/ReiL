@@ -35,9 +35,7 @@ class WarfarinModel_v2(Subject):
     '''
 
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
-
-        Subject.set_defaults(self, patient_selection='random',
+        self.set_defaults(patient_selection='random',
                              age_list=list(range(70, 86)),
                              CYP2C9_list=['*1/*1', '*1/*2',
                                           '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
@@ -49,8 +47,8 @@ class WarfarinModel_v2(Subject):
                              dose_history=10, pill_per_day=1, randomized=True,
                              dose_list=[None]*10
                              )
-
-        Subject.set_params(self, **kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         self._maxTime = self._dose_history*24
         result = hamberg_2007(self._current_dose, self._Cs_super, self._age, self._CYP2C9,
@@ -169,8 +167,8 @@ class WarfarinModel_v2(Subject):
             self._agent_list[agent_name] = 1
             return 1
 
-    def take_effect(self, _id, action):
-        self._current_dose = action.value[0]
+    def take_effect(self, action, _id=None):
+        self._current_dose = action.value
         self._d_previous = self._d_current
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
@@ -240,7 +238,7 @@ class WarfarinModel_v2(Subject):
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: [age: {}, CYP2C9: {}, VKORC1: {}, INR_prev: {}, INR: {}, d_prev: {}, d: {}]'.format(
-                self._age, self._CYP2C9, self._VKORC1, self._INR_previous, self._INR_current, self._d_previous, self._d_current)
+            return f'WarfarinModel: [age: {self._age}, CYP2C9: {self._CYP2C9}, VKORC1: {self._VKORC1}, ' \
+                   f'INR_prev: {self._INR_previous}, INR: {self._INR_current}, d_prev: {self._d_previous}, d: {self._d_current}]'
         except:
             return 'WarfarinModel'

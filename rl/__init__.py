@@ -14,6 +14,7 @@ submodules
         state and reward.
     environments: objects that connect agents to subjects and
         elapse time.
+    stats: objects that compute statistics.
     rlbase: base class for all rl objects.
     rldata: a data type to store states and actions.
     utils: all classes that are not part of the agent, subject, environment framework.
@@ -24,10 +25,11 @@ submodules
 
 
 __all__ = ['agents',
+           'data_collector',
            'environments',
-           'subjects',
+           'legacy',
            'rlbase',
            'rldata',
-           'data_collector',
-           'utils',
-           'legacy']
+           'stats',
+           'subjects',
+           'utils']

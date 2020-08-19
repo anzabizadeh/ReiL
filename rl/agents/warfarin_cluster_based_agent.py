@@ -10,7 +10,7 @@ An agent that produces action based on similarity of the state with clusters.
 
 
 import os
-from pickle import HIGHEST_PROTOCOL, dump, load
+from dill import HIGHEST_PROTOCOL, dump, load
 from random import choice, random
 from time import time
 from scipy.stats import norm
@@ -47,18 +47,19 @@ class WarfarinClusterAgent(Agent):
             rule based: argument `rule_base_filename` should specify the file that contains rules.
             two phase: argument `phase_change_day` should specify the change day. During each phase, average dose for the cluster is applied.
         '''
-        Agent.__init__(self, **kwargs)
-        Agent.set_defaults(self, default_actions={}, cluster_filename=cluster_filename,
+        self.set_defaults(default_actions={}, cluster_filename=cluster_filename,
                          type='smoothed', day=0, max_day=90, previous_dose=0.0, max_dose=15.0,
                          smoothing_dose_threshold=0.0, dose_step=0.5, rule_base_filename=None, phase_change_day=0)
-        Agent.set_params(self, **kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
+
         self.data_collector.available_statistics = {}
         self.data_collector.active_statistics = []
 
         try:
             self._cluster_data = pd.read_csv(self._cluster_filename, sep=',', index_col='Index')
         except FileNotFoundError:
-            raise FileNotFoundError('{} not found.'.format(kwargs['cluster_filename']))
+            raise FileNotFoundError(f'{kwargs["cluster_filename"]} not found.')
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -115,9 +116,9 @@ class WarfarinClusterAgent(Agent):
 
         if self._type == 'smoothed':
             try:
-                dose = round(self._cluster_data.at['dose {:02} mean'.format(self._day), str(self._cluster_label)] / self._dose_step) * self._dose_step
+                dose = round(self._cluster_data.at[f'dose {self._day:02} mean', str(self._cluster_label)] / self._dose_step) * self._dose_step
             except ZeroDivisionError:
-                dose = self._cluster_data.at['dose {:02} mean'.format(self._day), str(self._cluster_label)]
+                dose = self._cluster_data.at[f'dose {self._day:02} mean', str(self._cluster_label)]
 
             if abs(dose - self._previous_dose) >= self._smoothing_dose_threshold:
                 action = RLData(dose, lower=0.0, upper=15.0)
@@ -126,10 +127,10 @@ class WarfarinClusterAgent(Agent):
                 action = RLData(self._previous_dose, lower=0.0, upper=15.0)
         elif self._type == 'two phase':
             if self._day == 0:
-                self._dose = np.average(self._cluster_data.loc[['dose {:02} mean'.format(i) for i in range(self._phase_change_day)],
+                self._dose = np.average(self._cluster_data.loc[[f'dose {i:02} mean' for i in range(self._phase_change_day)],
                                                                str(self._cluster_label)])
             elif self._day == self._phase_change_day:
-                self._dose = np.average(self._cluster_data.loc[['dose {:02} mean'.format(i) for i in range(self._phase_change_day, self._max_day)],
+                self._dose = np.average(self._cluster_data.loc[[f'dose {i:02} mean' for i in range(self._phase_change_day, self._max_day)],
                                                                str(self._cluster_label)])
             
             action = RLData(self._dose, lower=0.0, upper=15.0)
@@ -146,7 +147,7 @@ class WarfarinClusterAgent(Agent):
 
     def __repr__(self):
         try:
-            return 'WarfarinClusterAgent({})'.format(self._cluster_filename)
+            return f'WarfarinClusterAgent({self._cluster_filename})'
         except AttributeError:
             return 'WarfarinClusterAgent'
 

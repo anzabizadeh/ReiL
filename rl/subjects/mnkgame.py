@@ -20,9 +20,9 @@ def main():
     player = {}
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')
-    board.take_effect(player['P1'], RLData(0))  # ValueSet(0))
-    board.take_effect(player['P2'], RLData(1))  # ValueSet(1))
-    print(board.printable())
+    board.take_effect(RLData(0), player['P1'])  # ValueSet(0))
+    board.take_effect(RLData(1), player['P2'])  # ValueSet(1))
+    print(f'{board}')
 
 
 class MNKGame(MNKBoard, Subject):
@@ -58,10 +58,10 @@ class MNKGame(MNKBoard, Subject):
             k: winning criteria (default=3)
             players: number of players (default=2)
         '''
-        MNKBoard.__init__(self, **kwargs, can_recapture=False)
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, board_status=None)
-        Subject.set_params(self, **kwargs)
+        self.set_defaults(board_status=None)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs, can_recapture=False)
+        super().__init__(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -92,19 +92,19 @@ class MNKGame(MNKBoard, Subject):
         '''
         return Subject.register(self, player_name)
 
-    def take_effect(self, id_, action):
+    def take_effect(self, action, _id):
         '''
         Set a piece for the given player on the board.
 
         Arguments
         ---------
-            id_: ID of the player who sets the piece.
+            _id: ID of the player who sets the piece.
             action: the location in which the piece is set. Can be either in index format or row column format.
         ''' 
-        self._set_piece(id_, index=int(action.value[0]), update='yes')
+        self._set_piece(_id, index=int(action.value[0]), update='yes')
         if self._board_status is None:
             return 0
-        if self._board_status == id_:
+        if self._board_status == _id:
             return 1
         if self._board_status > 0:
             return -1

@@ -24,9 +24,9 @@ def main():
     for _ in range(10):
         print(board.state)
         my_action = choice(board.possible_actions)
-        board.take_effect(1, my_action)
+        board.take_effect(my_action, 1)
         print(my_action.value)
-        print(board.printable())
+        print(f'{board}')
 
 
 class WindyGridworld(MNKBoard, Subject):
@@ -59,9 +59,9 @@ class WindyGridworld(MNKBoard, Subject):
             move_pattern: whether to choose 'R'ook moves or 'Q'ueen moves. (default='R')
             state_type: board (zero one list), tuple ()
         '''
-        Subject.__init__(self, **kwargs)
-        Subject.set_defaults(self, dim=(5, 5), start=(0, 0), goal=(4, 4), h_wind=[0]*5, v_wind=[0]*5, move_pattern='R')
-        Subject.set_params(self, **kwargs)
+        self.set_defaults(dim=(5, 5), start=(0, 0), goal=(4, 4), h_wind=[0]*5, v_wind=[0]*5, move_pattern='R')
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -77,7 +77,7 @@ class WindyGridworld(MNKBoard, Subject):
 
         self._default_moves = ValueSet(moves, binary=lambda x:(moves.index(x), len(moves))).as_valueset_array()
 
-        MNKBoard.__init__(self, m=self._dim[0], n=self._dim[1], players=1)
+        super().__init__(m=self._dim[0], n=self._dim[1], players=1)
         self.reset()
 
     @property
@@ -110,13 +110,13 @@ class WindyGridworld(MNKBoard, Subject):
             return Subject.register(self, player_name)
         raise ValueError('Windy Gridworld only accepts one player.')
 
-    def take_effect(self, id_, action):
+    def take_effect(self, action, _id=None):
         '''
         Move according to the action.
 
         Arguments
         ---------
-            id_: ID of the player.
+            _id: ID of the player.
             action: the location in which the piece is set. Can be either in index format or row column format.
         '''
         row, column = [*self._player_location]

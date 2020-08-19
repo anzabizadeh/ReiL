@@ -40,9 +40,7 @@ class WarfarinModel_v4(Subject):
     '''
 
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
-
-        Subject.set_defaults(self, patient_selection='random',
+        self.set_defaults(patient_selection='random',
                              list_of_characteristics={'age': (71, 86),
                                                       # lb
                                                       'weight': (35, 370),
@@ -96,7 +94,8 @@ class WarfarinModel_v4(Subject):
                 except KeyError:
                     pass
 
-        Subject.set_params(self, **kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         if False:
             self._model_filename = ''
@@ -146,7 +145,7 @@ class WarfarinModel_v4(Subject):
         if self._save_patients:
             if not self._patient_save_overwrite and not self._patient_use_existing:
                 while os.path.exists(os.path.join(self._patients_save_path,
-                                                  ''.join((self._patients_save_prefix, '{:06}'.format(self._filename_counter))))):
+                                                  ''.join((self._patients_save_prefix, f'{self._filename_counter:06}')))):
                     self._filename_counter += 1
 
         self.reset()
@@ -228,8 +227,8 @@ class WarfarinModel_v4(Subject):
             self._agent_list[agent_name] = 1
             return 1
 
-    def take_effect(self, _id, action):
-        self._current_dose = action.value[0]
+    def take_effect(self, action, _id=None):
+        self._current_dose = action.value
         self._d_previous = self._d_current
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
@@ -332,7 +331,7 @@ class WarfarinModel_v4(Subject):
                                 randomized=self._randomized, max_time=self._max_time)
 
         current_patient = os.path.join(self._patients_save_path,
-                                        ''.join((self._patients_save_prefix, '{:06}'.format(self._filename_counter))))
+                                        ''.join((self._patients_save_prefix, f'{self._filename_counter:06}')))
         if self._save_patients and not self._patient_save_overwrite:
             try:
                 # self._patient = Patient()
@@ -371,8 +370,8 @@ class WarfarinModel_v4(Subject):
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: {}, INR: {}, d_prev: {}, d: {}'.format(
-                [' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()], self._INR, self._d_previous, self._d_current)
+            return f"WarfarinModel: {[' '.join((str(k), ':', str(v))) for k, v in self._characteristics.items()]}, " \
+                f"INR: {self._INR}, d_prev: {self._d_previous}, d: {self._d_current}"
         except:
             return 'WarfarinModel'
 
@@ -402,9 +401,9 @@ class Patient(RLBase):
 
     def __init__(self, age=50, CYP2C9='*1/*1', VKORC1='G/A', randomized=True, max_time=24,
                  dose_interval=24, dose={}, lazy=False, **kwargs):
-        RLBase.__init__(self, **kwargs)
-        RLBase.set_defaults(self, **kwargs)
-        RLBase.set_params(self, **kwargs)
+        self.set_defaults(**kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         self._age = age
         self._CYP2C9 = CYP2C9

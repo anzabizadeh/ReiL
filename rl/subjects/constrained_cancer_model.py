@@ -29,10 +29,10 @@ class ConstrainedCancerModel(CancerModel):
         reset: reset the state and is_terminated.
     '''
     def __init__(self, **kwargs):
-        CancerModel.__init__(self, **kwargs)
         self.set_defaults(drug_cap=lambda x: kwargs.get('u_max', 0))
         if 'drug_cap' in kwargs:
             self.set_params(drug_cap=kwargs['drug_cap'])
+        super().__init__(**kwargs)
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
@@ -46,8 +46,8 @@ class ConstrainedCancerModel(CancerModel):
         return ValueSet([self._x['drug_cap']*x/self._u_steps for x in range(0, self._u_steps+1)], min=0, max=self._u_max, 
                         binary=lambda x: (int(x * self._u_steps // self._u_max), self._u_steps+1)).as_valueset_array()
 
-    def take_effect(self, _id, action):
-        r = CancerModel.take_effect(self, _id, action)
+    def take_effect(self, action, _id=None):
+        r = CancerModel.take_effect(self, action, _id)
         self._x['drug_cap'] = self._drug_cap(self._x)
         return r
 
@@ -57,7 +57,7 @@ class ConstrainedCancerModel(CancerModel):
 
     def __repr__(self):
         try:
-            return 'ConstrainedCancerModel: [day: {}, N: {}, T: {}, N: {}, C: {}, drug cap: {}]'.format(
-                self._x['day'], self._x['normal_cells'], self._x['tumor_cells'], self._x['immune_cells'], self._x['drug'], self._x.get('drug_cap','N/A'))
+            return f"ConstrainedCancerModel: [day: {self._x['day']}, N: {self._x['normal_cells']}, T: {self._x['tumor_cells']}, " \
+                   f"N: {self._x['immune_cells']}, C: {self._x['drug']}, drug cap: {self._x.get('drug_cap','N/A')}]"
         except:
             return 'ConstrainedCancerModel'

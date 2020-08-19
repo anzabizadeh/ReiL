@@ -39,9 +39,7 @@ class WarfarinModel_v3(Subject):
     '''
 
     def __init__(self, **kwargs):
-        Subject.__init__(self, **kwargs)
-
-        Subject.set_defaults(self, patient_selection='random',
+        self.set_defaults(patient_selection='random',
                              age_list=list(range(71, 86)),
                              CYP2C9_list=['*1/*1', '*1/*2',
                                           '*1/*3', '*2/*2', '*2/*3', '*3/*3'],
@@ -53,8 +51,8 @@ class WarfarinModel_v3(Subject):
                              dose_history=5, INR_history=5, pill_per_day=1, randomized=True,
                              dose_list=[None]*5, dose_change_penalty_coef=0
                              )
-
-        Subject.set_params(self, **kwargs)
+        self.set_params(**kwargs)
+        super().__init__(**kwargs)
 
         if False:
             self._model_filename = ''
@@ -138,8 +136,8 @@ class WarfarinModel_v3(Subject):
             self._agent_list[agent_name] = 1
             return 1
 
-    def take_effect(self, _id, action):
-        self._current_dose = action.value[0]
+    def take_effect(self, action, _id=None):
+        self._current_dose = action.value
         self._d_previous = self._d_current
         self._dose_list.append(self._current_dose)
         self._dose_list.popleft()
@@ -192,8 +190,8 @@ class WarfarinModel_v3(Subject):
 
     def __repr__(self):
         try:
-            return 'WarfarinModel: [age: {}, CYP2C9: {}, VKORC1: {}, INR: {}, d_prev: {}, d: {}]'.format(
-                self._age, self._CYP2C9, self._VKORC1, self._INR, self._d_previous, self._d_current)
+            return f'WarfarinModel: [age: {self._age}, CYP2C9: {self._CYP2C9}, VKORC1: {self._VKORC1}, ' \
+                   f'INR: {self._INR}, d_prev: {self._d_previous}, d: {self._d_current}]'
         except:
             return 'WarfarinModel'
 
