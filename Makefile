@@ -1,5 +1,5 @@
 init:
-	python -m pip install -r requirements.txt
+	python -m pip install --no-cache-dir -r requirements.txt
 
 test:
 	python -m unittest tests
