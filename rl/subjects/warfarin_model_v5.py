@@ -324,7 +324,7 @@ class WarfarinModel_v5(subjects.Subject):
 
     @property
     # only considers the dose
-    def possible_actions(self) -> List[rldata.RLData]:
+    def possible_actions(self) -> Union[rldata.RLData, List[rldata.RLData]]:
         try:
             if self._interval_max_dose[self._interval_index] < self._max_dose:
                 return rldata.RLData(({

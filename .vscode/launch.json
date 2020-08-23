@@ -23,7 +23,7 @@
             "debugOptions": [
                 "RedirectOutput"
             ],
-            "justMyCode": false
+            "justMyCode": true
         },
         {
             "name": "Python: Attach",
