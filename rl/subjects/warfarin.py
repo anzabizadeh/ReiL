@@ -422,7 +422,7 @@ class Warfarin(subjects.Subject):
             elif s == 'delta_dose':
                 temp = sum(abs(x-self._full_dose_history[i+1]) for i, x in enumerate(self._full_dose_history[:-1]))
             else:
-                print(f'WARNING! {s} is not one of the available stats!')
+                self._logger.warning(f'WARNING! {s} is not one of the available stats!')
                 continue
 
             results[s] = temp
