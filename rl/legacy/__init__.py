@@ -13,6 +13,8 @@ Classes
     WarfarinModel_v2
     WarfarinModel_v3
     WarfarinModel_v4
+    WarfarinLookAhead
+    WarfarinModelFixedInterval
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
@@ -37,3 +39,5 @@ from .legacyrldata import LegacyRLData
 # from .warfarin_model_v2 import WarfarinModel_v2
 # from .warfarin_model_v3 import WarfarinModel_v3
 # from .warfarin_model_v4 import WarfarinModel_v4
+from .warfarin_lookahead import WarfarinLookAhead
+from .warfarin_model_fixed_intervals import WarfarinModelFixedInterval

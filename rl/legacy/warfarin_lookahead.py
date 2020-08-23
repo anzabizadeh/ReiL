@@ -1,8 +1,8 @@
-from rl.subjects.warfarin_model_v5 import WarfarinModel_v5
+from rl.subjects.warfarin import Warfarin
 from rl.rldata import RLData
 from copy import deepcopy
 
-class WarfarinLookAhead(WarfarinModel_v5):
+class WarfarinLookAhead(Warfarin):
     def __init__(self, **kwargs):
         self._lookahead_duration = kwargs.get('lookahead_duration', 7)
         kwargs['max_day'] = kwargs.get('max_day', 90) + self._lookahead_duration

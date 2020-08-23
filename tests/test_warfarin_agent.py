@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 from rl.agents import WarfarinAgent
-from rl.subjects import WarfarinModel_v5
+from rl.subjects import Warfarin
 
 
 class testWarfarinAgent(unittest.TestCase):
@@ -68,7 +68,7 @@ class testWarfarinAgent(unittest.TestCase):
 
                 # print(f'Patient ID: {patient_info.name}')
 
-                w = WarfarinModel_v5(characteristics={'age': patient_info.AGE, 'weight': patient_info.WEIGHT, 'height': patient_info.HEIGHT,
+                w = Warfarin(characteristics={'age': patient_info.AGE, 'weight': patient_info.WEIGHT, 'height': patient_info.HEIGHT,
                                                       'CYP2C9': patient_info.CYP2C9, 'VKORC1': patient_info.VKORC1,
                                                       'gender': patient_info.GENDER,
                                                       'race': {'White': 'White',

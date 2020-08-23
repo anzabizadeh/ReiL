@@ -19,7 +19,7 @@ import numpy as np  # type: ignore
 from rl import rldata, subjects, utils
 
 
-class WarfarinModel_v5(subjects.Subject):
+class Warfarin(subjects.Subject):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model for wafarin.
 

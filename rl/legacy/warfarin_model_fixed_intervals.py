@@ -18,10 +18,10 @@ from collections import deque
 
 from ..rlbase import RLBase
 from ..rldata import RLData
-from ..subjects import WarfarinModel_v5
+from ..subjects import Warfarin
 from ..utils import Patient
 
-class WarfarinModelFixedInterval(WarfarinModel_v5):
+class WarfarinModelFixedInterval(Warfarin):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model for wafarin.
 

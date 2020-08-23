@@ -17,7 +17,7 @@ Classes
 
     CancerModel: a 4-ordinary differential equation model of cancer (uses legacy ValueSet instead of RLData)
     ConstrainedCancerModel: a constrained version of CancerModel (uses legacy ValueSet instead of RLData)
-    WarfarinModel_v5: a PK/PD model for warfarin with extended state definition
+    Warfarin: a PK/PD model for warfarin with extended state definition
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
@@ -27,7 +27,5 @@ from .mnkgame import MNKGame
 from .windy_gridworld import WindyGridworld
 from .cancer_model import CancerModel
 from .constrained_cancer_model import ConstrainedCancerModel
-from .warfarin_model_v5 import WarfarinModel_v5
+from .warfarin import Warfarin
 from .iterable_subject import IterableSubject
-from .warfarin_lookahead import WarfarinLookAhead
-from .warfarin_model_fixed_intervals import WarfarinModelFixedInterval
