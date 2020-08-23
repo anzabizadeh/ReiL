@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 
 import pandas as pd
-from .context.rl.agents import WarfarinAgent
-from .context.rl.subjects import WarfarinModel_v5
+from rl.agents import WarfarinAgent
+from rl.subjects import WarfarinModel_v5
 
 
 class testWarfarinAgent(unittest.TestCase):

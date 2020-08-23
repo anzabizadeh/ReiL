@@ -1,7 +1,7 @@
 import unittest
 from random import randint, sample
 
-from .context.rl.legacy import LegacyRLData
+from rl.legacy import LegacyRLData
 
 
 class testLegacyRLData(unittest.TestCase):
