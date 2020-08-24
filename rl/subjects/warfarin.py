@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-  pylint: disable=undefined-variable
 '''
-warfarin_model class
-==================
+warfarin class
+==============
 
-This `warfarin_model` class implements a two compartment PK/PD model for warfarin. 
+This `warfarin` class implements a two compartment PK/PD model for warfarin. 
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
