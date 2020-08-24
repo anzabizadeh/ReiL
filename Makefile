@@ -1,6 +1,6 @@
 #!/bin/bash
 
-.PHONY = clean-pyc clean-build init lint test
+.PHONY = clean-pyc clean-build setup lint test
 
 help:
 	@echo "	clean-pyc"
