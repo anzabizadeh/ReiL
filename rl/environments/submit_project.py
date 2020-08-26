@@ -8,7 +8,7 @@ Submit projects to Argon
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from hpc import job_scheduler
+from compute_resources import job_scheduler
 
 #TODO: disable_gpu is duplicate. The other one is in `warfarin_main_iterable.py`
 disable_gpu = True
