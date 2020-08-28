@@ -7,7 +7,7 @@ with open('LICENSE') as f:
     license = f.read()
 
 setup(name='Reinforcement Learning',
-      version='0.5',
+      version='0.5.0',
       description='The reinforcement learning module for Python',
       long_description=readme,
       url='https://research-git.uiowa.edu/sanzabizadeh/Reinforcement-Learning',
