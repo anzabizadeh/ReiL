@@ -11,7 +11,7 @@ This `subject` class emulates mnk game.
 
 from ..utils.mnkboard import MNKBoard
 from ..subjects.subject import Subject
-# from rl.valueset import ValueSet
+# from reil.valueset import ValueSet
 from ..rldata import RLData
 
 

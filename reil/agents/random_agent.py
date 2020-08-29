@@ -10,7 +10,7 @@ An agent that randomly chooses an action
 
 from random import choice
 
-from rl.agents import Agent
+from reil.agents import Agent
 
 
 class RandomAgent(Agent):

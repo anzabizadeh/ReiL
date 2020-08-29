@@ -16,7 +16,7 @@ import random
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np  # type: ignore
-from rl import rldata, subjects, utils
+from reil import rldata, subjects, utils
 
 
 class Warfarin(subjects.Subject):

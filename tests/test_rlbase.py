@@ -1,6 +1,6 @@
 import unittest
 
-from rl.rlbase import RLBase
+from reil.rlbase import RLBase
 
 
 class testRLData(unittest.TestCase):

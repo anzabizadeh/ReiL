@@ -12,7 +12,7 @@ from logging import WARNING
 from math import exp, log, sqrt
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from rl import rlbase, rldata, agents
+from reil import rlbase, rldata, agents
 
 
 class WarfarinAgent(agents.Agent):

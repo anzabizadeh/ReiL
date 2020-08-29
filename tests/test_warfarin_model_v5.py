@@ -1,6 +1,6 @@
 import unittest
 
-from rl.subjects import Warfarin
+from reil.subjects import Warfarin
 
 class testRLData(unittest.TestCase):
     def test_object_creation(self):

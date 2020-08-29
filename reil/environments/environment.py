@@ -11,12 +11,12 @@ This `environment` class provides a learning environment for any reinforcement l
 import functools
 import pathlib
 from collections import defaultdict
-from rl.subjects.subject import Subject
+from reil.subjects.subject import Subject
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from rl import agents as rlagents
-from rl import rlbase, rldata
-from rl import subjects as rlsubjects
+from reil import agents as rlagents
+from reil import rlbase, rldata
+from reil import subjects as rlsubjects
 
 AgentSubjectTuple = Tuple[str, str]
 

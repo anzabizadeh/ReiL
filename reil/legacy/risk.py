@@ -10,8 +10,8 @@ This `subject` class emulates dice throwing in Risk board game.
 
 from random import randrange
 
-from rl.valueset import ValueSet
-from rl.subjects.subject import Subject
+from reil.valueset import ValueSet
+from reil.subjects.subject import Subject
 
 
 def main():

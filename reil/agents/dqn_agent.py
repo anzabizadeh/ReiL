@@ -19,8 +19,8 @@ import numpy as np  # type: ignore
 import tensorflow as tf  # type: ignore
 from tensorflow import keras  # type: ignore
 
-from rl import rldata
-from rl import agents
+from reil import rldata
+from reil import agents
 
 
 class DQNAgent(agents.Agent):

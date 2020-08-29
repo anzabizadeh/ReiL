@@ -11,8 +11,8 @@ It serves as a super class for MNKGame.
 
 import pickle
 
-# from rl.valueset import ValueSet
-from rl.rldata import RLData
+# from reil.valueset import ValueSet
+from reil.rldata import RLData
 
 def main():
     # create a board and set piece for each player and print the board

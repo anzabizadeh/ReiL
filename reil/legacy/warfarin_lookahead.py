@@ -1,5 +1,5 @@
-from rl.subjects.warfarin import Warfarin
-from rl.rldata import RLData
+from reil.subjects.warfarin import Warfarin
+from reil.rldata import RLData
 from copy import deepcopy
 
 class WarfarinLookAhead(Warfarin):

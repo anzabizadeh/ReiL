@@ -1,7 +1,7 @@
 import unittest
 from random import randint, sample
 
-from rl import rldata
+from reil import rldata
 
 
 class testRLData(unittest.TestCase):

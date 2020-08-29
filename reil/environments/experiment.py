@@ -15,9 +15,9 @@ import os
 import pandas as pd
 import numpy as np
 
-from rl.environments import Environment
-import rl.agents as agents
-import rl.subjects as subjects
+from reil.environments import Environment
+import reil.agents as agents
+import reil.subjects as subjects
 
 
 class Experiment(Environment):
@@ -180,8 +180,8 @@ class Experiment(Environment):
 
 
 if __name__ == "__main__":
-    from rl.agents import RandomAgent
-    from rl.subjects import WarfarinModel_v4
+    from reil.agents import RandomAgent
+    from reil.subjects import WarfarinModel_v4
 
     def index_generator(number_of_subjects, start_number=3, digits=5):
         for i in range(start_number, start_number + number_of_subjects):

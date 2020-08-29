@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import dill  # type: ignore
 
-from rl import data_collector, rldata
+from reil import data_collector, rldata
 
 Observation = Dict[str, Union[rldata.RLData, numbers.Number]]
 History = List[Observation]

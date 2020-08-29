@@ -8,10 +8,10 @@ This `agent` class is the super class of all agent classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from rl import rldata
+from reil import rldata
 from typing import Any, Dict, Optional, Sequence
 
-from rl import rlbase
+from reil import rlbase
 
 
 class Agent(rlbase.RLBase):

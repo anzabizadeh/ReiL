@@ -10,7 +10,7 @@ This `subject` class is the super class of all subject classes.
 
 from typing import Any, Dict, Optional, Sequence
 
-from rl import rlbase, rldata
+from reil import rlbase, rldata
 
 
 class Subject(rlbase.RLBase):

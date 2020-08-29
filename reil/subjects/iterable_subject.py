@@ -11,8 +11,8 @@ This `iterable subject` class takes any `subject` object and returns an iterator
 import pathlib
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
-import rl.subjects as rlsubjects
-from rl import rlbase, rldata
+import reil.subjects as rlsubjects
+from reil import rlbase, rldata
 
 
 class IterableSubject(rlbase.RLBase):

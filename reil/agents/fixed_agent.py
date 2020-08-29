@@ -8,7 +8,7 @@ An agent that always chooses a fixed action
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from rl.agents import Agent
+from reil.agents import Agent
 
 
 class FixedAgent(Agent):

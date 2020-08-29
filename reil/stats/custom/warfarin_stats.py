@@ -3,7 +3,7 @@ import re
 from typing import Any, Dict, Optional, Sequence, Union
 
 import pandas as pd
-from rl import rlbase, stats
+from reil import rlbase, stats
 
 conditionals = {'<=': op.le,
                 '>=': op.ge,
