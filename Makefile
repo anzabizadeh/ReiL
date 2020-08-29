@@ -26,7 +26,7 @@ clean-build:
 
 setup:
 	python -m pip install --no-cache-dir --user -r requirements.txt
-	python -m pip install --user Reinforcement-Learning
+	python -m pip install -e --user .
 
 lint:
 	flake8 --exclude=.tox
