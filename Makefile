@@ -25,11 +25,11 @@ clean-build:
 	rm --force --recursive *.egg-info
 
 setup:
-	python -m pip install --no-cache-dir --user -r requirements.txt
-	python -m pip install -e --user .
+	python3 -m pip install --no-cache-dir --user -r requirements.txt
+	python3 -m pip install -e --user .
 
 lint:
 	flake8 --exclude=.tox
 
 test:
-	python -m unittest tests
+	python3 -m unittest tests
