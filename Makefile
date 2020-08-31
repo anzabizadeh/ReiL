@@ -26,7 +26,7 @@ clean-build:
 
 setup:
 	python3 -m pip install --no-cache-dir --user -r requirements.txt
-	python3 -m pip install -e --user .
+	python3 -m pip install --user -e .
 
 lint:
 	flake8 --exclude=.tox
