@@ -169,6 +169,8 @@ class Warfarin(subjects.Subject):
         elif len(interval_max_dose) != len(self._interval):
             self._logger.warning(
                 'interval_max_dose does not match "interval" in length. max_dose will be used for intervals without interval_max_dose values.')
+        else:
+            self._interval_max_dose = interval_max_dose
 
         self._lookahead_duration = lookahead_duration
         self._lookahead_penalty_coef = lookahead_penalty_coef
