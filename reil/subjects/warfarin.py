@@ -580,14 +580,21 @@ class Warfarin(subjects.Subject):
 
     def _get_next_interval(self) -> int:
         if self._interval[self._interval_index] < 0:
-            if not (self._therapeutic_range[0] <= self._decision_points_INR_history[self._decision_points_index] <= self._therapeutic_range[1]):
-                self._interval_index -= 1
+            if (self._therapeutic_range[0] <= self._decision_points_INR_history[self._decision_points_index] <= self._therapeutic_range[1]):
+                self._interval_index = min(self._interval_index + 1, len(self._interval) - 1)
+                interval = self._interval[self._interval_index]
+                self._interval_index = min(self._interval_index + 1, len(self._interval) - 1)
+            else:
+                interval = self._interval[self._interval_index]
 
-        try:
-            interval = self._interval[self._interval_index + 1]
-            self._interval_index += 1
-        except IndexError:
+        else:
             interval = self._interval[self._interval_index]
+            self._interval_index = min(self._interval_index + 1, len(self._interval) - 1)
+        # try:
+        #     interval = self._interval[self._interval_index + 1]
+        #     self._interval_index += 1
+        # except IndexError:
+        #     interval = self._interval[self._interval_index]
 
         return abs(interval)
 
