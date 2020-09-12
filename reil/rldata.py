@@ -315,8 +315,12 @@ class RLData(MutableSequence):
                              each object. If fails, True is assumed.
         '''
         self._data = []
+        self._clear_temps()
 
         def _from_tuple(d: Tuple[str, Mapping[str, Any]]) -> RangedData:
+            if isinstance(d, BaseRLData):
+                return d
+
             return RangedData(
                     name=d[0],
                     value=d[1].get('value'),
@@ -330,8 +334,9 @@ class RLData(MutableSequence):
                         'lazy_evaluation': lazy_evaluation if lazy_evaluation is not None
                             else d[1].get('lazy_evaluation', True)})
 
-        def _from_dict(val: Union[BaseRLData, Mapping[str, Any]]) -> RangedData:
-            v = val.as_dict() if isinstance(val, BaseRLData) else val
+        def _from_dict(v: Union[BaseRLData, Mapping[str, Any]]) -> RangedData:
+            if isinstance(v, BaseRLData):
+                return v
 
             return RangedData(
                     name=v['name'],
@@ -400,6 +405,13 @@ class RLData(MutableSequence):
 
         return cls(temp)
 
+    def _clear_temps(self):
+        self._value = None
+        self._lower = None
+        self._upper = None
+        self._categories = None
+        self._categorical = None
+
     def index(self, value: Any, start: int = 0, stop: Optional[int] = None) -> int:
         _stop = stop if stop is not None else len(self._data)
         if isinstance(value, BaseRLData):
@@ -422,43 +434,62 @@ class RLData(MutableSequence):
     @property
     def value(self) -> Dict[str, Any]:
         '''Returns a dictionary of (name, RangedData) form.'''
-        return dict((v.name, v.value) for v in self._data)
+        if self._value is None:
+            self._value = dict((v.name, v.value) for v in self._data)
+
+        return self._value
 
     @value.setter
     def value(self, v: Dict[str, Any]):
+        self._value = None
         for key, val in v.items():
             self._data[self.index(key)].value = val
 
     @property
     def lower(self) -> Dict[str, Number]:
-        return dict((v.name, v.lower) for v in self._data if hasattr(v, 'lower'))
+        if self._lower is None:
+            self._lower = dict((v.name, v.lower) for v in self._data if hasattr(v, 'lower'))
+
+        return self._lower
 
     @lower.setter
     def lower(self, value: Dict[str, Number]) -> None:
+        self._lower = None
         for key, val in value.items():
             self._data[self.index(key)].lower = val
 
     @property
     def upper(self) -> Dict[str, Number]:
-        return dict((v.name, v.upper) for v in self._data if hasattr(v, 'upper'))
+        if self._upper is None:
+            self._upper = dict((v.name, v.upper) for v in self._data if hasattr(v, 'upper'))
+
+        return self._upper
 
     @upper.setter
     def upper(self, value: Dict[str, Number]) -> None:
+        self._upper = None
         for key, val in value.items():
             self._data[self.index(key)].upper = val
 
     @property
     def categories(self) -> Dict[str, Sequence[Any]]:
-        return dict((v.name, v.categories) for v in self._data if hasattr(v, 'categories'))
+        if self._categories is None:
+            self._categories = dict((v.name, v.categories) for v in self._data if hasattr(v, 'categories'))
+
+        return self._categories
 
     @categories.setter
     def categories(self, value: Dict[str, Sequence[Any]]) -> None:
+        self._categories = None
         for key, val in value.items():
             self._data[self.index(key)].categories = val
 
     @property
     def categorical(self) -> Dict[str, Sequence[bool]]:
-        return dict((v.name, v.categorical) for v in self._data)
+        if self._categorical is None:
+            self._categorical = dict((v.name, v.categorical) for v in self._data)
+
+        return self._categorical
 
     @property
     def normalized(self) -> RLData:
@@ -523,6 +554,7 @@ class RLData(MutableSequence):
             raise TypeError(
                 'Only variables of type BaseRLData and subclasses are acceptable.')
 
+        self._clear_temps()
         return self._data.__setitem__(i, o)
 
     def __delitem__(self, i: Union[int, slice]) -> None:
@@ -533,6 +565,7 @@ class RLData(MutableSequence):
             raise TypeError(
                 'Only variables of type BaseRLData and subclasses are acceptable.')
 
+        self._clear_temps()
         self._data.insert(index, value)
 
     def __len__(self) -> int:
