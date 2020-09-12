@@ -148,7 +148,7 @@ class CategoricalData(BaseRLData):
     def value(self, v: T):
         if (isinstance(v, type(self.categories[0])) and v in self.categories) or \
                 (isinstance(v[0], type(self.categories[0])) and all(v_i in self.categories for v_i in v)):
-            super().value = v
+            super(CategoricalData, self.__class__).value.fset(self, v)
         else:
             raise ValueError(f'{v} is not in categories: {self._categories}.')
 
@@ -264,8 +264,8 @@ class NumericalData(BaseRLData):
             raise ValueError(
                 f'{v} is not in range: [{self.lower}, {self.upper}].')
         else:
-            self._value = v
-            self._normalize()
+            super(NumericalData, self.__class__).value.fset(self, v)
+
 
     def as_dict(self) -> Dict[str, Any]:
         temp_dict = super().as_dict()
@@ -571,27 +571,33 @@ class RLData(MutableSequence):
     def __len__(self) -> int:
         return self._data.__len__()
 
-    def __add__(self, other: RLData) -> RLData:
-        if not isinstance(other, (RLData, BaseRLData)):
-            raise TypeError(
-                f'Concatenation of type RLData and {type(other)} not implemented!')
+    def extend(self, values: R) -> None:
+        for v in values:
+            self._data.append(RLData(v))
 
+    def append(self, value: Union[Dict[str, Any], RLDataClass]) -> None:
+        self._data.append(RLData(value))
+
+    def __add__(self, other: RLData) -> RLData:
         if isinstance(other, BaseRLData):
             if other.name in self._data:
                 raise ValueError(
                     'Cannot have items with same names. Use update() if you need to update an item.')
-            else:
-                new_dict = other.as_dict()
-        else:
+        elif isinstance(other, RLData):
             for k in other:
                 if k in self._data:
                     raise ValueError(
                         'Cannot have items with same names. Use update() if you need to update an item.')
+        else:
+            raise TypeError(
+                f'Concatenation of type RLData and {type(other)} not implemented!')
 
-            new_dict = {v.name: v.as_dict() for v in other}
+                # new_dict = other.as_dict()
+
+                # new_dict = {v.name: v.as_dict() for v in other}
 
         temp = {v.name: v.as_dict() for v in self._data}
-        temp.update(new_dict)
+        # temp.update(new_dict)
 
         return RLData(temp)
 
@@ -647,10 +653,14 @@ if __name__ == "__main__":
             {'name': 'B', 'value': [10, 20], 'lower': 0, 'upper': 100}], lazy_evaluation=True)
         return t2
 
-    test = f1().split()
-    print(test)
+
+    t1 = f1()
+    t2 = RLData(t1)
+    t1[0].value = ['a'] 
+    # test = f1().split()
+    # print(test)
     # print(timeit(f1, number=1000))
-    print(timeit(f2, number=100))
+    # print(timeit(f2, number=100))
     # print(timeit(f3, number=1000))
     # print(f2().normalized.as_list())
     # print(a.values)
