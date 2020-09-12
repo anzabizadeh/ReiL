@@ -117,8 +117,12 @@ class CategoricalData(BaseRLData):
 
         if isinstance(x.value, type(x.categories[0])):
             return list(int(x_i == x.value) for x_i in x.categories)  # type: ignore
-        elif isinstance(x.value[0], type(x.categories[0])):
-            return list(int(x_i == v) for v in x.value for x_i in x.categories)  # type: ignore
+
+        # No need for the following type checking, since it was done in object creation.
+        # elif isinstance(x.value[0], type(x.categories[0])):
+        #     return list(int(x_i == v) for v in x.value for x_i in x.categories)  # type: ignore
+
+        return list(int(x_i == v) for v in x.value for x_i in x.categories)  # type: ignore
 
     @property
     def categories(self) -> Union[Categories, None]:
@@ -132,8 +136,7 @@ class CategoricalData(BaseRLData):
         elif not isinstance(cat, (list, tuple)):
             raise TypeError(
                 f'A sequence (list or tuple) was expected. Received a {type(cat)}.\n{self.__repr__()}')
-        elif (isinstance(self.value, type(cat[0])) and self.value in cat) or \
-             (isinstance(self.value[0], type(cat[0])) and all(v in cat for v in self.value)):
+        elif CategoricalData._type_check(self.value, cat):
             self._categories = cat
             self._normalize()
         else:
@@ -146,8 +149,7 @@ class CategoricalData(BaseRLData):
 
     @value.setter
     def value(self, v: T):
-        if (isinstance(v, type(self.categories[0])) and v in self.categories) or \
-                (isinstance(v[0], type(self.categories[0])) and all(v_i in self.categories for v_i in v)):
+        if CategoricalData._type_check(v, self.categories):
             super(CategoricalData, self.__class__).value.fset(self, v)
         else:
             raise ValueError(f'{v} is not in categories: {self._categories}.')
@@ -156,6 +158,11 @@ class CategoricalData(BaseRLData):
         temp_dict = super().as_dict()
         temp_dict.update({'categories': self.categories, 'categorical': True})
         return temp_dict
+
+    @staticmethod
+    def _type_check(val: Any, cat: Any):
+        return (isinstance(val, type(cat[0])) and val in cat) or \
+                (isinstance(val[0], type(cat[0])) and all(v in cat for v in val))
 
     def __str__(self):
         return f'{self.name}: {self._value} from {self._categories}'
@@ -188,13 +195,14 @@ class NumericalData(BaseRLData):
         except TypeError:  # upper or lower are not defined
             return None
 
+        sequence_check = isinstance(x.value, (list, tuple))
         try:
-            if isinstance(x.value, (list, tuple)):
+            if sequence_check:
                 return list((v - x.lower) / denominator for v in x.value)
             else:
                 return (x.value - x.lower) / denominator  # type: ignore
         except ZeroDivisionError:
-            return [1] * len*x.value if isinstance(x.value, (list, tuple)) else 1  # type: ignore
+            return [1] * len*x.value if sequence_check else 1  # type: ignore
 
     @staticmethod
     def _check_new_bound(value: N,
