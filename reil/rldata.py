@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import itertools
 import operator
 from collections.abc import MutableSequence
@@ -327,7 +328,7 @@ class RLData(MutableSequence):
 
         def _from_tuple(d: Tuple[str, Mapping[str, Any]]) -> RangedData:
             if isinstance(d, BaseRLData):
-                return d
+                return copy.copy(d)
 
             return RangedData(
                     name=d[0],
@@ -344,7 +345,7 @@ class RLData(MutableSequence):
 
         def _from_dict(v: Union[BaseRLData, Mapping[str, Any]]) -> RangedData:
             if isinstance(v, BaseRLData):
-                return v
+                return copy.copy(v)
 
             return RangedData(
                     name=v['name'],
@@ -361,7 +362,8 @@ class RLData(MutableSequence):
 
         if isinstance(data, Sequence):  # a sequence of dict, RLData, BaseRLData, etc.
             self._data.extend(_from_dict(v) for v in data)  # each item in the sequence is dict-like
-
+        elif isinstance(data, BaseRLData):
+            self._data.append(_from_dict(data))
         elif isinstance(data, Mapping):  # dict, RLData, BaseRLData, etc.
             if isinstance(list(data.values())[0], dict):
                 self._data.extend(_from_tuple(d) for d in data.items())
@@ -581,10 +583,10 @@ class RLData(MutableSequence):
 
     def extend(self, values: R) -> None:
         for v in values:
-            self._data.append(RLData(v))
+            self._data.extend(RLData(v))
 
     def append(self, value: Union[Dict[str, Any], RLDataClass]) -> None:
-        self._data.append(RLData(value))
+        self._data.extend(RLData(value))
 
     def __add__(self, other: RLData) -> RLData:
         if isinstance(other, BaseRLData):
@@ -604,10 +606,11 @@ class RLData(MutableSequence):
 
                 # new_dict = {v.name: v.as_dict() for v in other}
 
-        temp = {v.name: v.as_dict() for v in self._data}
+        temp = copy.deepcopy(self)
+        temp.extend(other)
         # temp.update(new_dict)
 
-        return RLData(temp)
+        return temp
 
     def __neg__(self) -> RLData:
         temp = {v.name: v.as_dict() for v in self._data}
@@ -662,9 +665,9 @@ if __name__ == "__main__":
         return t2
 
 
-    t1 = f1()
-    t2 = RLData(t1)
-    t1[0].value = ['a'] 
+    # t1 = f1()
+    # t2 = RLData(t1)
+    print(f1() + f3())
     # test = f1().split()
     # print(test)
     # print(timeit(f1, number=1000))
