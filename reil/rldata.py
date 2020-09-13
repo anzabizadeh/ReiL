@@ -582,11 +582,18 @@ class RLData(MutableSequence):
         return self._data.__len__()
 
     def extend(self, values: R) -> None:
-        for v in values:
-            self._data.extend(RLData(v))
+        if isinstance(values, RLData):
+            for v in values:
+                self._data.append(v)
+        else:
+            for v in values:
+                self._data.extend(RLData(v))
 
     def append(self, value: Union[Dict[str, Any], RLDataClass]) -> None:
-        self._data.extend(RLData(value))
+        if isinstance(value, RLData):
+            self._data.extend(value)
+        else:
+            self._data.extend(RLData(value))
 
     def __add__(self, other: RLData) -> RLData:
         if isinstance(other, BaseRLData):
