@@ -424,9 +424,12 @@ class Environment(rlbase.RLBase):
                             break
                         steps += 1
 
-                        try:
-                            complete_state = subject_instance.complete_state
-                        except NotImplementedError:
+                        if subject_instance.exchange_protocol['complete_state']:
+                            try:
+                                complete_state = subject_instance.complete_state
+                            except NotImplementedError:
+                                complete_state = None
+                        else:
                             complete_state = None
 
                         state = subject_instance.state

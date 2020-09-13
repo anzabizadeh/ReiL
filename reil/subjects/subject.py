@@ -31,8 +31,14 @@ class Subject(rlbase.RLBase):
     '''
 
     def __init__(self,
-                 ex_protocol_current: Dict[str, str] = {'state': 'standard', 'possible_actions': 'standard', 'take_effect': 'standard'},
-                 ex_protocol_options: Dict[str, Sequence[str]] = {'state': ['standard'], 'possible_actions': ['standard'], 'take_effect': ['standard', 'no_reward']},
+                 ex_protocol_current: Dict[str, str] = {'state': 'standard',
+                                                        'possible_actions': 'standard',
+                                                        'take_effect': 'standard',
+                                                        'complete_state': True},
+                 ex_protocol_options: Dict[str, Sequence[str]] = {'state': ['standard'],
+                                                                  'possible_actions': ['standard'],
+                                                                  'take_effect': ['standard', 'no_reward'],
+                                                                  'complete_state': [False, True]},
                  **kwargs: Any):
 
         kwargs['name'] = kwargs.get('name', __name__)
