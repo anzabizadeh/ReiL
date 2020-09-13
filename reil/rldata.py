@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import itertools
 import operator
 from collections.abc import MutableSequence
@@ -117,8 +118,12 @@ class CategoricalData(BaseRLData):
 
         if isinstance(x.value, type(x.categories[0])):
             return list(int(x_i == x.value) for x_i in x.categories)  # type: ignore
-        elif isinstance(x.value[0], type(x.categories[0])):
-            return list(int(x_i == v) for v in x.value for x_i in x.categories)  # type: ignore
+
+        # No need for the following type checking, since it was done in object creation.
+        # elif isinstance(x.value[0], type(x.categories[0])):
+        #     return list(int(x_i == v) for v in x.value for x_i in x.categories)  # type: ignore
+
+        return list(int(x_i == v) for v in x.value for x_i in x.categories)  # type: ignore
 
     @property
     def categories(self) -> Union[Categories, None]:
@@ -132,8 +137,7 @@ class CategoricalData(BaseRLData):
         elif not isinstance(cat, (list, tuple)):
             raise TypeError(
                 f'A sequence (list or tuple) was expected. Received a {type(cat)}.\n{self.__repr__()}')
-        elif (isinstance(self.value, type(cat[0])) and self.value in cat) or \
-             (isinstance(self.value[0], type(cat[0])) and all(v in cat for v in self.value)):
+        elif CategoricalData._type_check(self.value, cat):
             self._categories = cat
             self._normalize()
         else:
@@ -146,9 +150,8 @@ class CategoricalData(BaseRLData):
 
     @value.setter
     def value(self, v: T):
-        if (isinstance(v, type(self.categories[0])) and v in self.categories) or \
-                (isinstance(v[0], type(self.categories[0])) and all(v_i in self.categories for v_i in v)):
-            super().value = v
+        if CategoricalData._type_check(v, self.categories):
+            super(CategoricalData, self.__class__).value.fset(self, v)
         else:
             raise ValueError(f'{v} is not in categories: {self._categories}.')
 
@@ -156,6 +159,11 @@ class CategoricalData(BaseRLData):
         temp_dict = super().as_dict()
         temp_dict.update({'categories': self.categories, 'categorical': True})
         return temp_dict
+
+    @staticmethod
+    def _type_check(val: Any, cat: Any):
+        return (isinstance(val, type(cat[0])) and val in cat) or \
+                (isinstance(val[0], type(cat[0])) and all(v in cat for v in val))
 
     def __str__(self):
         return f'{self.name}: {self._value} from {self._categories}'
@@ -188,13 +196,14 @@ class NumericalData(BaseRLData):
         except TypeError:  # upper or lower are not defined
             return None
 
+        sequence_check = isinstance(x.value, (list, tuple))
         try:
-            if isinstance(x.value, (list, tuple)):
+            if sequence_check:
                 return list((v - x.lower) / denominator for v in x.value)
             else:
                 return (x.value - x.lower) / denominator  # type: ignore
         except ZeroDivisionError:
-            return [1] * len*x.value if isinstance(x.value, (list, tuple)) else 1  # type: ignore
+            return [1] * len*x.value if sequence_check else 1  # type: ignore
 
     @staticmethod
     def _check_new_bound(value: N,
@@ -264,8 +273,8 @@ class NumericalData(BaseRLData):
             raise ValueError(
                 f'{v} is not in range: [{self.lower}, {self.upper}].')
         else:
-            self._value = v
-            self._normalize()
+            super(NumericalData, self.__class__).value.fset(self, v)
+
 
     def as_dict(self) -> Dict[str, Any]:
         temp_dict = super().as_dict()
@@ -315,8 +324,12 @@ class RLData(MutableSequence):
                              each object. If fails, True is assumed.
         '''
         self._data = []
+        self._clear_temps()
 
         def _from_tuple(d: Tuple[str, Mapping[str, Any]]) -> RangedData:
+            if isinstance(d, BaseRLData):
+                return copy.copy(d)
+
             return RangedData(
                     name=d[0],
                     value=d[1].get('value'),
@@ -330,8 +343,9 @@ class RLData(MutableSequence):
                         'lazy_evaluation': lazy_evaluation if lazy_evaluation is not None
                             else d[1].get('lazy_evaluation', True)})
 
-        def _from_dict(val: Union[BaseRLData, Mapping[str, Any]]) -> RangedData:
-            v = val.as_dict() if isinstance(val, BaseRLData) else val
+        def _from_dict(v: Union[BaseRLData, Mapping[str, Any]]) -> RangedData:
+            if isinstance(v, BaseRLData):
+                return copy.copy(v)
 
             return RangedData(
                     name=v['name'],
@@ -348,7 +362,8 @@ class RLData(MutableSequence):
 
         if isinstance(data, Sequence):  # a sequence of dict, RLData, BaseRLData, etc.
             self._data.extend(_from_dict(v) for v in data)  # each item in the sequence is dict-like
-
+        elif isinstance(data, BaseRLData):
+            self._data.append(_from_dict(data))
         elif isinstance(data, Mapping):  # dict, RLData, BaseRLData, etc.
             if isinstance(list(data.values())[0], dict):
                 self._data.extend(_from_tuple(d) for d in data.items())
@@ -400,6 +415,13 @@ class RLData(MutableSequence):
 
         return cls(temp)
 
+    def _clear_temps(self):
+        self._value = None
+        self._lower = None
+        self._upper = None
+        self._categories = None
+        self._categorical = None
+
     def index(self, value: Any, start: int = 0, stop: Optional[int] = None) -> int:
         _stop = stop if stop is not None else len(self._data)
         if isinstance(value, BaseRLData):
@@ -422,43 +444,62 @@ class RLData(MutableSequence):
     @property
     def value(self) -> Dict[str, Any]:
         '''Returns a dictionary of (name, RangedData) form.'''
-        return dict((v.name, v.value) for v in self._data)
+        if self._value is None:
+            self._value = dict((v.name, v.value) for v in self._data)
+
+        return self._value
 
     @value.setter
     def value(self, v: Dict[str, Any]):
+        self._value = None
         for key, val in v.items():
             self._data[self.index(key)].value = val
 
     @property
     def lower(self) -> Dict[str, Number]:
-        return dict((v.name, v.lower) for v in self._data if hasattr(v, 'lower'))
+        if self._lower is None:
+            self._lower = dict((v.name, v.lower) for v in self._data if hasattr(v, 'lower'))
+
+        return self._lower
 
     @lower.setter
     def lower(self, value: Dict[str, Number]) -> None:
+        self._lower = None
         for key, val in value.items():
             self._data[self.index(key)].lower = val
 
     @property
     def upper(self) -> Dict[str, Number]:
-        return dict((v.name, v.upper) for v in self._data if hasattr(v, 'upper'))
+        if self._upper is None:
+            self._upper = dict((v.name, v.upper) for v in self._data if hasattr(v, 'upper'))
+
+        return self._upper
 
     @upper.setter
     def upper(self, value: Dict[str, Number]) -> None:
+        self._upper = None
         for key, val in value.items():
             self._data[self.index(key)].upper = val
 
     @property
     def categories(self) -> Dict[str, Sequence[Any]]:
-        return dict((v.name, v.categories) for v in self._data if hasattr(v, 'categories'))
+        if self._categories is None:
+            self._categories = dict((v.name, v.categories) for v in self._data if hasattr(v, 'categories'))
+
+        return self._categories
 
     @categories.setter
     def categories(self, value: Dict[str, Sequence[Any]]) -> None:
+        self._categories = None
         for key, val in value.items():
             self._data[self.index(key)].categories = val
 
     @property
     def categorical(self) -> Dict[str, Sequence[bool]]:
-        return dict((v.name, v.categorical) for v in self._data)
+        if self._categorical is None:
+            self._categorical = dict((v.name, v.categorical) for v in self._data)
+
+        return self._categorical
 
     @property
     def normalized(self) -> RLData:
@@ -523,6 +564,7 @@ class RLData(MutableSequence):
             raise TypeError(
                 'Only variables of type BaseRLData and subclasses are acceptable.')
 
+        self._clear_temps()
         return self._data.__setitem__(i, o)
 
     def __delitem__(self, i: Union[int, slice]) -> None:
@@ -533,34 +575,49 @@ class RLData(MutableSequence):
             raise TypeError(
                 'Only variables of type BaseRLData and subclasses are acceptable.')
 
+        self._clear_temps()
         self._data.insert(index, value)
 
     def __len__(self) -> int:
         return self._data.__len__()
 
-    def __add__(self, other: RLData) -> RLData:
-        if not isinstance(other, (RLData, BaseRLData)):
-            raise TypeError(
-                f'Concatenation of type RLData and {type(other)} not implemented!')
+    def extend(self, values: R) -> None:
+        if isinstance(values, RLData):
+            for v in values:
+                self._data.append(v)
+        else:
+            for v in values:
+                self._data.extend(RLData(v))
 
+    def append(self, value: Union[Dict[str, Any], RLDataClass]) -> None:
+        if isinstance(value, RLData):
+            self._data.extend(value)
+        else:
+            self._data.extend(RLData(value))
+
+    def __add__(self, other: RLData) -> RLData:
         if isinstance(other, BaseRLData):
             if other.name in self._data:
                 raise ValueError(
                     'Cannot have items with same names. Use update() if you need to update an item.')
-            else:
-                new_dict = other.as_dict()
-        else:
+        elif isinstance(other, RLData):
             for k in other:
                 if k in self._data:
                     raise ValueError(
                         'Cannot have items with same names. Use update() if you need to update an item.')
+        else:
+            raise TypeError(
+                f'Concatenation of type RLData and {type(other)} not implemented!')
 
-            new_dict = {v.name: v.as_dict() for v in other}
+                # new_dict = other.as_dict()
 
-        temp = {v.name: v.as_dict() for v in self._data}
-        temp.update(new_dict)
+                # new_dict = {v.name: v.as_dict() for v in other}
 
-        return RLData(temp)
+        temp = copy.deepcopy(self)
+        temp.extend(other)
+        # temp.update(new_dict)
+
+        return temp
 
     def __neg__(self) -> RLData:
         temp = {v.name: v.as_dict() for v in self._data}
@@ -614,10 +671,14 @@ if __name__ == "__main__":
             {'name': 'B', 'value': [10, 20], 'lower': 0, 'upper': 100}], lazy_evaluation=True)
         return t2
 
-    test = f1().split()
-    print(test)
+
+    # t1 = f1()
+    # t2 = RLData(t1)
+    print(f1() + f3())
+    # test = f1().split()
+    # print(test)
     # print(timeit(f1, number=1000))
-    print(timeit(f2, number=100))
+    # print(timeit(f2, number=100))
     # print(timeit(f3, number=1000))
     # print(f2().normalized.as_list())
     # print(a.values)
