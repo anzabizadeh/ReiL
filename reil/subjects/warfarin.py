@@ -145,7 +145,6 @@ class Warfarin(subjects.Subject):
         self._max_day = max_day + lookahead_duration
         self._max_time = (max_day + 1) * 24
         self._therapeutic_range = therapeutic_range
-        self._action_type = action_type
 
         self._INR_history_length = INR_history_length
         self._INR_penalty_coef = INR_penalty_coef
@@ -160,7 +159,7 @@ class Warfarin(subjects.Subject):
         if self._interval != interval:
             self._logger.warning('Replaced zero-day intervals with 1.')
 
-        self._max_interval = super().get_argument(max_interval, max_day)
+        self._max_interval = self.get_argument(max_interval, max_day)
 
         if not isinstance(interval_max_dose, Sequence):
             self._interval_max_dose = [interval_max_dose] * len(self._interval)
@@ -178,12 +177,19 @@ class Warfarin(subjects.Subject):
 
         self._stats_list = stats_list
         self._characteristics = characteristics
-        self._patient_selection = patient_selection
-        if self._patient_selection in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
+
+        if patient_selection.lower() in ('ravvaz', 'ravvaz 2017', 'ravvaz_2017', 'ravvaz2017'):
             if self._list_of_characteristics['CYP2C9'] != ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3') or \
                     self._list_of_characteristics['VKORC1'] != ('G/G', 'G/A', 'A/A'):
                 raise ValueError(
                     'For Ravvaz patient generation, CYP2C9 and VKORC1 should not be changed!')
+
+            self._patient_selection = 'ravvaz'
+
+        elif patient_selection.lower() not in ('fixed', 'random'):
+            raise ValueError('Patient selection should be one of "fixed", "random", or "ravvaz".')
+        else:
+            self._patient_selection = patient_selection.lower()
 
         self._randomized = randomized
         self._save_patients = save_patients
@@ -193,18 +199,6 @@ class Warfarin(subjects.Subject):
         self._patient_use_existing = patient_use_existing
         self._patient_counter_start = patient_counter_start
         self._filename_counter = self._patient_counter_start
-
-        # this makes sure that if some elements of dictionaries
-        # (e.g. characteristics, list_of_...) changes by the user,
-        # other elements of the dictionary remain intact.
-        # for key, value in kwargs.items():
-        #     if isinstance(value, dict):
-        #         try:
-        #             temp = self._defaults[key]
-        #             temp.update(kwargs[key])
-        #             kwargs[key] = temp
-        #         except KeyError:
-        #             pass
 
         if self._save_patients:
             if not self._patient_save_overwrite and not self._patient_use_existing:
@@ -218,29 +212,45 @@ class Warfarin(subjects.Subject):
             self._therapeutic_range[1] + self._therapeutic_range[0]) / 2
         self._INR_range = self._therapeutic_range[1] - self._therapeutic_range[0]
 
-        if self._action_type.lower() in ('dose', 'dose only', 'dose_only', 'only dose', 'only_dose'):
-            self._possible_actions = rldata.RLData(({
-                'name': f'dose: {x * self._dose_steps:.1f}',
-                'value': x * self._dose_steps,
-                'lower': 0, 'upper': self._max_dose}
-                for x in range(int(self._max_dose/self._dose_steps) + 1))).split()
+        if action_type.lower() in ('dose', 'dose only', 'dose_only', 'only dose', 'only_dose'):
+            self._action_type = 'dose'
+        elif action_type.lower() in ('interval', 'interval only', 'interval_only', 'only interval', 'only_interval'):
+            self._action_type = 'interval'
+        else:
+            self._action_type = 'both'
 
-        elif self._action_type.lower() in ('interval', 'interval only', 'interval_only', 'only interval', 'only_interval'):
-            self._possible_actions = rldata.RLData(({
-                'name': f'interval: {x}',
-                'value': x,
-                'lower': 1, 'upper': self._max_interval}
-                for x in range(1, self._max_interval + 1))).split()
+        self._possible_actions = self._generate_possible_actions()
+
+    def _generate_possible_actions(self,
+        dose_cap: Optional[float] = None,
+        interval_cap: Optional[float] = None) -> Union[rldata.RLData, List[rldata.RLData]]:
+
+        _dose_cap = self.get_argument(dose_cap, self._max_dose)
+        _interval_cap = self.get_argument(interval_cap, self._max_interval)
+
+        if self._action_type == 'dose':
+            return rldata.RLData((
+                {'name': f'dose: {x * self._dose_steps:.1f}',
+                 'value': x * self._dose_steps,
+                 'lower': 0, 'upper': self._max_dose}
+                for x in range(int(_dose_cap/self._dose_steps) + 1))).split()
+
+        elif self._action_type == 'interval':
+            return rldata.RLData((
+                {'name': f'interval: {x}',
+                 'value': x,
+                 'lower': 1, 'upper': self._max_interval}
+                for x in range(1, _interval_cap + 1))).split()
 
         else:
-            self._possible_actions = rldata.RLData(({
-                'name': f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
-                'value': (x*self._dose_steps, i),
-                'lower': (0, 1), 'upper': (self._max_dose, self._max_interval),
-                'normalizer': lambda x: [NumericalData._default_normalizer(x[0]),
+            return rldata.RLData((
+                {'name': f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
+                 'value': (x*self._dose_steps, i),
+                 'lower': (0, 1), 'upper': (self._max_dose, self._max_interval),
+                 'normalizer': lambda x: [NumericalData._default_normalizer(x[0]),
                     NumericalData._default_normalizer(x[1])]}
-                for x in range(int(self._max_dose/self._dose_steps) + 1)
-                for i in range(1, self._max_interval + 1))).split()
+                for x in range(int(_dose_cap/self._dose_steps) + 1)
+                for i in range(1, _interval_cap + 1))).split()
 
     @property
     def _INR_history(self) -> List[float]:
@@ -298,17 +308,11 @@ class Warfarin(subjects.Subject):
     @property
     # only considers the dose
     def possible_actions(self) -> Union[rldata.RLData, List[rldata.RLData]]:
-        try:
-            if self._current_max_dose < self._max_dose:
-                return rldata.RLData(({
-                    'name': f'dose: {x * self._dose_steps:.1f}',
-                    'value': x * self._dose_steps,
-                    'lower': 0, 'upper': self._max_dose}
-                    for x in range(int(self._current_max_dose/self._dose_steps) + 1)),
-                    lazy_evaluation=True).split()
-        except IndexError:
-            # When self._interval_index >= len(self._interval_max_dose), use self._max_dose instead of self._current_max_dose
-            pass
+        if self._action_type == 'dose' and self._current_max_dose < self._max_dose:
+            return self._possible_actions[:int(self._current_max_dose/self._dose_steps) + 1]
+            # return self._generate_possible_actions(dose_cap=self._current_max_dose)
+        # elif self._action_type == 'interval' and self._current_max_interval < self._max_interval:
+        #     return self._possible_actions[:self._current_max_interval + 1]
 
         return self._possible_actions
 
