@@ -13,6 +13,7 @@ import numbers
 import os
 import pathlib
 import random
+from reil.rldata import NumericalData
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np  # type: ignore
@@ -159,7 +160,7 @@ class Warfarin(subjects.Subject):
         if self._interval != interval:
             self._logger.warning('Replaced zero-day intervals with 1.')
 
-        self._max_interval = max_day if max_interval is None else max_interval
+        self._max_interval = super().get_argument(max_interval, max_day)
 
         if not isinstance(interval_max_dose, Sequence):
             self._interval_max_dose = [interval_max_dose] * len(self._interval)
@@ -230,14 +231,16 @@ class Warfarin(subjects.Subject):
                 'value': x,
                 'lower': 1, 'upper': self._max_interval}
                 for x in range(1, self._max_interval + 1))).split()
-                
+
         else:
             self._possible_actions = rldata.RLData(({
                 'name': f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
                 'value': (x*self._dose_steps, i),
-                'lower': (0, 1), 'upper': (self._max_dose, self._max_interval)}
+                'lower': (0, 1), 'upper': (self._max_dose, self._max_interval),
+                'normalizer': lambda x: [NumericalData._default_normalizer(x[0]),
+                    NumericalData._default_normalizer(x[1])]}
                 for x in range(int(self._max_dose/self._dose_steps) + 1)
-                for i in range(1, self._max_interval + 1))).split()  # TODO: needs a normalizer
+                for i in range(1, self._max_interval + 1))).split()
 
     @property
     def _INR_history(self) -> List[float]:
@@ -253,7 +256,8 @@ class Warfarin(subjects.Subject):
     @property
     def _interval_history(self) -> List[int]:
         return [0]*(self._interval_history_length-self._decision_points_index) \
-            + self._decision_points_interval_history[:self._decision_points_index][-self._interval_history_length:]
+            + self._decision_points_interval_history[:self._decision_points_index][-self._interval_history_length:] \
+            + [self._current_interval]
 
     @property
     def _interval_history_length(self) -> int:
@@ -295,15 +299,15 @@ class Warfarin(subjects.Subject):
     # only considers the dose
     def possible_actions(self) -> Union[rldata.RLData, List[rldata.RLData]]:
         try:
-            if self._interval_max_dose[self._interval_index] < self._max_dose:
+            if self._current_max_dose < self._max_dose:
                 return rldata.RLData(({
                     'name': f'dose: {x * self._dose_steps:.1f}',
                     'value': x * self._dose_steps,
                     'lower': 0, 'upper': self._max_dose}
-                    for x in range(int(self._interval_max_dose[self._interval_index]/self._dose_steps) + 1)),
+                    for x in range(int(self._current_max_dose/self._dose_steps) + 1)),
                     lazy_evaluation=True).split()
         except IndexError:
-            # When self._interval_index >= len(self._interval_max_dose), use self._max_dose instead of self._interval_max_dose[self._interval_index]
+            # When self._interval_index >= len(self._interval_max_dose), use self._max_dose instead of self._current_max_dose
             pass
 
         return self._possible_actions
@@ -327,8 +331,9 @@ class Warfarin(subjects.Subject):
         try:  # use the provided action, otherwise the interval
             current_interval = min(action[1].value, self._max_day - self._day)  # type: ignore
         except IndexError:
-            current_interval = min(
-                self._get_next_interval(), self._max_day - self._day)
+            current_interval = self._current_interval
+            # current_interval = min(
+            #     self._determine_interval_info(), self._max_day - self._day)
 
         self._patient.dose = dict(
             tuple((i + self._day, current_dose) for i in range(current_interval)))
@@ -358,7 +363,7 @@ class Warfarin(subjects.Subject):
                 else:
                     lookahead_penalty = 0
 
-                last_two_INRs = self._decision_points_INR_history[-2:]
+                last_two_INRs = self._decision_points_INR_history[self._decision_points_index - 1:self._decision_points_index + 1]
                 INR_penalty = -sum(((2 / self._INR_range * (self._INR_mid - last_two_INRs[-2] - (last_two_INRs[-1]-last_two_INRs[-2])/current_interval*j)) ** 2
                                     for j in range(1, current_interval + 1)))  # negative squared distance as reward (used *2/range to normalize)
                 dose_change_penalty = - \
@@ -374,6 +379,8 @@ class Warfarin(subjects.Subject):
 
         except TypeError:
             reward = 0
+
+        self._determine_interval_info()
 
         return rldata.RLData({'name': 'reward', 'value': reward})  # , normalizer=lambda x: x)
 
@@ -465,6 +472,9 @@ class Warfarin(subjects.Subject):
         self._full_INR_history[0] = self._patient.INR([0])[-1]
         self._decision_points_INR_history[0] = self._full_INR_history[0]
         self._interval_index = 0
+        self._determine_interval_info()
+        # self._current_max_dose = self._interval_max_dose[self._interval_index]
+        # self._current_interval = min(self._determine_interval_info(), self._max_day - self._day)
 
         self._state_normal_fixed = rldata.RLData([
                     {'name': 'age',
@@ -551,25 +561,25 @@ class Warfarin(subjects.Subject):
              'upper': self._max_interval}],
             lazy_evaluation=True)
 
-    def _get_next_interval(self) -> int:
+    def _determine_interval_info(self) -> None:
         if self._interval[self._interval_index] < 0:
-            if (self._therapeutic_range[0] <= self._decision_points_INR_history[self._decision_points_index] <= self._therapeutic_range[1]):
+            in_range = self._therapeutic_range[0] <= self._decision_points_INR_history[self._decision_points_index] <= self._therapeutic_range[1]
+            if in_range:
                 self._interval_index = min(self._interval_index + 1, len(self._interval) - 1)
-                interval = self._interval[self._interval_index]
+
+            interval = self._interval[self._interval_index]
+            max_dose = self._interval_max_dose[self._interval_index]
+
+            if in_range:
                 self._interval_index = min(self._interval_index + 1, len(self._interval) - 1)
-            else:
-                interval = self._interval[self._interval_index]
 
         else:
             interval = self._interval[self._interval_index]
+            max_dose = self._interval_max_dose[self._interval_index]
             self._interval_index = min(self._interval_index + 1, len(self._interval) - 1)
-        # try:
-        #     interval = self._interval[self._interval_index + 1]
-        #     self._interval_index += 1
-        # except IndexError:
-        #     interval = self._interval[self._interval_index]
 
-        return abs(interval)
+        self._current_interval = min(abs(interval), self._max_day - self._day)
+        self._current_max_dose = max_dose
 
     def _load_patient(self, current_patient: str) -> None:
         self._patient.load(path=self._patients_save_path,
