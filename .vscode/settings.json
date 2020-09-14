@@ -14,5 +14,8 @@
     "python.testing.unittestEnabled": true,
     "gitlab.instanceUrl": "research-git.uiowa.edu/",
     "python.analysis.typeCheckingMode": "basic",
-    "restructuredtext.confPath": "${workspaceFolder}\\docs"
+    "restructuredtext.confPath": "${workspaceFolder}\\docs",
+    "python.analysis.logLevel": "Warning",
+    "python.autoComplete.addBrackets": true,
+    "python.terminal.activateEnvInCurrentTerminal": true
 }
