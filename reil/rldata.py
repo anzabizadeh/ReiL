@@ -131,13 +131,14 @@ class CategoricalData(BaseRLData):
 
     @categories.setter
     def categories(self, cat: Union[Categories, None]):
-        if cat is None or self.value in (None, (), []):
+        val = self.value  # Added to speed up the code
+        if cat is None or val in (None, (), []):
             self._categories = cat
             self._normalized = None
         elif not isinstance(cat, (list, tuple)):
             raise TypeError(
                 f'A sequence (list or tuple) was expected. Received a {type(cat)}.\n{self.__repr__()}')
-        elif CategoricalData._type_check(self.value, cat):
+        elif CategoricalData._type_check(val, cat):
             self._categories = cat
             self._normalize()
         else:
@@ -185,6 +186,8 @@ class NumericalData(BaseRLData):
                          categorical=False,
                          normalizer=normalizer if normalizer is not None else self._default_normalizer,
                          lazy_evaluation=True)  # Do not evaluate before assigning lower and upper.
+        self._lower = None
+        self._upper = None
         self.lower = lower
         self.upper = upper
         self.lazy_evaluation = lazy_evaluation
@@ -227,13 +230,17 @@ class NumericalData(BaseRLData):
 
     @lower.setter
     def lower(self, l: Union[Number, None]):
-        if l is None or self.value in (None, (), []):
+        val = self.value  # Added to speed up the code
+        if l is None or val in (None, (), []):
             self._lower = l
             self._normalized = None
-        elif not isinstance(l, Number):
+        elif not isinstance(l, (int, float)):
             raise TypeError(
                 f'A numerical value expected. Received a {type(l)}.\n{self.__repr__()}')
-        elif self._check_new_bound(self.value, l, 'lower'):
+        elif self._lower is not None and self._lower >= l:
+            self._lower = l
+            self._normalize()
+        elif self._check_new_bound(val, l, 'lower'):
             self._lower = l
             self._normalize()
         else:
@@ -246,13 +253,17 @@ class NumericalData(BaseRLData):
 
     @upper.setter
     def upper(self, u: Union[Number, None]):
-        if u is None or self.value in (None, (), []):
+        val = self.value  # Added to speed up the code
+        if u is None or val in (None, (), []):
             self._upper = u
             self._normalized = None
-        elif not isinstance(u, Number):
+        elif not isinstance(u, (int, float)):
             raise TypeError(
                 f'A numerical value expected. Received a {type(u)}.\n{self.__repr__()}')
-        elif self._check_new_bound(self.value, u, 'upper'):
+        elif self._upper is not None and self._upper <= u:
+            self._upper = u
+            self._normalize()
+        elif self._check_new_bound(val, u, 'upper'):
             self._upper = u
             self._normalize()
         else:
@@ -360,11 +371,12 @@ class RLData(MutableSequence):
                         'lazy_evaluation': lazy_evaluation if lazy_evaluation is not None
                             else v.get('lazy_evaluation', True)})
 
-        if isinstance(data, Sequence):  # a sequence of dict, RLData, BaseRLData, etc.
+        data_type = type(data)
+        if data_type in (list, tuple):  # a sequence of dict, RLData, BaseRLData, etc.
             self._data.extend(_from_dict(v) for v in data)  # each item in the sequence is dict-like
-        elif isinstance(data, BaseRLData):
+        elif data_type in (BaseRLData, CategoricalData, NumericalData):
             self._data.append(_from_dict(data))
-        elif isinstance(data, Mapping):  # dict, RLData, BaseRLData, etc.
+        elif data_type == dict:  # dict, RLData, BaseRLData, etc.
             if isinstance(list(data.values())[0], dict):
                 self._data.extend(_from_tuple(d) for d in data.items())
             else:
@@ -372,9 +384,9 @@ class RLData(MutableSequence):
 
         elif isinstance(data, Generator):  # type: ignore
             for v in data:
-                if isinstance(v, Mapping):
+                if isinstance(v, dict):
                     self._data.append(_from_dict(v))  # type: ignore
-                elif isinstance(v, tuple):
+                elif isinstance(v, (list, tuple)):
                     self._data.append(_from_tuple(v))  # type: ignore
                 else:
                     raise TypeError('Type is not recognized!')
@@ -503,8 +515,8 @@ class RLData(MutableSequence):
 
     @property
     def normalized(self) -> RLData:
-        return RLData({'name': v.name, 'categorical': v.categorical,
-                       'value': v.normalized, 'lower': 0, 'upper': 1, 'lazy_evaluation': True} for v in self._data)
+        return RLData(tuple({'name': v.name, 'categorical': v.categorical,
+                       'value': v.normalized, 'lower': 0, 'upper': 1, 'lazy_evaluation': True} for v in self._data))
 
     def flatten(self) -> List[Any]:
         def make_iterable(x: Any) -> Iterable[Any]:
@@ -516,7 +528,7 @@ class RLData(MutableSequence):
     def split(self) -> Union[RLData, List[RLData]]:  #, name_suffix: Optional[str] = None):
         if len(self) == 1:
             d = self._data[0]
-            if isinstance(d.value, Sequence):
+            if isinstance(d.value, (list, tuple)):
                 val: Sequence[Any] = d.value
                 name = d.name
                 categorical = d.categorical

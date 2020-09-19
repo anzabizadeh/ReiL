@@ -48,20 +48,25 @@ class Patient(rlbase.RLBase):
             math.log(11.6), math.sqrt(0.141)) if randomized else 11.6)
         self._MTT_2: float = kwargs.get('MTT_2', rlnormRestricted(
             math.log(120), math.sqrt(1.02)) if randomized else 120)
+
+        self._gamma = 0.424  # no units
+
         # EC_50 in mg/L
-        self._EC_50 = kwargs.get('EC_50', None)
-        if self._EC_50 is None:
+        EC_50 = kwargs.get('EC_50', None)
+        if EC_50 is None:
             if VKORC1 == "G/G":  # Order of genotypes changed
-                self._EC_50 = rlnormRestricted(
+                EC_50 = rlnormRestricted(
                     math.log(4.61), math.sqrt(0.409)) if randomized else 4.61
             elif VKORC1 in ["G/A", "A/G"]:
-                self._EC_50 = rlnormRestricted(
+                EC_50 = rlnormRestricted(
                     math.log(3.02), math.sqrt(0.409)) if randomized else 3.02
             elif VKORC1 == "A/A":
-                self._EC_50 = rlnormRestricted(
+                EC_50 = rlnormRestricted(
                     math.log(2.20), math.sqrt(0.409)) if randomized else 2.20
             else:
                 raise ValueError('The VKORC1 genotype is not supported!')
+
+        self._EC_50_gamma = EC_50 ** self._gamma
 
         self._cyp_1_1: float = kwargs.get('cyp_1_1', rlnormRestricted(
             math.log(0.314), math.sqrt(0.31)) if randomized else 0.314)
@@ -72,15 +77,14 @@ class Patient(rlbase.RLBase):
         self._Q = 0.131    # (L/h)
         self._lambda = 3.61
 
-        self._gamma = 0.424  # no units
-
         # bioavilability fraction 0-1 (from: "Applied Pharmacokinetics & Pharmacodynamics 4th edition, p.717", some other references)
         self._F = 0.9
 
         self._ka = 2  # absorption rate (1/hr)
 
-        self._ktr1 = 6/self._MTT_1					# 1/hours; changed from 1/MTT_1
-        self._ktr2 = 1/self._MTT_2					# 1/hours
+        ktr1 = 6/self._MTT_1					# 1/hours; changed from 1/MTT_1
+        ktr2 = 1/self._MTT_2					# 1/hours
+        self._ktr = np.array([0.0] + [ktr1] * 6 + [0.0, ktr2])
         self._E_MAX = 1					        	# no units
 
         self._CL_s = 1
@@ -216,26 +220,34 @@ class Patient(rlbase.RLBase):
         end_days = sorted(days)
 
         if start_days[0] == 0:
-            self._A = [1]*7
-            self._dA = [0]*7
+            self._A = np.array([0.0] + [1.0] * 8)
+            # self._A = [1]*7
+            # self._dA = [0]*7
 
         INR_max = 20
         baseINR = 1
         INR = []
         for d1, d2 in zip(start_days, end_days):
             for i in range(int(d1*self._dose_interval), int(d2*self._dose_interval)):
-                self._dA[0] = self._ktr1 * (1 - self._E_MAX * Cs_gamma[i] /
-                                            (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr1*self._A[0]
-                for j in range(1, 6):
-                    self._dA[j] = self._ktr1 * (self._A[j-1] - self._A[j])
+                inflow = 1 - self._E_MAX * Cs_gamma[i] / (self._EC_50_gamma + Cs_gamma[i])
+                self._A[0] = inflow
+                self._A[7] = inflow
+                self._A[1:] += self._ktr[1:] * (self._A[0:-1] - self._A[1:])
 
-                self._dA[6] = self._ktr2 * (1 - self._E_MAX * Cs_gamma[i] /
-                                            (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr2*self._A[6]
-                for j in range(7):
-                    self._A[j] += self._dA[j]
+                # self._dA[0] = self._ktr1 * (1 - self._E_MAX * Cs_gamma[i] /
+                #                             (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr1*self._A[0]
+                # for j in range(1, 6):
+                #     self._dA[j] = self._ktr1 * (self._A[j-1] - self._A[j])
+
+                # self._dA[6] = self._ktr2 * (1 - self._E_MAX * Cs_gamma[i] /
+                #                             (self._EC_50 ** self._gamma + Cs_gamma[i])) - self._ktr2*self._A[6]
+                # for j in range(7):
+                #     self._A[j] += self._dA[j]
 
             INR.append(
-                (baseINR + (INR_max*(1-self._A[5]*self._A[6]) ** self._lambda)) * self._exp_e_INR[d2])
+                (baseINR + (INR_max*(1-self._A[6]*self._A[8]) ** self._lambda)) * self._exp_e_INR[d2])
+            # INR.append(
+            #     (baseINR + (INR_max*(1-self._A[5]*self._A[6]) ** self._lambda)) * self._exp_e_INR[d2])
 
         self._last_computed_day = end_days[-1]
 
