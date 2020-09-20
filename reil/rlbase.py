@@ -75,6 +75,14 @@ class RLBase():
     @classmethod
     def from_file(cls, filename: str, path: Optional[Union[pathlib.Path, str]] = None):
         instance = cls()
+        instance._logger_name = __name__
+        instance._logger_level = logging.WARNING
+        instance._logger_filename = None
+        instance._logger = logging.getLogger(instance._logger_name)
+        instance._logger.setLevel(instance._logger_level)
+        if instance._logger_filename is not None:
+            instance._logger.addHandler(logging.FileHandler(instance._logger_filename))
+
         instance.load(filename=filename, path=path)
         return instance
 
