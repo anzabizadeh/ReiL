@@ -424,13 +424,12 @@ class Environment(rlbase.RLBase):
                             break
                         steps += 1
 
+                        complete_state = None
                         if subject_instance.exchange_protocol['complete_state']:
                             try:
                                 complete_state = subject_instance.complete_state
                             except NotImplementedError:
-                                complete_state = None
-                        else:
-                            complete_state = None
+                                pass
 
                         state = subject_instance.state
                         possible_actions = subject_instance.possible_actions
@@ -465,17 +464,22 @@ class Environment(rlbase.RLBase):
                             self._agents[agent_name].learn(
                                 history=history[agent_name])
 
+                    if _return_output[agent_subject_tuple]:
+                        output[agent_subject_tuple].append(history[agent_name])
+
+                    history[agent_name] = []
+
                     try:
                         stats_list = stats[agent_subject_tuple]
                         result_agent = self._agents[agent_name].stats(
                             stats_list)
                         result_subject = subject_instance.stats(stats_list)
 
-                        if result_agent != {}:
+                        if result_agent:
                             stats_agents[agent_subject_tuple].append(
                                 result_agent)
 
-                        if result_subject != {}:
+                        if result_subject:
                             stats_subjects[agent_subject_tuple].append(
                                 result_subject)
                     except KeyError:
@@ -490,12 +494,10 @@ class Environment(rlbase.RLBase):
 
             for agent_name, _ in assigned_agents:
                 agent_subject_tuple = (agent_name, subject_name)
-                if _return_output[agent_subject_tuple]:
-                    output[agent_subject_tuple].append(history[agent_name])
 
                 if _stats.get(agent_subject_tuple, []):
                     result = _stats_func[agent_subject_tuple](agent_stats=stats_agents.get(agent_subject_tuple, None),
-                                                             subject_stats=stats_subjects.get(agent_subject_tuple, None))
+                                                                subject_stats=stats_subjects.get(agent_subject_tuple, None))
                     stats_final[agent_subject_tuple].append(result)
 
         return stats_final, output
