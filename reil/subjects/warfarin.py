@@ -284,7 +284,7 @@ class Warfarin(subjects.Subject):
     def complete_state(self) -> rldata.RLData:
         return self._state_extended_fixed + rldata.RLData([
             {'name': 'day',
-             'value': self._day,
+             'value': self._day if not self.is_terminated else None,
              'lower': 0,
              'upper': self._max_day - 1},
             {'name': 'Doses',
