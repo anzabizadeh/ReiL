@@ -223,7 +223,7 @@ class DQNAgent(agents.Agent):
             raise ValueError('Not in training mode!')
         try:
             if self._method == 'forward':
-                for i in range(len(history)):
+                for i in range(len(history)-1):
                     state = history[i]['state']
                     action = history[i]['action']
                     reward = history[i]['reward'][0].value
@@ -242,10 +242,10 @@ class DQNAgent(agents.Agent):
                         self._training_x[0] = state.normalized.flatten() + action.normalized.flatten()
                         self._training_y[0] = [new_q]
                         self._buffer_index = 1
-            
+
             else:  # backward
                 q_list = [0] * len(history)
-                for i in range(len(history)-1, -1, -1):
+                for i in range(len(history)-2, -1, -1):
                     state = history[i]['state']
                     action = history[i]['action']
                     reward = history[i]['reward'][0].value
