@@ -449,6 +449,16 @@ class Environment(rlbase.RLBase):
                                         (affected_agent != agent_name):
                                     history[affected_agent][-1]['reward'] = -reward
 
+                            complete_state = None
+                            if subject_instance.exchange_protocol['complete_state']:
+                                try:
+                                    complete_state = subject_instance.complete_state
+                                except NotImplementedError:
+                                    pass
+                            history[agent_name].append({'instance_id': instance_id,
+                                                        'state': subject_instance.state,
+                                                        'complete_state': complete_state})
+
                         if _training_mode[(agent_name, subject_name)] \
                                 and self._learning_batch_size != -1 \
                                 and len(history[agent_name]) >= self._learning_batch_size:
