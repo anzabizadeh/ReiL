@@ -566,6 +566,10 @@ class Warfarin(subjects.Subject):
             lazy_evaluation=True)
 
     def _determine_interval_info(self) -> None:
+        # if the loaded model is beyond the range, get it back to the range!
+        if self._interval_index >= len(self._interval):
+            self._interval_index = len(self._interval) - 1
+
         if self._interval[self._interval_index] < 0:
             in_range = self._therapeutic_range[0] <= self._decision_points_INR_history[self._decision_points_index] <= self._therapeutic_range[1]
             if in_range:
