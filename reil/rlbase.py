@@ -166,14 +166,14 @@ class RLBase():
                 data = dill.load(f)  #type: ignore
             except EOFError:
                 try:
-                    self._logger.info(f'First attempt failed to load {_path / f"{filename}.pkl"}.')
+                    # self._logger.info(f'First attempt failed to load {_path / f"{filename}.pkl"}.')
                     time.sleep(1)
                     data = dill.load(f)  #type: ignore
                 except EOFError:
-                    self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
+                    # self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
                     raise RuntimeError(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
 
-            self._logger.info(f'Changing the logger from {self._logger_name} to {data["_logger_name"]}.')
+            # self._logger.info(f'Changing the logger from {self._logger_name} to {data["_logger_name"]}.')
 
             persistent_attributes = self._persistent_attributes + ['_persistent_attributes', 'version']
             for key, value in data.items():
