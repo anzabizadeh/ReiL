@@ -155,7 +155,7 @@ class Warfarin(subjects.Subject):
         self._dose_change_penalty_coef = dose_change_penalty_coef
         self._dose_change_penalty_func = dose_change_penalty_func
 
-        self._interval = [x if x != 0 else 1 for x in interval]
+        self._interval = tuple(x if x != 0 else 1 for x in interval)
         if self._interval != interval:
             self._logger.warning('Replaced zero-day intervals with 1.')
 
