@@ -245,7 +245,7 @@ class NumericalData(BaseRLData):
             self._normalize()
         else:
             raise ValueError(
-                f'Lower bound {l} is greater than current value: {self.value}.\n{self.__repr__()}')
+                f'Lower bound {l} is greater than the current value: {self.value}.\n{self.__repr__()}')
 
     @property
     def upper(self) -> Union[Number, None]:
@@ -268,7 +268,7 @@ class NumericalData(BaseRLData):
             self._normalize()
         else:
             raise ValueError(
-                f'Lower bound {u} is greater than current value: {self.value}.\n{self.__repr__()}')
+                f'Upper bound {u} is less than the current value: {self.value}.\n{self.__repr__()}')
 
     @property
     def value(self) -> N:
