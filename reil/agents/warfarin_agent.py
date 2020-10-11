@@ -155,9 +155,8 @@ class WarfarinAgent(agents.Agent):
             return return_value
 
         next_test = 2
-        if patient['day'] == 1:
+        if patient['day'] <= 2:
             self._dose = 10.0 if patient['age'] < 65.0 else 5.0
-            # self._retest_day = 3
         elif patient['day'] <= 4:
             day_2_INR = patient['INRs'][-1] if patient['day'] == 3 else patient['INRs'][-2]
             if day_2_INR >= 2.0:
@@ -167,12 +166,9 @@ class WarfarinAgent(agents.Agent):
 
                 self._number_of_stable_days, next_test = self._aurora_retesting_table(
                     patient['INRs'][-1], self._number_of_stable_days, self._early_therapeutic)
-                # self._retest_day = patient['day'] + next_test
             else:
                 self._dose, next_test, _, _ = self._aurora_dosing_table(
                     day_2_INR, self._dose)
-                # self._retest_day = patient['day'] + next_test
-                # self._retest_day = 5
         else:
             self._number_of_stable_days, next_test = self._aurora_retesting_table(
                 patient['INRs'][-1], self._number_of_stable_days, self._early_therapeutic)
@@ -230,7 +226,6 @@ class WarfarinAgent(agents.Agent):
             next_test = {0: 1, 1: 6, 7: 6, 13: 13, 26: 27}
             max_gap = 26
         if 2.0 <= current_INR <= 3.0:
-            # number_of_stable_days = min(number_of_stable_days + next_test[number_of_stable_days], 28)
             number_of_stable_days = min(
                 number_of_stable_days + next_test[number_of_stable_days], max_gap)
         else:
@@ -627,59 +622,14 @@ class WarfarinAgent(agents.Agent):
         return self._dose
 
     def reset(self) -> None:
-        self._retest_day = 1
-        self._red_flag = False
-        self._lenzini_on_day_4 = False
-        self._skip_dose = 0
-        self._dose = 0
-        self._weekly_dose = 0
-        self._number_of_stable_days = 0
-        self._early_therapeutic = False
-
-    # def load(self, **kwargs):
-    #     '''
-    #     Load an object from a file.
-
-    #     Arguments
-    #     ---------
-    #         filename: the name of the file to be loaded.
-
-    #     Note: tensorflow part is saved in filename.tf folder
-
-    #     Raises ValueError if the filename is not specified.
-    #     '''
-    #     Agent.load(self, **kwargs)
-    #     tf.reset_default_graph()
-    #     self._model = keras.models.load_model(kwargs.get(
-    #         'path', self._path) + '/' + kwargs['filename'] + '.tf/' + kwargs['filename'])
-    #     self._tensorboard = keras.callbacks.TensorBoard(
-    #         log_dir=self._tensorboard_path)
-
-    # def save(self, **kwargs):
-    #     '''
-    #     Save the object to a file.
-
-    #     Arguments
-    #     ---------
-    #         filename: the name of the file to be saved.
-
-    #     Note: tensorflow part should be in filename.tf folder
-
-    #     Raises ValueError if the filename is not specified.
-    #     '''
-
-    #     pickle_data = tuple(key for key in self.__dict__ if key not in [
-    #                         '_model', '_tensorboard', 'data_collector'])
-    #     path, filename = Agent.save(self, **kwargs, data=pickle_data)
-    #     try:
-    #         self._model.save(kwargs.get('path', self._path) + '/' +
-    #                          kwargs['filename'] + '.tf/' + kwargs['filename'])
-    #     except OSError:
-    #         os.makedirs(kwargs.get('path', self._path) +
-    #                     '/' + kwargs['filename'] + '.tf/')
-    #         self._model.save(kwargs.get('path', self._path) + '/' +
-    #                          kwargs['filename'] + '.tf/' + kwargs['filename'])
-    #     return path, filename
+        self._retest_day: int = 1
+        self._red_flag: bool = False
+        self._lenzini_on_day_4: bool = False
+        self._skip_dose: int = 0
+        self._dose: float = 0.0
+        self._weekly_dose: float = 0.0
+        self._number_of_stable_days: int = 0
+        self._early_therapeutic: bool = False
 
     def __repr__(self) -> str:
         try:
