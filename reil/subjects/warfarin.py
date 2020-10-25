@@ -233,14 +233,14 @@ class Warfarin(subjects.Subject):
                 {'name': f'dose: {x * self._dose_steps:.1f}',
                  'value': x * self._dose_steps,
                  'lower': 0, 'upper': self._max_dose}
-                for x in range(int(_dose_cap/self._dose_steps) + 1))).split()
+                for x in range(int(_dose_cap/self._dose_steps) + 1))).split()   # type: ignore
 
         elif self._action_type == 'interval':
             return rldata.RLData((
                 {'name': f'interval: {x}',
                  'value': x,
                  'lower': 1, 'upper': self._max_interval}
-                for x in range(1, _interval_cap + 1))).split()
+                for x in range(1, _interval_cap + 1))).split()   # type: ignore
 
         else:
             return rldata.RLData((
@@ -250,7 +250,7 @@ class Warfarin(subjects.Subject):
                  'normalizer': lambda x: [NumericalData._default_normalizer(x[0]),
                                           NumericalData._default_normalizer(x[1])]}
                 for x in range(int(_dose_cap/self._dose_steps) + 1)
-                for i in range(1, _interval_cap + 1))).split()
+                for i in range(1, _interval_cap + 1))).split()  # type: ignore
 
     @property
     def _INR_history(self) -> List[float]:
@@ -260,14 +260,14 @@ class Warfarin(subjects.Subject):
 
     @property
     def _dose_history(self) -> List[float]:
-        return [0.0]*(self._dose_history_length-self._decision_points_index) \
+        return [0.0]*(self._dose_history_length - self._decision_points_index) \
             + self._decision_points_dose_history[:self._decision_points_index][-self._dose_history_length:]
 
     @property
     def _interval_history(self) -> List[int]:
-        return [0]*(self._interval_history_length-self._decision_points_index) \
+        return [0]*(self._interval_history_length - self._decision_points_index) \
             + self._decision_points_interval_history[:self._decision_points_index][-self._interval_history_length:] \
-            + [self._current_interval]
+            + ([self._current_interval] if self._action_type == 'dose_only' else [])
 
     @property
     def _interval_history_length(self) -> int:
@@ -331,17 +331,13 @@ class Warfarin(subjects.Subject):
             return 1
 
     def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> rldata.RLData:
-        current_dose = float(action[0].value)
-        try:  # use the provided action, otherwise the interval
-            current_interval = min(
-                int(action[1].value), self._max_day - self._day)
-        except IndexError:
-            current_interval = self._current_interval
-            # current_interval = min(
-            #     self._determine_interval_info(), self._max_day - self._day)
+        current_dose = float(action.value['dose'])
+        current_interval = min(
+            int(action.value.get('interval', self._current_interval)),
+            self._max_day - self._day)
 
-        self._patient.dose = dict(
-            tuple((i + self._day, current_dose) for i in range(current_interval)))
+        self._patient.dose = dict(tuple((i + self._day, current_dose)
+                                        for i in range(current_interval)))
 
         self._decision_points_dose_history[self._decision_points_index] = current_dose
         self._decision_points_interval_history[self._decision_points_index] = current_interval
@@ -607,39 +603,30 @@ class Warfarin(subjects.Subject):
     def _load_patient(self, current_patient: str) -> None:
         self._patient.load(path=self._patients_save_path,
                            filename=current_patient)
-        self._characteristics['age'] = self._patient._age  # type: ignore
-        # type: ignore pylint: disable=no-member
-        self._characteristics['weight'] = self._patient._weight
-        # type: ignore pylint: disable=no-member
-        self._characteristics['height'] = self._patient._height
-        # type: ignore pylint: disable=no-member
-        self._characteristics['gender'] = self._patient._gender
-        # type: ignore pylint: disable=no-member
-        self._characteristics['race'] = self._patient._race
-        # type: ignore pylint: disable=no-member
-        self._characteristics['tobaco'] = self._patient._tobaco
-        # type: ignore pylint: disable=no-member
-        self._characteristics['amiodarone'] = self._patient._amiodarone
-        # type: ignore pylint: disable=no-member
-        self._characteristics['fluvastatin'] = self._patient._fluvastatin
-        self._characteristics['CYP2C9'] = self._patient._CYP2C9  # type: ignore
-        self._characteristics['VKORC1'] = self._patient._VKORC1  # type: ignore
-        self._randomized: bool = self._patient._randomized  # type: ignore
-        self._max_time: int = self._patient._max_time  # type: ignore
+
+        for var in ('age', 'weight', 'height', 'gender', 'race', 'tobaco',
+                    'amiodarone', 'fluvastatin', 'CYP2C9', 'VKORC1'):
+            self._characteristics[var] = self._patient.__dict__['_'+var]
+
+        self._randomized: bool = self._patient._randomized
+        self._max_time: int = self._patient._max_time
 
     def _generate_ravvaz_patient(self) -> None:
+        # truncated normal distribution with 3-sigma bound
         self._characteristics['age'] = min([max([np.random.normal(self._list_of_probabilities['age'][0],
                                                                   self._list_of_probabilities['age'][1]),
                                                  self._list_of_characteristics['age'][0]]),
-                                            self._list_of_characteristics['age'][1]])  # truncated normal distribution with 3-sigma bound
+                                            self._list_of_characteristics['age'][1]])
+        # truncated normal distribution with 3-sigma bound
         self._characteristics['weight'] = min([max([np.random.normal(self._list_of_probabilities['weight'][0],
                                                                      self._list_of_probabilities['weight'][1]),
                                                     self._list_of_characteristics['weight'][0]]),
-                                               self._list_of_characteristics['weight'][1]])  # truncated normal distribution with 3-sigma bound
+                                               self._list_of_characteristics['weight'][1]])
+        # truncated normal distribution with 3-sigma bound
         self._characteristics['height'] = min([max([np.random.normal(self._list_of_probabilities['height'][0],
                                                                      self._list_of_probabilities['height'][1]),
                                                     self._list_of_characteristics['height'][0]]),
-                                               self._list_of_characteristics['height'][1]])  # truncated normal distribution with 3-sigma bound
+                                               self._list_of_characteristics['height'][1]])
 
         self._characteristics['gender'] = np.random.choice(self._list_of_characteristics['gender'], 1,
                                                            p=self._list_of_probabilities['gender'])[0]
