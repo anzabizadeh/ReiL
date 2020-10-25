@@ -169,11 +169,11 @@ class testRLData(unittest.TestCase):
                                         lower=min(self._numerical_data),
                                         upper=max(self._numerical_data))
 
-        rl_value[0] = (min(self._numerical_data) + max(self._numerical_data)) / 2
+        rl_value.value[0] = (min(self._numerical_data) + max(self._numerical_data)) / 2
         self.assertEqual(rl_value.value[0], self._numerical_data[0])
 
-        rl_value.value = (min(self._numerical_data) + max(self._numerical_data)) / 2
-        rl_value[0] = min(self._numerical_data)
+        rl_value.value[0] = (min(self._numerical_data) + max(self._numerical_data)) / 2
+        rl_value.value[0] = min(self._numerical_data)
         self.assertEqual(rl_value.value[0], self._numerical_data[0])
 
         # categorical = True
@@ -182,9 +182,9 @@ class testRLData(unittest.TestCase):
                                         value=self._categorical_data,
                                         categories=list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
 
-        rl_value[0] = 'Z'
+        rl_value.value[0] = 'Z'
 
-        self.assertEqual(rl_value.value[0], self._numerical_data[0])
+        self.assertEqual(rl_value.value[0], 'Z')
         # rl_value = RLData.RangedData(name='categorical',
         #                                 categorical = True,
         #                                 value=self._categorical_data)
