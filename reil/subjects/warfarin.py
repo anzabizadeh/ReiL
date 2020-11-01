@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np  # type: ignore
 from reil import rldata, subjects, utils
-
+from reil.stats import Functions
 
 class Warfarin(subjects.Subject):
     '''
@@ -230,27 +230,27 @@ class Warfarin(subjects.Subject):
 
         if self._action_type == 'dose':
             return rldata.RLData((
-                {'name': f'dose: {x * self._dose_steps:.1f}',
+                {'name': 'dose',  # f'dose: {x * self._dose_steps:.1f}',
                  'value': x * self._dose_steps,
                  'lower': 0, 'upper': self._max_dose}
-                for x in range(int(_dose_cap/self._dose_steps) + 1))).split()   # type: ignore
+                for x in range(int(_dose_cap/self._dose_steps) + 1))).split()
 
         elif self._action_type == 'interval':
             return rldata.RLData((
-                {'name': f'interval: {x}',
+                {'name': 'interval',  # f'interval: {x}',
                  'value': x,
                  'lower': 1, 'upper': self._max_interval}
-                for x in range(1, _interval_cap + 1))).split()   # type: ignore
+                for x in range(1, _interval_cap + 1))).split()
 
         else:
             return rldata.RLData((
-                {'name': f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
+                {'name': 'dose',  # f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
                  'value': (x*self._dose_steps, i),
                  'lower': (0, 1), 'upper': (self._max_dose, self._max_interval),
                  'normalizer': lambda x: [NumericalData._default_normalizer(x[0]),
                                           NumericalData._default_normalizer(x[1])]}
                 for x in range(int(_dose_cap/self._dose_steps) + 1)
-                for i in range(1, _interval_cap + 1))).split()  # type: ignore
+                for i in range(1, _interval_cap + 1))).split()
 
     @property
     def _INR_history(self) -> List[float]:
@@ -346,28 +346,30 @@ class Warfarin(subjects.Subject):
         day_temp = self._day
         self._day += current_interval
 
-        self._full_dose_history[day_temp:self._day] = [
-            current_dose] * current_interval
-        self._full_INR_history[day_temp + 1:self._day +
-                               1] = self._patient.INR(list(range(day_temp + 1, self._day + 1)))
+        self._full_dose_history[day_temp:self._day] = \
+            [current_dose] * current_interval
+        self._full_INR_history[day_temp + 1:self._day + 1] = \
+            self._patient.INR(list(range(day_temp + 1, self._day + 1)))
 
-        self._decision_points_INR_history[self._decision_points_index] = self._full_INR_history[self._day]
+        self._decision_points_INR_history[self._decision_points_index] = \
+            self._full_INR_history[self._day]
 
         try:
             if self.exchange_protocol['take_effect'] == 'standard':
                 if self._lookahead_duration > 0:
                     temp_patient = copy.deepcopy(self._patient)
-                    temp_patient.dose = dict(tuple(
-                        (i + day_temp, current_dose) for i in range(1, self._lookahead_duration + 1)))
-                    lookahead_penalty = -sum(((2 / self._INR_range * (self._INR_mid - INRi)) ** 2
-                                              for INRi in temp_patient.INR(list(range(day_temp + 1, day_temp + self._lookahead_duration + 1)))))
+                    start, end = self._day + 1, self._day + self._lookahead_duration + 1
+                    temp_patient.dose = dict((i, current_dose)
+                                             for i in range(start, end))
+                    lookahead_penalty = -Functions.normalized_square_dist(temp_patient.INR(
+                        list(range(start, end))))
                 else:
                     lookahead_penalty = 0
 
                 last_two_INRs = self._decision_points_INR_history[
                     self._decision_points_index - 1:self._decision_points_index + 1]
-                INR_penalty = -sum(((2 / self._INR_range * (self._INR_mid - last_two_INRs[-2] - (last_two_INRs[-1]-last_two_INRs[-2])/current_interval*j)) ** 2
-                                    for j in range(1, current_interval + 1)))  # negative squared distance as reward (used *2/range to normalize)
+                INR_penalty = -Functions.normalized_square_dist(last_two_INRs, [current_interval], exclude_first=True)
+
                 dose_change_penalty = - \
                     self._dose_change_penalty_func(self._dose_history)
                 reward = self._INR_penalty_coef * INR_penalty \
@@ -387,20 +389,22 @@ class Warfarin(subjects.Subject):
         return rldata.RLData({'name': 'reward', 'value': reward})
 
     def stats(self, stats_list: Union[Sequence[str], str]) -> Dict[str, Union[rldata.RLData, numbers.Number]]:
-        if isinstance(stats_list, str):
-            stats_list = [stats_list]
+        _stats_list = [stats_list] if isinstance(stats_list, str) else stats_list
         results = {}
-        for s in stats_list:
+        for s in _stats_list:
             if s == 'TTR':
-                INRs = self._full_INR_history
-                temp = sum(
-                    (1 if 2.0 <= INRi <= 3.0 else 0 for INRi in INRs)) / len(INRs)
+                temp = Functions.TTR(self._full_INR_history)
+                # INRs = self._full_INR_history
+                # sum(
+                #     (1 if 2.0 <= INRi <= 3.0 else 0 for INRi in INRs)) / len(INRs)
             elif s == 'dose_change':
-                temp = sum(x != self._full_dose_history[i+1]
-                           for i, x in enumerate(self._full_dose_history[:-1]))
+                temp = Functions.dose_change_count(self._full_dose_history)
+                # temp = sum(x != self._full_dose_history[i+1]
+                #            for i, x in enumerate(self._full_dose_history[:-1]))
             elif s == 'delta_dose':
-                temp = sum(abs(x-self._full_dose_history[i+1])
-                           for i, x in enumerate(self._full_dose_history[:-1]))
+                temp = Functions.delta_dose(self._full_dose_history)
+                # temp = sum(abs(x-self._full_dose_history[i+1])
+                #            for i, x in enumerate(self._full_dose_history[:-1]))
             else:
                 self._logger.warning(
                     f'WARNING! {s} is not one of the available stats!')

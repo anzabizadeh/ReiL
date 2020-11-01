@@ -14,3 +14,4 @@ Classes
 
 from .stats import Stats
 from .custom.warfarin_stats import WarfarinStats
+from .functions import Functions
