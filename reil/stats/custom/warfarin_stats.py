@@ -1,6 +1,6 @@
 import operator as op
 import re
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import pandas as pd
 from reil import rlbase, stats
@@ -27,12 +27,13 @@ def sensitivity(row):
 class WarfarinStats(stats.Stats):
     def __init__(self,
                  active_stats: Union[Sequence[str], str] = 'all',
-                 groupby: Optional[Sequence] = None,
-                 aggregators: Optional[Sequence] = ['mean', 'std']):
+                 groupby: Optional[List[str]] = None,
+                 aggregators: Optional[List[str]] = ['mean', 'std']):
         super().__init__(active_stats=active_stats,
-                         groupby=groupby, aggregators=aggregators,
-                         all_stats=['TTR', 'TTR>0.65', 'dose_change', 'count',
-                                    'INR', 'INR_percent_dose_change'])
+                         groupby=groupby,
+                         aggregators=aggregators,
+                         all_stats=('TTR', 'TTR>0.65', 'dose_change', 'count',
+                                    'INR', 'INR_percent_dose_change'))
 
     def from_history(self, history: rlbase.History) -> Dict[str, pd.DataFrame]:
         df_from_history = pd.DataFrame(history)
@@ -59,12 +60,13 @@ class WarfarinStats(stats.Stats):
             section['day'] = section.interval.expanding(1).sum().astype(int)
 
             for i, j in zip(section.day[:-1], section.day[1:]):
-                s = float(section.loc[section.day == i, 'INR_current'])
-                t = float(section.loc[section.day == j, 'INR_current'])
+                s = float(section.loc[section.day == i, 'INR_current'])  # type: ignore
+                t = float(section.loc[section.day == j, 'INR_current'])  # type: ignore
                 for k in range(0, j-i):
                     temp_INR.append(s + (t-s)*k/(j-i))
-                temp_action += [float(section.loc[section.day ==
-                                                  i, 'dose_current'])] * (j-i)
+                temp_action += [
+                    float(section.loc[section.day == i,
+                                      'dose_current'])] * (j-i)  # type: ignore
             temp_INR.append(section.iloc[-1]['INR_current'])
             temp_action.append(section.iloc[-1]['dose_current'])
 
@@ -95,8 +97,9 @@ class WarfarinStats(stats.Stats):
                                     4: 'highly sensitive'}}, inplace=True)
 
         results = {}
-        grouped_df = df.groupby(self._groupby if 'instance_id' in self._groupby \
-                                else ['instance_id'] + self._groupby)
+        temp_group_by = [] if self._groupby is None else self._groupby
+        grouped_df = df.groupby(temp_group_by if 'instance_id' in temp_group_by
+                                else ['instance_id'] + temp_group_by)
 
         for stat in self._active_stats:
             if stat == 'TTR':
@@ -116,14 +119,9 @@ class WarfarinStats(stats.Stats):
                 continue
 
             stat_temp = pd.DataFrame([
-                temp.mean().rename(f'{stat}_mean'),
-                temp.std().rename(f'{stat}_stdev')])
-            # elif stat == 'INR_percent_dose_change':
-            #     temp = df.groupby(['INR'] + groupby if 'instance_id' in groupby else ['instance_id'] + groupby)
-            #     stat_temp = (temp['delta_dose'].sum() /
-            #                     (temp['action'].sum()
-            #                     - temp['delta_dose'].sum())).rename(stat)
-
+                temp.mean().rename(f'{stat}_mean'),  # type: ignore
+                temp.std().rename(f'{stat}_stdev')])  # type: ignore
+ 
             results[stat] = stat_temp
 
         return results
@@ -179,16 +177,6 @@ class WarfarinStats(stats.Stats):
                 continue
 
             stat_temp = temp.agg([(func, func) for func in self._aggregators])
-            # pd.DataFrame([
-            # temp.max().rename(f'{stat}_max'),
-            # temp.min().rename(f'{stat}_min'),
-            # temp.mean().rename(f'{stat}_mean'),
-            # temp.std().rename(f'{stat}_stdev')])
-            # elif stat == 'INR_percent_dose_change':
-            #     temp = df.groupby(['INR'] + groupby if 'instance_id' in groupby else ['instance_id'] + groupby)
-            #     stat_temp = (temp['delta_dose'].sum() /
-            #                     (temp['action'].sum()
-            #                     - temp['delta_dose'].sum())).rename(stat)
 
             results[stat] = stat_temp
 
