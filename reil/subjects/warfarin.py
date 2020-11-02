@@ -39,7 +39,6 @@ class Warfarin(subjects.Subject):
 
     def __init__(self,
                  stats_list: Sequence[str] = ['TTR', 'dose_change', 'delta_dose'],
-
                  max_day: int = 90,
                  therapeutic_range: Tuple[int, int] = (2, 3),
                  action_type: str = 'dose only',
@@ -51,9 +50,10 @@ class Warfarin(subjects.Subject):
                  dose_change_penalty_coef: float = 1.0,
                  dose_change_penalty_func: Callable[[Sequence[float]], float] =
                  lambda x: int(x[-2] != x[-1]),  # -0.2 * abs(x[-2]-x[-1]),
-                 interval: Sequence[int] = (1,),
                  max_interval: Optional[int] = None,
-                 interval_max_dose: Union[Sequence[float], float] = (15.0,),
+                 interval_steps: int = 1,
+                 interval_list: Sequence[int] = (1,),
+                 dose_list: Union[Sequence[float], float] = (15.0,),
                  lookahead_duration: int = 0,
                  lookahead_penalty_coef: float = 0,
                  characteristics: Dict[str, Any] = {'age': 71, 'weight': 199.24, 'height': 66.78,
@@ -84,10 +84,11 @@ class Warfarin(subjects.Subject):
         \n  dose_change_penalty_coef: Coefficient of dose change penalty in reward calculation. (Default: 1.0)
         \n  dose_change_penalty_func: a function that computes penalty of changing dose from its previous value. The
         \n      argument for this function is the list of previous doses and should return a scalar. (Default: lambda x: int(x[-2] != x[-1]))
-        \n  interval: a list consisting of INR measurement intervals. If the list covers less than max_day, the last element is repeated.
+        \n  interval_list: a list consisting of INR measurement intervals. If the list covers less than max_day, the last element is repeated.
         \n      If a negative value is provided, the positive value of that interval is repeated until INR gets in the therapeutic_range. (Default = [1])
         \n  max_interval: maximum number of days between two INR testing/ dosing. Default value use max_day. (Default = None)
-        \n  interval_max_dose: a list consisting of maximum dose allowed per interval. (Default = [15.0])
+        \n  interval_steps: minimum possible change in interval (Default: 1)
+        \n  dose_list: a list consisting of maximum dose allowed per interval. (Default = [15.0])
         \n  lookahead_duration: (Default = 0)
         \n  lookahead_penalty_coef: (Default = 0)
         \n  stats_list: a list of statistics to compute for each patient (Default = ['TTR', 'dose_change', 'delta_dose'])
@@ -155,22 +156,23 @@ class Warfarin(subjects.Subject):
         self._dose_change_penalty_coef = dose_change_penalty_coef
         self._dose_change_penalty_func = dose_change_penalty_func
 
-        self._interval = tuple(x if x != 0 else 1 for x in interval)
-        if self._interval != tuple(interval):
+        self._interval_list = tuple(x if x != 0 else 1 for x in interval_list)
+        if self._interval_list != tuple(interval_list):
             self._logger.warning('Replaced zero-day intervals with 1.')
 
         self._max_interval = self.get_argument(max_interval, max_day)
+        self._interval_steps = interval_steps
 
-        if not isinstance(interval_max_dose, Sequence):
-            self._interval_max_dose = [interval_max_dose] * len(self._interval)
-        elif len(interval_max_dose) == 1:
-            self._interval_max_dose = list(interval_max_dose) * \
-                len(self._interval)
-        elif len(interval_max_dose) != len(self._interval):
+        if not isinstance(dose_list, Sequence):
+            self._dose_list = [dose_list] * len(self._interval_list)
+        elif len(dose_list) == 1:
+            self._dose_list = list(dose_list) * \
+                len(self._interval_list)
+        elif len(dose_list) != len(self._interval_list):
             self._logger.warning(
-                'interval_max_dose does not match "interval" in length. max_dose will be used for intervals without interval_max_dose values.')
+                'dose_list does not match "interval_list" in length. max_dose will be used for intervals without dose_list values.')
         else:
-            self._interval_max_dose = interval_max_dose
+            self._dose_list = dose_list
 
         self._lookahead_duration = lookahead_duration
         self._lookahead_penalty_coef = lookahead_penalty_coef
@@ -238,19 +240,24 @@ class Warfarin(subjects.Subject):
         elif self._action_type == 'interval':
             return rldata.RLData((
                 {'name': 'interval',  # f'interval: {x}',
-                 'value': x,
+                 'value': x * self._interval_steps,
                  'lower': 1, 'upper': self._max_interval}
-                for x in range(1, _interval_cap + 1))).split()
+                for x in range(1, int(_interval_cap/self._interval_steps) + 1))).split()
 
         else:
-            return rldata.RLData((
-                {'name': 'dose',  # f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
-                 'value': (x*self._dose_steps, i),
-                 'lower': (0, 1), 'upper': (self._max_dose, self._max_interval),
-                 'normalizer': lambda x: [NumericalData._default_normalizer(x[0]),
-                                          NumericalData._default_normalizer(x[1])]}
+            return [
+                # {'dose': {'value': x*self._dose_steps,
+                #           'lower': 0, 'upper': self._max_dose},
+                #  'interval': {'value': i * self._interval_steps,
+                #               'lower': 1, 'upper': self._max_interval}}
+                rldata.RLData([{'name': 'dose',  # f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
+                 'value': x*self._dose_steps,
+                 'lower': 0, 'upper': self._max_dose},
+                 {'name': 'interval',  # f'dose: {x * self._dose_steps:.1f}\tinterval: {i}',
+                  'value': i * self._interval_steps,
+                  'lower': 1, 'upper': self._max_interval}])
                 for x in range(int(_dose_cap/self._dose_steps) + 1)
-                for i in range(1, _interval_cap + 1))).split()
+                for i in range(1, int(_interval_cap/self._interval_steps) + 1)]
 
     @property
     def _INR_history(self) -> List[float]:
@@ -261,7 +268,8 @@ class Warfarin(subjects.Subject):
     @property
     def _dose_history(self) -> List[float]:
         return [0.0]*(self._dose_history_length - self._decision_points_index) \
-            + self._decision_points_dose_history[:self._decision_points_index][-self._dose_history_length:]
+            + self._decision_points_dose_history[:self._decision_points_index][-self._dose_history_length:] \
+            + ([self._current_dose] if self._action_type == 'interval_only' else [])
 
     @property
     def _interval_history(self) -> List[int]:
@@ -308,11 +316,12 @@ class Warfarin(subjects.Subject):
     @property
     # only considers the dose
     def possible_actions(self) -> Union[rldata.RLData, List[rldata.RLData]]:
-        if self._action_type == 'dose' and self._current_max_dose < self._max_dose:
-            return self._possible_actions[:int(self._current_max_dose/self._dose_steps) + 1]
-            # return self._generate_possible_actions(dose_cap=self._current_max_dose)
-        # elif self._action_type == 'interval' and self._current_max_interval < self._max_interval:
-        #     return self._possible_actions[:self._current_max_interval + 1]
+        if self._action_type == 'dose' and self._current_dose < self._max_dose:
+            return self._possible_actions[:int(self._current_dose/self._dose_steps) + 1]
+        elif self._action_type == 'interval' and self._current_interval < self._max_interval:
+            return self._possible_actions[:int(self._current_interval/self._interval_steps)]
+        elif self._current_dose < self._max_dose or self._current_interval < self._max_interval:
+            self._generate_possible_actions(dose_cap=self._current_dose, interval_cap=self._current_interval)
 
         return self._possible_actions
 
@@ -331,7 +340,7 @@ class Warfarin(subjects.Subject):
             return 1
 
     def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> rldata.RLData:
-        current_dose = float(action.value['dose'])
+        current_dose = float(action.value.get('dose', self._current_dose))
         current_interval = min(
             int(action.value.get('interval', self._current_interval)),
             self._max_day - self._day)
@@ -527,7 +536,7 @@ class Warfarin(subjects.Subject):
              'categories': self._list_of_characteristics['VKORC1']}],
             lazy_evaluation=True)
 
-        self._interval_index = 0
+        self._list_index = 0
         self._determine_interval_info()
         self._possible_actions = self._generate_possible_actions()
 
@@ -535,8 +544,8 @@ class Warfarin(subjects.Subject):
         super().load(filename, path)
 
         if any(attr in self._persistent_attributes
-               for attr in ('_interval', '_interval_max_dose')):
-            self._interval_index = 0
+               for attr in ('_interval', '_dose_list')):
+            self._list_index = 0
             self._determine_interval_info()
             self._possible_actions = self._generate_possible_actions()
 
@@ -578,31 +587,33 @@ class Warfarin(subjects.Subject):
 
     def _determine_interval_info(self) -> None:
         # if the loaded model is beyond the range, get it back to the range!
-        if self._interval_index >= len(self._interval):
-            self._interval_index = len(self._interval) - 1
+        list_size = len(self._interval_list)
 
-        if self._interval[self._interval_index] < 0:
-            in_range = self._therapeutic_range[0] <= self._decision_points_INR_history[
+        def in_range() -> bool:
+            return self._therapeutic_range[0] <= self._decision_points_INR_history[
                 self._decision_points_index] <= self._therapeutic_range[1]
-            if in_range:
-                self._interval_index = min(
-                    self._interval_index + 1, len(self._interval) - 1)
 
-            interval = self._interval[self._interval_index]
-            max_dose = self._interval_max_dose[self._interval_index]
+        if self._list_index >= list_size:
+            self._list_index = list_size - 1
 
-            if in_range:
-                self._interval_index = min(
-                    self._interval_index + 1, len(self._interval) - 1)
+        if (self._action_type == 'dose_only' and self._interval_list[self._list_index] < 0)\
+                or (self._action_type == 'interval_only' and self._dose_list[self._list_index] < 0):
+            if in_range():
+                self._list_index = min(self._list_index + 1, list_size - 1)
+
+            interval = self._interval_list[self._list_index]
+            dose = self._dose_list[self._list_index]
+
+            if in_range():
+                self._list_index = min(self._list_index + 1, list_size - 1)
 
         else:
-            interval = self._interval[self._interval_index]
-            max_dose = self._interval_max_dose[self._interval_index]
-            self._interval_index = min(
-                self._interval_index + 1, len(self._interval) - 1)
+            interval = self._interval_list[self._list_index]
+            dose = self._dose_list[self._list_index]
+            self._list_index = min(self._list_index + 1, list_size - 1)
 
         self._current_interval = min(abs(interval), self._max_day - self._day)
-        self._current_max_dose = max_dose
+        self._current_dose = dose
 
     def _load_patient(self, current_patient: str) -> None:
         self._patient.load(path=self._patients_save_path,
