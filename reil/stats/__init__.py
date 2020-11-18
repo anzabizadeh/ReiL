@@ -14,4 +14,4 @@ Classes
 
 from .stats import Stats
 from .custom.warfarin_stats import WarfarinStats
-from .functions import Functions
+from .rl_functions import RLFunction, NormalizedSquareDistance, PercentInRange, Delta
