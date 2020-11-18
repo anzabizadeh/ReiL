@@ -31,7 +31,6 @@ class WarfarinClusterAgent(Agent):
     ---------------------
         default_actions: list of default actions.
 
-        Note: This class doesn't have any data_collectors.
     Methods
     -------
         act: return an action based on the given state.
@@ -52,9 +51,6 @@ class WarfarinClusterAgent(Agent):
                          smoothing_dose_threshold=0.0, dose_step=0.5, rule_base_filename=None, phase_change_day=0)
         self.set_params(**kwargs)
         super().__init__(**kwargs)
-
-        self.data_collector.available_statistics = {}
-        self.data_collector.active_statistics = []
 
         try:
             self._cluster_data = pd.read_csv(self._cluster_filename, sep=',', index_col='Index')

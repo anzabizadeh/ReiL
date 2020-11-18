@@ -10,11 +10,10 @@ An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 
 import collections
 import functools
-import logging
 from math import exp, log, sqrt
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from reil import agents, rldata
+from reil import agents, rldata, learners, utils
 
 DoseInterval = collections.namedtuple('DoseInterval', 'dose, interval')
 
@@ -543,8 +542,6 @@ class WarfarinAgent(agents.Agent):
     Constructor Arguments
     ---------------------
 
-        Note: This class doesn't have any data_collectors.
-
     Methods
     -------
         act: return an action based on the given state.
@@ -552,25 +549,19 @@ class WarfarinAgent(agents.Agent):
         reset: Resets the dosing algorithm to day 1.
     '''
 
-    def __init__(self, study_arm: str = 'AAA',
-                 name: str = 'warfarin_agent',
-                 version: float = 0.5,
-                 path: str = '.',
-                 logger_name: str = __name__,
-                 logger_level: int = logging.WARNING,
-                 logger_filename: Optional[str] = None):
+    def __init__(self,
+                 study_arm: str = 'AAA',
+                 name: str = 'warfarin_agent'):
         '''
         Initialize a warfarin agent.
 
         Arguments:
         \n  study_arm: one of available study arms: AAA, CAA, PGAA, PGPGI, PGPGA
         '''
-        super().__init__(name=name,
-                         version=version,
-                         path=path,
-                         logger_name=logger_name,
-                         logger_level=logger_level,
-                         logger_filename=logger_filename)
+        super().__init__(
+            learner=learners.Learner(learning_rate=learners.ConstantLearningRate(1.0)),
+            exploration_strategy=utils.ExplorationStrategy(),
+            name=name)
 
         if study_arm.lower() in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
             self._protocol = AAA()
@@ -582,9 +573,6 @@ class WarfarinAgent(agents.Agent):
             self._protocol = PGPGI()
         elif study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
             self._protocol = PGPGA()
-
-        self.data_collector.available_statistics = {}
-        self.data_collector.active_statistics = []
 
     def act(self,
             state: rldata.RLData,

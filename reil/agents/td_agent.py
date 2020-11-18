@@ -43,11 +43,11 @@ class TD0Agent(Agent):
         self.set_params(**kwargs)
         super().__init__(**kwargs)
 
-        self.data_collector.available_statistics = {'states q': [False, self._report, '_state_action_list'],
-                                                    'states action': [False, self._report, '_state_action_list'],
-                                                    'state-actions q': [False, self._report, '_state_action_list'],
-                                                    'diff-q': [True, self._report, '_state_action_list']}
-        self.data_collector.active_statistics = ['states q', 'states action', 'state-actions q', 'diff-q']
+        # self.data_collector.available_statistics = {'states q': [False, self._report, '_state_action_list'],
+        #                                             'states action': [False, self._report, '_state_action_list'],
+        #                                             'state-actions q': [False, self._report, '_state_action_list'],
+        #                                             'diff-q': [True, self._report, '_state_action_list']}
+        # self.data_collector.active_statistics = ['states q', 'states action', 'state-actions q', 'diff-q']
 
         # The following code is just to suppress debugger's undefined variable errors!
         # These can safely be deleted, since all the attributes are defined using set_params!
