@@ -16,8 +16,13 @@ Classes
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from .action_generator import ActionGenerator
 from .mnkboard import MNKBoard
-from .patient import Patient
+from .buffers import Buffer, EndlessBuffer, CircularBuffer, VanillaExperienceReplay
+from .exploration_strategies import ExplorationStrategy, ConstantEpsilonGreedy, VariableEpsilonGreedy
+from .feature import Feature
+from .functions import (get_argument, random_categorical, random_truncated_normal,
+    random_truncated_lnorm, random_uniform)
 
 import warnings
 import pip
