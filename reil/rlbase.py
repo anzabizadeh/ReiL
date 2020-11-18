@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 RLBase class
-=================
+============
 
 The base class for reinforcement learning
 
@@ -9,61 +9,58 @@ The base class for reinforcement learning
 '''
 
 import logging
-import numbers
 import pathlib
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dill  # type: ignore
+from ruamel.yaml import YAML
 
-from reil import data_collector, rldata
+from reil import rldata, utils
 
-Observation = Dict[str, Union[rldata.RLData, numbers.Number]]
+Observation = Dict[str, rldata.RLData]
 History = List[Observation]
 
-class RLBase():
+
+class RLBase:
     '''
-    Super class of all classes in rl package.
-    
-    Attributes
-    ----------
-        data_collector: a DataCollector object
+    The base class of all classes in `reil` package.
 
     Methods
     -------
-        set_params: set parameters.
-        set_defaults: set default values for parameters.
-        load: load an object from a file.
-        save: save the object to a file.
+    from_pickle: create an `RLBase` instance from a pickled (dilled) `RLBase` object.
+
+    from_yaml: create an `RLBase` instance using specifications from a `YAML` file.
+
+    stats: compute statistics for the object and returns a dictionary.
+ 
+    set_params: set parameters.
+
+    load: load an object from a pickle file.
+
+    save: save (pickle) the object to a file.
     '''
-    version: str = "0.5"
+
+    version: str = "0.7"
+
     def __init__(self,
-                 name: Optional[str] = 'rlbase',
-                 path: str = '.',
-                 ex_protocol_options: Dict[str, Sequence[str]] = {},
-                 ex_protocol_current: Dict[str, str] = {},
-                 stats_list: Sequence[str] = (),
-                 logger_name: str = __name__,
-                 logger_level: int = logging.WARNING,
+                 name: Optional[str] = None,
+                 path: Optional[pathlib.Path] = None,
+                 logger_name: Optional[str] = None,
+                 logger_level: Optional[int] = None,
                  logger_filename: Optional[str] = None,
-                 persistent_attributes: Sequence[str] = (),
+                 persistent_attributes: Optional[List[str]] = None,
                  **kwargs: Any):
-        # self._defaults = {}
 
-        self.data_collector = data_collector.DataCollector(object=self)
+        self._name = utils.get_argument(name, __name__.lower())
+        self._path = pathlib.Path(utils.get_argument(path, '.'))
 
-        self._name = name
-        self._path = path
+        self._persistent_attributes = ['_'+p
+                                       for p in utils.get_argument(persistent_attributes, [])]
 
-        self._ex_protocol_options = ex_protocol_options
-        self._ex_protocol_current = dict((protocol, ex_protocol_current.get(protocol, value[0]))
-                                        for protocol, value in self._ex_protocol_options.items())
-        self._stats_list = stats_list
-
-        self._logger_name = logger_name
-        self._logger_level = logger_level
+        self._logger_name = utils.get_argument(logger_name, __name__)
+        self._logger_level = utils.get_argument(logger_level, logging.WARNING)
         self._logger_filename = logger_filename
-        self._persistent_attributes = ['_'+p for p in persistent_attributes]
 
         self._logger = logging.getLogger(self._logger_name)
         self._logger.setLevel(self._logger_level)
@@ -73,7 +70,8 @@ class RLBase():
         self.set_params(**kwargs)
 
     @classmethod
-    def from_file(cls, filename: str, path: Optional[Union[pathlib.Path, str]] = None):
+    def from_pickle(cls, filename: str,
+                    path: Optional[Union[pathlib.Path, str]] = None):
         instance = cls()
         instance._logger_name = __name__
         instance._logger_level = logging.WARNING
@@ -81,40 +79,31 @@ class RLBase():
         instance._logger = logging.getLogger(instance._logger_name)
         instance._logger.setLevel(instance._logger_level)
         if instance._logger_filename is not None:
-            instance._logger.addHandler(logging.FileHandler(instance._logger_filename))
+            instance._logger.addHandler(
+                logging.FileHandler(instance._logger_filename))
 
         instance.load(filename=filename, path=path)
         return instance
 
-    def stats(self, stats_list: Sequence[str]) -> Dict[str, Any]:
-        '''
-        Compute statistics.
+    @classmethod
+    def from_yaml(cls, yaml_node_name: str,
+                  filename: str, path: Optional[Union[pathlib.Path, str]] = None):
+        _path = pathlib.Path(utils.get_argument(path, '.'))
 
-        Arguments
-        ---------
-            stats_list: list of statistics to compute.
-        '''
-        return {}
+        yaml = YAML()
+        yaml_output = yaml.load(_path / f'{filename}.yaml')
 
-    def has_stat(self, stat: str) -> bool:
-        return stat in self._stats_list
+        if yaml_node_name not in yaml_output:
+            raise ValueError(f'{yaml_output} not found in {filename}.yaml')
 
-    @property
-    def exchange_protocol_options(self) -> Dict[str, Sequence[str]]:
-        return self._ex_protocol_options
+        obj_type = yaml_output[yaml_node_name].get('type', '')
+        if cls.__name__ != obj_type:
+            raise TypeError(
+                f'Attempted to load an object of type {obj_type} using class {cls.__name__}')
 
-    @property
-    def exchange_protocol(self) -> Dict[str, str]:
-        return self._ex_protocol_current
+        instance = cls(**yaml_output[yaml_node_name])
 
-    @exchange_protocol.setter
-    def exchange_protocol(self, p: Dict[str, str]) -> None:
-        for k, v in p.items():
-            if k in self._ex_protocol_options.keys():
-                if v in self._ex_protocol_options[k]:
-                    self._ex_protocol_current[k] = v
-                else:
-                    raise KeyError(f'Protocol {k} does not have option {v}.')
+        return instance
 
     def set_params(self, **params: Dict[str, Any]) -> None:
         '''
@@ -126,8 +115,6 @@ class RLBase():
         '''
         for key, value in params.items():
             self.__dict__[f'_{key}'] = value
-        # self.__dict__.update((f'_{key}', params.get(key, self._defaults[key]))
-        #                       for key in self._defaults if key in params)
 
     def set_defaults(self, **params: Dict[str, Any]) -> None:
         '''
@@ -159,23 +146,25 @@ class RLBase():
             path: the path of the file to be loaded. (Object's default path will be used if not provided)
 
         '''
-        _path = pathlib.Path(path if path is not None else self._path)
+        _path = pathlib.Path(utils.get_argument(path, self._path))
 
         with open(_path / f'{filename}.pkl', 'rb') as f:
             try:
-                data = dill.load(f)  #type: ignore
+                data = dill.load(f)  # type: ignore
             except EOFError:
                 try:
                     # self._logger.info(f'First attempt failed to load {_path / f"{filename}.pkl"}.')
                     time.sleep(1)
-                    data = dill.load(f)  #type: ignore
+                    data = dill.load(f)  # type: ignore
                 except EOFError:
                     # self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
-                    raise RuntimeError(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
+                    raise RuntimeError(
+                        f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
 
             # self._logger.info(f'Changing the logger from {self._logger_name} to {data["_logger_name"]}.')
 
-            persistent_attributes = self._persistent_attributes + ['_persistent_attributes', 'version']
+            persistent_attributes = self._persistent_attributes + \
+                ['_persistent_attributes', 'version']
             for key, value in data.items():
                 if key not in persistent_attributes:
                     self.__dict__[key] = value
@@ -186,14 +175,13 @@ class RLBase():
             self._logger = logging.getLogger(self._logger_name)
             self._logger.setLevel(self._logger_level)
             if self._logger_filename is not None:
-                self._logger.addHandler(logging.FileHandler(self._logger_filename))
-
-            self.data_collector.object = self
+                self._logger.addHandler(
+                    logging.FileHandler(self._logger_filename))
 
     def save(self,
              filename: Optional[str] = None,
              path: Optional[Union[str, pathlib.Path]] = None,
-             data_to_save: Optional[Sequence[str]] = None) -> Tuple[pathlib.Path, str]:
+             data_to_save: Optional[Tuple[str, ...]] = None) -> Tuple[pathlib.Path, str]:
         '''
         Save the object to a file.
 
@@ -201,43 +189,28 @@ class RLBase():
         ---------
             filename: the name of the object (Default=self._name)
             path: the path of the file to be loaded. (Default='.')
-            data: what to save (Default: saves everything)
+            data_to_save: what to save (Default: saves everything)
         '''
-
-        _filename = filename if filename is not None else self._name
-        _path: pathlib.Path = pathlib.Path(path if path is not None else self._path)
-
         if data_to_save is None:
             data = self.__dict__.copy()
         else:
-            data = {}
-            for d in data_to_save:
-                data[d] = self.__dict__[d]
-            for key in ('_name', '_path'):  # these should be saved automatically
-                data[key] = self.__dict__[key]
-        data['version'] = self.version
+            data = dict((d, self.__dict__[d])
+                        for d in list(data_to_save) + ['_name', '_path'])
 
-        _path.mkdir(parents=True, exist_ok=True)
         if '_logger' in data:
             data.pop('_logger')
+
+        data['version'] = self.version
+
+        _filename: str = utils.get_argument(filename, self._name)
+        _path: pathlib.Path = pathlib.Path(
+            utils.get_argument(path, self._path))
+
+        _path.mkdir(parents=True, exist_ok=True)
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
             dill.dump(data, f, dill.HIGHEST_PROTOCOL)  # type: ignore
 
-        return _path, _filename  # type: ignore
-
-    @staticmethod
-    def get_argument(x: Any, y: Any) -> Any:
-        return x if x is not None else y
-
-    def _report(self, **kwargs: Any) -> Any:
-        '''
-        Report statistics using `DataCollector` class. This method can be implemented if an agent/ a subject wants to use `DataCollector`.
-
-        Arguments
-        ---------
-            kwargs: data by which different statistics are computed.
-        '''
-        raise NotImplementedError
+        return _path, _filename
 
     def __repr__(self) -> str:
-        return 'RLBase'
+        return self.__class__.__qualname__ + f"\t(Version = {self.version})"
