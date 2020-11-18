@@ -26,6 +26,7 @@ pylint
 pyparsing
 python-dateutil
 pytz
+ruamel.yaml
 scipy
 six
 tensorboard==1.15.0
