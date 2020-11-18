@@ -17,5 +17,7 @@ Classes
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+# TODO: see if Experiment is still useful.
+
 from .environment import Environment
 from .experiment import Experiment
