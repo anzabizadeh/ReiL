@@ -15,7 +15,7 @@ Categories = Sequence[C]
 
 N = Union[Number, Sequence[Number]]  # Type for numerical value
 
-RLDataClass = TypeVar('RLDataClass')
+RLDataClass = TypeVar('RLDataClass', bound='BaseRLData')
 Normalized = Union[Number, Sequence[Number], None]
 Normalizer = Callable[[RLDataClass], Normalized]
 
@@ -87,6 +87,21 @@ class BaseRLData:
 
     def as_dict(self) -> Dict[str, Any]:
         return {'name': self.name, 'value': self.value}
+
+    def __eq__(self, other: BaseRLData) -> bool:
+        return (isinstance(other, type(self)) and
+                all((self.name == other.name,
+                     self._value == other._value,
+                     self._categorical == other._categorical,
+                     self._normalizer == other._normalizer,
+                     self._lazy_evaluation == other._lazy_evaluation)))
+
+    def __hash__(self) -> int:
+        return hash((self.name,
+                     self._value,
+                     self._categorical,
+                     self._normalizer,
+                     self._lazy_evaluation))
 
     def __str__(self) -> str:
         return f'{{{self.name}: {self.value}}}'
@@ -165,6 +180,17 @@ class CategoricalData(BaseRLData):
     def _type_check(val: Any, cat: Any):
         return (isinstance(val, type(cat[0])) and val in cat) or \
                 (isinstance(val[0], type(cat[0])) and all(v in cat for v in val))
+
+    def __eq__(self, other: CategoricalData) -> bool:
+        return super().__eq__(other) and (self._categories == other._categories)
+
+    def __hash__(self) -> int:
+        return super().__hash__() 
+        hash((self.name,
+                     self._value,
+                     self._categorical,
+                     self._normalizer,
+                     self._lazy_evaluation))
 
     def __str__(self):
         return f'{self.name}: {self._value} from {self._categories}'
@@ -292,6 +318,11 @@ class NumericalData(BaseRLData):
         temp_dict.update(
             {'lower': self.lower, 'upper': self.upper, 'categorical': False})
         return temp_dict
+
+    def __eq__(self, other: NumericalData) -> bool:
+        return (super().__eq__(other) and
+                (self._lower == other._lower) and
+                (self._upper == other._upper))
 
     def __str__(self):
         return f'{self.name}: {self.value} of range [{self.lower}, {self.upper}]'
@@ -592,6 +623,12 @@ class RLData(MutableSequence):
 
     def __len__(self) -> int:
         return self._data.__len__()
+
+    def __hash__(self) -> int:
+        return hash(tuple(self._data))
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, type(self)) and (self._data == other._data)
 
     def extend(self, values: R) -> None:
         if isinstance(values, RLData):
