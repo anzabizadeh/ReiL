@@ -1,10 +1,23 @@
 import pathlib
-from typing import List, Optional, Tuple, Union
+from typing import Generic, Optional, Tuple, TypeVar, Union
 
-from reil import rldata, learners
+from reil import learners, reilbase
+from reil.datatypes import ReilData
+
+LabelType = TypeVar('LabelType')
 
 
-class Learner:
+class Learner(reilbase.ReilBase, Generic[LabelType]):
+    '''
+    The base class for all `Learners`.
+
+    ### Methods
+    from_pickle: loads a learner from a file.
+
+    predict: predicts `y` for a given input list `X`.
+
+    learn: learns using training set `X` and `y`.
+    '''
     def __init__(self,
                  learning_rate: learners.LearningRateScheduler) -> None:
         self._learning_rate = learning_rate
@@ -16,19 +29,22 @@ class Learner:
 
         return instance
 
-    def predict(self, X: List[rldata.RLData]) -> List[float]:
+    def predict(self, X: Tuple[ReilData, ...]) -> Tuple[LabelType, ...]:
+        '''
+        predicts `y` for a given input list `X`.
+
+        ### Arguments
+        X: a list of `ReilData` as inputs to the prediction model.
+        '''
         raise NotImplementedError
 
-    def learn(self, X: List[rldata.RLData], Y: List[float]) -> None:
-        raise NotImplementedError
+    def learn(self, X: Tuple[ReilData, ...], Y: Tuple[LabelType, ...]) -> None:
+        '''
+        Learns using training set `X` and `Y`.
 
-    def reset(self) -> None:
-        pass
+        ### Arguments
+        X: a list of `ReilData` as inputs to the learning model.
 
-    def load(self, filename: str, path: Optional[Union[str, pathlib.Path]] = None) -> None:
-        raise NotImplementedError
-
-    def save(self,
-             filename: str,
-             path: Optional[Union[str, pathlib.Path]] = None) -> Tuple[pathlib.Path, str]:
+        Y: a list of float labels for the learning model.
+        '''
         raise NotImplementedError

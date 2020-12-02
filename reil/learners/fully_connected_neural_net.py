@@ -1,22 +1,67 @@
 import pathlib
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-from reil import learners, rldata
+from reil import learners
+from reil.datatypes import ReilData
 from tensorflow import keras  # type: ignore
 
 
-class Dense(learners.Learner):
+class Dense(learners.Learner[float]):
+    '''
+    The Dense learner.
+
+    This class uses `tf.keras` to build a sequential dense network with one output.
+
+    ### Methods
+    from_pickle: loads a learner from a file.
+
+    predict: predicts `y` for a given input list `X`.
+
+    learn: learns using training set `X` and `y`.
+
+    reset: resets the learner.
+
+    load: loads a Dense instance.
+
+    save: saves the learner.
+
+    _generate_network: generates a neural net based on the input size and layer
+    sizes.
+    '''
+
     def __init__(self,
                  learning_rate: learners.LearningRateScheduler,
                  validation_split: float = 0.3,
-                 hidden_layer_sizes: Sequence[int] = (1,),
+                 hidden_layer_sizes: Tuple[int, ] = (1,),
                  input_length: Optional[int] = None,
                  tensorboard_path: Optional[Union[str, pathlib.Path]] = None,
+                 **kwargs: Any
                  ) -> None:
+        '''
+        Initialize the instance.
 
-        super().__init__(learning_rate=learning_rate)
+        ### Arguments
+        learning_rate: a `LearningRateScheduler` object that determines the
+        learning rate based on epoch. If any scheduler other than constant is
+        provided, the model uses the `new_rate` method of the scheduler to
+        determine the learning rate at each epoch.
+
+        validation_split: how much of the training set should be used for
+        validation?
+
+        hidden_layer_sizes: a list of number of neurons for each layer.
+
+        input_length: size of the input data. If not supplied, the network will
+        be generated based on the size of the first data point in `predict` or
+        `learn` methods.
+
+        tensorboard_path: a path to save tensorboard outputs. If not provided,
+        tensorboard will be omitted.
+        '''
+
+        super().__init__(learning_rate=learning_rate, **kwargs)
 
         self._epoch = 0
 
@@ -44,14 +89,16 @@ class Dense(learners.Learner):
             self._session = tf.Session()
 
             self._model = keras.models.Sequential()
-            self._model.add(keras.layers.Dense(
-                self._hidden_layer_sizes[0], activation='relu', name='layer_01', input_shape=(self._input_length,)))
+            self._model.add(
+                keras.layers.Dense(self._hidden_layer_sizes[0],
+                                   activation='relu',
+                                   name='layer_01',
+                                   input_shape=(self._input_length,)))
             for i, v in enumerate(self._hidden_layer_sizes[1:]):
                 self._model.add(keras.layers.Dense(
                     v, activation='relu', name=f'layer_{i+2:0>2}'))
 
-            self._model.add(keras.layers.Dense(
-                1, name='output'))
+            self._model.add(keras.layers.Dense(1, name='output'))
 
             self._model.compile(optimizer=keras.optimizers.Adam(
                 learning_rate=self._learning_rate.initial_lr), loss='mae')
@@ -69,7 +116,13 @@ class Dense(learners.Learner):
                     self._learning_rate.new_rate, verbose=1)
                 self._callbacks.append(self._learning_rate_scheduler)
 
-    def predict(self, X: List[rldata.RLData]) -> float:
+    def predict(self, X: Tuple[ReilData, ...]) -> Tuple[float, ...]:
+        '''
+        predicts `y` for a given input list `X`.
+
+        ### Arguments
+        X: a list of `ReilData` as inputs to the prediction model.
+        '''
         _X = [x.normalized.flatten() for x in X]
         if self._graph is None:
             self._input_length = len(_X[0])
@@ -81,7 +134,15 @@ class Dense(learners.Learner):
 
         return result
 
-    def learn(self, X: List[rldata.RLData], Y: List[float]) -> None:
+    def learn(self, X: Tuple[ReilData, ...], Y: Tuple[float, ...]) -> None:
+        '''
+        Learns using training set `X` and `Y`.
+
+        ### Arguments
+        X: a list of `ReilData` as inputs to the learning model.
+
+        Y: a list of float labels for the learning model.
+        '''
         _X = [x.normalized.flatten() for x in X]
         if self._graph is None:
             self._input_length = len(_X[0])
@@ -96,11 +157,24 @@ class Dense(learners.Learner):
                                 verbose=2)
 
     def reset(self) -> None:
+        '''
+        resets the learner.
+        '''
         self._epoch += 1
 
     def save(self,
              filename: str,
              path: pathlib.Path) -> Tuple[pathlib.Path, str]:
+        '''
+        Saves the learner instance.
+
+        ### Arguments
+        filename: the name of the file to be saved.
+
+        path: the path of the file to be saved.
+
+        Raises ValueError if the filename is not specified.
+        '''
         path.mkdir(parents=True, exist_ok=True)
         with self._session.as_default():
             with self._graph.as_default():
@@ -109,6 +183,16 @@ class Dense(learners.Learner):
         return path, filename
 
     def load(self, filename: str, path: Optional[Union[str, pathlib.Path]] = None) -> None:
+        '''
+        Loads an instance from a file.
+
+        ### Arguments
+        filename: the name of the file to be loaded.
+
+        path: path of the location of the file.
+
+        Raises ValueError if the filename is not specified.
+        '''
         _path = path if path is not None else '.'
         self._graph = tf.Graph()
         with self._graph.as_default():
