@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
-DQNAgent class
-=================
+DeepQLearning class
+===================
 
 A Q-learning agent with Neural Network Q-function approximator
 
@@ -11,53 +11,37 @@ A Q-learning agent with Neural Network Q-function approximator
 from typing import Any
 
 from reil import agents, learners
-from reil.utils import buffers, ExplorationStrategy
+from reil.utils import buffers, exploration_strategies
 
 
 class DeepQLearning(agents.QLearning):
     '''
-    A Q-learning agent.
-
-    Constructor Arguments
-    ---------------------
-        * gamma: discount factor in TD equation. (Default = 1)
-        * epsilon: exploration probability. (Default = 0)
-        * default_actions: list of default actions.
-        * lr_initial: learning rate for ANN. (Default = 1e-3)
-        * hidden_layer_sizes: tuple containing hidden layer sizes.
-        * input_length: size of the input vector. (Default = 1)
-        buffer_size: DQN stores buffer_size observations and samples from it for training. (Default = 50)
-        batch_size: the number of samples to choose randomly from the buffer for training. (Default = 10)
-        * validation_split: proportion of sampled observations set for validation. (Default = 0.3)
-        clear_buffer: whether to clear buffer after sampling (True: clear buffer, False: only discard old observations). (Default = False)
-
-        Note: Although input_length has a default value, but it should be specified in object construction.
-    Methods
-    -------
-        * act: return an action based on the given state.
-        * learn: learn using either history or action, reward, and state.
+    A Deep Q-learning agent.
     '''
 
     def __init__(self,
                  learner: learners.Dense,
                  buffer: buffers.VanillaExperienceReplay,
-                 exploration_strategy: ExplorationStrategy,
+                 exploration_strategy: exploration_strategies.ExplorationStrategy,
                  method: str = 'backward',
                  **kwargs: Any):
         '''
         Initialize a Q-Learning agent with deep neural network Q-function approximator.
-        '''
 
+        ### Arguments
+        learner: the `Learner` of type `Dense` that does the learning.
+
+        buffer: a `Buffer` object that collects observations for training. Some
+        variation of `ExperienceReply` is recommended.
+
+        exploration_strategy: an `ExplorationStrategy` object that determines
+        whether the `action` should be exploratory or not for a given `state` at
+        a given `epoch`.
+
+        method: either 'forward' or 'backward' Q-learning.
+        '''
         super().__init__(learner=learner,
                          buffer=buffer,
                          exploration_strategy=exploration_strategy,
+                         method=method,
                          **kwargs)
-
-        self._method = method.lower()
-        if self._method not in ('backward', 'forward'):
-            self._logger.warning(
-                f'method {method} is not acceptable. Should be either "forward" or "backward". Will use "backward".')
-            self._method = 'backward'
-
-        self._buffer = buffer
-        self._epoch = 0

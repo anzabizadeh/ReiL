@@ -11,9 +11,12 @@ An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 import collections
 import functools
 from math import exp, log, sqrt
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from reil import agents, rldata, learners, utils
+from typing_extensions import Literal
+
+from reil import agents
+from reil.datatypes.reildata import ReilData
 
 DoseInterval = collections.namedtuple('DoseInterval', 'dose, interval')
 
@@ -149,7 +152,8 @@ class Aurora(DosingProtocol):
 
 
 class IWPC(DosingProtocol):
-    def __init__(self, method: str = 'default') -> None:
+    def __init__(self,
+                 method: Literal['pharmacogenetic', 'clinical', 'modified'] = 'pharmacogenetic') -> None:
         if method.lower() == 'clinical':
             self._method = self.clinical
         elif method.lower() == 'modified':
@@ -481,7 +485,7 @@ class CAA(CompositeDosingProtocol):
 
 class PGAA(CompositeDosingProtocol):
     def __init__(self) -> None:
-        iwpc_instance = IWPC('pg')
+        iwpc_instance = IWPC('pharmacogenetic')
         aurora_instance = Aurora()
         super().__init__(iwpc_instance, aurora_instance, aurora_instance)
 
@@ -535,33 +539,26 @@ class PGPGI(CompositeDosingProtocol):
         return dose, interval
 
 
-class WarfarinAgent(agents.Agent):
+class WarfarinAgent(agents.NoLearnAgent):
     '''
-    An agent for warfarin modeling based on the doses defined in Ravvaz et al (2017).
+    An `agent` that prescribes dose for a warfarin `subject`,
+    based on the dosing protocols defined in Ravvaz et al (2017).
 
-    Constructor Arguments
-    ---------------------
+    ### Methods
+    act: returns an `action` based on the given `state`.
 
-    Methods
-    -------
-        act: return an action based on the given state.
-        learn: learn using either history or action, reward, and state.
-        reset: Resets the dosing algorithm to day 1.
+    reset: Resets the dosing algorithm to day 1.
     '''
-
     def __init__(self,
-                 study_arm: str = 'AAA',
+                 study_arm: Literal['aaa', 'caa', 'pgaa', 'pgpgi', 'pgpga'] = 'aaa',
                  name: str = 'warfarin_agent'):
         '''
-        Initialize a warfarin agent.
+        Initializes the warfarin `agent`.
 
-        Arguments:
-        \n  study_arm: one of available study arms: AAA, CAA, PGAA, PGPGI, PGPGA
+        ### Arguments
+        study_arm: one of available study arms: aaa, caa, pgaa, pgpgi, pgpga
         '''
-        super().__init__(
-            learner=learners.Learner(learning_rate=learners.ConstantLearningRate(1.0)),
-            exploration_strategy=utils.ExplorationStrategy(),
-            name=name)
+        super().__init__(name=name)
 
         if study_arm.lower() in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
             self._protocol = AAA()
@@ -575,33 +572,35 @@ class WarfarinAgent(agents.Agent):
             self._protocol = PGPGA()
 
     def act(self,
-            state: rldata.RLData,
-            actions: Optional[Sequence[rldata.RLData]] = None,
-            episode: Optional[int] = 0) -> rldata.RLData:
+            state: ReilData,
+            actions: Optional[Tuple[ReilData, ...]] = None,
+            epoch: Optional[int] = 0) -> ReilData:
         '''
-        return the best action for a given state.
+        Generates the dosing `action` based on the `state` and current dosing 
+        protocol.
 
-        Arguments
-        ---------
-            state: the state for which an action is chosen.
+        ### Arguments
+        state: the state for which an action is chosen.
         '''
-        patient: Dict[str, Any] = state.value
+        patient = state.value
         patient['day'] += 1
 
         dose, interval = self._protocol.prescribe(patient)
 
         # Cuts out the dose if it is >15.0
-        return rldata.RLData({'dose': {'value': min(dose, 15.0), 'lower': 0.0, 'upper': 15.0},
-                              'interval': {'value': min(interval, 28), 'lower': 1, 'upper': 28}})
+        return ReilData(
+            [{'name': 'dose', 'value': min(dose, 15.0), 'lower': 0.0, 'upper': 15.0},
+             {'name': 'interval', 'value': min(interval, 28), 'lower': 1, 'upper': 28}])
 
-    def reset(self) -> None:
+    def reset(self):
+        '''Resets the agent at the end of a learning epoch.'''
         self._protocol.reset()
 
     def __repr__(self) -> str:
         try:
-            return f'WarfarinAgent: arm: {self._protocol}'
+            return super().__repr__() + f' arm: {self._protocol}'
         except NameError:
-            return 'WarfarinAgent'
+            return super().__repr__()
 
 # Implementation that matches RAVVAZ dataset.
 # -------------------------------------------

@@ -8,32 +8,38 @@ An agent that randomly chooses an action
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from random import choice
+import random
+from typing import Any, Optional, Tuple
 
-from reil.agents import Agent
+from reil import agents
+from reil.datatypes.reildata import ReilData
+from reil.utils import functions
 
 
-class RandomAgent(Agent):
+class RandomAgent(agents.NoLearnAgent):
     '''
     An agent that acts randomly.
 
-    Methods
-    -------
-        act: return an action randomly.
-    ''' 
-    def act(self, state, **kwargs):
+    ### Methods
+    act: return an action randomly.
+    '''
+
+    def __init__(self,
+                 default_actions: Tuple[ReilData, ...] = (),
+                 **kwargs: Any):
+        super().__init__(default_actions=default_actions, **kwargs)
+
+    def act(self,
+            state: ReilData,
+            actions: Optional[Tuple[ReilData, ...]] = None,
+            epoch: int = 0) -> ReilData:
         '''
         Return a random action.
 
-        Arguments
-        ---------
-            state: the state for which the action should be returned. This argument is solely to keep the method's signature unified.
-            actions: the set of possible actions to choose from. If not provided, an empty list is returned. 
-        '''
-        try:  # possible actions
-            return choice(kwargs['actions'])
-        except KeyError:
-            return []
+        ### Arguments
+        state: the state for which the action should be returned.
 
-    def __repr__(self):
-        return 'RandomAgent'
+        actions: the set of possible actions to choose from.
+        '''
+        return random.choice(functions.get_argument(
+            actions, self._default_actions))
