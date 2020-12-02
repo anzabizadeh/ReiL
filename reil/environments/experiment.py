@@ -57,18 +57,14 @@ class Experiment(Environment):
                       filename=kwargs['filename'])
             return
 
-        self.set_defaults(agent={}, subject={}, assignment_list={},
-                            number_of_subjects=1, max_steps=10000, save_subjects=True,
-                            file_index_generator=None)
+        self._agent = {}
+        self._subject = {}
+        self._assignment_list = {}
+        self._number_of_subjects = 1
+        self._max_steps = 10000
+        self._save_subjects = True
+        self._file_index_generator = None
         self.set_params(**kwargs)
-
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._agent, self._subject, self._assignment_list = {}, {}, {}
-            self._number_of_subjects, self._max_steps = 1, 10000
-            self._save_subjects = True
-            self._file_index_generator = None
 
     def _default_file_index_generator(self, number_of_subjects):
         digits = ceil(log10(number_of_subjects))
@@ -106,7 +102,7 @@ class Experiment(Environment):
 
         Arguments
         ---------
-            max_steps: maximum number of steps in the episode (Default = 10,000)
+            max_steps: maximum number of steps in the epoch (Default = 10,000)
 
         '''
         max_steps = kwargs.get('max_steps', self._max_steps)

@@ -11,17 +11,19 @@ This `environment` class provides a learning environment for any reinforcement l
 import functools
 import pathlib
 from collections import defaultdict
-from reil.subjects.subject import Subject
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from reil import agents as rlagents
-from reil import rlbase, rldata, utils
+from reil import stateful
 from reil import subjects as rlsubjects
+from reil import utils
+from reil.datatypes import reildata
+from reil.subjects.subject import Subject
 
 AgentSubjectTuple = Tuple[str, str]
 
 
-class Environment(rlbase.RLBase):
+class Environment(stateful.Stateful):
     '''
     Provide a learning environment for agents and subjects.
 
@@ -271,7 +273,7 @@ class Environment(rlbase.RLBase):
             if _reporting != 'none':
                 report_string = f'episode: {episode + 1}'
             # history = dict((agent_name, []) for agent_name in self._agents)
-            history: Dict[str, List[Dict[str, rldata.RLData]]] = defaultdict(list)
+            history: Dict[str, List[Dict[str, reildata.ReilData]]] = defaultdict(list)
             done = False
             stopping_criterion = _max_steps * (episode + 1)
             while not done:
@@ -412,7 +414,7 @@ class Environment(rlbase.RLBase):
                 self._agents[agent_name].training_mode = _training_mode[(
                     agent_name, subject_name)]
 
-            history: Dict[str, List[Dict[str, rldata.RLData]]] = defaultdict(list)
+            history: Dict[str, List[Dict[str, reildata.ReilData]]] = defaultdict(list)
             for instance_id, subject_instance in subject:
                 steps = 0
                 # for agent_name, _ in assigned_agents:
