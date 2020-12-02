@@ -7,7 +7,34 @@ FeatureType = TypeVar('FeatureType')
 
 
 @dataclasses.dataclass
-class Feature(Generic[FeatureType]):
+class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
+    '''
+    a datatype that accepts initial value and feature generator, and generates
+    new values.
+
+    ### Attributes
+    is_numerical: a boolean that shows if the feature is numerical.
+
+    value: the currect value of the feature.
+
+    randomized: whether the generator should produce random values
+
+    generator: a function that gets feature characteristics and generates a new
+    value
+
+    lower: lower bound for numerical features.
+
+    upper: upper bound for numerical features.
+
+    mean: mean value for numerical features.
+
+    stdev: standard deviation for numerical features.
+
+    categories: a list of possible values for categorical features.
+
+    probabilities: a list of probabilities corresponding to each possible value
+    for categorical features.
+    '''
     is_numerical: Optional[bool] = True
     value: Optional[Any] = None
     randomized: Optional[bool] = True
@@ -30,7 +57,22 @@ class Feature(Generic[FeatureType]):
                     probabilities: Optional[Tuple[float, ...]] = None,
                     randomized: Optional[bool] = None,
                     generator: Optional[Callable[[Feature], Any]] = None):
+        '''
+        Creates a categorical Feature.
 
+        ### Attributes
+        value: the currect value of the feature.
+
+        randomized: whether the generator should produce random values
+
+        generator: a function that gets feature characteristics and generates a new
+        value
+
+        categories: a list of possible values for categorical features.
+
+        probabilities: a list of probabilities corresponding to each possible value
+        for categorical features.
+        '''
         instance = cls(is_numerical=False,
                        value=value,
                        randomized=randomized,
@@ -52,7 +94,25 @@ class Feature(Generic[FeatureType]):
                   stdev: Optional[Union[int, float]] = None,
                   generator: Optional[Callable[[Feature], Any]] = None,
                   randomized: Optional[bool] = None):
+        '''
+        Creates a numerical Feature.
 
+        ### Attributes
+        value: the currect value of the feature.
+
+        randomized: whether the generator should produce random values
+
+        generator: a function that gets feature characteristics and generates a new
+        value
+
+        lower: lower bound for numerical features.
+
+        upper: upper bound for numerical features.
+
+        mean: mean value for numerical features.
+
+        stdev: standard deviation for numerical features.
+        '''
         instance = cls(is_numerical=True,
                        value=value,
                        generator=generator,
@@ -68,6 +128,9 @@ class Feature(Generic[FeatureType]):
         return instance
 
     def _numerical_validator(self):
+        '''
+        Checks if the value is in the defined range.
+        '''
         if self.value is not None:
             if self.lower is not None and self.value < self.lower:
                 raise ValueError(
@@ -78,6 +141,10 @@ class Feature(Generic[FeatureType]):
                     f'value={self.value} is greater than upper={self.upper}.')
 
     def _categorical_validator(self):
+        '''
+        Checks if the value is in the defined categories and probabilities add
+        up to one.
+        '''
         if self.value is not None:
             if self.categories is not None and self.value not in self.categories:
                 raise ValueError(
@@ -96,6 +163,9 @@ class Feature(Generic[FeatureType]):
                                  f'{len(self.categories)} probabilities')
 
     def generate(self):
+        '''
+        Generates a new value using the generator.
+        '''
         if self.generator is None:
             return
 

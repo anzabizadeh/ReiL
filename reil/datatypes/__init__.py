@@ -7,11 +7,14 @@ This module contains datatypes used in `reil`
 
 Classes
 -------
-Feature: a datatype that accepts initial value and feature generator and generates new values.
+Feature: a datatype that accepts initial value and feature generator and
+generates new values.
 
-InteractionProtocol: a datatype that specifies how an agent and a subject interact in an environment.
+InteractionProtocol: a datatype to specifies how an `agent` and a `subject`
+interact in an `environment`.
 
-ReilData: the main datatype used to communicate states, actions, and rewards, between objects in `reil`.
+ReilData: the main datatype used to communicate `state`s, `action`s, and `reward`s,
+between objects in `reil`.
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
