@@ -12,16 +12,17 @@ import pathlib
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import reil.subjects as rlsubjects
-from reil import rlbase, rldata
+from reil import stateful
+from reil.datatypes import reildata
 
 
-class IterableSubject(rlbase.RLBase):
+class IterableSubject(stateful.Stateful):
     '''
     Makes any subject an iterable.
 
     Attributes
     ----------
-        subject: 
+        subject:
         save_instances: whether to save instances of the `subject` class or not (Default=False).
         use_existing_instances: whether try to load instances before attempting to create them (Default=True).
         save_path: the path where instances should be saved/ loaded from (Default='./').
@@ -38,7 +39,7 @@ class IterableSubject(rlbase.RLBase):
     '''
 
     def __init__(self,
-                 subject: rlsubjects.Subject = rlsubjects.Subject(),
+                 subject: rlsubjects.Subject,
                  save_instances: bool = False,
                  use_existing_instances: bool = True,
                  save_path: Union[pathlib.Path, str] = '',
@@ -115,7 +116,7 @@ class IterableSubject(rlbase.RLBase):
         return (self._instance_counter, self._subject)
 
     @property
-    def state(self) -> rldata.RLData:
+    def state(self) -> reildata.ReilData:
         return self._subject.state
 
     @property
@@ -123,10 +124,10 @@ class IterableSubject(rlbase.RLBase):
         return self._subject.is_terminated
 
     @property
-    def possible_actions(self) -> Sequence[rldata.RLData]:
+    def possible_actions(self) -> Sequence[reildata.ReilData]:
         return self._subject.possible_actions
 
-    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None):
+    def take_effect(self, action: reildata.ReilData, _id: Optional[int] = None):
         return self._subject.take_effect(action, _id)
 
     def reset(self) -> None:
@@ -170,6 +171,6 @@ class IterableSubject(rlbase.RLBase):
 
     def __repr__(self) -> str:
         try:
-            return self._subject.__repr__()
+            return f'{self.__class__.__qualname__} -> {self._subject.__repr__()}'
         except AttributeError:
-            return 'iterable_subject'
+            return self.__class__.__qualname__

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
-from reil import rlbase
+from reil import stateful
 
 
 class Stats:
@@ -25,7 +27,7 @@ class Stats:
         else:
             self._active_stats = active_stats
 
-    def from_history(self, history: rlbase.History) -> Dict[str, pd.DataFrame]:
+    def from_history(self, history: stateful.History) -> Dict[str, pd.DataFrame]:
         raise NotImplementedError
 
     def aggregate(self,

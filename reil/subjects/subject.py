@@ -8,13 +8,14 @@ This `subject` class is the base class of all subject classes.
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, TypeVar
 
-from reil import rlbase, rldata
+from reil import stateful
+from reil.datatypes import reildata
 from reil.stats import rl_functions
 
 
-class Subject(rlbase.RLBase):
+class Subject(stateful.Stateful):
     '''
     The base class of all subject classes.
 
@@ -59,7 +60,9 @@ class Subject(rlbase.RLBase):
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''
-        Returns False as long as the subject can accept new actions.
+        Returns False as long as the subject can accept new actions from the
+            agent _id. If _id is None, then returns True if no agent can act on
+            the subject.
 
         ### Arguments
 
@@ -69,7 +72,7 @@ class Subject(rlbase.RLBase):
         '''
         raise NotImplementedError
 
-    def possible_actions(self, _id: Optional[int] = None) -> Tuple[rldata.RLData, ...]:
+    def possible_actions(self, _id: Optional[int] = None) -> Tuple[reildata.ReilData, ...]:
         '''
         Returns a list of possible actions for the agent with ID=_id.
 
@@ -77,9 +80,9 @@ class Subject(rlbase.RLBase):
 
         _id: ID of the agent that wants to act on the subject.
         '''
-        return (rldata.RLData({'default_action': {'value': None}}),)
+        return (reildata.ReilData.single_member(name='default_action'),)
 
-    def reward(self, name: str = 'default', _id: Optional[int] = None) -> rldata.RLData:
+    def reward(self, name: str = 'default', _id: Optional[int] = None) -> reildata.ReilData:
         '''
         Returns the reward that agent `_id` recieves, based on the reward
         definition `name`.
@@ -97,9 +100,9 @@ class Subject(rlbase.RLBase):
         f, s = self._reward_definitions[name.lower()]
         temp = f(self.state(s, _id))
 
-        return rldata.RLData({'name': 'reward', 'value': temp, 'lower': None, 'upper': None})
+        return reildata.ReilData.single_member(name='reward', value=temp)
 
-    def default_reward(self, _id: Optional[int] = None) -> rldata.RLData:
+    def default_reward(self, _id: Optional[int] = None) -> reildata.ReilData:
         '''
         Returns the default reward definition of the subject for agent `_id`.
 
@@ -107,9 +110,9 @@ class Subject(rlbase.RLBase):
 
         _id: ID of the agent that calls the reward method.
         '''
-        return rldata.RLData({'name': 'reward', 'value': 0.0, 'lower': None, 'upper': None})
+        return reildata.ReilData.single_member(name='reward', value=0.0)
 
-    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> None:
+    def take_effect(self, action: reildata.ReilData, _id: Optional[int] = None) -> None:
         '''
         Receive an `action` from agent `_id` and transition to the next state.
 
@@ -161,25 +164,38 @@ class Subject(rlbase.RLBase):
         ''' Resets the subject, so that it can resume accepting actions.'''
         raise NotImplementedError
 
-    def register(self, agent_name: str) -> int:
+    def register(self, agent_name: str, _id: Optional[int] = None) -> int:
         '''
         Registers an agent and returns its ID. If the agent is new, a new ID
         is generated and the agent_name is added to agent_list.
 
         ### Arguments
-
         agent_name: the name of the agent to be registered.
-        '''
-        try:
-            return self._agent_list[agent_name]
-        except KeyError:
-            try:
-                _id = max(self._agent_list.values()) + 1
-            except ValueError:
-                _id = 1
 
-            self._agent_list[agent_name] = _id
-            return _id
+        _id: the ID of the agent to be used. If not provided, subject will assign
+            an ID to agent.
+        '''
+        if _id is None:
+            try:
+                return self._agent_list[agent_name]
+            except KeyError:
+                try:
+                    new_id = max(self._agent_list.values()) + 1
+                except ValueError:
+                    new_id = 1
+        else:
+            if agent_name in self._agent_list:
+                if _id == self._agent_list[agent_name]:
+                    return _id
+                else:
+                    raise ValueError(f'{agent_name} is already registered with '
+                                     f'ID: {self._agent_list[agent_name]}.')
+            if _id in self._agent_list.values():
+                raise ValueError(f'{_id} is already taken.')
+            new_id = _id
+
+        self._agent_list[agent_name] = new_id
+        return new_id
 
     def deregister(self, agent_name: str) -> None:
         '''
@@ -190,3 +206,6 @@ class Subject(rlbase.RLBase):
         agent_name: the name of the agent to be registered.
         '''
         self._agent_list.pop(agent_name)
+
+
+SubjectType = TypeVar('SubjectType', bound=Subject)

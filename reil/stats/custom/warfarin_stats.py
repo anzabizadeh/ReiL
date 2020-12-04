@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import operator as op
 import re
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import pandas as pd
-from reil import rlbase, stats
+from reil import stateful, stats
 
 conditionals = {'<=': op.le,
                 '>=': op.ge,
@@ -35,7 +37,7 @@ class WarfarinStats(stats.Stats):
                          all_stats=('TTR', 'TTR>0.65', 'dose_change', 'count',
                                     'INR', 'INR_percent_dose_change'))
 
-    def from_history(self, history: rlbase.History) -> Dict[str, pd.DataFrame]:
+    def from_history(self, history: stateful.History) -> Dict[str, pd.DataFrame]:
         df_from_history = pd.DataFrame(history)
         df_from_history['interval'] = df_from_history.apply(
             lambda row: row['state']['Intervals'][-1], axis=1)
@@ -144,7 +146,7 @@ class WarfarinStats(stats.Stats):
                                         4: 'highly sensitive'}}, inplace=True)
 
         if 'ID' in self._groupby:
-            # since type(ID)=rldata and cannot be used in groupby, we replace it with row index.
+            # since type(ID)=reildata and cannot be used in groupby, we replace it with row index.
             df['ID'] = df.index
 
         results = {}

@@ -1,9 +1,12 @@
-from collections import namedtuple
+from __future__ import annotations
+
 import dataclasses
 import functools
-from typing import Any, Generator, Iterable, List, Optional, Tuple
+from collections import namedtuple
+from typing import Any, List, Optional, Tuple
 
-from reil import rldata
+from reil.datatypes import reildata
+from reil.utils import functions
 
 # SOME THOUGHTS!
 # Lookahead is not something a subject can/should do!
@@ -14,18 +17,6 @@ from reil import rldata
 
 
 Arguments = namedtuple('Arguments', ('y', 'x'), defaults=(None,))
-
-
-def square_dist(x: float, y: Iterable) -> float:
-    return sum((x - yi) ** 2 for yi in y)
-
-
-def in_range(r: Tuple[float, float], x: Iterable) -> int:
-    return sum(r[0] <= xi <= r[1] for xi in x)
-
-
-def interpolate(start: float, end: float, steps: int) -> Generator[float, None, None]:
-    return (start + (end - start) / steps * j for j in range(1, steps + 1))
 
 
 @dataclasses.dataclass
@@ -41,7 +32,7 @@ class RLFunction:
         if not isinstance(self.arguments, Arguments):
             self.arguments = Arguments(*self.arguments)  # type: ignore
 
-    def __call__(self, args: rldata.RLData) -> float:
+    def __call__(self, args: reildata.ReilData) -> float:
         temp = args.value
         y = temp[self.arguments.y]
         x = temp[self.arguments.x] if self.arguments.x is not None else None
@@ -94,7 +85,7 @@ class NormalizedSquareDistance(RLFunction):
         else:
             _y = y
 
-        result = sum(square_dist(self.center, interpolate(_y[i], _y[i+1], _x[i]))
+        result = sum(functions.square_dist(self.center, functions.interpolate(_y[i], _y[i+1], _x[i]))
                      for i in range(len(_x)))
 
         # normalize
@@ -121,7 +112,7 @@ class PercentInRange(RLFunction):
             _y = y
 
         result = sum(
-            in_range(self.acceptable_range, interpolate(_y[i], _y[i+1], _x[i]))
+            functions.in_range(self.acceptable_range, functions.interpolate(_y[i], _y[i+1], _x[i]))
             for i in range(len(_x)))
 
         total_intervals = sum(_x)
@@ -228,12 +219,6 @@ class Functions:
                                exclude_first: bool = False,
                                INR_range: Tuple[float, float] = (2.0, 3.0)) -> float:
 
-        def square_dist(x: float, y: Generator[float, None, None]) -> float:
-            return sum((x - yi) ** 2.0 for yi in y)
-
-        def interpolate(start: float, end: float, steps: int) -> Generator[float, None, None]:
-            return (start + (end - start) / steps * j for j in range(1, steps + 1))
-
         INR_mid = sum(INR_range) / 2.0
 
         _intervals = [1] * (len(INRs) - 1) if intervals is None else intervals
@@ -248,7 +233,7 @@ class Functions:
         else:
             _INRs = INRs
 
-        result = sum(square_dist(INR_mid, interpolate(_INRs[i], _INRs[i+1], _intervals[i]))
+        result = sum(functions.square_dist(INR_mid, functions.interpolate(_INRs[i], _INRs[i+1], _intervals[i]))
                      for i in range(len(_intervals)))
 
         # normalize

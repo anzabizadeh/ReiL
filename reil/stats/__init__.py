@@ -11,7 +11,6 @@ Classes
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
-
 from .stats import Stats
 from .custom.warfarin_stats import WarfarinStats
 from .rl_functions import RLFunction, NormalizedSquareDistance, PercentInRange, Delta

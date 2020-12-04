@@ -12,20 +12,14 @@ Classes
     MNKGame: a simple game consisting of an m-by-n board,
         each player should make a horizontal, vertical, or
         diagonal sequence of size k to win the game.
-    FrozenLake: a frozen lake with cracks in it! (uses legacy ValueSet instead of RLData)
-    WindyGridworld: a grid with displacement of agent (as if wind blows) (uses legacy ValueSet instead of RLData)
-
-    CancerModel: a 4-ordinary differential equation model of cancer (uses legacy ValueSet instead of RLData)
-    ConstrainedCancerModel: a constrained version of CancerModel (uses legacy ValueSet instead of RLData)
-    Warfarin: a PK/PD model for warfarin with extended state definition
+    FrozenLake: a frozen lake with cracks in it! (uses legacy ValueSet instead of ReilData)
+    WindyGridworld: a grid with displacement of agent (as if wind blows) (uses legacy ValueSet instead of ReilData)
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from .subject import Subject
+from .subject import Subject, SubjectType
 from .mnkgame import MNKGame
-from .windy_gridworld import WindyGridworld
-from .cancer_model import CancerModel
-from .constrained_cancer_model import ConstrainedCancerModel
-from .warfarin import Warfarin
+from .tic_tac_toe import TicTacToe
+# from .windy_gridworld import WindyGridworld
 from .iterable_subject import IterableSubject

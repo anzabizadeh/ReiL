@@ -9,20 +9,26 @@ This `subject` class emulates mnk game.
 '''
 
 
-from ..utils.mnkboard import MNKBoard
-from ..subjects.subject import Subject
-# from reil.valueset import ValueSet
-from ..rldata import RLData
-
+from typing import Optional, Tuple
+from reil.utils.mnkboard import MNKBoard
+from reil.subjects.subject import Subject
+from reil.datatypes import reildata
+import random
 
 def main():
     board = MNKGame()
     player = {}
+    p = 0
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')
-    board.take_effect(RLData(0), player['P1'])  # ValueSet(0))
-    board.take_effect(RLData(1), player['P2'])  # ValueSet(1))
-    print(f'{board}')
+    while not board.is_terminated():
+        current_player = ['P1', 'P2'][p]
+        print(p, current_player)
+        actions = board.possible_actions(player[current_player])
+        board.take_effect(random.choice(actions), player[current_player])
+        print(f'{board}\n', board.reward(
+            'default', player['P1']), board.reward('default', player['P2']))
+        p = (p + 1) % 2
 
 
 class MNKGame(MNKBoard, Subject):
@@ -30,17 +36,19 @@ class MNKGame(MNKBoard, Subject):
     Build an m-by-n board (using mnkboard super class) in which p players can play.
     Winner is the player who can put k pieces in on row, column, or diagonal.
 
-    Attributes
-    ----------
-        is_terminated: whether the game finished or not.
-        possible_actions: a list of possible actions.
+    ### Attributes
+    is_terminated: whether the game finished or not.
 
-    Methods
-    -------
-        register: register a new player and return its ID or return ID of an existing player.
-        take_effect: set a piece of the specified player on the specified square of the board.
-        set_piece: set a piece of the specified player on the specified square of the board.
-        reset: clear the board.
+    possible_actions: a list of possible actions.
+
+    ### Methods
+    register: register a new player and return its ID or return ID of an existing player.
+
+    take_effect: set a piece of the specified player on the specified square of the board.
+
+    set_piece: set a piece of the specified player on the specified square of the board.
+
+    reset: clear the board.
     '''
     # _board is a row vector. (row, column) and index start from 0
     # _board_status: None: no winner yet,
@@ -51,48 +59,31 @@ class MNKGame(MNKBoard, Subject):
         '''
         Initialize an instance of mnkgame.
 
-        Arguments
-        ---------
-            m: number of rows (default=3)
-            n: number of columns (default=3)
-            k: winning criteria (default=3)
-            players: number of players (default=2)
+        ### Arguments
+        m: number of rows (default=3)
+
+        n: number of columns (default=3)
+
+        k: winning criteria (default=3)
+
+        players: number of players (default=2)
         '''
-        self.set_defaults(board_status=None)
+        self._board_status = None
         self.set_params(**kwargs)
-        super().__init__(**kwargs, can_recapture=False)
-        super().__init__(**kwargs)
+        MNKBoard.__init__(self, **kwargs, can_recapture=False)
+        Subject.__init__(self, **kwargs)
 
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._board_status = None
-
-    @property
-    def is_terminated(self):
+    def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''Return True if no moves is left (either the board is full or a player has won).'''
-        if self._board_status is None:
-            return False
-        return True
+        return self._board_status is not None
 
-    @property
-    def possible_actions(self):
+    def possible_actions(self, _id: Optional[int] = None) -> Tuple[reildata.ReilData, ...]:
         '''Return a list of indexes of empty squares.'''
-        # return ValueSet(list(self.get_action_set()), min=0, max=len(self._board)-1).as_valueset_array()
-        return RLData(list(self.get_action_set()), lower=0, upper=len(self._board)-1).as_rldata_array()
+        return tuple(reildata.ReilData({'name': 'square', 'value': v,
+                                    'lower': 0, 'upper': len(self._board)-1})
+                                    for v in self.get_action_set())
 
-    def register(self, player_name):
-        '''
-        Register an agent and return its ID.
-        
-        If the agent is new, a new ID is generated and the agent_name is added to agent_list.
-        Arguments
-        ---------
-            agent_name: the name of the agent to be registered.
-        '''
-        return Subject.register(self, player_name)
-
-    def take_effect(self, action, _id):
+    def take_effect(self, action: reildata.ReilData, _id: Optional[int] = None) -> None:
         '''
         Set a piece for the given player on the board.
 
@@ -101,14 +92,20 @@ class MNKGame(MNKBoard, Subject):
             _id: ID of the player who sets the piece.
             action: the location in which the piece is set. Can be either in index format or row column format.
         ''' 
-        self._set_piece(_id, index=int(action.value[0]), update='yes')
+        self._set_piece(_id, index=int(
+            action.value['square']), update='yes')
+
+    def default_reward(self, _id: Optional[int] = None) -> reildata.ReilData:
         if self._board_status is None:
-            return 0
-        if self._board_status == _id:
-            return 1
-        if self._board_status > 0:
-            return -1
-        return 0
+            r = 0
+        elif self._board_status == _id:
+            r = 1
+        elif self._board_status > 0:
+            r = -1
+        else:
+            r = 0
+
+        return reildata.ReilData.single_member(name='reward', value=r)
 
     def reset(self):
         '''Clear the board and update board_status.'''
@@ -118,7 +115,7 @@ class MNKGame(MNKBoard, Subject):
     def _set_piece(self, player, **kwargs):
         '''
         Set a piece for a player.
-        
+
         Arguments
         ---------
             player: ID of the player whose piece will be set on the board.
@@ -234,7 +231,7 @@ class MNKGame(MNKBoard, Subject):
         return None
 
     def __repr__(self):
-        return 'MNKGame'
+        return self.__class__.__qualname__
 
 if __name__ == '__main__':
     main()
