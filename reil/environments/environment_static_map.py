@@ -34,7 +34,7 @@ class EnvironmentStaticMap(stateful.Stateful):
     followed during each pass of simulation.
 
     ### Methods
-    add: add a set of objects (agents/ subjects) to the environment.
+    add: add a set of entities (agents/ subjects) to the environment.
 
     append_observations: appends a new list of observations to history.
 
@@ -47,13 +47,13 @@ class EnvironmentStaticMap(stateful.Stateful):
     interact_while: simulates interactions of an `agent` and a `subject` until
     the subject terminates.
 
-    load: load an object (agent/ subject) or an environment.
+    load: load an entity (agent/ subject) or an environment.
 
     register_agents: registers agents in subjects befor each interaction.
 
-    remove: remove objects (agents/ subjects) from the environment.
+    remove: remove entities (agents/ subjects) from the environment.
 
-    save: save an object (agent/ subject) or the current environment.
+    save: save an entity (agent/ subject) or the current environment.
 
     simulate_one_pass: Passes over interaction_sequence once and simulates
     interactions.
@@ -61,36 +61,39 @@ class EnvironmentStaticMap(stateful.Stateful):
     simulate_passes: Passes over interaction_sequence multiple times and simulates
     interactions.
 
-    _collect_end_rewards: collect the rewards after a subject is terminated.
+    simulate_to_termination: Passes over interaction_sequence and simulates
+    interactions until all subject generators terminate.
+
+    _collect_terminal_rewards: collect the rewards after a subject is terminated.
 
     _calculate_statistics: calculate statistics after a subject is terminated.
 
     Note: Agents act on subjects and receive the reward of their action and
     the new state of subjects. Then agents learn based on this information to
-    improve its actions.
+    improve their actions.
 
-    Pass: visiting all protocols in the interaction sequence, once.
-    Epoch: For each subject, an epoch is one time reaching its terminal state.
+    `Pass`: visiting all protocols in the interaction sequence, once.
+
+    `Epoch`: For each subject, an epoch is one time reaching its terminal state.
     If the subject is an instance generator, then the generator should reach to
     terminal state, not just its current instance.
     '''
     # TODO: Statsitics aggregators are not supported yet!
     # TODO: simulate_passes and simulate_one_pass do not return anything!
-    # TODO: simulate_while or simulate_epochs?!
 
     def __init__(self,
-        object_dict: Optional[Dict[str, Union[Entity, EntityGenerator, str]]] = None,
+        entity_dict: Optional[Dict[str, Union[Entity, EntityGenerator, str]]] = None,
         interaction_sequence: Optional[Tuple[InteractionProtocol, ...]] = None,
         **kwargs: Any):
         '''
         Create a new environment.
 
         ### Arguments
-        object_dict: a dictionary that contains `agents`, `subjects`, and
+        entity_dict: a dictionary that contains `agents`, `subjects`, and
         `generators` for the environment.
 
         interaction_sequence: a tuple of `InteractionProtocol`s that specify
-        how objects interact in the simulation.
+        how entities interact in the simulation.
         '''
         super().__init__(name=kwargs.get('name', __name__),
                          logger_name=kwargs.get('logger_name', __name__),
@@ -107,37 +110,37 @@ class EnvironmentStaticMap(stateful.Stateful):
         self._agent_statistics: Dict[AgentSubjectTuple, List[ReilData]] = defaultdict(list)
         self._subject_statistics: Dict[AgentSubjectTuple, List[ReilData]] = defaultdict(list)
 
-        if object_dict is not None:
-            self.add(object_dict)
+        if entity_dict is not None:
+            self.add(entity_dict)
         if interaction_sequence is not None:
             self.interaction_sequence = interaction_sequence
 
-    def add(self, object_dict: Dict[str, Union[Entity, EntityGenerator, str]]) -> None:
+    def add(self, entity_dict: Dict[str, Union[Entity, EntityGenerator, str]]) -> None:
         '''
         Adds agents and subjects to the environment.
 
         ### Arguments
-        object_dict: a dictionary consist of agent/ subject name and the
-        respective object. Names should be unique, otherwise overwritten.
-        To assign the same object to different names, one can use the name in the
+        entity_dict: a dictionary consist of agent/ subject name and the
+        respective entity. Names should be unique, otherwise overwritten.
+        To assign the same entity to different names, one can use the name in the
         first assignment as the value of the dict for other assignments. For
         example:
         >>> env.add({'agent_1': Agent(), 'agent_2': 'agent_1'})
 
         When using name as value, the name is being looked up first in
         instance generators, then agents, and finally subjects. Whichever
-        contains the name first, the object corresponding to that instance is
+        contains the name first, the entity corresponding to that instance is
         being used. 
 
         Note: `InstanceGenerator` reused might produce unintended consequences.
         '''
-        for name, obj in object_dict.items():
+        for name, obj in entity_dict.items():
             if isinstance(obj, str):
                 _obj = self._instance_generators.get(
                     obj, self._agents.get(
                         obj, self._subjects.get(obj)))
                 if _obj is None:
-                    raise ValueError(f'Object {obj} defined for {name} is '
+                    raise ValueError(f'entity {obj} defined for {name} is '
                                      'not in the list of agents, subjects, '
                                      'and generators.')
             else:
@@ -149,7 +152,7 @@ class EnvironmentStaticMap(stateful.Stateful):
             elif isinstance(_obj, rlsubjects.Subject):
                 self._subjects.update({name: _obj})
             else:
-                raise TypeError(f'Object {name} is niether an agent nor a subject.')
+                raise TypeError(f'entity {name} is niether an agent nor a subject.')
 
         for name, generator in self._instance_generators.items():
             _, obj = next(generator)
@@ -159,25 +162,25 @@ class EnvironmentStaticMap(stateful.Stateful):
                 self._subjects.update({name: obj})
             else:
                 raise TypeError(
-                    f'Object {name} is niether an agent nor a subject.')
+                    f'entity {name} is niether an agent nor a subject.')
 
-    def remove(self, objects: Tuple[str, ...]) -> None:
+    def remove(self, entity_names: Tuple[str, ...]) -> None:
         '''
         Removes agents, subjects, or instance generators from the environment.
 
         ### Arguments
-        objects: a tuple of agent/ subject names to be deleted.
+        entity_names: a tuple of agent/ subject names to be deleted.
 
         Note: the method removes the item from both agents and subjects lists.
         Hence, it is not recommended to use the same name for both an agent
         and a subject.
         '''
-        names_in_use = [p.agent_name
+        names_in_use = [p.agent.name
                         for p in self._interaction_sequence] + \
-                       [p.subject_name
+                       [p.subject.name
                         for p in self._interaction_sequence]
-        for name in objects:
-            if names_in_use in names_in_use:
+        for name in entity_names:
+            if name in names_in_use:
                 raise ValueError(f'{name} is currently in use '
                                  'in the interaction sequence.')
             if name in self._agents:
@@ -202,14 +205,14 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Checks whether the given protocol:
 
-        * contains only objects that are known to the `environment`.
+        * contains only entities that are known to the `environment`.
 
         * unit is one of the possible values. 
         '''
-        if protocol.agent_name not in self._agents:
-            raise ValueError(f'Unknown agent name: {protocol.agent_name}.')
-        if protocol.subject_name not in self._subjects:
-            raise ValueError(f'Unknown subject name: {protocol.subject_name}.')
+        if protocol.agent.name not in self._agents:
+            raise ValueError(f'Unknown agent name: {protocol.agent.name}.')
+        if protocol.subject.name not in self._subjects:
+            raise ValueError(f'Unknown subject name: {protocol.subject.name}.')
         if protocol.unit not in ('interaction', 'instance', 'epoch'):
             raise ValueError(f'Unknown unit: {protocol.unit}. '
                              'It should be one of interaction, instance, or epoch. '
@@ -320,7 +323,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Allows `agent` and `subject` to interact until subject is terminated and
         returns a list of subject's reward and state before taking an action and
-        agent's action.
+        agent's action. Note that for `instance generators`, only the current
+        instance is run to termination, not the whole generator.
 
         ### Attributes
         agent_id: agent's ID by which it is registered at the subject.
@@ -347,7 +351,7 @@ class EnvironmentStaticMap(stateful.Stateful):
 
         return trajectory
 
-    def _collect_end_rewards(self, subject_name: str) -> None:
+    def _collect_terminal_rewards(self, subject_name: str) -> None:
         '''
         When a `subject` is terminated for all interacting `agents`, this
         function is called to collect final rewards for all agents.
@@ -356,9 +360,9 @@ class EnvironmentStaticMap(stateful.Stateful):
         subject_name: name of the `subject` that is terminated.
         '''
         agents_state_n_rewards = (a_s_n_r
-                              for a_s_n_r in set((p.agent_name, p.state_name, p.reward_function_name)
+                              for a_s_n_r in set((p.agent.name, p.state_name, p.reward_function_name)
                                                for p in self._interaction_sequence
-                                               if p.subject_name == subject_name))
+                                               if p.subject.name == subject_name))
 
         for agent_name, r_func_name, state_name in agents_state_n_rewards:
             agent_id = self._assignment_list[(agent_name, subject_name)]
@@ -378,9 +382,9 @@ class EnvironmentStaticMap(stateful.Stateful):
         subject_name: name of the `subject` that is terminated.
         '''
         agents_and_stats = (a_n_s
-                            for a_n_s in set((p.agent_name, p.agent_statistic_name, p.subject_statistic_name)
+                            for a_n_s in set((p.agent.name, p.agent.statistic_name, p.subject.statistic_name)
                                              for p in self._interaction_sequence
-                                             if p.subject_name == subject_name))
+                                             if p.subject.name == subject_name))
 
         for agent_name, a_stat_name, s_stat_name in agents_and_stats:
             agent_id = self._assignment_list[(agent_name, subject_name)]
@@ -388,6 +392,65 @@ class EnvironmentStaticMap(stateful.Stateful):
                 self._agents[agent_name].statistic(a_stat_name, agent_id))
             self._subject_statistics[(agent_name, subject_name)].append(
                 self._subjects[subject_name].statistic(s_stat_name, agent_id))
+
+    def _train_related_agents(self, subject_name: str) -> None:
+        '''
+        When a `subject` is terminated for all interacting `agents`, this
+        function is called to provide history data to any related agent that can learn.
+
+        ### Attributes
+        subject_name: name of the `subject` that is terminated.
+        '''
+        affected_agents = (a_name
+                            for a_name in set(p.agent.name
+                                                for p in self._interaction_sequence
+                                              if p.subject.name == subject_name))
+        for a_name in affected_agents:
+            if self._agents[a_name].training_mode:
+                self._agents[a_name].learn(self._history[(a_name, subject_name)][1:])
+                del self._history[(a_name, subject_name)]
+
+    def _reset_subject(self, subject_name: str) -> None:
+        '''
+        When a `subject` is terminated for all interacting `agents`, this
+        function is called to reset the subject. If the subject is an
+        `InstanceGenerator`, a new instance is created. If reset is successful,
+        `epoch` is incremented by one.
+
+        ### Attributes
+        subject_name: name of the `subject` that is terminated.
+        '''
+        if subject_name in self._instance_generators:
+            # get a new instance if possible,
+            # if not instance generator returns StopIteration.
+            # So, increment epoch by 1, then if the generator is not terminated,
+            # get a new instance.
+            try:
+                _, self._subjects[subject_name] = cast(
+                    Tuple[int, rlsubjects.SubjectType],
+                    next(self._instance_generators[subject_name]))
+            except StopIteration:
+                # TODO: self._aggregated
+                self._epochs[subject_name] += 1
+                if not self._instance_generators[subject_name].is_terminated():
+                    _, self._subjects[subject_name] = cast(
+                        Tuple[int, rlsubjects.SubjectType],
+                        next(self._instance_generators[subject_name]))
+        else:
+            self._epochs[subject_name] += 1
+            self._subjects[subject_name].reset()
+
+    def manage_terminated_subjects(self) -> None:
+        '''
+        Goes over all `subjects`. If terminated, collects terminal rewards,
+        calculates stats, trains related agents, and resets the subject.
+        '''
+        for s_name in set(p.subject.name for p in self._interaction_sequence):
+            if self._subjects[s_name].is_terminated(None):
+                self._collect_terminal_rewards(s_name)
+                self._calculate_statistics(s_name)
+                self._train_related_agents(s_name)
+                self._reset_subject(s_name)
 
     def register_agents(self) -> None:
         '''
@@ -397,36 +460,11 @@ class EnvironmentStaticMap(stateful.Stateful):
         agents attempt to register with the same ID to have access to the same
         information.
         '''
-        for s_name in set(p.subject_name for p in self._interaction_sequence):
-            if self._subjects[s_name].is_terminated(None):
-                self._collect_end_rewards(s_name)
-                self._calculate_statistics(s_name)
-                affected_agents = (a_name
-                                   for a_name in set(p.agent_name
-                                                     for p in self._interaction_sequence
-                                                     if p.subject_name == s_name))
-                for a_name in affected_agents:
-                    if self._agents[a_name].training_mode:
-                        self._agents[a_name].learn(self._history[(a_name, s_name)][1:])
-                        del self._history[(a_name, s_name)]
-
-                if s_name in self._instance_generators:
-                    try:
-                        _, self._subjects[s_name] = cast(
-                            Tuple[int, rlsubjects.SubjectType],
-                            next(self._instance_generators[s_name]))
-                        self._epochs[s_name] += 1
-                    except StopIteration:
-                        pass  # reset if possible, if not keep the terminated instance.
-                else:
-                    self._subjects[s_name].reset()
-                    self._epochs[s_name] += 1
-
         for p in self._interaction_sequence:
-            self._assignment_list[(p.agent_name, p.subject_name)] = \
-                self._subjects[p.subject_name].register(
-                    agent_name=p.agent_name,
-                    _id=self._assignment_list[(p.agent_name, p.subject_name)])
+            self._assignment_list[(p.agent.name, p.subject.name)] = \
+                self._subjects[p.subject.name].register(
+                    agent_name=p.agent.name,
+                    _id=self._assignment_list[(p.agent.name, p.subject.name)])
 
     def append_observations(self,
         agent_name: str, subject_name: str, observations: stateful.History) -> None:
@@ -449,10 +487,11 @@ class EnvironmentStaticMap(stateful.Stateful):
         Goes through the interaction map for one pass and simulates interactions
         accordingly.
         '''
+        self.manage_terminated_subjects()
         self.register_agents()
         for protocol in self._interaction_sequence:
-            agent_name = protocol.agent_name
-            subject_name = protocol.subject_name
+            agent_name = protocol.agent.name
+            subject_name = protocol.subject.name
             agent_id = self._assignment_list[(agent_name, subject_name)]
             if protocol.unit == 'interaction':
                 observations = self.interact_n_times(
@@ -476,23 +515,23 @@ class EnvironmentStaticMap(stateful.Stateful):
 
             self.append_observations(agent_name, subject_name, observations)
 
-            if protocol.unit == 'epoch':
-                if subject_name in self._instance_generators:
-                    for _, instance in self._instance_generators[subject_name]:
-                        self._subjects[subject_name] = cast(rlsubjects.Subject, instance)
-                        self._assignment_list[(agent_name, subject_name)] = \
-                            self._subjects[subject_name].register(
-                                agent_name=agent_name,
-                                _id=self._assignment_list[(agent_name, subject_name)])
+            if (protocol.unit == 'epoch'
+                and subject_name in self._instance_generators):
+                for _, instance in self._instance_generators[subject_name]:
+                    self._subjects[subject_name] = cast(rlsubjects.Subject, instance)
+                    self._assignment_list[(agent_name, subject_name)] = \
+                        self._subjects[subject_name].register(
+                            agent_name=agent_name,
+                            _id=self._assignment_list[(agent_name, subject_name)])
 
-                        observations = self.interact_while(
-                            agent_id=agent_id,  # type: ignore
-                            agent_instance=self._agents[agent_name],
-                            subject_instance=self._subjects[subject_name],
-                            protocol=protocol,
-                            epoch=self._epochs[subject_name])
+                    observations = self.interact_while(
+                        agent_id=agent_id,  # type: ignore
+                        agent_instance=self._agents[agent_name],
+                        subject_instance=self._subjects[subject_name],
+                        protocol=protocol,
+                        epoch=self._epochs[subject_name])
 
-                        self.append_observations(agent_name, subject_name, observations)
+                    self.append_observations(agent_name, subject_name, observations)
 
     def simulate_passes(self, passes: int) -> None:
         '''
@@ -505,22 +544,44 @@ class EnvironmentStaticMap(stateful.Stateful):
         for _ in range(passes):
             self.simulate_one_pass()
 
-    # def simulate_epochs(self, epochs: Optional[int] = None) -> None:
-    #     if epochs is not None:
-    #         for epoch in range(epochs):
-    #             self._simulate_epoch(epoch)
+    def simulate_to_termination(self) -> None:
+        '''
+        Goes through the interaction map and simulates interactions accordingly,
+        until all subjects are terminated.
+        To avoid possible infinite loops caused by normal `subjects`, this method
+        is only available if all subjects are generated by `instance generators`.
+        Attempt to call this method will normal subjects in the interaction map
+        will result in TypeError.
+        '''
+        subjects_in_use = set(s.subject.name
+                              for s in self.interaction_sequence)
+        no_generators = subjects_in_use.difference(self._instance_generators)
+        if no_generators:
+        # if any(s.subject.name not in self._instance_generators
+        #        for s in self.interaction_sequence):
+            raise TypeError('Found subject(s) in the interaction_sequence that '
+                            f'are not instance generators: {no_generators}')
+        infinites = [s
+                     for s in subjects_in_use
+                     if not self._instance_generators[s].is_finite]
+        if infinites:
+            raise TypeError('Found infinite instance generator(s) in the '
+                            f'interaction_sequence: {infinites}')
+        while not all(self._instance_generators[s].is_terminated()
+                      for s in self._subjects):
+            self.simulate_one_pass()
 
     def load(self,
-             object_name: Union[List[str], str] = 'all',
+             entity_name: Union[List[str], str] = 'all',
              filename: Optional[str] = None,
              path: Optional[Union[pathlib.Path, str]] = None) -> None:
         '''
-        Loads an object or an environment from a file.
+        Loads an entity or an environment from a file.
 
         ### Arguments
         filename: the name of the file to be loaded.
 
-        object_name: if specified, that object (agent or subject) is being
+        entity_name: if specified, that entity (agent or subject) is being
         loaded from file. 'all' loads an environment. (Default = 'all')
 
         Raises ValueError if the filename is not specified.
@@ -528,7 +589,7 @@ class EnvironmentStaticMap(stateful.Stateful):
         _filename: str = functions.get_argument(filename, self._name)
         _path = pathlib.Path(path if path is not None else self._path)
 
-        if object_name == 'all':
+        if entity_name == 'all':
             super().load(filename=_filename, path=_path)
             self._agents: Dict[str, rlagents.AgentType] = {}
             self._subjects: Dict[str, rlsubjects.SubjectType] = {}
@@ -542,7 +603,7 @@ class EnvironmentStaticMap(stateful.Stateful):
             del self._env_data  # type: ignore
 
         else:
-            for obj in object_name:
+            for obj in entity_name:
                 if obj in self._agents:
                     self._agents[obj].load(
                         path=(_path / f'{_filename}.data'), filename=obj)
@@ -557,14 +618,14 @@ class EnvironmentStaticMap(stateful.Stateful):
              path: Optional[Union[pathlib.Path, str]] = None,
              data_to_save: Union[List[str], str] = 'all') -> Tuple[pathlib.Path, str]:
         '''
-        Saves an object or the environment to a file.
+        Saves an entity or the environment to a file.
 
         ### Arguments
         filename: the name of the file to be saved.
 
         path: the path of the file to be saved. (Default='./')
 
-        object_name: if specified, that object (agent or subject) is being saved
+        entity_name: if specified, that entity (agent or subject) is being saved
         to file. 'all' saves the environment. (Default = 'all')
 
         Raises ValueError if the filename is not specified.
