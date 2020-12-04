@@ -10,6 +10,9 @@ Classes
 Feature: a datatype that accepts initial value and feature generator and
 generates new values.
 
+Entity: a datatype to specify `agent` or `subject` information. Used in
+`InteractionProtocol`.
+
 InteractionProtocol: a datatype to specifies how an `agent` and a `subject`
 interact in an `environment`.
 
@@ -20,5 +23,5 @@ between objects in `reil`.
 '''
 
 from .feature import Feature, FeatureType
-from .interaction_protocol import InteractionProtocol
+from .interaction_protocol import InteractionProtocol, Entity
 from .reildata import ReilData

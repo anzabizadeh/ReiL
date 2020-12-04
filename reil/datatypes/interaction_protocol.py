@@ -4,16 +4,25 @@ from typing_extensions import Literal
 
 
 @dataclasses.dataclass
+class Entity:
+    '''
+    The datatype to specify an `agent` or a `subject`. 
+    Used in `InteractionProtocol`.
+    '''
+    name: str
+    statistic_name: str
+    aggregator_name: str
+
+
+@dataclasses.dataclass
 class InteractionProtocol:
     '''
     The datatype to specify how an `agent` should interact with a `subject` in
     an `environment`.
     '''
-    agent_name: str
-    subject_name: str
+    agent: Entity
+    subject: Entity
     state_name: str
     reward_function_name: str
-    agent_statistic_name: str
-    subject_statistic_name: str
     n: int
     unit: Literal['interaction', 'instance', 'epoch']
