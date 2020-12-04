@@ -9,7 +9,7 @@ This `cancer_model` class implements a four-state nonlinear cancer chemotherapy 
 '''
 
 from reil.subjects.healthcare import Patient
-from reil.utils import Feature
+from reil.datatypes import Feature
 
 if False:
     class CancerPatient(Patient):

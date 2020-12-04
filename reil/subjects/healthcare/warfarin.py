@@ -11,7 +11,9 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 import pathlib
 from typing import Any, Dict, List, Optional, Tuple
 
-from reil import rldata, subjects, utils
+from reil import subjects
+from reil.datatypes import reildata
+from reil.utils import action_generator
 from reil.subjects import healthcare
 
 
@@ -36,7 +38,7 @@ class Warfarin(subjects.Subject):
 
     def __init__(self,
                  patient: healthcare.Patient,
-                 action_generator: utils.ActionGenerator,
+                 action_generator: action_generator.ActionGenerator,
                  max_day: int = 90,
                  **kwargs: Any):
         '''
@@ -84,7 +86,7 @@ class Warfarin(subjects.Subject):
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         return self._day >= self._max_day
 
-    def possible_actions(self, _id: Optional[int] = None) -> Tuple[rldata.RLData, ...]:
+    def possible_actions(self, _id: Optional[int] = None) -> Tuple[reildata.ReilData, ...]:
         return self._action_generator.possible_actions(self.state('default', _id))
         # if self._action_type == 'dose' and self._current_dose < self._max_dose:
         #     return self._possible_actions[:int(self._current_dose/self._dose_steps) + 1]
@@ -95,9 +97,9 @@ class Warfarin(subjects.Subject):
 
         # return self._possible_actions
 
-    def default_state(self, _id: Optional[int] = None) -> rldata.RLData:
+    def default_state(self, _id: Optional[int] = None) -> reildata.ReilData:
         index = self._decision_points_index - 1
-        return self._state_normal_fixed + rldata.RLData([
+        return self._state_normal_fixed + reildata.ReilData([
             {'name': 'dose',
              'value': (self._decision_points_dose_history[index],),
              'lower': self._action_generator.lower['dose'],
@@ -112,7 +114,7 @@ class Warfarin(subjects.Subject):
              'upper': self._action_generator.upper['interval']}],
             lazy_evaluation=True)
 
-    def take_effect(self, action: rldata.RLData, _id: Optional[int] = None) -> None:
+    def take_effect(self, action: reildata.ReilData, _id: Optional[int] = None) -> None:
         current_dose = float(action.value['dose'])
         current_interval = min(int(action.value['interval']),
                                self._max_day - self._day)
@@ -153,7 +155,7 @@ class Warfarin(subjects.Subject):
 
         patient_features = self._patient.feature_set
 
-        self._state_normal_fixed = rldata.RLData([
+        self._state_normal_fixed = reildata.ReilData([
             {'name': 'age',
              'value': patient_features['age'].value,
              'lower': patient_features['age'].lower,
@@ -166,19 +168,31 @@ class Warfarin(subjects.Subject):
              'categories': patient_features['VKORC1'].categories}],
             lazy_evaluation=True)
 
-    def register(self, agent_name: str) -> int:
+    def register(self, agent_name: str, _id: Optional[int] = None) -> int:
         '''
-        Registers an agent and returns its ID. If the agent is new, a new ID is generated and the agent_name is added to agent_list.
-        \nArguments:
-        \n    agent_name: the name of the agent to be registered.
+        Registers an agent and returns its ID. If the agent is new, a new ID
+        is generated and the agent_name is added to agent_list.
+
+        ### Arguments
+        agent_name: the name of the agent to be registered.
+
+        _id: the ID of the agent to be used. If not provided, subject will assign
+            an ID to the agent.
+
+        Note: `Warfarin` accepts only one agent.
         '''
-        try:
-            return self._agent_list[agent_name]
-        except KeyError:
-            if len(self._agent_list) == 1:
-                raise ValueError('Only one drug is allowed.')
-            self._agent_list[agent_name] = 1
-            return 1
+        if agent_name in self._agent_list:
+            if _id is None or _id == self._agent_list[agent_name]:
+                return self._agent_list[agent_name]
+            else:
+                raise ValueError(f'{agent_name} is already registered with '
+                                    f'ID: {self._agent_list[agent_name]}.')
+
+        if len(self._agent_list) == 1:
+            raise ValueError('Only one agent is allowed. The agent list if full.')
+
+        self._agent_list[agent_name] = utils.get_argument(_id, 1)
+        return self._agent_list[agent_name]
 
     def _generate_state_components(self) -> None:
         def age(**kwargs: Any) -> Dict[str, Any]:
@@ -371,7 +385,7 @@ class Warfarin(subjects.Subject):
 
     #         results[s] = temp
 
-    #     results['ID'] = rldata.RLData([
+    #     results['ID'] = reildata.ReilData([
     #         {'name': 'age',
     #          'value': self._patient.feature_set['age'].value,
     #          'lower': self._patient.feature_set['age'].lower,
@@ -409,7 +423,7 @@ class Warfarin(subjects.Subject):
     #     return max(self._dose_history_length, self._INR_history_length)
 
     # @property
-    # def state(self) -> rldata.RLData:
+    # def state(self) -> reildata.ReilData:
     #     if self._ex_protocol_current['state'] == 'extended':
     #         return self._state_extended()
     #     else:
@@ -479,8 +493,8 @@ class Warfarin(subjects.Subject):
 
     #     return output
 
-    # def _state_extended(self) -> rldata.RLData:
-    #     return self._state_extended_fixed + rldata.RLData([
+    # def _state_extended(self) -> reildata.ReilData:
+    #     return self._state_extended_fixed + reildata.ReilData([
     #         {'name': 'day',
     #          'value': self._day if 0 <= self._day < self._max_day else None,
     #          'lower': 0,
@@ -499,8 +513,8 @@ class Warfarin(subjects.Subject):
     #          'upper': self._action_generator.upper['interval']}],
     #         lazy_evaluation=True)
 
-    # def _state_normal(self) -> rldata.RLData:
-    #     return self._state_normal_fixed + rldata.RLData([
+    # def _state_normal(self) -> reildata.ReilData:
+    #     return self._state_normal_fixed + reildata.ReilData([
     #         {'name': 'Doses',
     #          'value': tuple(self._dose_history),
     #          'lower': self._action_generator.lower['dose'],

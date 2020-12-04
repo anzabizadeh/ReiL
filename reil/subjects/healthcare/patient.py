@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
 from reil.subjects.healthcare.mathematical_models import HealthMathModel
-from reil.utils import Feature
+from reil.datatypes import Feature
 
 
 class Patient:

@@ -3,8 +3,9 @@ from typing import Any
 
 from reil.subjects.healthcare import Patient
 from reil.subjects.healthcare.mathematical_models import HealthMathModel
-from reil.utils import (Feature, random_categorical, random_truncated_lnorm,
-                        random_truncated_normal)
+from reil.datatypes import Feature
+from reil.utils.functions import (random_categorical, random_truncated_lnorm,
+                                  random_truncated_normal)
 
 
 class WarfarinPatientRavvaz(Patient):

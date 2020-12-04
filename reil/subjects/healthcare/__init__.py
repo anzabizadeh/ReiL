@@ -12,8 +12,8 @@ Classes
     WarfarinPatientRavvaz: a warfarin patient model with features and parameters
         of Ravvaz et al. 2016.
 
-    CancerModel: a 4-ordinary differential equation model of cancer (uses legacy ValueSet instead of RLData)
-    ConstrainedCancerModel: a constrained version of CancerModel (uses legacy ValueSet instead of RLData)
+    CancerModel: a 4-ordinary differential equation model of cancer (uses legacy ValueSet instead of ReilData)
+    ConstrainedCancerModel: a constrained version of CancerModel (uses legacy ValueSet instead of ReilData)
     Warfarin: a PK/PD model for warfarin with extended state definition
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)

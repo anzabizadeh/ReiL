@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from reil.utils import Feature
+from reil.datatypes import Feature
 
 
 class HealthMathModel:
