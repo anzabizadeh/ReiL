@@ -53,15 +53,12 @@ class Risk(Subject):
         ---------
             pieces: an array containing the number of peices for players 1 and 2 (default=[3, 2])
         '''
-        self.set_defaults(pieces=[3, 2], turn=0)
+        self._pieces = [3, 2]
+        self._turn = 0
         self.set_params(**kwargs)
         super().__init__(**kwargs)
 
         self._temp = 0
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._pieces, self._turn = [3, 2], 0
 
         self._initial_pieces = list(self._pieces)
 

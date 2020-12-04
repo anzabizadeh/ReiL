@@ -45,17 +45,10 @@ class Snake(MNKBoard, Subject):
             m: number of rows (default=10)
             n: number of columns (default=10)
         '''
-        self.set_defaults(m=10, n=10)
+        self._m = 10
+        self._n = 10
         self.set_params(**kwargs)
         super().__init__(**kwargs)
-
-        # The following code is just to suppress debugger's undefined variable errors!
-        # These can safely be deleted, since all the attributes are defined using set_params!
-        if False:
-            self._m = 10
-            self._n = 10
-
-        # super().__init__(m=self._m, n=self._n, players=2)  # player 1 is the snake, player 2 is the fruit!
         self.reset()
 
     @property

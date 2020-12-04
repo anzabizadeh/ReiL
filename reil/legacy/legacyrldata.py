@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-LegacyRLData class
+LegacyReilData class
 ==================
 
 A data type used for state and action variables.
@@ -14,7 +14,7 @@ from typing import (Any, Callable, Dict, Iterator, List, Optional, Sequence,
                     Union)
 
 
-class LegacyRLData(dict):
+class LegacyReilData(dict):
     def __new__(cls, value=[0], **kwargs):
         obj = super().__new__(cls)
 
@@ -38,7 +38,7 @@ class LegacyRLData(dict):
                                             Dict[Any, Callable[[dict], Number]], Dict[Any, Callable[[dict], List[Number]]]]] = None,
                  lazy_evaluation: Optional[bool] = False) -> None:
         '''
-        Create an LegacyRLData instance.
+        Create an LegacyReilData instance.
 
         Attributes:
             value: value to store as a list or a dictionary
@@ -78,13 +78,13 @@ class LegacyRLData(dict):
             self._normalized = self._normalize()
 
     @property
-    def value(self) -> "LegacyRLData":
+    def value(self) -> "LegacyReilData":
         return self._value
 
     @value.setter
     def value(self, v: Union[Sequence, dict]) -> None:
         '''
-        Sets the value of the LegacyRLData instance.
+        Sets the value of the LegacyReilData instance.
 
         Attributes:
             v: value to store as a list or a dictionary. If a list is provided,
@@ -237,17 +237,17 @@ class LegacyRLData(dict):
         except AttributeError:
             return self._value
 
-    def as_rldata_array(self) -> List["LegacyRLData"]:
-        ''' return the value as a list of LegacyRLData.'''
+    def as_reildata_array(self) -> List["LegacyReilData"]:
+        ''' return the value as a list of LegacyReilData.'''
         try:
-            array = [LegacyRLData(value=self._value[key],
+            array = [LegacyReilData(value=self._value[key],
                             lower=self._lower[key],
                             upper=self._upper[key],
                             categories=self._categories[key],
                             is_numerical=self._is_numerical[key],
                             lazy_evaluation=self._lazy) for key in self._value.keys()]
         except AttributeError:
-            array = [LegacyRLData(value=v,
+            array = [LegacyReilData(value=v,
                             lower=self._lower,
                             upper=self._upper,
                             categories=self._categories,
@@ -319,18 +319,18 @@ class LegacyRLData(dict):
 
         return self.__remove_nestings(temp)
 
-    def normalize(self) -> "LegacyRLData":
+    def normalize(self) -> "LegacyReilData":
         '''
         Normalize values.
 
         This function uses max and min for numericals and categories for categoricals to turn them into [0, 1] values.
         '''
         if self._lazy:
-            return LegacyRLData(self._normalize(), lower=0, upper=1, lazy_evaluation=True)
+            return LegacyReilData(self._normalize(), lower=0, upper=1, lazy_evaluation=True)
         else:
-            return LegacyRLData(self._normalized, lower=0, upper=1, lazy_evaluation=True)
+            return LegacyReilData(self._normalized, lower=0, upper=1, lazy_evaluation=True)
 
-    def __setitem__(self, key: Any, value: Any) -> "LegacyRLData":
+    def __setitem__(self, key: Any, value: Any) -> "LegacyReilData":
         if key is None:  # complete list
             if isinstance(self._value, dict):  # Go from dict to list
                 self._is_numerical = None
@@ -385,7 +385,7 @@ class LegacyRLData(dict):
         elif isinstance(key, slice):  # slice of a list
             if isinstance(self._value, dict):
                 raise TypeError(
-                    'Cannot use slice for a LegacyRLData instance of type dict.')
+                    'Cannot use slice for a LegacyReilData instance of type dict.')
 
             if self._categories is not None:
                 for t in value:
@@ -399,7 +399,7 @@ class LegacyRLData(dict):
                             f'{t} is outside the range [{self._lower}, {self._upper}].')
             else:
                 raise RuntimeError(
-                    'LegacyRLData is corrupted! No categories, lower or upper attributes found!')
+                    'LegacyReilData is corrupted! No categories, lower or upper attributes found!')
 
             self._value[key] = value
             self._normal_form = None
@@ -448,7 +448,7 @@ class LegacyRLData(dict):
                         f'{value} is outside the range [{self._lower}, {self._upper}].')
             else:
                 raise RuntimeError(
-                    'LegacyRLData is corrupted! No categories, lower or upper attributes found!')
+                    'LegacyReilData is corrupted! No categories, lower or upper attributes found!')
 
             self._value[key] = value
             self._normal_form = None
@@ -458,9 +458,9 @@ class LegacyRLData(dict):
 
         return value
 
-    def __getitem__(self, key: Any) -> "LegacyRLData":
+    def __getitem__(self, key: Any) -> "LegacyReilData":
         try:
-            return LegacyRLData(self._value[key],
+            return LegacyReilData(self._value[key],
                           lower=self._lower[key],
                           upper=self._upper[key],
                           categories=self._categories[key],
@@ -471,7 +471,7 @@ class LegacyRLData(dict):
             if isinstance(key, Number):
                 return self._value[key]
             else:
-                return LegacyRLData(self._value[key],
+                return LegacyReilData(self._value[key],
                               lower=self._lower,
                               upper=self._upper,
                               categories=self._categories,
@@ -501,7 +501,7 @@ class LegacyRLData(dict):
     def has_key(self, k: Any) -> bool:
         return k in self._value.keys()
 
-    def update(self, kwargs: Union["LegacyRLData", list, dict]) -> "LegacyRLData":
+    def update(self, kwargs: Union["LegacyReilData", list, dict]) -> "LegacyReilData":
         try:
             if isinstance(kwargs._value, list):
                 if self.is_numerical:
@@ -530,7 +530,7 @@ class LegacyRLData(dict):
             except TypeError:
                 return 0
 
-    def values(self) -> "LegacyRLData":
+    def values(self) -> "LegacyReilData":
         try:
             return self._value.values()
         except AttributeError:
@@ -545,7 +545,7 @@ class LegacyRLData(dict):
             except TypeError:
                 return enumerate([self._value])
 
-    def pop(self, *args: Any) -> "LegacyRLData":
+    def pop(self, *args: Any) -> "LegacyReilData":
         return self._value.pop(*args)
 
     def __contains__(self, item: Any) -> bool:
@@ -554,8 +554,8 @@ class LegacyRLData(dict):
     def __iter__(self) -> Iterator:
         return iter(self._value)
 
-    def __add__(self, other: Union["LegacyRLData", list, dict]) -> "LegacyRLData":
-        temp = LegacyRLData(value=self._value,
+    def __add__(self, other: Union["LegacyReilData", list, dict]) -> "LegacyReilData":
+        temp = LegacyReilData(value=self._value,
                       lower=self.lower,
                       upper=self.upper,
                       categories=self.categories,
@@ -565,11 +565,11 @@ class LegacyRLData(dict):
         temp.update(other)
         return temp
 
-    def __iadd__(self, other: Union["LegacyRLData", list, dict]) -> "LegacyRLData":
+    def __iadd__(self, other: Union["LegacyReilData", list, dict]) -> "LegacyReilData":
         self.update(other)
         return self
 
-    def __eq__(self, other: "LegacyRLData") -> bool:
+    def __eq__(self, other: "LegacyReilData") -> bool:
         try:
             return (self.value == other.value).bool() and (
                 ((self.upper == other.upper).bool() and (self.lower == other.lower).bool()) if self.is_numerical.bool() else
@@ -579,8 +579,8 @@ class LegacyRLData(dict):
                 ((self.upper == other.upper) and (self.lower == other.lower)) if self.is_numerical else
                 (self.categories == other.categories))
 
-    def __ge__(self, other: Union["LegacyRLData", list, dict]) -> bool:
-        if isinstance(other, LegacyRLData):
+    def __ge__(self, other: Union["LegacyReilData", list, dict]) -> bool:
+        if isinstance(other, LegacyReilData):
             other_value = other.value
         else:
             other_value = other
@@ -590,8 +590,8 @@ class LegacyRLData(dict):
         except AttributeError:
             return (self.value >= other_value)
 
-    def __gt__(self, other: Union["LegacyRLData", list, dict]) -> bool:
-        if isinstance(other, LegacyRLData):
+    def __gt__(self, other: Union["LegacyReilData", list, dict]) -> bool:
+        if isinstance(other, LegacyReilData):
             other_value = other.value
         else:
             other_value = other
@@ -601,8 +601,8 @@ class LegacyRLData(dict):
         except AttributeError:
             return (self.value > other_value)
 
-    def __le__(self, other: Union["LegacyRLData", list, dict]) -> bool:
-        if isinstance(other, LegacyRLData):
+    def __le__(self, other: Union["LegacyReilData", list, dict]) -> bool:
+        if isinstance(other, LegacyReilData):
             other_value = other.value
         else:
             other_value = other
@@ -612,8 +612,8 @@ class LegacyRLData(dict):
         except AttributeError:
             return (self.value <= other_value)
 
-    def __lt__(self, other: Union["LegacyRLData", list, dict]) -> bool:
-        if isinstance(other, LegacyRLData):
+    def __lt__(self, other: Union["LegacyReilData", list, dict]) -> bool:
+        if isinstance(other, LegacyReilData):
             other_value = other.value
         else:
             other_value = other
@@ -623,8 +623,8 @@ class LegacyRLData(dict):
         except AttributeError:
             return (self.value < other_value)
 
-    def __ne__(self, other: Union["LegacyRLData", list, dict]) -> bool:
-        if isinstance(other, LegacyRLData):
+    def __ne__(self, other: Union["LegacyReilData", list, dict]) -> bool:
+        if isinstance(other, LegacyReilData):
             other_value = other.value
         else:
             other_value = other
@@ -659,13 +659,13 @@ class LegacyRLData(dict):
 
 
 if __name__ == '__main__':
-    # d = LegacyRLData([1, 2, 3], lower=1, upper=10)
+    # d = LegacyReilData([1, 2, 3], lower=1, upper=10)
     # print(d._value)
     # print(d._normalized)
     # d.value = 10
     # print(d._normalized)
 
-    # d = LegacyRLData({'a': [10, 20], 'b': [30, 10, 5, 40], 'c': 50, 'd': 'hello'},
+    # d = LegacyReilData({'a': [10, 20], 'b': [30, 10, 5, 40], 'c': 50, 'd': 'hello'},
     #            lower={'a': 1, 'b': 2, 'c': 3, 'd': 'a'})
     # print(d._value)
     # print(d._normalized)
@@ -674,38 +674,38 @@ if __name__ == '__main__':
     # print(d._value)
     # print(d._normalized)
     # # d.is_numerical={'a': False}
-    # for temp in d.as_rldata_array():
+    # for temp in d.as_reildata_array():
     #     print(temp)
 
     # print(d.normalize())
-    d = LegacyRLData([1, 2, 3], lazy_evaluation=True)
+    d = LegacyReilData([1, 2, 3], lazy_evaluation=True)
     print(d.value)
     print(d.normalize())
     print(d.normalize())
     d += [1, 2, 3]
     print(d.normalize())
-    print(d.as_rldata_array())
+    print(d.as_reildata_array())
     print(d == d)
-    d += LegacyRLData([1.5, 2.5, 3], lower=0)
+    d += LegacyReilData([1.5, 2.5, 3], lower=0)
     print(d)
 
-    d = LegacyRLData({'a': 1, 'b': 2, 'c': 3},
+    d = LegacyReilData({'a': 1, 'b': 2, 'c': 3},
                lower={'a': 0, 'b': 0},
                upper={'a': 10, 'b': 10},
                categories={'c': (1, 2, 3)},
                is_numerical={'c': False})
 
-    print(d+LegacyRLData({'a': 5, 'c': 1}, is_numerical={'a': True,
+    print(d+LegacyReilData({'a': 5, 'c': 1}, is_numerical={'a': True,
                                                    'c': False}, lazy_evaluation=True))
 
-    d1 = LegacyRLData(['a', 'b', 'c'], categories=['a', 'b', 'c'])
+    d1 = LegacyReilData(['a', 'b', 'c'], categories=['a', 'b', 'c'])
     assert d1.value == ['a', 'b', 'c']
     print(d1.value)
     print(d1.normalize())
-    print(d1.as_rldata_array())
-    d = LegacyRLData({'tuples': [(1, 1), (1, 2), (1, 3)], 'ints': 1})
+    print(d1.as_reildata_array())
+    d = LegacyReilData({'tuples': [(1, 1), (1, 2), (1, 3)], 'ints': 1})
     print(d.value)
     print(d.normalize())
     d_temp = d['tuples']
     print(d_temp[0])
-    print(d.as_rldata_array()[0].normalize().as_list())
+    print(d.as_reildata_array()[0].normalize().as_list())
