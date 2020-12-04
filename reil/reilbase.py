@@ -33,7 +33,7 @@ class ReilBase:
 
     from_yaml_file: create a `ReilBase` instance using specifications from a `YAML` file.
 
-    from_parsed_yaml: create a `ReilBase` instance using specifications from a parsed `YAML` document.
+    parse_yaml: create a `ReilBase` instance using specifications from a parsed `YAML` document.
 
     set_params: set parameters.
 
@@ -89,7 +89,7 @@ class ReilBase:
         return instance
 
     @classmethod
-    def from_yaml_file(cls, yaml_node_name: str,
+    def from_yaml_file(cls, node_reference: Tuple[str, ...],
                        filename: str, path: Optional[Union[pathlib.Path, str]] = None):
         _path = pathlib.Path(get_argument(path, '.'))
 
@@ -97,28 +97,30 @@ class ReilBase:
         with open(_path / f'{filename}.yaml', 'r') as f:
             yaml_output = yaml.load(f)
 
-        return cls.from_parsed_yaml(yaml_output[yaml_node_name])
+        temp_yaml = yaml_output
+        for key in node_reference:
+            temp_yaml = temp_yaml[key]
 
-    @classmethod
-    def from_parsed_yaml(cls, data: OrderedDict):
+        return cls.parse_yaml(temp_yaml)
+
+    @staticmethod
+    def parse_yaml(data: OrderedDict):
         # cls._validate_parsed_yaml(yaml_node_name, data)
         if isinstance(data, (int, float, str)):
             return data
 
         if len(data) == 1:
             k, v = next(iter(data.items()))
-            try:
-                return ReilBase._load_component_from_yaml(k, v)
-            except ValueError:
-                pass
-                # return {k: ReilBase.from_parsed_yaml(v)}
+            result = ReilBase._load_component_from_yaml(k, v)
+            if result is not None:
+                return result
 
         args = {}
         for k, v in data.items():
             if isinstance(v, dict):
-                v_obj = ReilBase.from_parsed_yaml(data[k])
+                v_obj = ReilBase.parse_yaml(data[k])
             elif isinstance(v, list):
-                v_obj = [ReilBase.from_parsed_yaml(v_i)
+                v_obj = [ReilBase.parse_yaml(v_i)
                          for v_i in v]
             elif isinstance(v, str) and 'lambda' in v:
                 v_obj = eval(v)
@@ -141,26 +143,19 @@ class ReilBase:
 
         return args
 
-    @classmethod
-    def _validate_parsed_yaml(cls, yaml_node_name: str, data: OrderedDict):
-        pass
-        # if yaml_node_name not in data:
-        #     raise ValueError(f'{yaml_node_name} not found.')
-
-        # obj_type = data[yaml_node_name].get('type', '')
-        # if cls.__name__ != obj_type:
-        #     raise TypeError(
-        #         f'Attempted to load an object of type {obj_type} using class {cls.__name__}')
-
     @staticmethod
     def _load_component_from_yaml(name: str, args: Any):
         temp = name.split('.')
-        module = importlib.import_module('.'.join(temp[:-1]))
+        try:
+            module = importlib.import_module('.'.join(temp[:-1]))
+        except ValueError:
+            return None
+
         f = getattr(module, temp[-1])
-        if hasattr(f, 'from_parsed_yaml'):
-            result = f(**f.from_parsed_yaml(args))
+        if hasattr(f, 'parse_yaml'):
+            result = f(**f.parse_yaml(args))
         else:
-            result = f(**args)
+            result = f(**ReilBase.parse_yaml(args))
 
         return result
 
