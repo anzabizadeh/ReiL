@@ -109,7 +109,8 @@ class Agent(agents.NoLearnAgent):
         else:
             X, Y = [], []
 
-        self._learner.learn(X, Y)
+        if X:
+            self._learner.learn(X, Y)
 
     def reset(self):
         '''Reset the agent at the end of a learning epoch.'''
