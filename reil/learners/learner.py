@@ -1,5 +1,5 @@
 import pathlib
-from typing import Generic, Optional, Tuple, TypeVar, Union
+from typing import Any, Generic, Optional, Tuple, TypeVar, Union
 
 from reil import learners, reilbase
 from reil.datatypes import ReilData
@@ -19,7 +19,9 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
     learn: learns using training set `X` and `y`.
     '''
     def __init__(self,
-                 learning_rate: learners.LearningRateScheduler) -> None:
+                 learning_rate: learners.LearningRateScheduler,
+                 **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self._learning_rate = learning_rate
 
     @classmethod
