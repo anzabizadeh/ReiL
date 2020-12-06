@@ -3,20 +3,20 @@
 NoLearnAgent class
 ==================
 
-This `NoLearnAgent` class is the base class of all agent classes. 
+This `NoLearnAgent` class is the base class of all `agent` classes. 
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
 import random
-from typing import Any, List, Optional, Tuple, TypeVar
+from typing import Any, Optional, Tuple, TypeVar
 
 from reil import stateful
 from reil.datatypes.reildata import ReilData
 from reil.utils import functions
 from typing_extensions import Literal
 
-TrainingData = Tuple[List[ReilData], List[float]]
+TrainingData = Tuple[Tuple[ReilData, ...], Tuple[float, ...]]
 T = TypeVar('T')
 
 class NoLearnAgent(stateful.Stateful):

@@ -34,7 +34,7 @@ class QLearning(agents.Agent):
     _max_q: Returns `max(Q)` of one state or a list of states.
     '''
     def __init__(self,
-                 learner: Learner,
+                 learner: Learner[float],
                  buffer: Buffer,
                  exploration_strategy: ExplorationStrategy,
                  method: str = 'backward',
@@ -53,7 +53,7 @@ class QLearning(agents.Agent):
 
         method: either 'forward' or 'backward' Q-learning.
         '''
-        super().__init__(learner=learner,
+        super().__init__(learner=cast(Learner[float], learner),
                          exploration_strategy=exploration_strategy,
                          **kwargs)
 
@@ -69,7 +69,7 @@ class QLearning(agents.Agent):
 
     def _q(self,
            state: Union[Tuple[ReilData, ...], ReilData],
-           action: Optional[Union[Tuple[ReilData, ...], ReilData]] = None) -> List[float]:
+           action: Optional[Union[Tuple[ReilData, ...], ReilData]] = None) -> Tuple[float, ...]:
         '''
         Returns the Q-value of `state` `action` pairs.
 
@@ -93,20 +93,20 @@ class QLearning(agents.Agent):
         len_action = len(action_list)
 
         if len_state == len_action:
-            X = [state_list[i] + action_list[i]
-                 for i in range(len_state)]
+            X = tuple(state_list[i] + action_list[i]
+                      for i in range(len_state))
         elif len_action == 1:
-            X = [state_list[i] + action_list[0]
-                 for i in range(len_state)]
+            X = tuple(state_list[i] + action_list[0]
+                      for i in range(len_state))
         elif len_state == 1:
-            X = [state_list[0] + action_list[i]
-                 for i in range(len_action)]
+            X = tuple(state_list[0] + action_list[i]
+                      for i in range(len_action))
         else:
             raise ValueError(
                 'State and action should be of the same size'
                 ' or at least one should be of size one.')
 
-        return self._learner.predict(X)
+        return cast(Tuple[float, ...], self._learner.predict(X))
 
     def _max_q(self, state: Union[Tuple[ReilData, ...], ReilData]) -> float:
         '''
@@ -124,7 +124,7 @@ class QLearning(agents.Agent):
         return max_q
 
     def _prepare_training(self,
-        history: stateful.History) -> Tuple[List[ReilData], List[float]]:
+        history: stateful.History) -> agents.TrainingData:
         '''
         Prepares training set based on history.
 

@@ -18,7 +18,6 @@ class DeepQLearning(agents.QLearning):
     '''
     A Deep Q-learning agent.
     '''
-
     def __init__(self,
                  learner: learners.Dense,
                  buffer: buffers.VanillaExperienceReplay,

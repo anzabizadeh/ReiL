@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 Agent class
-============
+===========
 
 This `agent` class is the base class of all agent classes that can learn from
 `history`. 
@@ -10,7 +10,7 @@ This `agent` class is the base class of all agent classes that can learn from
 '''
 
 import pathlib
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union, cast
 
 from reil import agents, stateful
 from reil.datatypes.reildata import ReilData
@@ -18,8 +18,6 @@ from reil.learners.learner import Learner
 from reil.utils import functions
 from reil.utils.exploration_strategies import ExplorationStrategy
 from typing_extensions import Literal
-
-TrainingData = Tuple[List[ReilData], List[float]]
 
 
 class Agent(agents.NoLearnAgent):
@@ -107,7 +105,7 @@ class Agent(agents.NoLearnAgent):
         if history is not None:
             X, Y = self._prepare_training(history)
         else:
-            X, Y = [], []
+            X, Y = cast(agents.TrainingData, ([], []))
 
         if X:
             self._learner.learn(X, Y)
@@ -163,7 +161,7 @@ class Agent(agents.NoLearnAgent):
         return _path, _filename
 
     def _prepare_training(self,
-                          history: stateful.History) -> TrainingData:
+                          history: stateful.History) -> agents.TrainingData:
         '''
         Uses `history` to create the training set in the form of `X` and `y`
         vectors.

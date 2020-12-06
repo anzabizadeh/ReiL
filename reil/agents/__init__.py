@@ -17,8 +17,6 @@ DeepQLearning: the agent with neural network as a learner (derived from QLearnin
 
 RandomAgent: an agent that randomly chooses an action
 
-FixedAgent: an agent that outputs a constant action
-
 UserAgent: an agent that shows current state and asks for user's choice of action
 
 WarfarinAgent: an agent based on Ravvaz et al (2016) paper for Warfarin Dosing
@@ -26,9 +24,16 @@ WarfarinAgent: an agent based on Ravvaz et al (2016) paper for Warfarin Dosing
 WarfarinClusterAgent: an agent whose actions are based on clustering of observations
 Note: This agent will no longer run due to changes in the module implementation.
 
+Types
+-----
+TrainingData: a type alias for training data, consisting of a tuple of `ReilData`
+for X matrix and a tuple of floats for Y vector.
+
+AgentType: a type variable that is bound to `Agent`.
+
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
-from .no_learn_agent import NoLearnAgent
+from .no_learn_agent import NoLearnAgent, TrainingData
 from .agent import Agent
 from .q_learning import QLearning
 from .deep_q_learning import DeepQLearning
