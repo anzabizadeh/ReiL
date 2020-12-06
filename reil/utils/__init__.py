@@ -30,13 +30,14 @@ WekaClusterer: a clustering class based on Weka's clustering capabilities (disab
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
+from .action_generator import ActionGenerator, CategoricalComponent, NumericalComponent
+from .instance_generator import InstanceGenerator
+from .mnkboard import MNKBoard
+
 import reil.utils.buffers
 import reil.utils.exploration_strategies
 import reil.utils.functions
 
-from .action_generator import ActionGenerator
-from .instance_generator import InstanceGenerator
-from .mnkboard import MNKBoard
 
 # import warnings
 # import pip
@@ -48,6 +49,8 @@ from .mnkboard import MNKBoard
 #         from .weka_clustering import WekaClusterer
 #     else:
 #         import warnings
-#         warnings.warn('Could not find dependencies of "WekaClusterer" ("weka"). Skipped installing the module.')
+#         warnings.warn('Could not find dependencies of "WekaClusterer" '
+#           '("weka"). Skipped installing the module.')
 # except AttributeError:
-#     warnings.warn('Could not use pip to check the availability of dependencies of "WekaClusterer" ("weka"). Skipped installing the module.')
+#     warnings.warn('Could not use pip to check the availability of'
+#       ' dependencies of "WekaClusterer" ("weka"). Skipped installing the module.')
