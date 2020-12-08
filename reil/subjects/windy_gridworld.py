@@ -7,7 +7,7 @@ This class creates a gridworld (board) in which one square is the goal.
 The agent starts from a location and should find the fastest route to the goal.
 Wind is a fixed amount of padding based on the location of the agent on the board.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 

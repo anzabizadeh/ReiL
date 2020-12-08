@@ -5,7 +5,7 @@ Submit projects
 
 Submit projects to Argon
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from compute_resources import job_scheduler

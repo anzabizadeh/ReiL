@@ -19,7 +19,7 @@ interact in an `environment`.
 ReilData: the main datatype used to communicate `state`s, `action`s, and `reward`s,
 between objects in `reil`.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from .feature import Feature, FeatureType

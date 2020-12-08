@@ -12,7 +12,8 @@ class LearningRateScheduler(reilbase.ReilBase):
         '''
         Initialize the scheduler.
 
-        ### Arguments
+        Arguments
+-----------
         initial_lr: initial learning rate.
         new_rate_function: a function that accepts epoch and current learning
         rate and returns a new learning rate.
@@ -35,7 +36,8 @@ class ConstantLearningRate(LearningRateScheduler):
         '''
         Initialize the scheduler.
 
-        ### Arguments
+        Arguments
+-----------
         initial_lr: initial learning rate.
         '''
         super().__init__(initial_lr, lambda e, lr: initial_lr)

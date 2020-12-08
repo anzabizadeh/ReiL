@@ -6,7 +6,7 @@ MNKBoard class
 This class creates a board for players to play mnk game.
 It serves as a super class for MNKGame.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from reil.datatypes import ReilData
@@ -25,11 +25,13 @@ class MNKBoard:
     '''
     Provide an m-by-n board to play.
 
-    ### Attributes
+    Attributes
+-----------
     board_state: the state of the board as a ReilData.
 
 
-    ### Methods
+    Methods
+-----------
     set_piece: set a piece of the specified player on the specified square of the board.
 
     clear_square: clear the specified square of the board.
@@ -45,7 +47,8 @@ class MNKBoard:
         '''
         Initialize an instance of mnkgame.
 
-        ### Arguments
+        Arguments
+-----------
         m: number of rows (default=3)
 
         n: number of columns (default=3)
@@ -67,7 +70,8 @@ class MNKBoard:
         '''
         Set a piece for a player.
         
-        ### Arguments
+        Arguments
+-----------
         player: ID of the player whose piece will be set on the board.
 
         index: If provided, the piece is set using 'index'. Index starts from 0 and assumes the board to be a list.
@@ -97,7 +101,8 @@ class MNKBoard:
         '''
         Clear a square on the board.
 
-        ### Arguments
+        Arguments
+-----------
         index: If provided, the piece is set using 'index'. Index starts from 0 and assumes the board to be a list.
 
         row: The row in which the piece is set.
@@ -123,7 +128,8 @@ class MNKBoard:
         '''
         Return the board.
 
-        ### Arguments
+        Arguments
+-----------
         format_: 'vector' returns the board as a list. 'matrix' returns the board as a 2D list. (Default='vector').
 
         Raises ValueError if undefined format is provided.
@@ -139,7 +145,8 @@ class MNKBoard:
         '''
         Return a list of indexes of empty squares.
 
-        ### Arguments
+        Arguments
+-----------
         format_: 'vector' returns the board as a list. 'matrix' returns the board as a 2D list. (Default='vector').
 
         Raises ValueError if undefined format is provided.
@@ -166,7 +173,8 @@ class MNKBoard:
         '''
         Get a board and returns it in 2D list format.
 
-        ### Arguments
+        Arguments
+-----------
         args[0]: the board to be converted. If no arguments is supplied, current object's board is returned.
         '''
         if not args:

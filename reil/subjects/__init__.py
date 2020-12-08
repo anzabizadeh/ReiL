@@ -15,7 +15,7 @@ Classes
     FrozenLake: a frozen lake with cracks in it! (uses legacy ValueSet instead of ReilData)
     WindyGridworld: a grid with displacement of agent (as if wind blows) (uses legacy ValueSet instead of ReilData)
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from .subject import Subject, SubjectType

@@ -5,7 +5,7 @@ subject class
 
 This `subject` class is the base class of all subject classes. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from typing import Any, Dict, Optional, Tuple, TypeVar
@@ -64,7 +64,8 @@ class Subject(stateful.Stateful):
             agent _id. If _id is None, then returns True if no agent can act on
             the subject.
 
-        ### Arguments
+        Arguments
+-----------
 
         _id: ID of the agent that checks termination. In a multi-agent setting,
             e.g. an RTS game, one agent might die and another agent might still
@@ -76,7 +77,8 @@ class Subject(stateful.Stateful):
         '''
         Returns a list of possible actions for the agent with ID=_id.
 
-        ### Arguments
+        Arguments
+-----------
 
         _id: ID of the agent that wants to act on the subject.
         '''
@@ -87,7 +89,8 @@ class Subject(stateful.Stateful):
         Returns the reward that agent `_id` recieves, based on the reward
         definition `name`.
 
-        ### Arguments
+        Arguments
+-----------
 
         name: name of the reward definition. If omitted, output of the
             `default_reward` method will be returned. 
@@ -106,7 +109,8 @@ class Subject(stateful.Stateful):
         '''
         Returns the default reward definition of the subject for agent `_id`.
 
-        ### Arguments
+        Arguments
+-----------
 
         _id: ID of the agent that calls the reward method.
         '''
@@ -116,7 +120,8 @@ class Subject(stateful.Stateful):
         '''
         Receive an `action` from agent `_id` and transition to the next state.
 
-        ### Arguments
+        Arguments
+-----------
 
         action: the action sent by the agent that will affect this subject.
 
@@ -131,7 +136,8 @@ class Subject(stateful.Stateful):
         Adds a new reward definition called `name` with function `rl_function`
         that uses state `state_name`.
 
-        ### Arguments
+        Arguments
+-----------
 
         name: name of the new reward definition. ValueError is raise if the reward
             already exists.
@@ -169,7 +175,8 @@ class Subject(stateful.Stateful):
         Registers an agent and returns its ID. If the agent is new, a new ID
         is generated and the agent_name is added to agent_list.
 
-        ### Arguments
+        Arguments
+-----------
         agent_name: the name of the agent to be registered.
 
         _id: the ID of the agent to be used. If not provided, subject will assign
@@ -201,7 +208,8 @@ class Subject(stateful.Stateful):
         '''
         Deregisters an agent given its name.
 
-        ### Arguments
+        Arguments
+-----------
 
         agent_name: the name of the agent to be registered.
         '''

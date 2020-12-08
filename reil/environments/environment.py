@@ -5,7 +5,7 @@ environment class
 
 This `environment` class provides a learning environment for any reinforcement learning agent on any subject.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 import functools

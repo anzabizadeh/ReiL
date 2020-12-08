@@ -5,7 +5,7 @@ MNKGame class
 
 This `subject` class emulates mnk game. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 
@@ -36,12 +36,14 @@ class MNKGame(MNKBoard, Subject):
     Build an m-by-n board (using mnkboard super class) in which p players can play.
     Winner is the player who can put k pieces in on row, column, or diagonal.
 
-    ### Attributes
+    Attributes
+-----------
     is_terminated: whether the game finished or not.
 
     possible_actions: a list of possible actions.
 
-    ### Methods
+    Methods
+-----------
     register: register a new player and return its ID or return ID of an existing player.
 
     take_effect: set a piece of the specified player on the specified square of the board.
@@ -59,7 +61,8 @@ class MNKGame(MNKBoard, Subject):
         '''
         Initialize an instance of mnkgame.
 
-        ### Arguments
+        Arguments
+-----------
         m: number of rows (default=3)
 
         n: number of columns (default=3)

@@ -32,7 +32,8 @@ class QLookupTable(learners.Learner[float]):
 
     This class stores input data and the corresponding output as a dictionay.
 
-    ### Methods
+    Methods
+-----------
     predict: predicts `y` for a given input list `X`.
 
     learn: learns using training set `X` and `y`.
@@ -48,7 +49,8 @@ class QLookupTable(learners.Learner[float]):
         '''
         Initialize the lookup table.
 
-        ### Arguments
+        Arguments
+-----------
         learning_rate: a `LearningRateScheduler` object that determines the 
         learning rate of this learner.
 
@@ -70,7 +72,8 @@ class QLookupTable(learners.Learner[float]):
         '''
         predicts `y` for a given input list `X`.
 
-        ### Arguments
+        Arguments
+-----------
         X: a list of `ReilData` as inputs to the prediction model.
         '''
         dummy = TableEntry(self._initial_estimate)
@@ -85,7 +88,8 @@ class QLookupTable(learners.Learner[float]):
         '''
         Learns using training set `X` and `Y`.
 
-        ### Arguments
+        Arguments
+-----------
         X: a list of `ReilData` as inputs to the learning model.
 
         Y: a list of float labels for the learning model.

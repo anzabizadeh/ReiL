@@ -14,7 +14,8 @@ class Dense(learners.Learner[float]):
 
     This class uses `tf.keras` to build a sequential dense network with one output.
 
-    ### Methods
+    Methods
+-----------
     from_pickle: loads a learner from a file.
 
     predict: predicts `y` for a given input list `X`.
@@ -42,7 +43,8 @@ class Dense(learners.Learner[float]):
         '''
         Initialize the instance.
 
-        ### Arguments
+        Arguments
+-----------
         learning_rate: a `LearningRateScheduler` object that determines the
         learning rate based on epoch. If any scheduler other than constant is
         provided, the model uses the `new_rate` method of the scheduler to
@@ -120,7 +122,8 @@ class Dense(learners.Learner[float]):
         '''
         predicts `y` for a given input list `X`.
 
-        ### Arguments
+        Arguments
+-----------
         X: a list of `ReilData` as inputs to the prediction model.
         '''
         _X = [x.normalized.flatten() for x in X]
@@ -138,7 +141,8 @@ class Dense(learners.Learner[float]):
         '''
         Learns using training set `X` and `Y`.
 
-        ### Arguments
+        Arguments
+-----------
         X: a list of `ReilData` as inputs to the learning model.
 
         Y: a list of float labels for the learning model.
@@ -168,7 +172,8 @@ class Dense(learners.Learner[float]):
         '''
         Saves the learner instance.
 
-        ### Arguments
+        Arguments
+-----------
         filename: the name of the file to be saved.
 
         path: the path of the file to be saved.
@@ -186,7 +191,8 @@ class Dense(learners.Learner[float]):
         '''
         Loads an instance from a file.
 
-        ### Arguments
+        Arguments
+-----------
         filename: the name of the file to be loaded.
 
         path: path of the location of the file.

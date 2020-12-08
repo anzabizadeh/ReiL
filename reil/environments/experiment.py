@@ -5,7 +5,7 @@ experiment class
 
 This `environment` class provides an experimentation environment for any reinforcement learning agent on any subject. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from math import log10, ceil

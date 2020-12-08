@@ -9,7 +9,7 @@ Classes
 -------
     WarfarinStats: a statistic class for warfarin analysis.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from .warfarin_stats import WarfarinStats

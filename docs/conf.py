@@ -17,12 +17,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'Reinforcement Learning'
+project = 'reil - A Reinforcement Learning Package'
 copyright = '2020, Sadjad Anzabi Zadeh'
 author = 'Sadjad Anzabi Zadeh'
-
-# The full version, including alpha/beta/rc tags
-release = '0.5.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -32,8 +29,27 @@ release = '0.5.0'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autodoc.typehints',
     'sphinx.ext.napoleon'
 ]
+
+autodoc_typehints = 'description'
+
+autodoc_default_flags = [
+    'members',
+    'undoc-members',
+    'private-members',
+    'special-members',
+    'inherited-members',
+    'show-inheritance'
+]
+
+autodoc_type_aliases = {
+    'reil.datatypes.reildata.ReilData': 'ReilData'
+}
+
+autoclass_content = 'both'
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -49,7 +65,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'sphinx_rtd_theme'  # 'alabaster'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

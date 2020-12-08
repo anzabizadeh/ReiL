@@ -3,9 +3,7 @@
 DeepQLearning class
 ===================
 
-A Q-learning agent with Neural Network Q-function approximator
-
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+A Q-learning `agent` with a Neural Network Q-function approximator.
 '''
 
 from typing import Any
@@ -16,7 +14,7 @@ from reil.utils import buffers, exploration_strategies
 
 class DeepQLearning(agents.QLearning):
     '''
-    A Deep Q-learning agent.
+    A Deep Q-learning `agent`.
     '''
     def __init__(self,
                  learner: learners.Dense,
@@ -25,19 +23,25 @@ class DeepQLearning(agents.QLearning):
                  method: str = 'backward',
                  **kwargs: Any):
         '''
-        Initialize a Q-Learning agent with deep neural network Q-function approximator.
+        Arguments
+        ---------
+        learner:
+            The `Learner` of type `Dense` that does the learning.
 
-        ### Arguments
-        learner: the `Learner` of type `Dense` that does the learning.
+        buffer:
+            A buffer that collects observations for training. Some
+            variation of `ExperienceReply` is recommended.
 
-        buffer: a `Buffer` object that collects observations for training. Some
-        variation of `ExperienceReply` is recommended.
+        exploration_strategy:
+            An `ExplorationStrategy` object that determines
+            whether the `action` should be exploratory or not for a given `state` at
+            a given `epoch`.
 
-        exploration_strategy: an `ExplorationStrategy` object that determines
-        whether the `action` should be exploratory or not for a given `state` at
-        a given `epoch`.
+        method:
+            Either 'forward' or 'backward' Q-learning.
 
-        method: either 'forward' or 'backward' Q-learning.
+        kwargs:
+            Keyword arguments to be passed on to the parent class.
         '''
         super().__init__(learner=learner,
                          buffer=buffer,

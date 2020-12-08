@@ -19,7 +19,7 @@ so it should be used with memory and performance constraints in mind.
 VanilaExperienceReplay: a `CircularBuffer` that only picks randomly and returns
 values only if it is full.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from .buffer import Buffer, PickModes, T

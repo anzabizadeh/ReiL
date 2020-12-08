@@ -12,7 +12,8 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
     a datatype that accepts initial value and feature generator, and generates
     new values.
 
-    ### Attributes
+    Attributes
+-----------
     is_numerical: a boolean that shows if the feature is numerical.
 
     value: the currect value of the feature.
@@ -60,7 +61,8 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
         '''
         Creates a categorical Feature.
 
-        ### Attributes
+        Attributes
+-----------
         value: the currect value of the feature.
 
         randomized: whether the generator should produce random values
@@ -97,7 +99,8 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
         '''
         Creates a numerical Feature.
 
-        ### Attributes
+        Attributes
+-----------
         value: the currect value of the feature.
 
         randomized: whether the generator should produce random values

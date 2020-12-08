@@ -5,7 +5,7 @@ iterableSubject class
 
 This `iterable subject` class takes any `subject` object and returns an iterator. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 import pathlib

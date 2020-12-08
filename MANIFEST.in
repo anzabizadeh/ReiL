@@ -1,3 +1,7 @@
+include README.rst
 include LICENSE
+include requirements.txt
+graft reil
+recursive-exclude * *.py[co]
 include versioneer.py
 include reil/_version.py

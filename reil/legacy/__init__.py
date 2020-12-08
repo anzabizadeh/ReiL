@@ -16,7 +16,7 @@ Classes
     WarfarinLookAhead
     WarfarinModelFixedInterval
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 # import warnings

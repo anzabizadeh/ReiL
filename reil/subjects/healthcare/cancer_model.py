@@ -5,7 +5,7 @@ cancer_model class
 
 This `cancer_model` class implements a four-state nonlinear cancer chemotherapy model proposed by Lisette et al. (2003).
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from reil.subjects.healthcare import Patient

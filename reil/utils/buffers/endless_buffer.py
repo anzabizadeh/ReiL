@@ -5,7 +5,7 @@ EndlessBuffer class
 
 A `Buffer` without size limit.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from typing import Dict, List, Optional, cast
@@ -18,7 +18,8 @@ class EndlessBuffer(Buffer[T]):
 
     Extends `Buffer` class.
 
-    ### Methods
+    Methods
+-----------
     setup: sets up the buffer by defining its queue names and pick mode.
 
     add: adds a new item to the buffer. Overrides `Buffer.add`.
@@ -34,7 +35,8 @@ class EndlessBuffer(Buffer[T]):
         '''
         Initializes the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         buffer_names: a list containing the names of buffer queues.
 
         pick_mode: the default mode to pick items from the list.
@@ -47,7 +49,8 @@ class EndlessBuffer(Buffer[T]):
         '''
         Sets up the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         buffer_names: a list containing the names of buffer elements.
 
         pick_mode: the default mode to pick items from the list.
@@ -62,7 +65,8 @@ class EndlessBuffer(Buffer[T]):
         '''
         Adds a new item to the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         data: a dictionary with the name of buffer queues as keys.
         '''
         self._buffer_index += 1

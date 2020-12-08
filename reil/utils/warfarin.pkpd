@@ -45,7 +45,8 @@ hamberg_2007 <- function(dose, Cs_super, AGE, CYP2C9, VKORC1, SS, maxTime=24) {
 	times = c(0, 1:maxTime)	# prepend time 0 to the list of times for deSolve initial conditions (remove when returning list of times)
 	                        # times also equals the time-step for deSolve
     
-    ############### Random Univariate Parameters ###############                    
+    ############Random Univariate Parameters ###############                    
+-----------
 	# based on suggestion from Marc Gastonguay from Metrum
 	MTT_1 = rlnormRestricted(log(11.6), sqrt(0.141))		# hours
 	parameters$MTT_1 = MTT_1

@@ -3,9 +3,7 @@
 NoLearnAgent class
 ==================
 
-This `NoLearnAgent` class is the base class of all `agent` classes. 
-
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+The base class of all `agent` classes.
 '''
 
 import random
@@ -23,11 +21,6 @@ class NoLearnAgent(stateful.Stateful):
     '''
     The base class of all `agent` classes. This class does not support any
     `learner`.
-
-    ### Methods
-    act: returns an `action` based on the given `state`.
-
-    best_actions: returns a list of best `action`s for a given `state`.
     '''
 
     def __init__(self,
@@ -35,13 +28,19 @@ class NoLearnAgent(stateful.Stateful):
                  tie_breaker: Literal['first', 'last', 'random'] = 'random',
                  **kwargs: Any):
         '''
-        Initializes the `agent`.
+        Arguments
+        ---------
+        default_actions:
+            A list of default actions.
 
-        ### Arguments
-        default_actions: a tuple of default actions.
+        tie_breaker:
+            How to choose the `action` if more than one is candidate
+            to be chosen.
 
-        tie_breaker: how to choose the `action` if more than one is candidate
-        to be chosen.
+        Raises
+        ------
+        ValueError:
+            if `tie_breaker` is not one of 'first', 'last', and 'random'.
         '''
         super().__init__(**kwargs)
 
@@ -58,15 +57,23 @@ class NoLearnAgent(stateful.Stateful):
             actions: Optional[Tuple[ReilData, ...]] = None,
             epoch: int = 0) -> ReilData:
         '''
-        Returns an `action` based on the given `state`.
+        Return an action based on the given state.
 
-        ### Arguments
-        state: the state for which the action should be returned.
+        Arguments
+        ---------
+        state:
+            The state for which the action should be returned.
 
-        actions: the set of possible actions to choose from. If not supplied,
-        `default_actions` is used.
+        actions:
+            The set of possible actions to choose from.
 
-        epoch: the epoch in which the agent is acting.
+        epoch:
+            The epoch in which the agent is acting.
+
+        Returns
+        -------
+        :
+            The action
         '''
         possible_actions = functions.get_argument(
             actions, self._default_actions)
@@ -85,12 +92,20 @@ class NoLearnAgent(stateful.Stateful):
                      actions: Tuple[ReilData, ...],
                      ) -> Tuple[ReilData, ...]:
         '''
-        Returns a tuple of best `action`s based on the given `state`.
+        Find the best `action`s for the given `state`.
 
-        ### Arguments
-        state: the state for which the action should be returned.
+        Arguments
+        ---------
+        state:
+            The state for which the action should be returned.
 
-        actions: the set of possible actions to choose from.
+        actions:
+            The set of possible actions to choose from.
+
+        Returns
+        -------
+        :
+            A list of best actions.
         '''
         raise NotImplementedError
 
@@ -98,11 +113,20 @@ class NoLearnAgent(stateful.Stateful):
     def _break_tie(input_tuple: Tuple[T, ...],
                    method: Literal['first', 'last', 'random']) -> T:
         '''
-        Chooses one item from the supplied list of options, based on the method.
-        ### Arguments
-        input_tuple: the set of options to choose from.
+        Choose one item from the supplied list of options, based on the method.
 
-        method: method of choosing an item from `input_tuple`.
+        Arguments
+        ---------
+        input_tuple:
+            The set of options to choose from.
+
+        method:
+            Method of choosing an item from `input_tuple`.
+
+        Returns
+        -------
+        :
+            One of the items from the list
         '''
         if method == 'first':
             action = input_tuple[0]

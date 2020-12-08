@@ -5,7 +5,7 @@ InstanceGenerator class
 
 `InstanceGenerator` takes any object derived form `ReilBase` and returns an iterator. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from __future__ import annotations
@@ -26,11 +26,13 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):  # pylint: disable=unsub
     iterate, and `instance_counter_stops`, which is a tuple of the instance
     numbers where the instance generator should stop.
 
-    ### Attributes
+    Attributes
+-----------
     is_finite: `True` if `auto_rewind` is `False` and `instance_counter_stops`
     does not contain -1.
 
-    ### Methods
+    Methods
+-----------
     rewind: Rewinds the iterator object.
 
     is_terminated: returns `True` if no new instances can be generated.
@@ -50,7 +52,8 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):  # pylint: disable=unsub
         '''
         Initialize the InstanceGenerator
 
-        ### Attributes
+        Attributes
+-----------
         object: an instance of an object.
 
         instance_counter_stops: a tuple of the instance numbers where the instance

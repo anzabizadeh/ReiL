@@ -5,7 +5,7 @@ Risk class
 
 This `subject` class emulates dice throwing in Risk board game. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from random import randrange

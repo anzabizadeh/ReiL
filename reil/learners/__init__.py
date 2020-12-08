@@ -17,7 +17,7 @@ LearningRateScheduler: base class for learning rate schedulers
 
 ConstantLearningRate: a class that returns a constant learning rate
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,

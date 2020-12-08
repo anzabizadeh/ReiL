@@ -5,8 +5,6 @@ Agent class
 
 This `agent` class is the base class of all agent classes that can learn from
 `history`. 
-
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
 import pathlib
@@ -23,11 +21,6 @@ from typing_extensions import Literal
 class Agent(agents.NoLearnAgent):
     '''
     The base class of all agent classes that learn from history.
-
-    ### Methods
-    learn: learns using history, which consists of state, action, rewards.
-
-    _prepare_training: converts a history into X and y vectors for training.
     '''
 
     def __init__(self,
@@ -39,23 +32,28 @@ class Agent(agents.NoLearnAgent):
                  tie_breaker: Literal['first', 'last', 'random'] = 'random',
                  **kwargs: Any):
         '''
-        Initializes the `agent`.
+        Arguments
+        ---------
+        learner:
+            the `Learner` object that does the learning.
 
-        ### Arguments
-        learner: the `Learner` object that does the learning.
+        exploration_strategy:
+            an `ExplorationStrategy` object that determines
+            whether the `action` should be exploratory or not for a given `state`
+            at a given `epoch`.
 
-        exploration_strategy: an `ExplorationStrategy` object that determines
-        whether the `action` should be exploratory or not for a given `state`
-        at a given `epoch`.
+        discount_factor:
+            by what factor should future rewards be discounted?
 
-        discount_factor: by what factor should future rewards be discounted?
+        default_actions:
+            a tuple of default actions.
 
-        default_actions: a tuple of default actions.
+        training_mode:
+            whether the agent is in training mode or not.
 
-        training_mode: whether the agent is in training mode or not.
-
-        tie_breaker: how to choose the `action` if more than one is candidate
-        to be chosen.
+        tie_breaker:
+            how to choose the `action` if more than one is candidate
+            to be chosen.
         '''
         super().__init__(default_actions, tie_breaker, **kwargs)
 
@@ -75,12 +73,21 @@ class Agent(agents.NoLearnAgent):
         '''
         Return an action based on the given state.
 
-        ### Arguments
-        state: the state for which the action should be returned.
+        Arguments
+        ---------
+        state:
+            the state for which the action should be returned.
 
-        actions: the set of possible actions to choose from.
+        actions:
+            the set of possible actions to choose from.
 
-        epoch: the epoch in which the agent is acting.
+        epoch:
+            the epoch in which the agent is acting.
+
+        Returns
+        -------
+        :
+            the action
         '''
         if self.training_mode and self._exploration_strategy.explore(epoch):
             possible_actions = functions.get_argument(
@@ -96,8 +103,10 @@ class Agent(agents.NoLearnAgent):
         '''
         Learn using history.
 
-        ### Arguments
-        history: a `History` object from which the `agent` learns.
+        Arguments
+        ---------
+        history:
+            a `History` object from which the `agent` learns.
         '''
         if not self.training_mode:
             raise ValueError('Not in training mode!')
@@ -121,12 +130,18 @@ class Agent(agents.NoLearnAgent):
         '''
         Load an object from a file.
 
-        ### Arguments
-        filename: the name of the file to be loaded.
+        Arguments
+        ---------
+        filename:
+            the name of the file to be loaded.
 
-        path: the path in which the file is saved.
+        path:
+            the path in which the file is saved.
 
-        Raises ValueError if the filename is not specified.
+        Raises
+        ------
+            ValueError
+                if the filename is not specified.
         '''
         super().load(filename, path)
 
@@ -140,13 +155,22 @@ class Agent(agents.NoLearnAgent):
         '''
         Save the object to a file.
 
-        ### Arguments
-        filename: the name of the file to be saved.
+        Arguments
+        ---------
+        filename:
+            the name of the file to be saved.
 
-        path: the path in which the file should be saved.
+        path:
+            the path in which the file should be saved.
 
-        data_to_save: a list of variables that should be pickled. If omitted,
+        data_to_save:
+            a list of variables that should be pickled. If omitted,
             the `agent` is saved completely.
+
+        Returns
+        -------
+        :
+            a `Path` object to the location of the saved file and its name as `str`
         '''
         pickle_data = functions.get_argument(data_to_save, self.__dict__)
         save_learner = '_learner' in pickle_data
@@ -163,10 +187,17 @@ class Agent(agents.NoLearnAgent):
     def _prepare_training(self,
                           history: stateful.History) -> agents.TrainingData:
         '''
-        Uses `history` to create the training set in the form of `X` and `y`
+        Use `history` to create the training set in the form of `X` and `y`
         vectors.
 
-        ### Arguments
-        history: a `History` object from which the `agent` learns.
+        Arguments
+        ---------
+        history:
+            a `History` object from which the `agent` learns.
+
+        Returns
+        -------
+        :
+            a `TrainingData` object that contains `X` and 'y` vectors
         '''
         raise NotImplementedError

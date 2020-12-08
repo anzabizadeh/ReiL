@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 '''
 ReilBase class
-============
+==============
 
 The base class for reinforcement learning
-
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
 from __future__ import annotations
@@ -27,21 +25,6 @@ def get_argument(x: Any, y: Any) -> Any:
 class ReilBase:
     '''
     The base class of all classes in `reil` package.
-
-    ### Methods
-    from_pickle: create a `ReilBase` instance from a pickled (dilled) `ReilBase` object.
-
-    from_yaml_file: create a `ReilBase` instance using specifications from a `YAML` file.
-
-    parse_yaml: create a `ReilBase` instance using specifications from a parsed `YAML` document.
-
-    set_params: set parameters.
-
-    load: load an object from a pickle file.
-
-    save: save (pickle) the object to a file.
-
-    reset: reset the object.
     '''
 
     version: str = "0.7"
@@ -54,7 +37,47 @@ class ReilBase:
                  logger_filename: Optional[str] = None,
                  persistent_attributes: Optional[List[str]] = None,
                  **kwargs: Any):
+        '''
+        Arguments
+        ---------
+        name:
+            An optional name for the instance that can be used to `save` the instance.
+        path:
+            An optional path to be used to `save` the instance.
+        logger_name:
+            Name of the `logger` that records logging messages.
+        logger_level:
+            Level of logging.
+        logger_filename:
+            An optional filename to be used by the logger.
+        persistent_attributes:
+            A list of attributes that should be preserved when loading an instance.
 
+            For example, one might need to `load` an instance, but keep the name of the current instance.
+
+            Example
+            -------
+            >>> instance = ReilBase(name='my_instance', persistent_attributes=['name'])
+            >>> another_instance = ReilBase(name='another_instance')
+            >>> another_instance.save('another_instance')
+            >>> instance._name
+            my_instance
+            >>> another_instance._name
+            another_instance
+            >>> instance.load('another_instance')
+            >>> instance._name
+            my_instance
+
+        kwargs:
+            Any other attributes to set for the object.
+            Note that `ReilBase` accepts any attribute and adds an underscore before its name.
+
+            Example
+            -------
+            >>> instance = ReilBase(name='my_instance', my_attr='test')
+            >>> instance._my_attr
+            test
+        '''
         self._name = get_argument(name, __name__.lower())
         self._path = pathlib.Path(get_argument(path, '.'))
 
@@ -74,7 +97,23 @@ class ReilBase:
 
     @classmethod
     def from_pickle(cls, filename: str,
-                    path: Optional[Union[pathlib.Path, str]] = None):
+                    path: Optional[Union[pathlib.Path, str]] = None) -> ReilBase:
+        '''
+        Load a pickled instance.
+
+        Arguments
+        ---------
+        filename:
+            Name of the pickle file.
+
+        path:
+            Path of the pickle file.
+
+        Returns
+        -------
+        :
+            A `ReilBase` instance.
+        '''
         instance = cls()
         instance._logger_name = __name__
         instance._logger_level = logging.WARNING
@@ -90,11 +129,34 @@ class ReilBase:
 
     @classmethod
     def from_yaml_file(cls, node_reference: Tuple[str, ...],
-                       filename: str, path: Optional[Union[pathlib.Path, str]] = None):
+                       filename: str,
+                       path: Optional[Union[pathlib.Path, str]] = None):
+        '''
+        Create an instance based on a yaml file.
+
+        Arguments
+        ---------
+        node_reference:
+            A list of node names that determines the location of the
+            specification in the yaml tree.
+
+        filename:
+            Name of the pickle file.
+
+        path:
+            Path of the pickle file.
+
+        Returns
+        -------
+        :
+            The generated instance.
+        '''
         _path = pathlib.Path(get_argument(path, '.'))
+        _filename = filename if filename.endswith((
+            '.yaml', '.yml')) else f'{filename}.yaml'
 
         yaml = YAML()
-        with open(_path / f'{filename}.yaml', 'r') as f:
+        with open(_path / _filename, 'r') as f:
             yaml_output = yaml.load(f)
 
         temp_yaml = yaml_output
@@ -105,17 +167,37 @@ class ReilBase:
 
     @staticmethod
     def parse_yaml(data: OrderedDict):
-        # cls._validate_parsed_yaml(yaml_node_name, data)
+        '''
+        Parse a yaml tree.
+
+        This method reads a yaml tree and recursively creates objects specified
+        by it.
+
+        Arguments
+        ---------
+        data:
+            A yaml tree data.
+
+        Returns
+        -------
+        :
+            Based on the tree, the method returns:
+
+            * A python object, e.g. `int`, `float`, `str`.
+            * A dictionary of arguments and their values to be fed to the
+              'parse_yaml` caller.
+            * An instance of an object derived from `ReilBase`.
+        '''
         if isinstance(data, (int, float, str)):
             return data
 
         if len(data) == 1:
             k, v = next(iter(data.items()))
-            result = ReilBase._load_component_from_yaml(k, v)
+            result = ReilBase._create_component_from_yaml(k, v)
             if result is not None:
                 return result
 
-        args = {}
+        args: Dict[str, Any] = {}
         for k, v in data.items():
             if isinstance(v, dict):
                 v_obj = ReilBase.parse_yaml(data[k])
@@ -128,23 +210,33 @@ class ReilBase:
                 v_obj = v
 
             args.update({k: v_obj})
-                # if isinstance(v, dict):
-                #     new_k, new_v = next(iter(v.items()))
-                #     try:
-                #         v_obj = ReilBase._load_component_from_yaml(
-                #             new_k, new_v)
-                #         args.update({k: v_obj})
-                #     except ValueError:  # Empty module name
-                #         args.update({k: v})
-                # elif isinstance(v, str) and 'lambda' in v:
-                #     args.update({k: eval(v)})
-                # else:
-                #     args.update({k: v})
 
         return args
 
     @staticmethod
-    def _load_component_from_yaml(name: str, args: Any):
+    def _create_component_from_yaml(name: str, args: OrderedDict):
+        '''
+        Create a component from yaml data.
+
+        This method attempts to import the `reil` class specified in `name`,
+        parse arguments specified in `args` and create an instance of the
+        class using the parsed arguments. If such class does not exist,
+        `None` will be returned.
+
+        Arguments
+        ---------
+        name:
+            Name of the object to be created.
+
+        args:
+            A yaml tree section that contains arguments and values to create the
+            object.
+
+        Returns
+        -------
+        :
+            The created object or `None`.
+        '''
         temp = name.split('.')
         try:
             module = importlib.import_module('.'.join(temp[:-1]))
@@ -165,20 +257,32 @@ class ReilBase:
 
         Arguments
         ---------
-            params: a dictionary containing parameter names and their values.
+        params:
+            A dictionary containing parameter names and their values.
         '''
         for key, value in params.items():
             self.__dict__[f'_{key}'] = value
 
-    def load(self, filename: str, path: Optional[Union[str, pathlib.Path]] = None) -> None:
+    def load(self, filename: str,
+             path: Optional[Union[str, pathlib.Path]] = None) -> None:
         '''
         Load an object from a file.
 
         Arguments
         ---------
-            filename: the name of the file to be loaded.
-            path: the path of the file to be loaded. (Object's default path will be used if not provided)
+        filename:
+            the name of the file to be loaded.
 
+        path:
+            the path in which the file is saved.
+
+        Raises
+        ------
+            ValueError
+                if the filename is not specified.
+
+            RuntimeError
+                if the file cannot be loaded.
         '''
         _path = pathlib.Path(get_argument(path, self._path))
 
@@ -222,9 +326,20 @@ class ReilBase:
 
         Arguments
         ---------
-            filename: the name of the object (Default=self._name)
-            path: the path of the file to be loaded. (Default='.')
-            data_to_save: what to save (Default: saves everything)
+        filename:
+            the name of the file to be saved.
+
+        path:
+            the path in which the file should be saved.
+
+        data_to_save:
+            a list of variables that should be pickled. If omitted,
+            the `agent` is saved completely.
+
+        Returns
+        -------
+        :
+            a `Path` object to the location of the saved file and its name as `str`
         '''
         if data_to_save is None:
             data = self.__dict__.copy()
@@ -248,7 +363,7 @@ class ReilBase:
         return _path, _filename
 
     def reset(self) -> None:
-        ''' Resets the object.'''
+        ''' Reset the object.'''
         pass
 
     def __repr__(self) -> str:

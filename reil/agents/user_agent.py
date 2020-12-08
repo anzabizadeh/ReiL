@@ -5,7 +5,7 @@ UserAgent class
 
 An agent that prints the state and asks the user for action.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 from typing import Any, Optional, Tuple
 
@@ -18,7 +18,8 @@ class UserAgent(agents.NoLearnAgent):
     '''
     An agent that acts based on user input.
 
-    ### Methods
+    Methods
+-----------
     act: return user's chosen action.
     ''' 
     def __init__(self,
@@ -33,7 +34,8 @@ class UserAgent(agents.NoLearnAgent):
         '''
         Return an action based user input.
 
-        ### Arguments
+        Arguments
+-----------
         state: the state for which the action should be returned.
 
         actions: the set of possible actions to choose from.

@@ -10,7 +10,7 @@ Classes
     HealthMathModel: the base class for healthcare math models.
     HambergPKPD: Hamberg's warfarin PK/PD model.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from .health_math_model import HealthMathModel

@@ -5,7 +5,7 @@ warfarin class
 
 This `warfarin` class implements a two compartment PK/PD model for warfarin. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 import pathlib
@@ -173,7 +173,8 @@ class Warfarin(subjects.Subject):
         Registers an agent and returns its ID. If the agent is new, a new ID
         is generated and the agent_name is added to agent_list.
 
-        ### Arguments
+        Arguments
+-----------
         agent_name: the name of the agent to be registered.
 
         _id: the ID of the agent to be used. If not provided, subject will assign

@@ -145,7 +145,8 @@ class ReilData(Sequence[BoundedData[Any]]):
         '''
         Create a ReilData instance.
 
-        ### Attributes
+        Attributes
+-----------
         data: data can be one or a sequence of either BoundedData instances or dicts that include 'name'. Other attributes are optional. If categories are not provided, the object is assumed numerical.
 
         lazy_evaluation: whether to store normalized values or compute on-demand.
@@ -183,7 +184,8 @@ class ReilData(Sequence[BoundedData[Any]]):
         '''
         Create a ReilData instance.
 
-        ### Attributes
+        Attributes
+-----------
         name: name of the object
         value: value to store
         lower: minimum value if the object is numerical

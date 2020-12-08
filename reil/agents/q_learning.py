@@ -5,7 +5,7 @@ QLearning class
 
 A Q-learning `agent`.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from typing import Any, List, Optional, Tuple, Union, cast
@@ -20,18 +20,7 @@ from reil.utils.exploration_strategies import ExplorationStrategy
 
 class QLearning(agents.Agent):
     '''
-    A Q-learning `agent`. Extends `reil.agents.Agent`.
-
-    ### Methods
-    best_action: Returns a tuple of best `action`s based on the given `state`.
-
-    reset: Resets the agent at the end of a learning epoch.
-
-    _prepare_training: Prepares training set based on history.
-
-    _q: Returns the Q-value of `state` `action` pairs.
-
-    _max_q: Returns `max(Q)` of one state or a list of states.
+    A Q-learning `agent`.
     '''
     def __init__(self,
                  learner: Learner[float],
@@ -40,18 +29,28 @@ class QLearning(agents.Agent):
                  method: str = 'backward',
                  **kwargs: Any):
         '''
-        Initializes the `agent`.
+        Arguments
+        ---------
+        learner:
+            the `Learner` object that does the learning.
 
-        ### Arguments
-        learner: the `Learner` object that does the learning.
+        exploration_strategy:
+            an `ExplorationStrategy` object that determines
+            whether the `action` should be exploratory or not for a given `state`
+            at a given `epoch`.
 
-        buffer: a `Buffer` object that collects observations for training.
+        discount_factor:
+            by what factor should future rewards be discounted?
 
-        exploration_strategy: an `ExplorationStrategy` object that determines
-        whether the `action` should be exploratory or not for a given `state` at
-        a given `epoch`.
+        default_actions:
+            a tuple of default actions.
 
-        method: either 'forward' or 'backward' Q-learning.
+        training_mode:
+            whether the agent is in training mode or not.
+
+        tie_breaker:
+            how to choose the `action` if more than one is candidate
+            to be chosen.
         '''
         super().__init__(learner=cast(Learner[float], learner),
                          exploration_strategy=exploration_strategy,
@@ -73,7 +72,8 @@ class QLearning(agents.Agent):
         '''
         Returns the Q-value of `state` `action` pairs.
 
-        ### Arguments
+        Arguments
+-----------
         state: one state or a list of states for which Q-value is returned.
         action: one action or a list of actions for which Q-value is returned. 
         If not supplied, `default_actions` will be used.
@@ -112,7 +112,8 @@ class QLearning(agents.Agent):
         '''
         Returns `max(Q)` of one state or a list of states.
 
-        ### Arguments
+        Arguments
+-----------
         state: one state or a list of states for which MAX(Q) is returned.
         '''
         try:
@@ -128,7 +129,8 @@ class QLearning(agents.Agent):
         '''
         Prepares training set based on history.
 
-        ### Arguments
+        Arguments
+-----------
         history: a `History` consisting of state, action, reward of one sample path.
 
         Note: Learning actually occurs every batch_size iterations.
@@ -168,7 +170,8 @@ class QLearning(agents.Agent):
         '''
         Returns a tuple of best `action`s based on the given `state`.
 
-        ### Arguments
+        Arguments
+-----------
         state: the state for which the action should be returned.
 
         actions: the set of possible actions to choose from.

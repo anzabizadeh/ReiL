@@ -5,7 +5,7 @@ RandomAgent class
 
 An agent that randomly chooses an action
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 import random
@@ -20,7 +20,8 @@ class RandomAgent(agents.NoLearnAgent):
     '''
     An agent that acts randomly.
 
-    ### Methods
+    Methods
+-----------
     act: return an action randomly.
     '''
 
@@ -36,7 +37,8 @@ class RandomAgent(agents.NoLearnAgent):
         '''
         Return a random action.
 
-        ### Arguments
+        Arguments
+-----------
         state: the state for which the action should be returned.
 
         actions: the set of possible actions to choose from.

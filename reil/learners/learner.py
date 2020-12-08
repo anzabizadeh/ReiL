@@ -11,7 +11,8 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
     '''
     The base class for all `Learners`.
 
-    ### Methods
+    Methods
+-----------
     from_pickle: loads a learner from a file.
 
     predict: predicts `y` for a given input list `X`.
@@ -35,7 +36,8 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
         '''
         predicts `y` for a given input list `X`.
 
-        ### Arguments
+        Arguments
+-----------
         X: a list of `ReilData` as inputs to the prediction model.
         '''
         raise NotImplementedError
@@ -44,7 +46,8 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
         '''
         Learns using training set `X` and `Y`.
 
-        ### Arguments
+        Arguments
+-----------
         X: a list of `ReilData` as inputs to the learning model.
 
         Y: a list of float labels for the learning model.

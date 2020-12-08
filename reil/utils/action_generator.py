@@ -6,7 +6,7 @@ ActionGenerator class
 Gets lists of categorical or numerical lists as components, and generates lists
 of `ReilData` objects using the product of these components.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 import dataclasses
 import itertools
@@ -90,7 +90,8 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
         '''
         Adds a categorical component.
 
-        ### Arguments
+        Arguments
+-----------
         component_name: name of the component.
 
         possible_values: a list of lists of categorical values.
@@ -99,7 +100,8 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
 
         Raises `KeyError` if `component_name` is duplicate.
 
-        ### Example:
+        Example:
+-----------
         >>> AG = ActionGenerator()
         >>> AG.add_categorical(
         ...     component_name='compass_directions',
@@ -123,7 +125,8 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
         '''
         Adds a numerical component.
 
-        ### Arguments
+        Arguments
+-----------
         component_name: name of the component.
 
         possible_values: a list of lists of numerical values.
@@ -134,7 +137,8 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
 
         Raises `KeyError` if `component_name` is duplicate.
 
-        ### Example:
+        Example:
+-----------
         >>> AG = ActionGenerator()
         >>> AG.add_numerical(component_name='odds',
         ...     possible_values=((1,), (1, 3)),
@@ -160,12 +164,14 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
         `index` is incremented by 1 unit. The last lits of a component is used
         if it is exhausted.
 
-        ### Arguments
+        Arguments
+-----------
         state: an optional argument that provides the generator with the current
         state of a subject. Subclasses of `ActionGenerator` can use this argument
         to generate tailored actions.
 
-        ### Example
+        Example
+-----------
         >>> AG = ActionGenerator()
         >>> AG.add_categorical(
         ...     component_name='compass_directions',

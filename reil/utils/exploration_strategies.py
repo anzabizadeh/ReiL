@@ -14,7 +14,7 @@ ConstantEpsilonGreedy: an epsilon greedy object with constant epsilon
 VariableEpsilonGreedy: an epsilon greedy object that accepts a uni-variate
 function to determine epsilon.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 import random
 from typing import Callable
@@ -27,7 +27,8 @@ class ExplorationStrategy(reilbase.ReilBase):
     '''
     The base class for all exploration strategies.
 
-    ### Methods
+    Methods
+-----------
     explore: returns True if the `agent` needs to explore.
     '''
 
@@ -41,7 +42,8 @@ class ExplorationStrategy(reilbase.ReilBase):
         '''
         Returns True if the `agent` needs to explore.
 
-        ### Arguments
+        Arguments
+-----------
         epoch: the current epoch number.
         '''
         return True
@@ -51,7 +53,8 @@ class ConstantEpsilonGreedy(ExplorationStrategy):
     '''
     An epsilon greedy object with constant epsilon.
 
-    ### Methods
+    Methods
+-----------
     explore: returns True if the `agent` needs to explore.
     '''
 
@@ -59,7 +62,8 @@ class ConstantEpsilonGreedy(ExplorationStrategy):
         '''
         initilizes the instance.
 
-        ### Arguments
+        Arguments
+-----------
         epsilon: the value of epsilon
 
         Note: if epsilon is not in the range of [0, 1], a warning is being issued,
@@ -73,7 +77,8 @@ class ConstantEpsilonGreedy(ExplorationStrategy):
         '''
         Returns True if a randomly generated number is less than `epsilon`.
 
-        ### Arguments
+        Arguments
+-----------
         epoch: the current epoch number.
         '''
         return random.random() < self._epsilon
@@ -83,7 +88,8 @@ class VariableEpsilonGreedy(ExplorationStrategy):
     '''
     An epsilon greedy object with constant epsilon.
 
-    ### Methods
+    Methods
+-----------
     explore: returns True if the `agent` needs to explore.
     '''
 
@@ -91,7 +97,8 @@ class VariableEpsilonGreedy(ExplorationStrategy):
         '''
         initilizes the instance.
 
-        ### Arguments
+        Arguments
+-----------
         epsilon: a uni-variate function that computes `epsilon` based on `epoch`.
 
         Raises `TypeError` if `epsilon` is not callable.
@@ -105,7 +112,8 @@ class VariableEpsilonGreedy(ExplorationStrategy):
         '''
         Returns True if a randomly generated number is less than `epsilon`.
 
-        ### Arguments
+        Arguments
+-----------
         epoch: the current epoch number.
         '''
         return random.random() < self._epsilon(epoch)

@@ -5,7 +5,7 @@ WarfarinClusterAgent class
 
 An agent that produces action based on similarity of the state with clusters.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 

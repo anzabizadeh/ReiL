@@ -5,7 +5,7 @@ WarfarinAgent class
 
 An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 import collections
@@ -544,7 +544,8 @@ class WarfarinAgent(agents.NoLearnAgent):
     An `agent` that prescribes dose for a warfarin `subject`,
     based on the dosing protocols defined in Ravvaz et al (2017).
 
-    ### Methods
+    Methods
+-----------
     act: returns an `action` based on the given `state`.
 
     reset: Resets the dosing algorithm to day 1.
@@ -555,7 +556,8 @@ class WarfarinAgent(agents.NoLearnAgent):
         '''
         Initializes the warfarin `agent`.
 
-        ### Arguments
+        Arguments
+-----------
         study_arm: one of available study arms: aaa, caa, pgaa, pgpgi, pgpga
         '''
         super().__init__(name=name)
@@ -579,7 +581,8 @@ class WarfarinAgent(agents.NoLearnAgent):
         Generates the dosing `action` based on the `state` and current dosing 
         protocol.
 
-        ### Arguments
+        Arguments
+-----------
         state: the state for which an action is chosen.
         '''
         patient = state.value

@@ -16,7 +16,7 @@ functionality for a reinforcement learning environment.
 Experiment: (disabled) an environment to explore performance of trained
 agents on subjects.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 # TODO: see if Experiment is still useful.

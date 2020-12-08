@@ -5,7 +5,7 @@ MNKGame class
 
 This `subject` class emulates mnk game. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 

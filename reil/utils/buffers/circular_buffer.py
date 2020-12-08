@@ -5,7 +5,7 @@ CircularBuffer class
 
 A `Buffer` that overflows!
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from typing import Dict, Tuple
@@ -19,7 +19,8 @@ class CircularBuffer(Buffer[T]):
 
     Extends `Buffer` class.
 
-    ### Methods
+    Methods
+-----------
     setup: sets up the buffer by defining its size, queue names and pick mode.
 
     add: adds a new item to the buffer. Extends `Buffer.add`.
@@ -42,7 +43,8 @@ class CircularBuffer(Buffer[T]):
 
         If the buffer is full, new items will be writen over the oldest one.
 
-        ### Arguments
+        Arguments
+-----------
         data: a dictionary with the name of buffer queues as keys.
         '''
         try:
@@ -59,7 +61,8 @@ class CircularBuffer(Buffer[T]):
         '''
         Returns the oldest items in the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         count: the number of items to return.
         '''
         if self._buffer_full:
@@ -74,7 +77,8 @@ class CircularBuffer(Buffer[T]):
         '''
         Returns the most recent items in the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         count: the number of items to return.
         '''
         if count - self._buffer_index <= 1 or not self._buffer_full:

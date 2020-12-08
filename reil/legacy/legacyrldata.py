@@ -5,7 +5,7 @@ LegacyReilData class
 
 A data type used for state and action variables.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 # from __future__ import annotations

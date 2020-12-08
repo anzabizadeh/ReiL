@@ -5,7 +5,7 @@ VanillaExperienceReplay class
 
 A `Buffer` with random pick that picks only if it is full.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from typing import Dict, List, Optional, Tuple
@@ -19,7 +19,8 @@ class VanillaExperienceReplay(CircularBuffer[T]):
 
     Extends `CircularBuffer` class.
 
-    ### Methods
+    Methods
+-----------
     setup: sets up the buffer by defining its size, queue names, pick mode, batch_size, and clear_buffer. Extends `CircularBuffer.setup`.
 
     add: adds a new item to the buffer. Extends `Buffer.add`.
@@ -40,7 +41,8 @@ class VanillaExperienceReplay(CircularBuffer[T]):
         '''
         Initializes the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         buffer_size: the size of the buffer.
 
         batch_size: the number of items to return at each `pick`.
@@ -64,7 +66,8 @@ class VanillaExperienceReplay(CircularBuffer[T]):
         '''
         Sets up the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         buffer_size: the size of the buffer.
 
         batch_size: the number of items to return at each `pick`.

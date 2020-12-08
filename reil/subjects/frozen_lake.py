@@ -7,7 +7,7 @@ This class creates a frozen lake (board) in which one square is the goal.
 The agent starts from a location and should find the fastest route to the goal.
 Some locations are holes.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 

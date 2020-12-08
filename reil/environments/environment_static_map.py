@@ -5,7 +5,7 @@ environment class
 
 This `environment` class provides a learning environment for any reinforcement learning agent on any subject.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 import pathlib
 from collections import defaultdict
@@ -29,11 +29,13 @@ class EnvironmentStaticMap(stateful.Stateful):
     Provide an interaction and learning environment for `agent`s and `subject`s,
     based on a static interaction map.
 
-    ### Attributes
+    Attributes
+-----------
     interaction_sequence: a sequence of `InteractionProtocols` that should be
     followed during each pass of simulation.
 
-    ### Methods
+    Methods
+-----------
     add: add a set of entities (agents/ subjects) to the environment.
 
     append_observations: appends a new list of observations to history.
@@ -88,7 +90,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Create a new environment.
 
-        ### Arguments
+        Arguments
+-----------
         entity_dict: a dictionary that contains `agents`, `subjects`, and
         `generators` for the environment.
 
@@ -119,7 +122,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Adds agents and subjects to the environment.
 
-        ### Arguments
+        Arguments
+-----------
         entity_dict: a dictionary consist of agent/ subject name and the
         respective entity. Names should be unique, otherwise overwritten.
         To assign the same entity to different names, one can use the name in the
@@ -168,7 +172,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Removes agents, subjects, or instance generators from the environment.
 
-        ### Arguments
+        Arguments
+-----------
         entity_names: a tuple of agent/ subject names to be deleted.
 
         Note: the method removes the item from both agents and subjects lists.
@@ -230,7 +235,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Returns subject's reward and state before taking an action and agent's action.
 
-        ### Attributes
+        Attributes
+-----------
         agent_id: agent's ID by which it is registered at the subject.
 
         agent_instance: an instance of an agent that takes the action.
@@ -275,7 +281,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         Allows `agent` and `subject` to interact at most "times" times and returns
         a list of subject's reward and state before taking an action and agent's action.
 
-        ### Attributes
+        Attributes
+-----------
         agent_id: agent's ID by which it is registered at the subject.
 
         agent_instance: an instance of an agent that takes the action.
@@ -326,7 +333,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         agent's action. Note that for `instance generators`, only the current
         instance is run to termination, not the whole generator.
 
-        ### Attributes
+        Attributes
+-----------
         agent_id: agent's ID by which it is registered at the subject.
 
         agent_instance: an instance of an agent that takes the action.
@@ -356,7 +364,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         When a `subject` is terminated for all interacting `agents`, this
         function is called to collect final rewards for all agents.
 
-        ### Attributes
+        Attributes
+-----------
         subject_name: name of the `subject` that is terminated.
         '''
         agents_state_n_rewards = (a_s_n_r
@@ -378,7 +387,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         When a `subject` is terminated for all interacting `agents`, this
         function is called to calculate statistics for all agents and the subject.
 
-        ### Attributes
+        Attributes
+-----------
         subject_name: name of the `subject` that is terminated.
         '''
         agents_and_stats = (a_n_s
@@ -398,7 +408,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         When a `subject` is terminated for all interacting `agents`, this
         function is called to provide history data to any related agent that can learn.
 
-        ### Attributes
+        Attributes
+-----------
         subject_name: name of the `subject` that is terminated.
         '''
         affected_agents = (a_name
@@ -417,7 +428,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         `InstanceGenerator`, a new instance is created. If reset is successful,
         `epoch` is incremented by one.
 
-        ### Attributes
+        Attributes
+-----------
         subject_name: name of the `subject` that is terminated.
         '''
         if subject_name in self._instance_generators:
@@ -471,7 +483,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Appends observations to the history of the given `agent` and `subject`.
 
-        ### Arguments
+        Arguments
+-----------
         agent_name: name of the agent that the observations belong to.
 
         subject_name: name of the subject that the observations belong to.
@@ -538,7 +551,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         Goes through the interaction map for a number of passes and simulates
         interactions accordingly.
 
-        ### Attributes
+        Attributes
+-----------
         passes: the number of passes that simulation should go.
         '''
         for _ in range(passes):
@@ -578,7 +592,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Loads an entity or an environment from a file.
 
-        ### Arguments
+        Arguments
+-----------
         filename: the name of the file to be loaded.
 
         entity_name: if specified, that entity (agent or subject) is being
@@ -620,7 +635,8 @@ class EnvironmentStaticMap(stateful.Stateful):
         '''
         Saves an entity or the environment to a file.
 
-        ### Arguments
+        Arguments
+-----------
         filename: the name of the file to be saved.
 
         path: the path of the file to be saved. (Default='./')

@@ -16,7 +16,7 @@ Classes
     ConstrainedCancerModel: a constrained version of CancerModel (uses legacy ValueSet instead of ReilData)
     Warfarin: a PK/PD model for warfarin with extended state definition
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 # TODO: update CancerModel

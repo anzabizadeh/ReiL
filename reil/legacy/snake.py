@@ -5,7 +5,7 @@ Snake class
 
 This `subject` class emulates a single player snake game. 
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 import curses

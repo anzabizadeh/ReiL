@@ -9,6 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
+set SPHINX_APIDOC_OPTIONS=members, undoc-members, private-members, special-members, inherited-members, show-inheritance
 
 if "%1" == "" goto help
 

@@ -5,7 +5,7 @@ Buffer class
 
 The base class for all buffers in `reil`.
 
-@author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
+
 '''
 
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, cast
@@ -22,7 +22,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
     '''
     The base class for all buffers in `reil`.
 
-    ### Methods
+    Methods
+-----------
     setup: sets up the buffer by defining its size, queue names, and pick mode.
 
     add: adds a new item to the buffer.
@@ -53,7 +54,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
         '''
         Initializes the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         buffer_size: the size of the buffer.
 
         buffer_names: a list containing the names of buffer queues.
@@ -69,7 +71,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
         '''
         Sets up the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         buffer_size: the size of the buffer.
 
         buffer_names: a list containing the names of buffer elements.
@@ -114,7 +117,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
         or if the provided names exist in the buffer queues. As a result, this
         situations will result in exceptions by the system.
 
-        ### Arguments
+        Arguments
+-----------
         data: a dictionary with the name of buffer queues as keys.
         '''
         self._buffer_index += 1
@@ -128,7 +132,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
         '''
         Returns items from the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         count: the number of items to return. If omitted, the number of items in
         the buffer is used. `count` will be ignored if `mode` is 'all'.
 
@@ -168,7 +173,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
         '''
         Returns the oldest items in the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         count: the number of items to return.
         '''
         return dict((name, tuple(buffer[:count]))
@@ -178,7 +184,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
         '''
         Returns the most recent items in the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         count: the number of items to return.
         '''
         return dict((name, tuple(buffer[self._buffer_index+1-count:self._buffer_index+1]))
@@ -188,7 +195,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):  # pylint: disable=unsubscriptable-
         '''
         Returns a random sample of items in the buffer.
 
-        ### Arguments
+        Arguments
+-----------
         count: the number of items to return.
         '''
         index = np.random.choice(
