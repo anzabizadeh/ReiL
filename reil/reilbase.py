@@ -27,8 +27,6 @@ class ReilBase:
     The base class of all classes in `reil` package.
     '''
 
-    version: str = "0.7"
-
     def __init__(self,
                  name: Optional[str] = None,
                  path: Optional[pathlib.Path] = None,
@@ -350,8 +348,6 @@ class ReilBase:
         if '_logger' in data:
             data.pop('_logger')
 
-        data['version'] = self.version
-
         _filename: str = get_argument(filename, self._name)
         _path: pathlib.Path = pathlib.Path(
             get_argument(path, self._path))
@@ -367,4 +363,4 @@ class ReilBase:
         pass
 
     def __repr__(self) -> str:
-        return self.__class__.__qualname__ + f"\t(Version = {self.version})"
+        return self.__class__.__qualname__
