@@ -1,4 +1,4 @@
-Reinforcement-Learning
-======================
+ReiL - A Reinforcement Learning Package
+=======================================
 
-This repository contains my codes for a Reinforcement Learning system.
+My codes for a Reinforcement Learning framework!

@@ -4,9 +4,6 @@ import versioneer
 with open('README.rst') as f:
     long_description = f.read()
 
-with open('LICENSE') as f:
-    license = f.read()
-
 with open("requirements.txt", "r") as fh:
     requirements = [line.strip() for line in fh]
 
@@ -15,10 +12,11 @@ setuptools.setup(name='ReiL',
                  cmdclass=versioneer.get_cmdclass(),
                  description='A Reinforcement Learning Module for Python',
                  long_description=long_description,
+                 long_description_content_type="text/x-rst",
                  url='https://research-git.uiowa.edu/sanzabizadeh/Reinforcement-Learning',
                  author='Sadjad Anzabi Zadeh',
                  author_email='sadjad-anzabizadeh@uiowa.edu',
-                 license=license,
+                 license='MIT License',
                  packages=setuptools.find_packages(exclude=('tests', 'docs')),
                  classifiers=[
                      "Programming Language :: Python :: 3",
