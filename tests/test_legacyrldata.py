@@ -1,19 +1,19 @@
 import unittest
 from random import randint, sample
 
-from reil.legacy import LegacyRLData
+from reil.legacy import LegacyReilData
 
 
-class testLegacyRLData(unittest.TestCase):
+class testLegacyReilData(unittest.TestCase):
     def test_numerical_list_creation(self):
         data = [randint(-100, 100) for _ in range(10)]
-        rl_value = LegacyRLData(data)
+        rl_value = LegacyReilData(data)
         self.assertEqual(rl_value._value, data)
         self.assertEqual(rl_value.value, data)
 
     def test_numerical_list_indexing(self):
         data = [randint(-100, 100) for _ in range(10)]
-        rl_value = LegacyRLData(data)
+        rl_value = LegacyReilData(data)
         for i in range(len(data)):
             self.assertEqual(rl_value[i], data[i])
 
@@ -30,7 +30,7 @@ class testLegacyRLData(unittest.TestCase):
 
     def test_numerical_list_modification(self):
         data_numerical = [randint(-100, 100) for _ in range(10)]
-        rl_value_numerical = LegacyRLData(data_numerical, lower=-100, upper=100)
+        rl_value_numerical = LegacyReilData(data_numerical, lower=-100, upper=100)
 
         # slice of a list - numerical
         # Normal
@@ -49,7 +49,7 @@ class testLegacyRLData(unittest.TestCase):
 
         # one index of a list
         data_numerical = [randint(-100, 100) for _ in range(10)]
-        rl_value_numerical = LegacyRLData(data_numerical, lower=-100, upper=100)
+        rl_value_numerical = LegacyReilData(data_numerical, lower=-100, upper=100)
         new_value = randint(-100, 100)
         index = randint(0, len(data_numerical))
         data_numerical[index] = new_value
@@ -66,7 +66,7 @@ class testLegacyRLData(unittest.TestCase):
         # slice of a list - categorical
         # Normal
         data_categorical = sample(list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 10)
-        rl_value_categorical = LegacyRLData(data_categorical)
+        rl_value_categorical = LegacyReilData(data_categorical)
         new_value = sample(rl_value_categorical.categories, 2)
         result = rl_value_categorical[:2].value + \
             new_value + rl_value_categorical[4:].value
@@ -88,12 +88,12 @@ class testLegacyRLData(unittest.TestCase):
 
     def test_numerical_list_normalizer(self):
         data = [randint(-100, 100) for _ in range(10)]
-        rl_value = LegacyRLData(data)
+        rl_value = LegacyReilData(data)
         lower = min(data)
         upper = max(data)
         values_range = upper - lower
         expected_output = [(i - lower) / values_range for i in data]
-        self.assertEqual(rl_value.normalize(), LegacyRLData(expected_output))
+        self.assertEqual(rl_value.normalize(), LegacyReilData(expected_output))
 
         # slice of a list - numerical
         new_value = [randint(lower, upper) for _ in range(2)]
@@ -110,7 +110,7 @@ class testLegacyRLData(unittest.TestCase):
         # Normal
         data_categorical = dict(zip(sample(list(
             'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 10), (randint(-100, 100) for _ in range(10))))
-        rl_value_categorical = LegacyRLData(data_categorical)
+        rl_value_categorical = LegacyReilData(data_categorical)
         index = sample(rl_value_categorical.keys(), 1)[0]
 
         rl_value_categorical._lower[index] = -100

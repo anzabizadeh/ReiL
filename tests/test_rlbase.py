@@ -1,13 +1,13 @@
 import unittest
 
-from reil.rlbase import RLBase
+from reil.reilbase import ReilBase
 
 
-class testRLData(unittest.TestCase):
+class testReilData(unittest.TestCase):
     def test_persistent(self):
-        base_1 = RLBase(name='test_persistent', version=1.0)
+        base_1 = ReilBase(name='test_persistent', version=1.0)
         base_1.save(filename='test_persistent')
-        base_2 = RLBase(name='base_2', version=0.6,
+        base_2 = ReilBase(name='base_2', version=0.6,
                         persistent_attributes=['name', 'version'])
         base_2.load(filename='test_persistent')
 
@@ -15,7 +15,7 @@ class testRLData(unittest.TestCase):
         self.assertEqual(base_2._version, 0.6)
 
     def test_inheritance(self):
-        class interited(RLBase):
+        class interited(ReilBase):
             def __init__(self, myarg: str='hello', **kwargs) -> None:
                 self._myarg = myarg
                 super().__init__(**kwargs)

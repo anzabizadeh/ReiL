@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 from reil.agents import WarfarinAgent
-from reil.subjects import Warfarin
+from reil.subjects.healthcare import Warfarin
 
 
 class testWarfarinAgent(unittest.TestCase):

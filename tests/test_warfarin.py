@@ -1,6 +1,6 @@
 import unittest
 
-from reil.subjects import Warfarin
+from reil.subjects.healthcare import Warfarin
 
 
 class testWarfarin(unittest.TestCase):

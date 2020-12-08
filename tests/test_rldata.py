@@ -1,17 +1,17 @@
 import unittest
 from random import randint, sample
 
-from reil import rldata
+from reil.datatypes import reildata
 
 
-class testRLData(unittest.TestCase):
+class testReilData(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._numerical_data = [randint(-100, 100) for _ in range(10)]
         cls._categorical_data = sample(list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 10)
 
-    def test_create_baserldata(self):
-        rl_value = rldata.BaseRLData(name='test',
+    def test_create_basereildata(self):
+        rl_value = reildata.BaseReilData(name='test',
                         value=self._numerical_data,
                         categorical=False,
                         normalizer=lambda _: 1,  # type: ignore
@@ -21,7 +21,7 @@ class testRLData(unittest.TestCase):
         self.assertEqual(rl_value.normalized, 1)
         self.assertEqual(rl_value.lazy_evaluation, True)
 
-        rl_value = rldata.BaseRLData(name='test',
+        rl_value = reildata.BaseReilData(name='test',
                         value=self._categorical_data,
                         categorical=False,
                         normalizer=lambda _: 1,  # type: ignore
@@ -31,8 +31,8 @@ class testRLData(unittest.TestCase):
         self.assertEqual(rl_value.normalized, 1)
         self.assertEqual(rl_value.lazy_evaluation, True)
 
-    def test_modify_baserldata(self):
-        rl_value = rldata.BaseRLData(name='test',
+    def test_modify_basereildata(self):
+        rl_value = reildata.BaseReilData(name='test',
                         categorical=False,
                         value=self._numerical_data.copy(),
                         normalizer=lambda x: 0 if isinstance(x.value, str) else 1,  # type: ignore
@@ -60,7 +60,7 @@ class testRLData(unittest.TestCase):
 
     def test_create_rangeddata(self):
         # categorical = False
-        rl_value = rldata.RangedData(name='numerical',
+        rl_value = reildata.RangedData(name='numerical',
                                         categorical = False,
                                         value=self._numerical_data)
 
@@ -68,7 +68,7 @@ class testRLData(unittest.TestCase):
         self.assertIsNone(rl_value.upper)
         self.assertIsNone(rl_value.normalized)
 
-        rl_value = rldata.RangedData(name='numerical',
+        rl_value = reildata.RangedData(name='numerical',
                                         categorical = False,
                                         value=self._numerical_data,
                                         lower=min(self._numerical_data),
@@ -79,14 +79,14 @@ class testRLData(unittest.TestCase):
         self.assertIsNotNone(rl_value.normalized)
 
         # categorical = True
-        rl_value = rldata.RangedData(name='categorical',
+        rl_value = reildata.RangedData(name='categorical',
                                         categorical = True,
                                         value=self._categorical_data)
 
         self.assertIsNone(rl_value.categories)
         self.assertIsNone(rl_value.normalized)
 
-        rl_value = rldata.RangedData(name='categorical',
+        rl_value = reildata.RangedData(name='categorical',
                                         categorical = True,
                                         value=self._categorical_data,
                                         categories=list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
@@ -96,7 +96,7 @@ class testRLData(unittest.TestCase):
 
     def test_modify_rangeddata(self):
         # categorical = False
-        rl_value = rldata.RangedData(name='numerical',
+        rl_value = reildata.RangedData(name='numerical',
                                         categorical = False,
                                         value=self._numerical_data.copy())
 
@@ -117,7 +117,7 @@ class testRLData(unittest.TestCase):
            rl_value.upper = 'x'
 
         # categorical = True
-        rl_value = rldata.RangedData(name='numerical',
+        rl_value = reildata.RangedData(name='numerical',
                                         categorical = True,
                                         value=self._categorical_data.copy())
 
@@ -135,7 +135,7 @@ class testRLData(unittest.TestCase):
            rl_value.categories = 'x'
 
     def test_categorical_normalizer(self):
-        rl_value = rldata.RangedData(name='categorical',
+        rl_value = reildata.RangedData(name='categorical',
                                         categorical = True,
                                         value='A',
                                         categories=list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
@@ -148,7 +148,7 @@ class testRLData(unittest.TestCase):
         rl_value.value = ['A', 'Z']
         self.assertEqual(rl_value.normalized, [1] + [0]*25 + [0]*25 + [1])
 
-        rl_value = rldata.RangedData(name='categorical_tuple',
+        rl_value = reildata.RangedData(name='categorical_tuple',
                                         categorical = True,
                                         value=('A', 'A'),
                                         categories=list((x, y) for x in 'ABCD' for y in 'ABCD'))
@@ -163,7 +163,7 @@ class testRLData(unittest.TestCase):
 
     def test_indexing_rangeddata(self):
         # categorical = False
-        rl_value = rldata.RangedData(name='numerical',
+        rl_value = reildata.RangedData(name='numerical',
                                         categorical = False,
                                         value=self._numerical_data,
                                         lower=min(self._numerical_data),
@@ -177,7 +177,7 @@ class testRLData(unittest.TestCase):
         self.assertEqual(rl_value.value[0], self._numerical_data[0])
 
         # categorical = True
-        rl_value = rldata.RangedData(name='categorical',
+        rl_value = reildata.RangedData(name='categorical',
                                         categorical = True,
                                         value=self._categorical_data,
                                         categories=list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
@@ -185,7 +185,7 @@ class testRLData(unittest.TestCase):
         rl_value.value[0] = 'Z'
 
         self.assertEqual(rl_value.value[0], 'Z')
-        # rl_value = RLData.RangedData(name='categorical',
+        # rl_value = ReilData.RangedData(name='categorical',
         #                                 categorical = True,
         #                                 value=self._categorical_data)
 

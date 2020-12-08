@@ -99,16 +99,4 @@ ENV/
 
 # mypy
 .mypy_cache/
-
-# PKPD model
-.pkpd
-warfarin_pkpd_model.py
-
-# TF logs
-/logs
-/log
-/Saved Models
-
-# pickle files
-*.pkl
-outputs/.pkl
+.vscode/launch.json
