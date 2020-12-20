@@ -7,9 +7,12 @@ Welcome to ReiL - A Reinforcement Learning Package's documentation!
 ===================================================================
 
 .. toctree::
-   :maxdepth: 6
-   :caption: Contents:
+   :caption: Contents
+   :maxdepth: 2
 
+    _source/modules
+    _source/reil.agents
+    _source/reil.datatypes
 
 
 Indices and tables
