@@ -4,8 +4,8 @@ reil.subjects.healthcare.mathematical\_models package
 .. automodule:: reil.subjects.healthcare.mathematical_models
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Submodules
 ----------

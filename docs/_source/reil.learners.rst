@@ -4,8 +4,8 @@ reil.learners package
 .. automodule:: reil.learners
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Submodules
 ----------

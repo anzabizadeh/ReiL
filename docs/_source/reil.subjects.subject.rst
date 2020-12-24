@@ -1,8 +1,5 @@
-reil.subjects.subject module
-============================
-
 .. automodule:: reil.subjects.subject
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

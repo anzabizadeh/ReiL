@@ -4,8 +4,8 @@ reil package
 .. automodule:: reil
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Subpackages
 -----------

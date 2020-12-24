@@ -34,15 +34,15 @@ extensions = [
 ]
 
 autodoc_typehints = 'description'
-
-autodoc_default_flags = [
-    'members',
-    'undoc-members',
-    'private-members',
-    'special-members',
-    'inherited-members',
-    'show-inheritance'
-]
+autodoc_member_order = 'bysource'
+# autodoc_default_flags = [
+#     'members',
+#     'undoc-members',
+#     'private-members',
+#     'special-members',
+#     'inherited-members',
+#     'show-inheritance'
+# ]
 
 autodoc_type_aliases = {
     'reil.datatypes.reildata.ReilData': 'ReilData'
@@ -52,7 +52,7 @@ autoclass_content = 'both'
 
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+# templates_path = ['_templates']
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -66,7 +66,19 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # a list of builtin themes.
 #
 html_theme = 'sphinx_rtd_theme'  # 'alabaster'
-
+html_theme_options = {
+    'display_version': True,
+    'prev_next_buttons_location': 'bottom',
+    'style_external_links': True,
+    'vcs_pageview_mode': '',
+    # Toc options
+    'collapse_navigation': True,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'includehidden': True,
+    'titles_only': False,
+    'gitlab_url': 'https://research-git.uiowa.edu/sanzabizadeh/Reinforcement-Learning'
+}
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".

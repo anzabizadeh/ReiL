@@ -1,8 +1,5 @@
-reil.legacy.legacyrldata module
-===============================
-
 .. automodule:: reil.legacy.legacyrldata
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

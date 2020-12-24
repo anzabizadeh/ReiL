@@ -1,8 +1,5 @@
-reil.legacy.risk module
-=======================
-
 .. automodule:: reil.legacy.risk
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

@@ -1,8 +1,5 @@
-reil.utils.mnkboard module
-==========================
-
 .. automodule:: reil.utils.mnkboard
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

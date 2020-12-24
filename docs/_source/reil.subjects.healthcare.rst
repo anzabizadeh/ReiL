@@ -4,8 +4,8 @@ reil.subjects.healthcare package
 .. automodule:: reil.subjects.healthcare
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Subpackages
 -----------

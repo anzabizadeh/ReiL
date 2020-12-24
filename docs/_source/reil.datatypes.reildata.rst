@@ -1,8 +1,5 @@
-reil.datatypes.reildata module
-==============================
-
 .. automodule:: reil.datatypes.reildata
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

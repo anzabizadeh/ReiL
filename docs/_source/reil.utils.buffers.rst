@@ -4,8 +4,8 @@ reil.utils.buffers package
 .. automodule:: reil.utils.buffers
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Submodules
 ----------

@@ -1,8 +1,5 @@
-reil.environments.experiment module
-===================================
-
 .. automodule:: reil.environments.experiment
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

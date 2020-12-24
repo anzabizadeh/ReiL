@@ -4,8 +4,8 @@ reil.datatypes package
 .. automodule:: reil.datatypes
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Submodules
 ----------

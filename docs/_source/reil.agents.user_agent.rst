@@ -1,8 +1,5 @@
-reil.agents.user\_agent module
-==============================
-
 .. automodule:: reil.agents.user_agent
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

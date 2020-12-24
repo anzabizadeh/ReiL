@@ -1,8 +1,5 @@
-reil.stats.rl\_functions module
-===============================
-
-.. automodule:: reil.stats.rl_functions
+.. automodule:: reil.stats.reil_functions
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

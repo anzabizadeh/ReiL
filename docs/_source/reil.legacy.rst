@@ -4,8 +4,8 @@ reil.legacy package
 .. automodule:: reil.legacy
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Submodules
 ----------
@@ -16,4 +16,3 @@ Submodules
    reil.legacy.legacyrldata
    reil.legacy.risk
    reil.legacy.snake
-   reil.legacy.warfarin_pkpd_model

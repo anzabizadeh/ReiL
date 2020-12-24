@@ -4,8 +4,8 @@ reil.subjects package
 .. automodule:: reil.subjects
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Subpackages
 -----------

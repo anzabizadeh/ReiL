@@ -4,8 +4,8 @@ reil.agents package
 .. automodule:: reil.agents
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Submodules
 ----------

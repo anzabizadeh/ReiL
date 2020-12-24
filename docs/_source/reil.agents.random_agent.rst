@@ -1,8 +1,5 @@
-reil.agents.random\_agent module
-================================
-
 .. automodule:: reil.agents.random_agent
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

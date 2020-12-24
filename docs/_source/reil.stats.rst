@@ -4,8 +4,8 @@ reil.stats package
 .. automodule:: reil.stats
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
 
 Subpackages
 -----------
@@ -21,5 +21,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   reil.stats.rl_functions
+   reil.stats.reil_functions
    reil.stats.stats

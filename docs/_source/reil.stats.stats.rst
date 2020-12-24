@@ -1,8 +1,5 @@
-reil.stats.stats module
-=======================
-
 .. automodule:: reil.stats.stats
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:

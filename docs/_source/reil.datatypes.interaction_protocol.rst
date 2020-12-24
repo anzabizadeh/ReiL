@@ -1,8 +1,5 @@
-reil.datatypes.interaction\_protocol module
-===========================================
-
 .. automodule:: reil.datatypes.interaction_protocol
    :members:
    :undoc-members:
+   :inherited-members:
    :show-inheritance:
-   :private-members:
