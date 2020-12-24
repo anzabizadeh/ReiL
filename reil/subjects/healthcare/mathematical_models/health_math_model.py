@@ -1,11 +1,41 @@
-from typing import Any, Dict
+# -*- coding: utf-8 -*-
+'''
+HealthMathModel class
+=====================
 
-from reil.datatypes import Feature
+The base class of all mathematical models, e.g. ODE, PDE, PK/PD, etc. in
+healthcare.
+'''
+from typing import Any, Dict
 
 
 class HealthMathModel:
-    def setup(self, **arguments):
+    '''
+    The base class of all mathematical models in healthcare.
+    '''
+    def setup(self, **arguments: Any) -> None:
+        '''
+        Set up the model.
+
+        Arguments
+        ---------
+        arguments:
+            Any parameter that the model needs to setup initially.
+        '''
         raise NotImplementedError
 
-    def run(self, **inputs) -> Dict[str, Any]:
+    def run(self, **inputs: Any) -> Dict[str, Any]:
+        '''
+        Run the model.
+
+        Arguments
+        ---------
+        inputs:
+            Any input arguments that the model needs for the run.
+
+        Returns
+        -------
+        :
+            A dictionary of model's return values.
+        '''
         raise NotImplementedError

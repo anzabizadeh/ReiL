@@ -7,11 +7,12 @@ This module provides mathematical models, e.g. PK/PDs, cancer PDEs, etc.
 
 Classes
 -------
-    HealthMathModel: the base class for healthcare math models.
-    HambergPKPD: Hamberg's warfarin PK/PD model.
+HealthMathModel:
+    The base class for healthcare math models.
 
-
+HambergPKPD:
+    Hamberg's warfarin PK/PD model.
 '''
 
-from .health_math_model import HealthMathModel
-from .hamberg_pkpd import HambergPKPD
+from .health_math_model import HealthMathModel  # noqa: W0611
+from .hamberg_pkpd import HambergPKPD  # noqa: W0611

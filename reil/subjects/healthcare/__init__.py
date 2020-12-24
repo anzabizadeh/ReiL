@@ -8,22 +8,31 @@ context.
 
 Classes
 -------
-    Patient: the base class of all healthcare subject classes
-    WarfarinPatientRavvaz: a warfarin patient model with features and parameters
-        of Ravvaz et al. 2016.
+Patient:
+    The base class of all healthcare subject classes
 
-    CancerModel: a 4-ordinary differential equation model of cancer (uses legacy ValueSet instead of ReilData)
-    ConstrainedCancerModel: a constrained version of CancerModel (uses legacy ValueSet instead of ReilData)
-    Warfarin: a PK/PD model for warfarin with extended state definition
+WarfarinPatientRavvaz:
+    A warfarin patient model with features and parameters of
+    Ravvaz et al. 2016.
 
+CancerModel:
+    A 4-ordinary differential equation model of cancer.
+    (uses legacy ValueSet instead of ReilData)
 
+ConstrainedCancerModel:
+    A constrained version of CancerModel.
+    (uses legacy ValueSet instead of ReilData)
+
+Warfarin:
+    A `Subject` for warfarin that uses `WarfarinPatientRavvaz` and
+    `healthcare.hamberg_pkpd`.
 '''
 
 # TODO: update CancerModel
 # TODO: update ConstrainedCancerModel
 
-from .patient import Patient
-from .warfarin_patient_ravvaz import WarfarinPatientRavvaz
-# from .cancer_model import CancerModel
-# from .constrained_cancer_model import ConstrainedCancerModel
-from .warfarin import Warfarin
+from .patient import Patient  # noqa: W0611
+from .warfarin_patient_ravvaz import WarfarinPatientRavvaz  # noqa: W0611
+# from .cancer_model import CancerModel  # noqa: W0611
+# from .constrained_cancer_model import ConstrainedCancerModel  # noqa: W0611
+from .warfarin import Warfarin  # noqa: W0611

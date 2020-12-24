@@ -213,7 +213,7 @@ class Patient(stateful.Stateful):
             base_term = self._total_Cs[0:int(max(days)*self._dose_interval)+1]
 
         Cs_gamma = np.power(
-            base_term, self._gamma)  # pylint: disable=assignment-from-no-return
+            base_term, self._gamma)
 
         start_days = sorted(
             [0 if days[0] < self._last_computed_day else self._last_computed_day] + days[:-1])

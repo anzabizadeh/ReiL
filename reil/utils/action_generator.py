@@ -5,12 +5,11 @@ ActionGenerator class
 
 Gets lists of categorical or numerical lists as components, and generates lists
 of `ReilData` objects using the product of these components.
-
-
 '''
 import dataclasses
 import itertools
-from typing import Any, Dict, Generic, Iterator, Optional, Tuple, TypeVar, Union
+from typing import (Any, Dict, Generic, Iterator, Optional, Tuple, TypeVar,
+                    Union)
 
 from reil.datatypes import ReilData
 from reil.reilbase import ReilBase
@@ -20,7 +19,7 @@ Numerical = TypeVar('Numerical', int, float)
 
 
 @dataclasses.dataclass(frozen=True)
-class CategoricalComponent(Generic[Categorical]):  # pylint: disable=unsubscriptable-object
+class CategoricalComponent(Generic[Categorical]):
     name: str
     possible_values: Tuple[Tuple[Categorical, ...], ...]
     categories: Tuple[Categorical, ...]
@@ -40,7 +39,7 @@ class CategoricalComponent(Generic[Categorical]):  # pylint: disable=unsubscript
 
 
 @dataclasses.dataclass(frozen=True)
-class NumericalComponent(Generic[Numerical]):  # pylint: disable=unsubscriptable-object
+class NumericalComponent(Generic[Numerical]):
     name: str
     possible_values: Tuple[Tuple[Numerical, ...], ...]
     lower: Numerical
@@ -61,15 +60,18 @@ class NumericalComponent(Generic[Numerical]):  # pylint: disable=unsubscriptable
             for vi in self.possible_values[_index])
 
 
-class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: disable=unsubscriptable-object
+class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
     '''
     Gets lists of categorical or numerical lists as components, and generates
     lists of `ReilData` objects using the product of these components.
     '''
 
-    def __init__(self,
-                 components: Optional[Dict[str, Union[CategoricalComponent, NumericalComponent]]] = None,
-                 **kwargs: Any) -> None:
+    def __init__(
+            self,
+            components: Optional[
+                Dict[str,
+                     Union[CategoricalComponent, NumericalComponent]]] = None,
+            **kwargs: Any) -> None:
         '''
         Initializes the `ActionGenerator` instance.
         '''
@@ -78,8 +80,8 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
         if components is not None:
             self._components = components
         else:
-            self._components: Dict[str,
-                                   Union[CategoricalComponent, NumericalComponent]] = {}
+            self._components: Dict[
+                str, Union[CategoricalComponent, NumericalComponent]] = {}
         self._max_index: int = 0
         self.reset()
 
@@ -88,20 +90,26 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
                         possible_values: Tuple[Tuple[Categorical, ...], ...],
                         categories: Tuple[Categorical, ...]) -> None:
         '''
-        Adds a categorical component.
+        Add a categorical component.
 
         Arguments
------------
-        component_name: name of the component.
+        ---------
+        component_name:
+            Name of the component.
 
-        possible_values: a list of lists of categorical values.
+        possible_values:
+            A list of lists of categorical values.
 
-        categories: a list of all possible categories.
+        categories:
+            A list of all possible categories.
 
-        Raises `KeyError` if `component_name` is duplicate.
+        Raises
+        ------
+        KeyError
+            `component_name` is duplicate.
 
-        Example:
------------
+        Example
+        -------
         >>> AG = ActionGenerator()
         >>> AG.add_categorical(
         ...     component_name='compass_directions',
@@ -111,11 +119,12 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
         if component_name in self._components:
             raise KeyError(f'Key {component_name} already exists.')
 
-        self._components[component_name] = CategoricalComponent(component_name,
-                                                                possible_values, categories)
+        self._components[component_name] = CategoricalComponent(
+            component_name, possible_values, categories)
 
-        self._max_index = max(self._max_index,
-                              len(self._components[component_name].possible_values))
+        self._max_index = max(
+            self._max_index,
+            len(self._components[component_name].possible_values))
 
     def add_numerical(self,
                       component_name: str,
@@ -123,22 +132,29 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
                       lower: Numerical,
                       upper: Numerical) -> None:
         '''
-        Adds a numerical component.
+        Add a numerical component.
 
         Arguments
------------
-        component_name: name of the component.
+        ---------
+        component_name:
+            Name of the component.
 
-        possible_values: a list of lists of numerical values.
+        possible_values:
+            A list of lists of numerical values.
 
-        lower: minimum value possible.
+        lower:
+            The minimum value possible.
 
-        upper: maximum value possible.
+        upper:
+            The maximum value possible.
 
-        Raises `KeyError` if `component_name` is duplicate.
+        Raises
+        ------
+        KeyError:
+            `component_name` is duplicate.
 
-        Example:
------------
+        Example
+        -------
         >>> AG = ActionGenerator()
         >>> AG.add_numerical(component_name='odds',
         ...     possible_values=((1,), (1, 3)),
@@ -150,28 +166,31 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):  # pylint: dis
         self._components[component_name] = NumericalComponent(
             component_name, possible_values, lower, upper)
 
-        self._max_index = max(self._max_index,
-                              len(self._components[component_name].possible_values))
+        self._max_index = max(
+            self._max_index,
+            len(self._components[component_name].possible_values))
 
-    def possible_actions(self,
-                         state: Optional[ReilData] = None) -> Tuple[ReilData, ...]:
+    def possible_actions(
+            self,
+            state: Optional[ReilData] = None) -> Tuple[ReilData, ...]:
         '''
-        Generates and returns a list of possible actions.
+        Generate and return a list of possible actions.
 
         In this implementation, an `index` keeps track of where on the list it
-        is on each component, and each call of this method generates the product
-        of component values and returns the result as a list of `ReilData`. The
-        `index` is incremented by 1 unit. The last lits of a component is used
-        if it is exhausted.
+        is on each component, and each call of this method generates the
+        product of component values and returns the result as a list of
+        `ReilData`. The `index` is incremented by 1 unit. The last list of a
+        component is used if it is exhausted.
 
         Arguments
------------
-        state: an optional argument that provides the generator with the current
-        state of a subject. Subclasses of `ActionGenerator` can use this argument
-        to generate tailored actions.
+        ---------
+        state:
+            An optional argument that provides the generator with the current
+            state of a subject. Subclasses of `ActionGenerator` can use this
+            argument to generate tailored actions.
 
         Example
------------
+        -------
         >>> AG = ActionGenerator()
         >>> AG.add_categorical(
         ...     component_name='compass_directions',

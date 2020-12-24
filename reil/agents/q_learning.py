@@ -8,13 +8,13 @@ A Q-learning `agent`.
 
 '''
 
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import Any, Optional, Tuple, Union, cast
 
-import numpy as np  # type: ignore
+import numpy as np
 from reil import agents, stateful
-from reil.datatypes.reildata import ReilData
-from reil.learners.learner import Learner
-from reil.utils.buffers import Buffer
+from reil.datatypes import ReilData
+from reil.datatypes.buffers import Buffer
+from reil.learners import Learner
 from reil.utils.exploration_strategies import ExplorationStrategy
 
 
@@ -22,6 +22,7 @@ class QLearning(agents.Agent):
     '''
     A Q-learning `agent`.
     '''
+
     def __init__(self,
                  learner: Learner[float],
                  buffer: Buffer,
@@ -36,8 +37,8 @@ class QLearning(agents.Agent):
 
         exploration_strategy:
             an `ExplorationStrategy` object that determines
-            whether the `action` should be exploratory or not for a given `state`
-            at a given `epoch`.
+            whether the `action` should be exploratory or not for a given
+            `state` at a given `epoch`.
 
         discount_factor:
             by what factor should future rewards be discounted?
@@ -59,8 +60,8 @@ class QLearning(agents.Agent):
         self._method = method.lower()
         if self._method not in ('backward', 'forward'):
             self._logger.warning(
-                f'method {method} is not acceptable. '
-                'Should be either "forward" or "backward". Will use "backward".')
+                f'method {method} is not acceptable. Should be '
+                'either "forward" or "backward". Will use "backward".')
             self._method = 'backward'
 
         self._buffer = buffer
@@ -68,19 +69,28 @@ class QLearning(agents.Agent):
 
     def _q(self,
            state: Union[Tuple[ReilData, ...], ReilData],
-           action: Optional[Union[Tuple[ReilData, ...], ReilData]] = None) -> Tuple[float, ...]:
+           action: Optional[Union[Tuple[ReilData, ...], ReilData]] = None
+           ) -> Tuple[float, ...]:
         '''
-        Returns the Q-value of `state` `action` pairs.
+        Return the Q-value of `state` `action` pairs.
 
         Arguments
------------
-        state: one state or a list of states for which Q-value is returned.
-        action: one action or a list of actions for which Q-value is returned. 
-        If not supplied, `default_actions` will be used.
+        ---------
+        state:
+            One state or a list of states for which Q-value is returned.
 
-        Note: if one of state or action is one item, it will be broadcasted to
+        action:
+            One action or a list of actions for which Q-value is returned.
+            If not supplied, `default_actions` will be used.
+
+        Notes
+        -----
+        If one of state or action is one item, it will be broadcasted to
         match the size of the other one. If both are lists, the should match in
         size.
+
+
+        :meta public:
         '''
         state_list = [state] if isinstance(state, ReilData) else state
         len_state = len(state_list)
@@ -110,11 +120,15 @@ class QLearning(agents.Agent):
 
     def _max_q(self, state: Union[Tuple[ReilData, ...], ReilData]) -> float:
         '''
-        Returns `max(Q)` of one state or a list of states.
+        Return `max(Q)` of one state or a list of states.
 
         Arguments
------------
-        state: one state or a list of states for which MAX(Q) is returned.
+        ---------
+        state:
+            One state or a list of states for which MAX(Q) is returned.
+
+
+        :meta public:
         '''
         try:
             q_values = self._q(state)
@@ -125,15 +139,23 @@ class QLearning(agents.Agent):
         return max_q
 
     def _prepare_training(self,
-        history: stateful.History) -> agents.TrainingData:
+                          history: stateful.History) -> agents.TrainingData:
         '''
-        Prepares training set based on history.
+        Use `history` to create the training set in the form of `X` and `y`
+        vectors.
 
         Arguments
------------
-        history: a `History` consisting of state, action, reward of one sample path.
+        ---------
+        history:
+            a `History` object from which the `agent` learns.
 
-        Note: Learning actually occurs every batch_size iterations.
+        Returns
+        -------
+        :
+            a `TrainingData` object that contains `X` and 'y` vectors
+
+
+        :meta public:
         '''
         if self._method == 'forward':
             for i in range(len(history)-1):
@@ -159,22 +181,30 @@ class QLearning(agents.Agent):
 
                 self._buffer.add(
                     {'X': state + action, 'Y': q_list[i]})
- 
+
         temp = self._buffer.pick()
 
         return temp['X'], temp['Y']
 
     def best_actions(self,
                      state: ReilData,
-                     actions: Optional[Tuple[ReilData, ...]] = None) -> Tuple[ReilData, ...]:
+                     actions: Optional[Tuple[ReilData, ...]] = None
+                     ) -> Tuple[ReilData, ...]:
         '''
-        Returns a tuple of best `action`s based on the given `state`.
+        Find the best `action`s for the given `state`.
 
         Arguments
------------
-        state: the state for which the action should be returned.
+        ---------
+        state:
+            The state for which the action should be returned.
 
-        actions: the set of possible actions to choose from.
+        actions:
+            The set of possible actions to choose from.
+
+        Returns
+        -------
+        :
+            A list of best actions.
         '''
         # None is used to avoid redundant normalization of default_actions
         q_values = self._q(state, None if actions ==

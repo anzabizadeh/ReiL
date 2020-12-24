@@ -4,23 +4,17 @@ environments module for reinforcement learning
 ==============================================
 
 This module contains classes that provides tools to load/save objects and
-environments, add/remove agents/subjects, assign agents to subjects and run models.
+environments, add/remove `agents`/`subjects`, assign `agents` to `subjects` and
+run models.
 
 Classes
 -------
-EnvironmentStaticMap: an environment with static interaction map.
+Environment:
+    The base class of all environment classes.
 
-Environment: (disabled) the base class that provides minimum required
-functionality for a reinforcement learning environment.
-
-Experiment: (disabled) an environment to explore performance of trained
-agents on subjects.
-
-
+EnvironmentStaticMap:
+    An environment with static interaction map.
 '''
 
-# TODO: see if Experiment is still useful.
-
-from .environment_static_map import EnvironmentStaticMap
-# from .environment import Environment
-# from .experiment import Experiment
+from .environment import Environment  # noqa: W0611
+from .environment_static_map import EnvironmentStaticMap  # noqa: W0611

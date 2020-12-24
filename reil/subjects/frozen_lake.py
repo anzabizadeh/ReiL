@@ -1,32 +1,19 @@
 # -*- coding: utf-8 -*-
 '''
-WindyGridworld class
-==============
+FrozenLake class
+=================
 
 This class creates a frozen lake (board) in which one square is the goal.
-The agent starts from a location and should find the fastest route to the goal.
-Some locations are holes.
-
-
+The `agent` starts from a location and should find the fastest route to
+the goal. Some locations are holes.
 '''
 
-
 from random import choice
+from typing import Any, Dict, List, Optional, Tuple
 
-from ..utils.mnkboard import MNKBoard
-from ..subjects.subject import Subject
-from ..legacy.valueset import ValueSet
-
-
-def main():
-    board = FrozenLake()
-    _ = board.register('P1')
-    for _ in range(10):
-        print(board.state)
-        my_action = choice(board.possible_actions)
-        board.take_effect(my_action, 1)
-        print(my_action.value)
-        print(f'{board}')
+from reil.utils.mnkboard import MNKBoard
+from reil.subjects.subject import Subject
+from reil.datatypes import ReilData
 
 
 class FrozenLake(MNKBoard, Subject):
@@ -49,57 +36,56 @@ class FrozenLake(MNKBoard, Subject):
         take_effect: moves the player on the grid.
         reset: clears the grid.
     '''
-    def __init__(self, **kwargs):
+    def __init__(self, map: Optional[List[List[str]]] = None, **kwargs: Any):
         '''
-        Initialize an instance of windy gridworld.
-
         Arguments
         ---------
-            map: the map to be used
-            dim: dimensions of the grid as a tuple. (default=(4, 4))
-            start: (row, column) of the starting square. (default=(0, 0))
-            goal: (row, column) of the goal square. (default=(4, 4))
-            state_type: board (zero one list), tuple ()
+        map:
+            the map to be used
         '''
 
-        map = [['S', 'F', 'F', 'F'],
-               ['F', 'H', 'F', 'H'],
-               ['F', 'F', 'F', 'H'],
-               ['H', 'F', 'F', 'G']]
+        default_map = [['S', 'F', 'F', 'F'],
+                       ['F', 'H', 'F', 'H'],
+                       ['F', 'F', 'F', 'H'],
+                       ['H', 'F', 'F', 'G']]
 
-        self._map = map
-        self._start = (0, 0)
-        self._goal = (4, 4)
+        def locate(map: List[List[Any]], element: Any) -> Tuple[int, int]:
+            row = [element in m_i
+                   for m_i in map].index(True)
+            col = map[row].index(element)
+            return (row, col)
 
-        self.set_params(**kwargs)
-        self._dim = (len(map), len(map[0]))
-        super().__init__(**kwargs)
+        self._map = map if map is not None else default_map
 
-        moves = ['U', 'D', 'R', 'L']
-        self._default_moves = ValueSet(moves, binary=lambda x:(moves.index(x), len(moves))).as_valueset_array()
+        self._dim = (len(self._map), len(self._map[0]))
+        self._start = locate(self._map, 'S')
+        self._goal = locate(self._map, 'G')
 
-        super().__init__(m=self._dim[0], n=self._dim[1], players=1)
+        moves = ('U', 'D', 'R', 'L')
+        self._default_moves = tuple(
+            ReilData.single_categorical(
+                name='move', value=m, categories=moves)
+            for m in moves)
+
+        MNKBoard.__init__(self, m=self._dim[0], n=self._dim[1], players=1)
+        Subject.__init__(**kwargs)
         self.reset()
 
-    @property
-    def is_terminated(self):
+    def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''Return True if the player get to the goal.'''
-        return [*self._player_location] == [*self._goal]
+        return self._player_location == self._goal
 
-    @property
-    def state(self):
-        '''Return the state of the board as a ValueSet.'''
-        return ValueSet(self._player_location, binary=lambda x: (x[0]*self._dim[1] + x[1], len(self._board)))
-
-    @property
-    def possible_actions(self):
+    def possible_actions(self, _id: int = 0) -> Tuple[ReilData, ...]:
         '''Return the set of possible moves.'''
         return self._default_moves
+
+    def default_reward(self, _id: int = 0) -> ReilData:
+        return ReilData.single_base(name='reward', value=(float(self._player_location == self._goal) - 0.5) * 2)
 
     def register(self, player_name):
         '''
         Register an agent and return its ID.
-        
+
         If the agent is new, a new ID is generated and the agent_name is added to agent_list.
         Arguments
         ---------
@@ -111,7 +97,7 @@ class FrozenLake(MNKBoard, Subject):
             return Subject.register(self, player_name)
         raise ValueError('Windy Gridworld only accepts one player.')
 
-    def take_effect(self, action, _id=None):
+    def take_effect(self, action: ReilData, _id: int = 0) -> None:
         '''
         Move according to the action.
 
@@ -120,34 +106,53 @@ class FrozenLake(MNKBoard, Subject):
             _id: ID of the player.
             action: the location in which the piece is set. Can be either in index format or row column format.
         '''
-        row, column = [*self._player_location]
-        max_row, max_column = self._dim[0]-1, self._dim[1]-1
+        row, column = self._player_location
+        max_row = self._dim[0] - 1
+        max_column = self._dim[1] - 1
         MNKBoard.clear_square(self, row=row, column=column)
 
         a = str(*action.value)
-        if a in ['U', 'UR', 'UL']:
-            self._player_location[0] = row - 1  # min(max(row-1+self._v_wind[column], 0), max_row)
-        if a in ['D', 'DR', 'DL']:
-            self._player_location[0] = row + 1  # max(min(row+1+self._v_wind[column], max_row), 0)
-        if a in ['L', 'UL', 'DL']:
-            self._player_location[1] = column - 1  # min(max(column-1+self._h_wind[row], 0), max_column)
-        if a in ['R', 'UR', 'DR']:
-            self._player_location[1] = column + 1  # max(min(column+1+self._h_wind[row], max_column), 0)
+        temp = (
+            row - (a == ['U', 'UR', 'UL']) + (a in ['D', 'DR', 'DL']),
+            column - (a in ['L', 'UL', 'DL']) + (a in ['R', 'UR', 'DR'])
+        )
 
-        self._player_location[0] = min(max(self._player_location[0]+self._v_wind[column], 0), max_row)
-        self._player_location[1] = min(max(self._player_location[1]+self._h_wind[row], 0), max_column)
+        self._player_location = (
+            min(max(temp[0], 0), max_row),
+            min(max(temp[1], 0), max_column)
+        )
 
-        MNKBoard.set_piece(self, player=1, row=self._player_location[0], column=self._player_location[1])
-        if self.is_terminated:
-            return 1
-        return -1
+        if self._map[self._player_location[0]][self._player_location[1]] == 'H':
+            self._player_location = self._start
+
+        MNKBoard.set_piece(self, player=1,
+                           row=self._player_location[0],
+                           column=self._player_location[1])
 
     def reset(self):
         '''Clear the board and update board_status.'''
         MNKBoard.reset(self)
-        self._player_location = [*self._start]
-        MNKBoard.set_piece(self, player=1, row=self._player_location[0], column=self._player_location[1])
+        self._player_location = self._start
+        MNKBoard.set_piece(self, player=1,
+                           row=self._player_location[0],
+                           column=self._player_location[1])
 
+    def _generate_state_components(self) -> None:
+        def full_map(**kwargs: Any) -> Dict[str, Any]:
+            return {'name': 'full_map',
+                    'value': self._map,
+                    'categories': ('S', 'F', 'H', 'G')}
+
+        self._available_state_components = {
+            'full_map': full_map,
+        }
 
 if __name__ == '__main__':
-    main()
+    board = FrozenLake()
+    _ = board.register('P1')
+    for _ in range(10):
+        print(board.state)
+        my_action = choice(board.possible_actions)
+        board.take_effect(my_action, 1)
+        print(my_action.value)
+        print(f'{board}')

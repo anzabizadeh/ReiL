@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 '''
-HambergPKPD class
-=================
+DePillisChemo class
+==================
 
-A PK/PD model proposed by Hamberg et al. (2007).
-DOI: 10.1038/sj.clpt.6100084
+A four-state nonlinear cancer chemotherapy model proposed by
+De Pillis et al. (2003).
+
+De Pillis, L. G., & Radunskaya, A. (2003). The dynamics of an optimally
+controlled tumor model: A case study. Mathematical and computer modelling,
+37(11), 1221-1244.
 '''
 import math
 from collections import namedtuple
@@ -17,12 +21,12 @@ from reil.subjects.healthcare.mathematical_models import HealthMathModel
 DoseEffect = namedtuple('DoseEffect', ['dose', 'Cs'])
 
 
-class HambergPKPD(HealthMathModel):
+class DePillisChemo(HealthMathModel):
     '''
-    Hamberg PK/PD model for warfarin.
+    De Pillis et al. (2003) cancer chemo model.
     '''
     def __init__(self, randomized: bool = True, cache_size: int = 30) -> None:
-        """
+        '''
         Arguments
         ---------
         randomized:
@@ -31,7 +35,7 @@ class HambergPKPD(HealthMathModel):
         cache_size:
             Size of the cache used to store pre-computed values needed for
             INR computation.
-        """
+        '''
         self._randomized = randomized
         self._d2h = 24
 

@@ -1,218 +1,557 @@
+# -*- coding: utf-8 -*-
+'''
+ReilData class
+==============
+
+The main datatype used to communicate `state`s, `action`s, and `reward`s,
+between objects in `reil`. `ReilData` is basically a tuple that contains
+instances of `BaseData`, `CategoricalData`, and `NumericalData`.
+'''
 from __future__ import annotations
 
 import dataclasses
 import itertools
-import warnings
 from dataclasses import field
-from numbers import Number
-from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, Iterator,
-                    List, Mapping, Optional, Sequence, Tuple, TypeVar, Union,
-                    cast, overload)
+from typing import (Any, Callable, Dict, Generic, Iterable, Iterator, List,
+                    Mapping, Optional, Sequence, Tuple, TypeVar, Union, cast,
+                    overload)
+
+from typing_extensions import Literal
 
 T = TypeVar('T')
-T_or_SeqT = Union[T, Sequence[T]]
-N = TypeVar('N', int, float)
-Normalized = Union[N, Tuple[N, ...], None]
+
+Categorical = TypeVar('Categorical')
+Numerical = TypeVar('Numerical', int, float)
+
+Normal = Union[Literal[0], Literal[1], float]
+Normalized = Union[Normal, Sequence[Normal], None]
 Normalizer = Callable[..., Normalized]
 
+
 @dataclasses.dataclass(frozen=True)
-class BoundedData(Generic[T]):  # pylint: disable=unsubscriptable-object
+class BaseData(Generic[T]):
+    '''
+    The base class for `ReilData` elements.
+
+    Attributes
+    ----------
+    name:
+        Name of the data.
+
+    value:
+        Value of the data. Can be one item or a sequence.
+
+    normalizer:
+        A function that gets a `BaseData` object and returns its normalized
+        form.
+
+    lazy_evaluation:
+        Whether normalization should be done at the point of instantiation
+        (False) or at the access time (True).
+
+
+    :meta private:
+    '''
     name: str
-    value: Optional[T_or_SeqT] = None
-    normalizer: Optional[Normalizer] = None
+    value: Optional[Union[T, Sequence[T]]] = None
+    normalizer: Optional[Normalizer] = lambda _: None
     lazy_evaluation: Optional[bool] = field(default=None, compare=False)
-    categories: Optional[Tuple[T, ...]] = None
-    lower: Optional[T] = None
-    upper: Optional[T] = None
-    is_numerical: Optional[bool] = field(default=None, init=False, repr=False, compare=False)
-    _normalized: Normalized = field(default=None, init=False, repr=False, compare=False)
+    is_numerical: Optional[bool] = field(
+        default=None, init=False, repr=False, compare=False)
+    _normalized: Normalized = field(
+        default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self):
-        if not isinstance(self.value, Hashable):
-            warnings.warn('Non-hashable object!')
-
-        if self.categories is not None:
-            if self.lower is not None or self.upper is not None:
-                raise ValueError('Either categories or lower and upper should be specified.')
-            object.__setattr__(self, 'is_numerical', False)
-            self._categorical_validator(self.value, self.categories)
-            if self.normalizer is None:
-                object.__setattr__(self, 'normalizer', self._default_normalizer_categorical)
-            if not self.lazy_evaluation:
-                object.__setattr__(self, '_normalized',
-                    self.normalizer(  # pylint: disable=not-callable
-                        self.value, self.categories))
-        else:
-            object.__setattr__(self, 'is_numerical', True)
-            self._numerical_validator(self.value, self.lower, self.upper)
-            if self.normalizer is None:
-                object.__setattr__(self, 'normalizer', self._default_normalizer_numerical)
-            if not self.lazy_evaluation:
-                object.__setattr__(self, '_normalized',
-                    self.normalizer(  # pylint: disable=not-callable
-                        self.value, self.lower, self.upper))
+        # if not isinstance(self.value, Hashable):
+        #     warnings.warn('Non-hashable object!')
+        self._validate(self)
+        if self.normalizer is None:
+            object.__setattr__(self, 'normalizer',
+                               self._default_normalizer)
+        if not self.lazy_evaluation:
+            object.__setattr__(self, '_normalized',
+                               self.normalizer(self))
 
     @staticmethod
-    def _default_normalizer_categorical(
-        value: Optional[T_or_SeqT], categories: Optional[Tuple[T, ...]]) -> Normalized:
-        if categories is None:
+    def _validate(data: BaseData[T]) -> None:
+        '''
+        Validate the input data.
+
+        Arguments
+        ---------
+        data:
+            An instance to be validated.
+
+        Raises
+        ------
+        ValueError:
+            if `data.value` does not match the validation criteria.
+
+
+        :meta public:
+        '''
+        pass
+
+    @staticmethod
+    def _default_normalizer(data: BaseData[T]) -> Normalized:
+        '''
+        Normalize the data.
+
+        Arguments
+        ---------
+        data:
+            An instance to be normalized.
+
+        Returns
+        -------
+        :
+            The normalized form of `data.value`.
+        '''
+        return None
+
+    @property
+    def normalized(self) -> Normalized:
+        if self._normalized is None:
+            object.__setattr__(self, '_normalized',
+                               self.normalizer(self))
+
+        return self._normalized
+
+    def as_dict(self) -> Dict[str, Any]:
+        '''
+        Return the data as a dictionary.
+
+        Returns
+        -------
+        :
+            The data as a dictionary.
+        '''
+        return {'name': self.name, 'value': self.value}
+
+
+@dataclasses.dataclass(frozen=True)
+class CategoricalData(BaseData[Categorical]):
+    '''
+    A datatype for categorical data.
+
+    Attributes
+    ----------
+    name:
+        Name of the data.
+
+    value:
+        Value of the data. Can be one item or a sequence.
+
+    normalizer:
+        A function that gets a `BaseData` object and returns its normalized
+        form.
+
+    lazy_evaluation:
+        Whether normalization should be done at the point of instantiation
+        (False) or at the access time (True).
+
+    categories:
+        A list of all categories.
+    '''
+    categories: Optional[Tuple[Categorical, ...]] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        object.__setattr__(self, 'is_numerical', False)
+
+    @staticmethod
+    def _default_normalizer(data: CategoricalData) -> Normalized:
+        value = data.value
+        categories = data.categories
+        if categories is None or value is None:
             return None
 
         if isinstance(value, type(categories[0])):
-            return list(int(x_i == value)
-                        for x_i in categories)
+            return tuple(int(x_i == value)
+                         for x_i in categories)
 
         return tuple(int(x_i == v)
-                    for v in value
-                    for x_i in categories)
+                     for v in value
+                     for x_i in categories)
 
     @staticmethod
-    def _default_normalizer_numerical(
-        value: Optional[T_or_SeqT], lower: Optional[T], upper: Optional[T]) -> Normalized:
-        try:
-            denominator = upper - lower  # type: ignore
-        except TypeError:  # upper or lower are not defined
+    def _validate(data: CategoricalData) -> None:
+        value = data.value
+        if value is not None:
+            is_sequence = isinstance(value, (list, tuple))
+
+            categories = data.categories
+            if categories is not None:
+                if ((not is_sequence and value not in categories) or
+                        (is_sequence and any(v not in categories
+                                             for v in value))):
+                    raise ValueError(
+                        f'value={value} is '
+                        f'in the categories={categories}.')
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {'name': self.name, 'value': self.value,
+                'categories': self.categories,
+                'is_numerical': self.is_numerical}
+
+
+@dataclasses.dataclass(frozen=True)
+class NumericalData(BaseData[Numerical]):
+    '''
+    A datatype for numerical data.
+
+    Attributes
+    ----------
+    name:
+        Name of the data.
+
+    value:
+        Value of the data. Can be one item or a sequence.
+
+    normalizer:
+        A function that gets a `BaseData` object and returns its normalized
+        form.
+
+    lazy_evaluation:
+        Whether normalization should be done at the point of instantiation
+        (False) or at the access time (True).
+
+    lower:
+        The lower bound of value.
+
+    upper:
+        The upper bound of value.
+    '''
+    lower: Optional[Numerical] = None
+    upper: Optional[Numerical] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        object.__setattr__(self, 'is_numerical', True)
+
+    @staticmethod
+    def _default_normalizer(data: NumericalData) -> Normalized:
+        value = data.value
+        lower = data.lower
+        upper = data.upper
+        if value is None or lower is None or upper is None:
             return None
+
+        denominator = upper - lower
 
         sequence_check = isinstance(value, (list, tuple))
         try:
             if sequence_check:
                 return tuple((v - lower) / denominator
-                            for v in value)
+                             for v in value)
             else:
-                return (cast(T, value) - lower) / denominator
+                return (value - lower) / denominator
         except ZeroDivisionError:
-            return [1] * len(cast(Sequence[T], value)) if sequence_check else 1
+            return [1] * len(value) if sequence_check else 1
 
     @staticmethod
-    def _numerical_validator(value: T_or_SeqT, lower: T, upper: T) -> None:
+    def _validate(data: NumericalData) -> None:
+        value = data.value
+        lower = data.lower
+        upper = data.upper
         if value is not None:
             is_sequence = isinstance(value, (list, tuple))
 
             if lower is not None:
                 if ((not is_sequence and value < lower) or
-                        (is_sequence and any(v < lower for v in value))):
+                        (is_sequence and any(v < lower
+                                             for v in value))):
                     raise ValueError(
                         f'value={value} is less than lower={lower}.')
 
             if upper is not None:
                 if ((not is_sequence and value > upper) or
-                        (is_sequence and any(v > upper for v in value))):
+                        (is_sequence and any(v > upper
+                                             for v in value))):
                     raise ValueError(
-                        f'value={value} is greater than upper={upper}.')
-
-    @staticmethod
-    def _categorical_validator(value: T_or_SeqT, categories: Tuple[T, ...]) -> None:
-        if value is not None:
-            is_sequence = isinstance(value, (list, tuple))
-
-            if categories is not None:
-                if ((not is_sequence and value not in categories) or
-                        (is_sequence and any(v not in categories for v in value))):
-                    raise ValueError(
-                        f'value={value} is in the categories={categories}.')
-
-    @property
-    def normalized(self) -> Normalized:
-        if self._normalized is None:
-            if self.is_numerical:
-                object.__setattr__(self, '_normalized',
-                    self.normalizer(self.value, self.lower, self.upper))  # pylint: disable=not-callable
-            else:
-                object.__setattr__(self, '_normalized',
-                    self.normalizer(self.value, self.categories))  # pylint: disable=not-callable
-
-        return self._normalized
+                        f'value={value} is '
+                        f'greater than upper={upper}.')
 
     def as_dict(self) -> Dict[str, Any]:
-        if self.is_numerical:
-            return {'name': self.name, 'value': self.value,
-                    'lower': self.lower, 'upper': self.upper,
-                    'is_numerical': True}
-        else:
-            return {'name': self.name, 'value': self.value,
-                    'categories': self.categories,
-                    'is_numerical': False}
+        return {'name': self.name, 'value': self.value,
+                'lower': self.lower, 'upper': self.upper,
+                'is_numerical': self.is_numerical}
 
 
 ReilDataInput = Union[Mapping[str, Any],
-                      BoundedData[Any]]
+                      BaseData[Any],
+                      CategoricalData[Categorical],
+                      NumericalData[Numerical]]
 
-class ReilData(Sequence[BoundedData[Any]]):
+
+class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
+    '''
+    The main datatype used to communicate `state`s, `action`s, and `reward`s,
+    between objects in `reil`.
+    '''
+
     def __init__(self,
-        data: Union[ReilDataInput, Sequence[ReilDataInput], Iterator[ReilDataInput]],
-        lazy_evaluation: Optional[bool] = None):
+                 data: Union[ReilDataInput,
+                             Sequence[ReilDataInput],
+                             Iterator[ReilDataInput]],
+                 lazy_evaluation: Optional[bool] = None):
         '''
-        Create a ReilData instance.
+        Arguments
+        ---------
+        data:
+            One or a sequence of `BaseData`, `CategoricalData`,
+            `NumericalData`, or dicts that include 'name'. Other attributes are
+            optional. If none of `categories`, `lower` and `upper` are
+            provided, the object is assumed `BaseData`.
 
-        Attributes
------------
-        data: data can be one or a sequence of either BoundedData instances or dicts that include 'name'. Other attributes are optional. If categories are not provided, the object is assumed numerical.
-
-        lazy_evaluation: whether to store normalized values or compute on-demand.
-        If not provided, class looks for 'lazy evaluation' in each object.
-        If fails, True is assumed.
+        lazy_evaluation:
+            Whether to compute normalized value at the time of instantiation or
+            at the time of the first access. If not provided, `ReilData` looks
+            for `lazy_evaluation` in each item. If failed, True is assumed.
         '''
-        temp = []
+        temp: List[Union[BaseData[Any],
+                         CategoricalData[Categorical],
+                         NumericalData[Numerical]]] = []
         _data = data if isinstance(data, (Sequence, Iterator)) else [data]
         for d in _data:
-            if isinstance(d, BoundedData):
+            if isinstance(d, BaseData):
                 temp.append(d)
             elif isinstance(d, dict):
-                temp.append(BoundedData(
-                    name=d['name'],
-                    value=d.get('value'),
-                    **{'categories': d.get('categories'),
-                       'lower': d.get('lower'),
-                       'upper': d.get('upper'),
-                       'normalizer': d.get('normalizer'),
-                       'lazy_evaluation': lazy_evaluation if lazy_evaluation is not None
-                       else d.get('lazy_evaluation', True)}))
+                name = d['name']
+                value = d.get('value')
+                normalizer = d.get('normalizer')
+                l_e = lazy_evaluation if lazy_evaluation is not None \
+                    else d.get('lazy_evaluation', True)
+
+                if 'categories' in d:
+                    temp.append(CategoricalData(
+                        name=name,
+                        value=value,
+                        categories=d['categories'],
+                        normalizer=normalizer,
+                        lazy_evaluation=l_e))
+                elif 'lower' in d or 'upper' in d:
+                    temp.append(NumericalData(
+                        name=name,
+                        value=value,
+                        lower=d.get('lower'),
+                        upper=d.get('upper'),
+                        normalizer=normalizer,
+                        lazy_evaluation=l_e))
+                else:
+                    temp.append(BaseData(
+                        name=name,
+                        value=value,
+                        normalizer=normalizer,
+                        lazy_evaluation=l_e))
+            else:
+                raise TypeError(f'Unknow input type {type(d)} for item: {d}')
 
         self._data = tuple(temp)
         self._clear_temps()
 
     @classmethod
-    def single_member(cls,
-                   name: str,
-                   value: Optional[T_or_SeqT] = None,
-                   normalizer: Optional[Normalizer] = None,
-                   lazy_evaluation: Optional[bool] = None,
-                   categories: Optional[Tuple[T, ...]] = None,
-                   lower: Optional[T] = None,
-                   upper: Optional[T] = None) -> ReilData:
+    def single_base(
+            cls,
+            name: str,
+            value: Optional[Union[T, Sequence[T]]] = None,
+            normalizer: Optional[Normalizer] = None,
+            lazy_evaluation: Optional[bool] = None) -> ReilData:
         '''
-        Create a ReilData instance.
+        Create a `ReilData` instance.
 
-        Attributes
------------
-        name: name of the object
-        value: value to store
-        lower: minimum value if the object is numerical
-        upper: maximum value if the object is numerical
-        categories: a tuple of categories if the object is categorical
-        normalizer: a function that normalizes value
-        lazy_evaluation: whether to store normalized values or compute on-demand (Default: False)
+        Arguments
+        ---------
+        name:
+            Name of the instance.
+
+        value:
+            The value to store.
+
+        normalizer:
+            A function that accepts a `BaseData` object and returns the
+            normalized value.
+
+        lazy_evaluation:
+            Whether normalization should be done at the point of instantiation
+            (False) or at the access time (True).
         '''
-        return cls(BoundedData(
-            name=name,
-            value=value,
-            normalizer=normalizer,
-            lazy_evaluation=lazy_evaluation,
-            categories=categories,
-            lower=lower,
-            upper=upper))
+        instance = cls([])
+        instance._data = (
+            BaseData(name=name,
+                     value=value,
+                     normalizer=normalizer,
+                     lazy_evaluation=lazy_evaluation),)
+
+        return instance
+
+    @classmethod
+    def single_categorical(
+            cls,
+            name: str,
+            value: Optional[Union[Categorical, Sequence[Categorical]]] = None,
+            normalizer: Optional[Normalizer] = None,
+            lazy_evaluation: Optional[bool] = None,
+            categories: Optional[Tuple[Categorical, ...]] = None) -> ReilData:
+        '''
+        Create a `ReilData` instance.
+
+        Arguments
+        ---------
+        name:
+            Name of the instance.
+
+        value:
+            The value to store.
+
+        categories:
+            A list of categories if the object is categorical
+
+        normalizer:
+            A function that accepts a `BaseData` object and returns the
+            normalized value.
+
+        lazy_evaluation:
+            Whether normalization should be done at the point of instantiation
+            (False) or at the access time (True).
+        '''
+        instance = cls([])
+        instance._data = (
+            CategoricalData(
+                name=name,
+                value=value,
+                categories=categories,
+                normalizer=normalizer,
+                lazy_evaluation=lazy_evaluation),)
+
+        return instance
+
+    @classmethod
+    def single_numerical(
+            cls,
+            name: str,
+            value: Optional[Union[Numerical, Sequence[Numerical]]] = None,
+            normalizer: Optional[Normalizer] = None,
+            lazy_evaluation: Optional[bool] = None,
+            lower: Optional[Numerical] = None,
+            upper: Optional[Numerical] = None) -> ReilData:
+        '''
+        Create a `ReilData` instance.
+
+        Arguments
+        ---------
+        name:
+            Name of the instance.
+
+        value:
+            The value to store.
+
+        lower:
+            The lower bound of value if data is numerical
+
+        upper:
+            The upper bound of the value is numerical
+
+        normalizer:
+            A function that accepts a `BaseData` object and returns the
+            normalized value.
+
+        lazy_evaluation:
+            Whether normalization should be done at the point of instantiation
+            (False) or at the access time (True).
+        '''
+        instance = cls([])
+        instance._data = (
+            NumericalData(
+                name=name,
+                value=value,
+                lower=lower,
+                upper=upper,
+                normalizer=normalizer,
+                lazy_evaluation=lazy_evaluation),)
+
+        return instance
+
+    @classmethod
+    def single_item(
+            cls,
+            name: str,
+            value: Optional[Union[
+                Numerical, Sequence[Numerical],
+                Categorical, Sequence[Categorical]]] = None,
+            normalizer: Optional[Normalizer] = None,
+            lazy_evaluation: Optional[bool] = None,
+            categories: Optional[Tuple[Categorical, ...]] = None,
+            lower: Optional[Numerical] = None,
+            upper: Optional[Numerical] = None) -> ReilData:
+        '''
+        Create a `ReilData` instance.
+
+        Arguments
+        ---------
+        name:
+            Name of the instance.
+
+        value:
+            The value to store.
+
+        categories:
+            A list of categories if the object is categorical
+
+        lower:
+            The lower bound of value if data is numerical
+
+        upper:
+            The upper bound of the value is numerical
+
+        normalizer:
+            A function that accepts a `BaseData` object and returns the
+            normalized value.
+
+        lazy_evaluation:
+            Whether normalization should be done at the point of instantiation
+            (False) or at the access time (True).
+        '''
+        instance = cls([])
+        if lower is not None or upper is not None:
+            instance._data = (
+                NumericalData(
+                    name=name,
+                    value=value,  # type: ignore
+                    lower=lower,
+                    upper=upper,
+                    normalizer=normalizer,
+                    lazy_evaluation=lazy_evaluation),)
+        elif categories is not None:
+            instance._data = (
+                CategoricalData(
+                    name=name,
+                    value=value,
+                    categories=categories,
+                    normalizer=normalizer,
+                    lazy_evaluation=lazy_evaluation),)
+        else:
+            instance._data = (
+                CategoricalData(
+                    name=name,
+                    value=value,
+                    categories=categories,
+                    normalizer=normalizer,
+                    lazy_evaluation=lazy_evaluation),)
+
+        return instance
 
     def _clear_temps(self):
-        self._value = None
-        self._lower = None
-        self._upper = None
-        self._categories = None
-        self._is_numerical = None
+        self._value: Optional[Dict[str, Any]] = None
+        self._lower: Optional[Dict[str, Numerical]] = None
+        self._upper: Optional[Dict[str, Numerical]] = None
+        self._categories: Optional[Dict[str, Tuple[Categorical, ...]]] = None
+        self._is_numerical: Optional[Dict[str, bool]] = None
 
-    def index(self, value: Any, start: int = 0, stop: Optional[int] = None) -> int:
+    def index(self, value: Any,
+              start: int = 0, stop: Optional[int] = None) -> int:
         _stop = stop if stop is not None else len(self._data)
-        if isinstance(value, BoundedData):
+        if isinstance(value, BaseData):
             for i in range(start, _stop):
                 if self._data[i] == value:
                     return i
@@ -231,139 +570,149 @@ class ReilData(Sequence[BoundedData[Any]]):
 
     @property
     def value(self) -> Dict[str, Any]:
-        '''Returns a dictionary of (name, RangedData) form.'''
+        '''
+        Return a dictionary with elements' names as keys and
+        their respective values as values.
+
+        Returns
+        -------
+        :
+            Names of the elements and their values.
+        '''
         if self._value is None:
-            self._value = dict((v.name, v.value) for v in self._data)
+            self._value = dict((v.name, v.value)
+                               for v in self._data)
 
         return self._value
 
-    # @value.setter
-    # def value(self, v: Dict[str, Any]):
-    #     self._value = None
-    #     for key, val in v.items():
-    #         self._data[self.index(key)].value = val
-
     @property
-    def lower(self) -> Dict[str, Number]:
+    def lower(self) -> Dict[str, Numerical]:
+        '''
+        Return all `lower` attributes.
+
+        Returns
+        -------
+        :
+            `lower` attribute of all `NumericalData` variables with their names
+            as keys.
+        '''
         if self._lower is None:
-            self._lower = dict((v.name, v.lower) for v in self._data if hasattr(v, 'lower'))
+            self._lower = dict(
+                (v.name, cast(Numerical, v.lower))  # type: ignore
+                for v in self._data
+                if hasattr(v, 'lower'))
 
         return self._lower
 
-    # @lower.setter
-    # def lower(self, value: Dict[str, Number]) -> None:
-    #     self._lower = None
-    #     for key, val in value.items():
-    #         self._data[self.index(key)].lower = val
-
     @property
-    def upper(self) -> Dict[str, Number]:
+    def upper(self) -> Dict[str, Numerical]:
+        '''
+        Return all `upper` attributes.
+
+        Returns
+        -------
+        :
+            `upper` attribute of all `NumericalData` variables with their names
+            as keys.
+        '''
         if self._upper is None:
-            self._upper = dict((v.name, v.upper) for v in self._data if hasattr(v, 'upper'))
+            self._upper = dict(
+                (v.name, cast(Numerical, v.upper))  # type: ignore
+                for v in self._data
+                if hasattr(v, 'upper'))
 
         return self._upper
 
-    # @upper.setter
-    # def upper(self, value: Dict[str, Number]) -> None:
-    #     self._upper = None
-    #     for key, val in value.items():
-    #         self._data[self.index(key)].upper = val
-
     @property
-    def categories(self) -> Dict[str, Sequence[Any]]:
+    def categories(self) -> Dict[str, Tuple[Categorical, ...]]:
+        '''
+        Return all `categories` attributes.
+
+        Returns
+        -------
+        :
+            `categories` attribute of all `CategoricalData` variables with
+            their names as keys.
+        '''
         if self._categories is None:
-            self._categories = dict((v.name, v.categories) for v in self._data if hasattr(v, 'categories'))
+            self._categories = dict(
+                (v.name, cast(Categorical, v.categories))  # type: ignore
+                for v in self._data
+                if hasattr(v, 'categories'))
 
         return self._categories
 
-    # @categories.setter
-    # def categories(self, value: Dict[str, Sequence[Any]]) -> None:
-    #     self._categories = None
-    #     for key, val in value.items():
-    #         self._data[self.index(key)].categories = val
-
-    @property
-    def is_numerical(self) -> Dict[str, Sequence[bool]]:
-        if self._is_numerical is None:
-            self._is_numerical = dict((v.name, v.is_numerical)
-                                      for v in self._data)
-
-        return self._is_numerical
-
     @property
     def normalized(self) -> ReilData:
-        return ReilData(BoundedData(name=v.name, value=v.normalized,
-                                    lower=0, upper=1, lazy_evaluation=True)
-                        for v in self._data)
+        '''
+        Normalize all items in the instance.
 
-    def flatten(self) -> List[Any]:
-        def make_iterable(x: Any) -> Iterable[Any]:
+        Returns
+        -------
+        :
+            A `ReilData` consist of normalized values of all the items in the
+            instance, in the form of `NumericalData` objects.
+        '''
+        return ReilData(
+            NumericalData(name=v.name, value=v.normalized,
+                          lower=0, upper=1, lazy_evaluation=True)
+            for v in self._data)
+
+    def flatten(self) -> List[BaseData]:
+        """Combine values of all items in the instance.
+
+        Returns
+        -------
+        :
+            A list that contains all the values of all the items.
+        """
+        def make_iterable(x: T) -> Iterable[T]:
             return x if isinstance(x, Iterable) else [x]
 
         return list(itertools.chain(*[make_iterable(sublist)
-            for sublist in self.value.values()]))
+                                      for sublist in self.value.values()]))
 
-    def split(self) -> Union[ReilData, List[ReilData]]:  #, name_suffix: Optional[str] = None):
+    def split(self) -> Union[ReilData, List[ReilData]]:
+        """Split the `ReilData` into a list of `ReilData`.
+
+        Returns
+        -------
+        :
+            All items in the instance as separate `ReilData` instances.
+        """
         if len(self) == 1:
             d = self._data[0]
             if not isinstance(d.value, (list, tuple)):
                 splitted_list = ReilData(self._data)
             else:
+                temp = d.as_dict()
+                cls = type(d)
+                value = temp['value']
+                del temp['value']
+                if 'is_numerical' in temp:
+                    del temp['is_numerical']
+
                 splitted_list = [
-                    ReilData.single_member(
-                        name=d.name,
+                    ReilData(cls(
                         value=v,
-                        lower=d.lower,
-                        upper=d.upper,
-                        categories=d.categories,
-                        normalizer=d.normalizer,
-                        lazy_evaluation=d.lazy_evaluation)
-                    for v in d.value]
+                        **temp))
+                    for v in value]
 
         else:
-            splitted_list = [ReilData.single_member(
-                    name=d.name,
-                    value=d.value,
-                    upper=d.upper,
-                    lower=d.lower,
-                    categories=d.categories,
-                    normalizer=d.normalizer,
-                    lazy_evaluation=d.lazy_evaluation)
-                    for d in self._data]
+            splitted_list = cast(List[ReilData], list(self._data))
 
         return splitted_list
 
     @overload
-    def __getitem__(self, i: int) -> BoundedData:
+    def __getitem__(self, i: int) -> BaseData:
         ...
 
     @overload
-    def __getitem__(self, s: slice) -> Tuple[BoundedData, ...]:  # pylint: disable=function-redefined
+    def __getitem__(self, s: slice) -> Tuple[BaseData, ...]:
         ...
 
-    def __getitem__(self, x):  # pylint: disable=function-redefined
+    def __getitem__(self, x):
         return self._data.__getitem__(x)
-
-    # def __setitem__(self, i: Union[int, slice], o: Union[Any, Iterable[Any]]):
-    #     # TODO: I should somehow check the iterable to make sure it has proper data,
-    #     # but currently I have no idea how!
-    #     if not isinstance(o, (BoundedData, Iterable)):
-    #         raise TypeError(
-    #             'Only variables of type BoundedData and subclasses are acceptable.')
-
-    #     self._clear_temps()
-    #     return self._data.__setitem__(i, o)
-
-    # def __delitem__(self, i: Union[int, slice]) -> None:
-    #     self._data.__delitem__(i)
-
-    # def insert(self, index: int, value: Any) -> None:
-    #     if not isinstance(value, BoundedData):
-    #         raise TypeError(
-    #             'Only variables of type BoundedData and subclasses are acceptable.')
-
-    #     self._clear_temps()
-    #     self._data.insert(index, value)
 
     def __len__(self) -> int:
         return self._data.__len__()
@@ -374,46 +723,32 @@ class ReilData(Sequence[BoundedData[Any]]):
     def __eq__(self, other) -> bool:
         return isinstance(other, type(self)) and (self._data == other._data)
 
-    # def extend(self, values: R) -> None:
-    #     if isinstance(values, ReilData):
-    #         for v in values:
-    #             self._data.append(v)
-    #     else:
-    #         for v in values:
-    #             self._data.extend(ReilData(v))
-
-    # def append(self, value: Union[Dict[str, Any], ReilDataClass]) -> None:
-    #     if isinstance(value, ReilData):
-    #         self._data.extend(value)
-    #     else:
-    #         self._data.extend(ReilData(value))
-
-    def __add__(self, other: Union[BoundedData[Any], ReilData]) -> ReilData:
-        if isinstance(other, BoundedData):
+    def __add__(self, other: Union[BaseData[T], ReilData]) -> ReilData:
+        if isinstance(other, BaseData):
             if other.name in self._data:
                 raise ValueError(
-                    'Cannot have items with same names. Use update() if you need to update an item.')
+                    'Cannot have items with same names.'
+                    ' Use update() if you need to update an item.')
             new_data = [other]
         elif isinstance(other, ReilData):
             for k in other:
                 if k in self._data:
                     raise ValueError(
-                        'Cannot have items with same names. Use update() if you need to update an item.')
+                        'Cannot have items with same names.'
+                        ' Use update() if you need to update an item.')
             new_data = list(other._data)
         else:
             raise TypeError(
-                f'Concatenation of type ReilData and {type(other)} not implemented!')
-
-                # new_dict = other.as_dict()
-
-                # new_dict = {v.name: v.as_dict() for v in other}
+                'Concatenation of type ReilData'
+                f' and {type(other)} not implemented!')
 
         return ReilData(list(self._data) + new_data)
 
     def __neg__(self) -> ReilData:
-        temp = {v.name: v.as_dict()
-                for v in self._data}
-        temp['value'] = -temp['value']
+        temp = [v.as_dict()
+                for v in self._data]
+        for item in temp:
+            item['value'] = -item['value']
 
         return ReilData(temp)
 
@@ -424,41 +759,28 @@ class ReilData(Sequence[BoundedData[Any]]):
         return f"[{', '.join((d.__str__() for d in self._data))}]"
 
 
-    # # Mixin methods
-    # def append(self, value: _T) -> None: ...
-    # def clear(self) -> None: ...
-    # def extend(self, values: Iterable[_T]) -> None: ...
-    # def reverse(self) -> None: ...
-    # def pop(self, index: int = ...) -> _T: ...
-    # def remove(self, value: _T) -> None: ...
-    # def __iadd__(self, x: Iterable[_T]) -> MutableSequence[_T]: ...
-
-    # # Sequence Mixin methods
-    # def index(self, value: Any, start: int = ..., stop: int = ...) -> int: ...
-    # def count(self, value: Any) -> int: ...
-    # def __contains__(self, x: object) -> bool: ...
-    # def __iter__(self) -> Iterator[_T_co]: ...
-    # def __reversed__(self) -> Iterator[_T_co]: ...
-
-
 if __name__ == "__main__":
-    from timeit import timeit
+    # from timeit import timeit
 
     def f1():
-        t1 = ReilData.single_member(name='test A', value=['a', 'b'],
-                    categories=('a', 'b'))
+        t1 = ReilData.single_categorical(name='test A', value=['a', 'b'],
+                                         categories=('a', 'b'))
+        t1 = ReilData.single_numerical(name='test A', value=[1, 2])
+        t1 = ReilData.single_base(name='test A', value=['a', 'b'])
         return t1
 
     def f2():
-        t2 = ReilData(({'name': x, 'value': x, 'categories': list('abcdefghijklmnopqrstuvwxyz')}
-            for x in 'abcdefghijklmnopqrstuvwxyz'), lazy_evaluation=True)
+        t2 = ReilData(({'name': x, 'value': x,
+                        'categories': list('abcdefghijklmnopqrstuvwxyz')}
+                       for x in 'abcdefghijklmnopqrstuvwxyz'),
+                      lazy_evaluation=True)
         return t2.normalized.flatten()
 
     def f3():
         t2 = ReilData([{'name': 'A', 'value': 'a', 'categories': ['a', 'b']},
-            {'name': 'B', 'value': [10, 20], 'lower': 0, 'upper': 100}], lazy_evaluation=True)
+                       {'name': 'B', 'value': [10, 20],
+                        'lower': 0, 'upper': 100}], lazy_evaluation=True)
         return t2
-
 
     # t1 = f1()
     # t2 = ReilData(t1)

@@ -7,37 +7,25 @@ This module provides classes that are no longer supported.
 
 Classes
 -------
-    ANNAgent
-    ValueSet
-    WarfarinModel
-    WarfarinModel_v2
-    WarfarinModel_v3
-    WarfarinModel_v4
-    WarfarinLookAhead
-    WarfarinModelFixedInterval
+Environment:
+    The base class that provides minimum required
+    functionality for a reinforcement learning environment.
 
+Experiment:
+    An environment to explore performance of trained
+    agents on subjects.
 
+IterableSubject:
+    Now `InstanceGenerator` does the job and goes beyond that!
+
+LegacyReilData
+
+Risk
+
+Snake
+
+WarfarinClusterAgent:
+    an agent whose actions are based on clustering of observations.
+    Note: This agent will no longer run due to changes in the module
+    implementation.
 '''
-
-# import warnings
-# import pip
-
-# try:
-#     installed_pkgs = [pkg.key for pkg in pip.get_installed_distributions()]
-#     if 'rpy2' in installed_pkgs:
-#         from .warfarin_model import WarfarinModel
-#     else:
-#         import warnings
-#         warnings.warn('Could not find dependencies of "WarfarinModel" ("rpy2"). Skipped installing the module.')
-# except AttributeError:
-#     warnings.warn('Could not use pip to check the availability of dependencies of "WarfarinModel" ("rpy2"). Skipped installing the module.')
-
-# from .ann_agent import ANNAgent
-# from .valueset import ValueSet
-# from .legacyreildata import LegacyReilData
-
-# from .warfarin_model_v2 import WarfarinModel_v2
-# from .warfarin_model_v3 import WarfarinModel_v3
-# from .warfarin_model_v4 import WarfarinModel_v4
-# from .warfarin_lookahead import WarfarinLookAhead
-# from .warfarin_model_fixed_intervals import WarfarinModelFixedInterval

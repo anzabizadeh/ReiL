@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+'''
+Feature class
+=============
+
+A datatype that accepts initial value and feature generator, and generates
+new values.
+'''
 from __future__ import annotations
 
 import dataclasses
@@ -7,39 +15,49 @@ FeatureType = TypeVar('FeatureType')
 
 
 @dataclasses.dataclass
-class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
+class Feature(Generic[FeatureType]):
     '''
-    a datatype that accepts initial value and feature generator, and generates
+    A datatype that accepts initial value and feature generator, and generates
     new values.
 
     Attributes
------------
-    is_numerical: a boolean that shows if the feature is numerical.
+    ----------
+    is_numerical:
+        Is the feature numerical?
 
-    value: the currect value of the feature.
+    value:
+        The currect value of the feature.
 
-    randomized: whether the generator should produce random values
+    randomized:
+        Whether the generator should produce random values.
 
-    generator: a function that gets feature characteristics and generates a new
-    value
+    generator:
+        A function that accepts feature characteristics and generates a new
+        value
 
-    lower: lower bound for numerical features.
+    lower:
+        The lower bound for numerical features.
 
-    upper: upper bound for numerical features.
+    upper:
+        The upper bound for numerical features.
 
-    mean: mean value for numerical features.
+    mean:
+        Mean of the distribution for numerical features.
 
-    stdev: standard deviation for numerical features.
+    stdev:
+        Standard Deviation of the distribution for numerical features.
 
-    categories: a list of possible values for categorical features.
+    categories:
+        A list of possible values for categorical features.
 
-    probabilities: a list of probabilities corresponding to each possible value
-    for categorical features.
+    probabilities:
+        A list of probabilities corresponding to each possible value
+        for categorical features.
     '''
     is_numerical: Optional[bool] = True
     value: Optional[Any] = None
     randomized: Optional[bool] = True
-    generator: Optional[Callable[[FeatureType], Any]] = lambda x: x.value
+    generator: Optional[Callable[["Feature"], Any]] = lambda x: x.value
 
     def __post_init__(self):
         if self.is_numerical:
@@ -59,21 +77,25 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
                     randomized: Optional[bool] = None,
                     generator: Optional[Callable[[Feature], Any]] = None):
         '''
-        Creates a categorical Feature.
+        Create a categorical Feature.
 
-        Attributes
------------
-        value: the currect value of the feature.
+        Arguments
+        ---------
+        value:
+            The initial value of the feature.
 
-        randomized: whether the generator should produce random values
+        randomized:
+            Whether the generator should produce random values.
 
-        generator: a function that gets feature characteristics and generates a new
-        value
+        generator:
+            A function that gets feature characteristics and generates a new
+            value
 
-        categories: a list of possible values for categorical features.
+        categories:
+            A list of possible values.
 
-        probabilities: a list of probabilities corresponding to each possible value
-        for categorical features.
+        probabilities:
+            A list of probabilities corresponding to each possible value.
         '''
         instance = cls(is_numerical=False,
                        value=value,
@@ -97,24 +119,31 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
                   generator: Optional[Callable[[Feature], Any]] = None,
                   randomized: Optional[bool] = None):
         '''
-        Creates a numerical Feature.
+        Create a numerical Feature.
 
-        Attributes
------------
-        value: the currect value of the feature.
+        Arguments
+        ---------
+        value:
+            The currect value of the feature.
 
-        randomized: whether the generator should produce random values
+        randomized:
+            Whether the generator should produce random values.
 
-        generator: a function that gets feature characteristics and generates a new
-        value
+        generator:
+            A function that gets feature characteristics and generates a new
+            value
 
-        lower: lower bound for numerical features.
+        lower:
+            The lower bound.
 
-        upper: upper bound for numerical features.
+        upper:
+            The upper bound.
 
-        mean: mean value for numerical features.
+        mean:
+            Mean of the distribution.
 
-        stdev: standard deviation for numerical features.
+        stdev:
+            Standard Deviation of the distribution.
         '''
         instance = cls(is_numerical=True,
                        value=value,
@@ -130,9 +159,9 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
 
         return instance
 
-    def _numerical_validator(self):
+    def _numerical_validator(self) -> None:
         '''
-        Checks if the value is in the defined range.
+        Check if the value is in the defined range.
         '''
         if self.value is not None:
             if self.lower is not None and self.value < self.lower:
@@ -143,15 +172,17 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
                 raise ValueError(
                     f'value={self.value} is greater than upper={self.upper}.')
 
-    def _categorical_validator(self):
+    def _categorical_validator(self) -> None:
         '''
-        Checks if the value is in the defined categories and probabilities add
+        Check if the value is in the defined categories and probabilities add
         up to one.
         '''
         if self.value is not None:
-            if self.categories is not None and self.value not in self.categories:
+            if (self.categories is not None and
+                    self.value not in self.categories):
                 raise ValueError(
-                    f'value={self.value} is in the categories={self.categories}.')
+                    f'value={self.value} is in '
+                    f'the categories={self.categories}.')
 
         if self.probabilities is not None:
             if abs(sum(self.probabilities) - 1.0) > 1e-6:
@@ -165,9 +196,9 @@ class Feature(Generic[FeatureType]):  # pylint: disable=unsubscriptable-object
                                  f'{len(self.categories)} categories vs. '
                                  f'{len(self.categories)} probabilities')
 
-    def generate(self):
+    def generate(self) -> None:
         '''
-        Generates a new value using the generator.
+        Generate a new value using the generator.
         '''
         if self.generator is None:
             return

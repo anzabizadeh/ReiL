@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 '''
 WarfarinClusterAgent class
-=================
+==========================
 
 An agent that produces action based on similarity of the state with clusters.
-
-
 '''
 
 
@@ -118,10 +116,10 @@ class WarfarinClusterAgent(Agent):
                 dose = self._cluster_data.at[f'dose {self._day:02} mean', str(self._cluster_label)]
 
             if abs(dose - self._previous_dose) >= self._smoothing_dose_threshold:
-                action = ReilData.single_member(name='dose', value=dose, lower=0.0, upper=15.0)
+                action = ReilData.single_numerical(name='dose', value=dose, lower=0.0, upper=15.0)
                 self._previous_dose = dose
             else:
-                action = ReilData.single_member(
+                action = ReilData.single_numerical(
                     name='dose', value=self._previous_dose, lower=0.0, upper=15.0)
         elif self._type == 'two phase':
             if self._day == 0:
@@ -131,7 +129,7 @@ class WarfarinClusterAgent(Agent):
                 self._dose = np.average(self._cluster_data.loc[[f'dose {i:02} mean' for i in range(self._phase_change_day, self._max_day)],
                                                                str(self._cluster_label)])
 
-            action = ReilData.single_member(
+            action = ReilData.single_numerical(
                 name='dose', value=self._dose, lower=0.0, upper=15.0)
 
         elif self._type == 'rule based':

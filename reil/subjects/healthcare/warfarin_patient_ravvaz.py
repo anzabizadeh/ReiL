@@ -1,9 +1,34 @@
+# -*- coding: utf-8 -*-
+'''
+WarfarinPatientRavvaz class
+===========================
+
+A warfarin patient class with features and parameters of Ravvaz et al. 2016.
+
+Features included in this model are:
+* age
+* weight
+* height
+* gender
+* race
+* tobaco
+* amiodarone
+* fluvastatin
+* CYP2C9
+* VKORC1
+* MTT_1
+* MTT_2
+* cyp_1_1
+* V1
+* V2
+* EC_50
+'''
 import math
 from typing import Any
 
+from reil.datatypes import Feature
 from reil.subjects.healthcare import Patient
 from reil.subjects.healthcare.mathematical_models import HealthMathModel
-from reil.datatypes import Feature
 from reil.utils.functions import (random_categorical, random_truncated_lnorm,
                                   random_truncated_normal)
 
@@ -50,19 +75,24 @@ class WarfarinPatientRavvaz(Patient):
             generator=random_categorical),
 
         'MTT_1': Feature.numerical(  # Hamberg PK/PD
-            value=math.exp(math.log(11.6) + 0.141/2), mean=math.log(11.6), stdev=math.sqrt(0.141),
+            value=math.exp(math.log(11.6) + 0.141/2), mean=math.log(11.6),
+            stdev=math.sqrt(0.141),
             generator=random_truncated_lnorm),
         'MTT_2': Feature.numerical(  # Hamberg PK/PD
-            value=math.exp(math.log(120.0) + 1.02/2), mean=math.log(120.0), stdev=math.sqrt(1.02),
+            value=math.exp(math.log(120.0) + 1.02/2), mean=math.log(120.0),
+            stdev=math.sqrt(1.02),
             generator=random_truncated_lnorm),
         'cyp_1_1': Feature.numerical(  # Hamberg PK/PD
-            value=math.exp(math.log(0.314) + 0.31/2), mean=math.log(0.314), stdev=math.sqrt(0.31),
+            value=math.exp(math.log(0.314) + 0.31/2), mean=math.log(0.314),
+            stdev=math.sqrt(0.31),
             generator=random_truncated_lnorm),
         'V1': Feature.numerical(  # Hamberg PK/PD
-            value=math.exp(math.log(13.8) + 0.262/2), mean=math.log(13.8), stdev=math.sqrt(0.262),
+            value=math.exp(math.log(13.8) + 0.262/2), mean=math.log(13.8),
+            stdev=math.sqrt(0.262),
             generator=random_truncated_lnorm),
         'V2': Feature.numerical(  # Hamberg PK/PD
-            value=math.exp(math.log(6.59) + 0.991/2), mean=math.log(6.59), stdev=math.sqrt(0.991),
+            value=math.exp(math.log(6.59) + 0.991/2), mean=math.log(6.59),
+            stdev=math.sqrt(0.991),
             generator=random_truncated_lnorm),
 
         'EC_50': Feature.numerical(  # Hamberg PK/PD
@@ -70,12 +100,30 @@ class WarfarinPatientRavvaz(Patient):
             generator=random_truncated_lnorm)
     }
 
-    def __init__(self, model: HealthMathModel, randomized: bool = True, **feature_values: Any) -> None:
+    def __init__(self,
+                 model: HealthMathModel,
+                 randomized: bool = True,
+                 **feature_values: Any) -> None:
         for f in self.feature_set.values():
             f.randomized = randomized
+        '''
+        Parameters
+        ----------
+        model:
+            A `HealthMathModel` to be used to model patient's behavior.
 
-        # Since EC_50 is not set (it depends on other features), super().__init__()
-        # fails to setup the model. I catch it, generate EC_50 and set up the model.
+        randomized:
+            Whether patient characteristics and model parameters should be
+            generated randomly or deterministically.
+
+        feature_values:
+            Keyword arguments by which some of the `features` of the patient
+            can be determined. For example, if "age" is one of the features,
+            age=40.0 will set the initial age to 40.0.
+        '''
+        # Since EC_50 is not set (it depends on other features),
+        # super().__init__() fails to setup the model.
+        # I catch it, generate EC_50 and set up the model.
         try:
             super().__init__(model, EC_50=None, **feature_values)
         except TypeError:

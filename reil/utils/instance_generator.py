@@ -3,9 +3,8 @@
 InstanceGenerator class
 =======================
 
-`InstanceGenerator` takes any object derived form `ReilBase` and returns an iterator. 
-
-
+`InstanceGenerator` takes any object derived form `ReilBase` and returns
+an iterator.
 '''
 
 from __future__ import annotations
@@ -18,24 +17,13 @@ from reil import reilbase
 T = TypeVar('T', bound=reilbase.ReilBase)
 
 
-class InstanceGenerator(Generic[T], reilbase.ReilBase):  # pylint: disable=unsubscriptable-object
+class InstanceGenerator(Generic[T], reilbase.ReilBase):
     '''
-    Makes any ReilBase object an iterable.
+    Make any ReilBase object an iterable.
 
     The initializer accepts, among other arguments, an instance of an object to
     iterate, and `instance_counter_stops`, which is a tuple of the instance
     numbers where the instance generator should stop.
-
-    Attributes
------------
-    is_finite: `True` if `auto_rewind` is `False` and `instance_counter_stops`
-    does not contain -1.
-
-    Methods
------------
-    rewind: Rewinds the iterator object.
-
-    is_terminated: returns `True` if no new instances can be generated.
     '''
 
     def __init__(self,
@@ -50,33 +38,37 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):  # pylint: disable=unsub
                  filename_pattern: str = '{n:04}',
                  **kwargs: Any):
         '''
-        Initialize the InstanceGenerator
-
         Attributes
------------
-        object: an instance of an object.
+        ----------
+        object:
+            An instance of an object.
 
-        instance_counter_stops: a tuple of the instance numbers where the instance
-            generator should stop. A value of -1 means infinite (Default = (-1,)).
+        instance_counter_stops:
+            A tuple of the instance numbers where the instance
+            generator should stop. A value of -1 means infinite.
 
-        first_instance_number: the number of the first instance to be generated.
-            (Default = 0)
+        first_instance_number:
+            The number of the first instance to be generated.
 
-        auto_rewind: whether to rewind after the generator hits the last stop (Default = False).
+        auto_rewind:
+            Whether to rewind after the generator hits the last stop.
 
-        save_instances: whether to save instances of the `object` or not (Default = False).
+        save_instances:
+            Whether to save instances of the `object` or not.
 
-        overwrite_instances: whether to overwrite instances of the `object` or not.
-            This flag is useful only if `save_instances` is set to True (Default = False).
+        overwrite_instances:
+            Whether to overwrite instances of the `object` or not.
+            This flag is useful only if `save_instances` is set to `True`.
 
-        use_existing_instances: whether try to load instances before attempting
-            to create them (Default = True).
+        use_existing_instances:
+            Whether try to load instances before attempting to create them.
 
-        save_path: the path where instances should be saved to/ loaded from
-            (Default = '').
+        save_path:
+            The path where instances should be saved to/ loaded from.
 
-        filename_pattern: a string that uses "n" as the instance number, and is
-            used for saving and loading instances (Default = '{n:04}').
+        filename_pattern:
+            A string that uses "n" as the instance number, and is
+            used for saving and loading instances.
         '''
         super().__init__(**kwargs)
 
@@ -99,7 +91,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):  # pylint: disable=unsub
     def __iter__(self):
         return self
 
-    def __next__(self) -> Tuple[int, T]:
+    def __next__(self) -> Tuple[int, T]:  # noqa: C901
         try:
             end = self._instance_counter_stops[self._stops_index]
         except IndexError:
@@ -117,11 +109,11 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):  # pylint: disable=unsub
 
             if self._stops_index <= self._last_stop_index:
                 if self._instance_counter_stops[self._stops_index] == -1:
-                    self._stop_check: Callable[[int, int],
-                                               bool] = lambda current, end: False
+                    self._stop_check: Callable[
+                        [int, int], bool] = lambda current, end: False
                 else:
-                    self._stop_check: Callable[[int, int],
-                                               bool] = lambda current, end: current > end
+                    self._stop_check: Callable[
+                        [int, int], bool] = lambda current, end: current > end
             raise StopIteration
         else:
             current_instance = self._filename_pattern.format(
@@ -149,22 +141,24 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):  # pylint: disable=unsub
 
     def rewind(self) -> None:
         '''
-        Rewinds the iterator object.
+        Rewind the iterator object.
         '''
         self._instance_counter = self._first_instance_number - 1
         self._stops_index = 0
         if self._instance_counter_stops[self._stops_index] == -1:
-            self._stop_check: Callable[[int, int],
-                                       bool] = lambda current, end: False
+            self._stop_check: Callable[
+                [int, int], bool] = lambda current, end: False
         else:
-            self._stop_check: Callable[[int, int],
-                                       bool] = lambda current, end: current > end
+            self._stop_check: Callable[
+                [int, int], bool] = lambda current, end: current > end
 
     def is_terminated(self) -> bool:
         return self._stops_index > self._last_stop_index
 
     def __repr__(self) -> str:
         try:
-            return f'{self.__class__.__qualname__} -> {self._object.__repr__()}'
+            return (f'{self.__class__.__qualname__} '
+                    f'-- {self._instance_counter} --> '
+                    f'{self._object.__repr__()}')
         except AttributeError:
             return self.__class__.__qualname__

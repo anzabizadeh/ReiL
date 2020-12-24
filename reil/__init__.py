@@ -17,7 +17,8 @@ subjects
     `agents`' action via an `environment` and return new state and reward.
 
 environments
-    Classes that connect `agents` and `subjects`, and simulate their interactions.
+    Classes that connect `agents` and `subjects`, and simulate their
+    interactions.
 
 learners
 A set of learning techniques used as the learner of an `agent`.
@@ -42,6 +43,9 @@ legacy
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
+
+from .reilbase import ReilBase  # noqa: W0611
+from .stateful import Stateful  # noqa: W0611
 
 from ._version import get_versions
 __version__ = get_versions()['version']

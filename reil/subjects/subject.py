@@ -3,217 +3,380 @@
 subject class
 =============
 
-This `subject` class is the base class of all subject classes. 
-
-
+This `subject` class is the base class of all subject classes.
 '''
 
-from typing import Any, Dict, Optional, Tuple, TypeVar
+from reil.datatypes.components import SecondayComponent
+from typing import Any, List, Optional, Tuple, TypeVar
 
 from reil import stateful
 from reil.datatypes import reildata
-from reil.stats import rl_functions
+# from reil.stats import reil_functions
+
+
+class AgentList:
+    '''
+    Create and maintain a list of registered `agents` for the `subject`.
+
+
+    :meta private:
+    '''
+    def __init__(self, min_agent_count: int, max_agent_count: int,
+                 unique_agents: bool = True):
+        '''
+        Arguments
+        ---------
+        min_agent_count:
+            The minimum number of `agents` needed to be registered so that the
+            `subject` is ready for interaction.
+
+        max_agent_count:
+            The maximum number of `agents` that can act on the `subject`.
+
+        unique_agents:
+            If `True`, each `agent` can be registered only once.
+        '''
+        self._id_list: List[int] = []
+        self._agent_list: List[str] = []
+        self._min_agent_count = min_agent_count
+        self._max_agent_count = max_agent_count
+        self._unique_agents = unique_agents
+
+    @property
+    def ready(self) -> bool:
+        '''
+        Determine if enough `agents` are registered.
+
+        Returns
+        -------
+        :
+            `True` if enough agents are registered, else `False`.
+        '''
+        return len(self._id_list) >= self._min_agent_count
+
+    def append(self, agent_name: str, _id: Optional[int] = None) -> int:
+        '''
+        Add a new `agent` to the end of the list.
+
+        Parameters
+        ----------
+        agent_name:
+            The name of the `agent` to add.
+
+        _id:
+            If provided, method tries to register the `agent` with the given
+            ID.
+
+        Returns
+        -------
+        :
+            The ID assigned to the `agent`.
+
+        Raises
+        ------
+        ValueError:
+            Capacity is reached. No new agents can be registered.
+
+        ValueError:
+            ID is already taken.
+
+        ValueError:
+            `agent_name` is already registered with a different ID.
+        '''
+        if (0 < self._max_agent_count < len(self._id_list)):
+            raise ValueError('Capacity is reached. No new agents can be'
+                             ' registered.')
+
+        if _id is not None:
+            if _id in self._id_list:
+                raise ValueError(f'{_id} is already taken.')
+
+            if self._unique_agents:
+                try:
+                    current_id = self._id_list[
+                        self._agent_list.index(agent_name)]
+                    if _id == current_id:
+                        return _id
+                    else:
+                        raise ValueError(
+                            f'{agent_name} is already registered with '
+                            f'ID: {current_id}.')
+                except ValueError:
+                    pass
+
+            new_id = _id
+        else:
+            new_id = max(self._id_list, default=0) + 1
+
+        self._agent_list.append(agent_name)
+        self._id_list.append(new_id)
+
+        return new_id
+
+    def remove(self, _id: int):
+        '''
+        Remove the `agent` registered by ID=`_id`.
+
+        Arguments
+        ---------
+        _id:
+            ID of the `agent` to remove.
+        '''
+        agent_name = self._agent_list[self._id_list.index(_id)]
+        self._agent_list.remove(agent_name)
+        self._id_list.remove(_id)
 
 
 class Subject(stateful.Stateful):
     '''
     The base class of all subject classes.
-
-    Methods
-    -------
-    is_terminated: returns True if the subject is in the terminal state for
-        the agent with the provided _id.
-
-    possible_actions: a list of possible actions for the agent with the provided _id.
-
-    reward: returns the reward for the agent `_id` based on reward definition
-        `name`. For subjects that are turn-based, it is a good practice to
-        check that an agent is retrieving the reward only when it is the
-        agent's turn.
-
-    default_reward: returns the default reward for the agent `_id`. This can
-        be a more efficient implementation of the reward, when possible.
-
-    take_effect: gets an action and changes the state accordingly.
-        Note: take_effect does not return the reward. `Reward` method should
-        be used afterwards to get the realization of reward.
-
-    add_reward_definition: add a new reward definition consisting of a `name`,
-        and reward function, and a state definition name.
-
-    reset: resets the state and is_terminated.
-
-    register: registers a new agent and returns its ID or returns ID of an existing agent.
-
-    deregister: deregisters an agent identified by its ID.
     '''
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self,
+                 min_agent_count: int = 1, max_agent_count: int = -1,
+                 unique_agents: bool = True,
+                 sequential_interaction: bool = True,
+                 **kwargs: Any):
         '''
-        Initializes the subject.
-        '''
+        Arguments
+        ---------
+        min_agent_count:
+            The minimum number of `agents` needed to be registered so that the
+            `subject` is ready for interaction.
 
+        max_agent_count:
+            The maximum number of `agents` that can act on the `subject`.
+
+        unique_agents:
+            If `True`, each `agent` can be registered only once.
+
+        sequential_interaction:
+            If `True`, `agents` can only act on the `subject` in the order they
+            are added.
+        '''
         super().__init__(**kwargs)
 
-        self._agent_list: Dict[str, int] = {}
-        self._reward_definitions: Dict[str, Tuple[rl_functions.RLFunction, str]] = {}
+        self._sequential_interaction = sequential_interaction
+        self._agent_list = AgentList(min_agent_count=min_agent_count,
+                                     max_agent_count=max_agent_count,
+                                     unique_agents=unique_agents)
+        self._reward = SecondayComponent(name='reward',
+                                         primary_component=self._state)
+        # self._reward_definitions: Dict[
+        #     str, Tuple[reil_functions.ReilFunction, str]] = {}
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''
-        Returns False as long as the subject can accept new actions from the
-            agent _id. If _id is None, then returns True if no agent can act on
-            the subject.
+        Determine if the `subject` is terminated for the given `agent` ID.
 
         Arguments
------------
-
-        _id: ID of the agent that checks termination. In a multi-agent setting,
+        ---------
+        _id:
+            ID of the agent that checks termination. In a multi-agent setting,
             e.g. an RTS game, one agent might die and another agent might still
             be alive.
+
+        Returns
+        -------
+        :
+            `False` as long as the subject can accept new actions from the
+            `agent`. If `_id` is `None`, then returns `True` if no `agent`
+            can act on the `subject`.
         '''
         raise NotImplementedError
 
-    def possible_actions(self, _id: Optional[int] = None) -> Tuple[reildata.ReilData, ...]:
+    def possible_actions(self, _id: int = 0) -> Tuple[reildata.ReilData, ...]:
         '''
-        Returns a list of possible actions for the agent with ID=_id.
+        Generate the list of possible actions.
 
         Arguments
------------
+        ---------
+        _id:
+            ID of the `agent` that wants to act on the `subject`.
 
-        _id: ID of the agent that wants to act on the subject.
+        Returns
+        -------
+        :
+            A list of possible actions for the `agent` with ID=_id.
         '''
-        return (reildata.ReilData.single_member(name='default_action'),)
+        return (reildata.ReilData.single_base(name='default_action'),)
 
-    def reward(self, name: str = 'default', _id: Optional[int] = None) -> reildata.ReilData:
+    def reward(self,
+               name: str = 'default', _id: int = 0) -> reildata.ReilData:
         '''
-        Returns the reward that agent `_id` recieves, based on the reward
+        Compute the reward that `agent` receives, based on the reward
         definition `name`.
 
         Arguments
------------
+        ---------
+        name:
+            The name of the reward definition. If omitted, output of the
+            `default_reward` method will be returned.
 
-        name: name of the reward definition. If omitted, output of the
-            `default_reward` method will be returned. 
+        _id:
+            The ID of the calling `agent`.
 
-        _id: ID of the agent that calls the retrieves the reward.
+        Returns
+        -------
+        :
+            The reward for the given `agent`.
         '''
-        if name.lower() == 'default':
-            return self.default_reward(_id)
+        return self._reward(name, _id)
 
-        f, s = self._reward_definitions[name.lower()]
-        temp = f(self.state(s, _id))
-
-        return reildata.ReilData.single_member(name='reward', value=temp)
-
-    def default_reward(self, _id: Optional[int] = None) -> reildata.ReilData:
+    def take_effect(self, action: reildata.ReilData, _id: int = 0) -> None:
         '''
-        Returns the default reward definition of the subject for agent `_id`.
+        Receive an `action` from `agent` with ID=`_id` and transition to
+        the next state.
 
         Arguments
------------
+        ---------
+        action:
+            The action sent by the `agent` that will affect this `subject`.
 
-        _id: ID of the agent that calls the reward method.
-        '''
-        return reildata.ReilData.single_member(name='reward', value=0.0)
-
-    def take_effect(self, action: reildata.ReilData, _id: Optional[int] = None) -> None:
-        '''
-        Receive an `action` from agent `_id` and transition to the next state.
-
-        Arguments
------------
-
-        action: the action sent by the agent that will affect this subject.
-
-        _id: ID of the agent that has sent the action.
+        _id:
+            ID of the `agent` that has sent the `action`.
         '''
         raise NotImplementedError
 
-    def add_reward_definition(self, name: str,
-                              rl_function: rl_functions.RLFunction,
-                              state_name: str) -> None:
-        '''
-        Adds a new reward definition called `name` with function `rl_function`
-        that uses state `state_name`.
-
-        Arguments
------------
-
-        name: name of the new reward definition. ValueError is raise if the reward
-            already exists.
-
-        rl_function: An instance of `RLFunction` that gets the state of the
-            subject, and computes the reward. The rl_function should have the
-            list if arguments from the state in its definition.
-
-        state_name: The name of the state definition that should be used to
-            compute the reward. ValueError is raise if the state_name is
-            undefined.
-
-        Note: statistic and reward are basicly doing the same thing. The
-            difference is in their application: Statistic should be called at
-            the end of each trajectory (sample path) to compute the necessary
-            statistics about the performance of the agents and subjects. Reward,
-            on the other hand, should be called after each interaction between
-            an agent and the subject to guide the reinforcement learning model
-            to learn the optimal policy.
-        '''
-        if name.lower() in self._reward_definitions:
-            raise ValueError(f'Reward definition {name} already exists.')
-
-        if state_name.lower() not in self._state_definitions:
-            raise ValueError(f'Unknown state name: {state_name}.')
-
-        self._reward_definitions[name.lower()] = (rl_function, state_name)
-
     def reset(self) -> None:
-        ''' Resets the subject, so that it can resume accepting actions.'''
+        ''' Reset the `subject`, so that it can resume accepting actions.'''
         raise NotImplementedError
 
     def register(self, agent_name: str, _id: Optional[int] = None) -> int:
         '''
-        Registers an agent and returns its ID. If the agent is new, a new ID
-        is generated and the agent_name is added to agent_list.
+        Register an `agent` and return its ID. If the `agent` is new, a new ID
+        is generated and the `agent_name` is added to the list of
+        registered agents.
 
         Arguments
------------
-        agent_name: the name of the agent to be registered.
+        ---------
+        agent_name:
+            The name of the `agent` to be registered.
 
-        _id: the ID of the agent to be used. If not provided, subject will assign
-            an ID to agent.
+        _id:
+            The ID of the agent to be used. If not provided, subject will
+            assign an ID to the `agent`.
+
+        Returns
+        -------
+        :
+            ID of the registered `agent`.
+
+        Raises
+        ------
+        ValueError:
+            Attempt to register an already registered `agent` with a new ID.
+
+        ValueError:
+            Attempt to register an `agent` with an already assigned ID.
+
+        ValueError:
+            Reached max capacity.
         '''
-        if _id is None:
-            try:
-                return self._agent_list[agent_name]
-            except KeyError:
-                try:
-                    new_id = max(self._agent_list.values()) + 1
-                except ValueError:
-                    new_id = 1
-        else:
-            if agent_name in self._agent_list:
-                if _id == self._agent_list[agent_name]:
-                    return _id
-                else:
-                    raise ValueError(f'{agent_name} is already registered with '
-                                     f'ID: {self._agent_list[agent_name]}.')
-            if _id in self._agent_list.values():
-                raise ValueError(f'{_id} is already taken.')
-            new_id = _id
+        return self._agent_list.append(agent_name=agent_name, _id=_id)
 
-        self._agent_list[agent_name] = new_id
-        return new_id
-
-    def deregister(self, agent_name: str) -> None:
+    def deregister(self, agent_id: int) -> None:
         '''
-        Deregisters an agent given its name.
+        Deregister an `agent` given its ID.
 
         Arguments
------------
-
-        agent_name: the name of the agent to be registered.
+        ---------
+        agent_id:
+            The ID of the `agent` to be deregistered.
         '''
-        self._agent_list.pop(agent_name)
+        self._agent_list.remove(agent_id)
 
 
 SubjectType = TypeVar('SubjectType', bound=Subject)
+
+
+# def reward(self,
+#            _id: int = 0, name: Optional[str] = None) -> reildata.ReilData:
+#     '''
+#     Compute the reward that `agent` receives, based on the reward
+#     definition `name`.
+
+#     Arguments
+#     ---------
+#     _id:
+#         The ID of the calling `agent`.
+
+#     name:
+#         The name of the reward definition. If omitted, output of the
+#         `default_reward` method will be returned.
+
+#     Returns
+#     -------
+#     :
+#         The reward for the given `agent`.
+#     '''
+#     if name is None or name.lower() == 'default':
+#         return self.default_reward(_id)
+
+#     f, s = self._reward_definitions[name.lower()]
+#     temp = f(self.state(s, _id))
+
+#     return reildata.ReilData.single_base(name='reward', value=temp)
+
+# def default_reward(self, _id: int = 0) -> reildata.ReilData:
+#     '''
+#     Compute the default reward definition of the subject for agent `_id`.
+
+#     Arguments
+#     ---------
+#     _id:
+#         ID of the `agent` that calls the reward method.
+
+#     Returns
+#     -------
+#     :
+#         The reward for the given `agent`.
+#     '''
+#     return reildata.ReilData.single_base(name='reward', value=0.0)
+
+# def add_reward_definition(self, name: str,
+#                           rl_function: reil_functions.ReilFunction,
+#                           state_name: str) -> None:
+#     '''
+#     Add a new reward definition called `name` with function `rl_function`
+#     that uses state `state_name`.
+
+#     Arguments
+#     ---------
+#     name:
+#         The name of the new reward definition.
+
+#     rl_function:
+#         An instance of `ReilFunction` that gets the state of the
+#         `subject`, and computes the reward. The `rl_function` should
+#         have the list of arguments from the state in its definition.
+
+#     state_name:
+#         The name of the state definition that should be used to
+#         compute the reward.
+
+#     Raises
+#     ------
+#     ValueError:
+#         The reward `name` already exists.
+
+#     ValueError:
+#         The `state_name` is undefined.
+
+#     Notes
+#     -----
+#         `statistic` and `reward` are basicly doing the same thing. The
+#         difference is in their application: `statistic` should be called at
+#         the end of each trajectory (sampled path) to compute the necessary
+#         statistics about the performance of the `agents` and `subjects`.
+#         `reward`, on the other hand, should be called after each
+#         interaction between an `agent` and the `subject` to guide the
+#         reinforcement learning model to learn the optimal policy.
+#     '''
+#     if name.lower() in self._reward_definitions:
+#         raise ValueError(f'Reward definition {name} already exists.')
+
+#     if state_name.lower() not in self._state_definitions:
+#         raise ValueError(f'Unknown state name: {state_name}.')
+
+#     self._reward_definitions[name.lower()] = (rl_function, state_name)

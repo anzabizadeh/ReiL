@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+'''
+Dense class
+===========
+
+The Dense learner.
+'''
 import pathlib
 from typing import Any, Optional, Tuple, Union
 
@@ -12,24 +19,8 @@ class Dense(learners.Learner[float]):
     '''
     The Dense learner.
 
-    This class uses `tf.keras` to build a sequential dense network with one output.
-
-    Methods
------------
-    from_pickle: loads a learner from a file.
-
-    predict: predicts `y` for a given input list `X`.
-
-    learn: learns using training set `X` and `y`.
-
-    reset: resets the learner.
-
-    load: loads a Dense instance.
-
-    save: saves the learner.
-
-    _generate_network: generates a neural net based on the input size and layer
-    sizes.
+    This class uses `tf.keras` to build a sequential dense network with one
+    output.
     '''
 
     def __init__(self,
@@ -38,29 +29,35 @@ class Dense(learners.Learner[float]):
                  hidden_layer_sizes: Tuple[int, ] = (1,),
                  input_length: Optional[int] = None,
                  tensorboard_path: Optional[Union[str, pathlib.Path]] = None,
-                 **kwargs: Any
-                 ) -> None:
+                 **kwargs: Any) -> None:
         '''
-        Initialize the instance.
-
         Arguments
------------
-        learning_rate: a `LearningRateScheduler` object that determines the
-        learning rate based on epoch. If any scheduler other than constant is
-        provided, the model uses the `new_rate` method of the scheduler to
-        determine the learning rate at each epoch.
+        ---------
+        learning_rate:
+            A `LearningRateScheduler` object that determines the learning rate
+            based on epoch. If any scheduler other than constant is provided,
+            the model uses the `new_rate` method of the scheduler to determine
+            the learning rate at each epoch.
 
-        validation_split: how much of the training set should be used for
-        validation?
+        validation_split:
+            How much of the training set should be used for validation?
 
-        hidden_layer_sizes: a list of number of neurons for each layer.
+        hidden_layer_sizes:
+            A list of number of neurons for each layer.
 
-        input_length: size of the input data. If not supplied, the network will
-        be generated based on the size of the first data point in `predict` or
-        `learn` methods.
+        input_length:
+            Size of the input data. If not supplied, the network will be
+            generated based on the size of the first data point in `predict` or
+            `learn` methods.
 
-        tensorboard_path: a path to save tensorboard outputs. If not provided,
-        tensorboard will be omitted.
+        tensorboard_path:
+            A path to save tensorboard outputs. If not provided,
+            tensorboard will be disabled.
+
+        Raises
+        ------
+        ValueError
+            Validation split not in the range of (0.0, 1.0).
         '''
 
         super().__init__(learning_rate=learning_rate, **kwargs)
@@ -83,12 +80,12 @@ class Dense(learners.Learner[float]):
 
     def _generate_network(self) -> None:
         '''
-        Generate a tensorflow ANN network.
+        Generate a multilayer neural net using `keras.Dense`.
         '''
 
-        self._graph = tf.Graph()
+        self._graph = tf.Graph()  # type: ignore
         with self._graph.as_default():
-            self._session = tf.Session()
+            self._session = tf.Session()  # type: ignore
 
             self._model = keras.models.Sequential()
             self._model.add(
@@ -110,21 +107,30 @@ class Dense(learners.Learner[float]):
                 self._tensorboard_path = pathlib.Path(
                     'logs', self._tensorboard_path)
                 self._tensorboard = keras.callbacks.TensorBoard(
-                    log_dir=self._tensorboard_path)  # , histogram_freq=1)  #, write_images=True)
+                    log_dir=self._tensorboard_path)
+                # , histogram_freq=1)  #, write_images=True)
                 self._callbacks.append(self._tensorboard)
 
-            if not isinstance(self._learning_rate, learners.ConstantLearningRate):
-                self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(
-                    self._learning_rate.new_rate, verbose=1)
+            if not isinstance(self._learning_rate,
+                              learners.ConstantLearningRate):
+                self._learning_rate_scheduler = \
+                    keras.callbacks.LearningRateScheduler(
+                        self._learning_rate.new_rate, verbose=1)
                 self._callbacks.append(self._learning_rate_scheduler)
 
     def predict(self, X: Tuple[ReilData, ...]) -> Tuple[float, ...]:
         '''
-        predicts `y` for a given input list `X`.
+        predict `y` for a given input list `X`.
 
         Arguments
------------
-        X: a list of `ReilData` as inputs to the prediction model.
+        ---------
+        X:
+            A list of `ReilData` as inputs to the prediction model.
+
+        Returns
+        -------
+        :
+            The predicted `y`.
         '''
         _X = [x.normalized.flatten() for x in X]
         if self._graph is None:
@@ -139,13 +145,15 @@ class Dense(learners.Learner[float]):
 
     def learn(self, X: Tuple[ReilData, ...], Y: Tuple[float, ...]) -> None:
         '''
-        Learns using training set `X` and `Y`.
+        Learn using the training set `X` and `Y`.
 
         Arguments
------------
-        X: a list of `ReilData` as inputs to the learning model.
+        ---------
+        X:
+            A list of `ReilData` as inputs to the learning model.
 
-        Y: a list of float labels for the learning model.
+        Y:
+            A list of float labels for the learning model.
         '''
         _X = [x.normalized.flatten() for x in X]
         if self._graph is None:
@@ -154,15 +162,16 @@ class Dense(learners.Learner[float]):
 
         with self._session.as_default():
             with self._graph.as_default():
-                self._model.fit(np.array(_X), np.array(Y),
-                                initial_epoch=self._epoch, epochs=self._epoch+1,
-                                callbacks=self._callbacks,
-                                validation_split=self._validation_split,
-                                verbose=2)
+                self._model.fit(
+                    np.array(_X), np.array(Y),
+                    initial_epoch=self._epoch, epochs=self._epoch+1,
+                    callbacks=self._callbacks,
+                    validation_split=self._validation_split,
+                    verbose=2)
 
     def reset(self) -> None:
         '''
-        resets the learner.
+        reset the learner.
         '''
         self._epoch += 1
 
@@ -170,15 +179,20 @@ class Dense(learners.Learner[float]):
              filename: str,
              path: pathlib.Path) -> Tuple[pathlib.Path, str]:
         '''
-        Saves the learner instance.
+        Extends `ReilBase.save` to handle `TF` objects.
 
         Arguments
------------
-        filename: the name of the file to be saved.
+        ---------
+        filename:
+            The name of the file to be saved.
 
-        path: the path of the file to be saved.
+        path:
+            The path of the file to be saved.
 
-        Raises ValueError if the filename is not specified.
+        Raises
+        ------
+        ValueError:
+            The filename is not specified.
         '''
         path.mkdir(parents=True, exist_ok=True)
         with self._session.as_default():
@@ -187,25 +201,34 @@ class Dense(learners.Learner[float]):
 
         return path, filename
 
-    def load(self, filename: str, path: Optional[Union[str, pathlib.Path]] = None) -> None:
+    def load(self,
+             filename: str,
+             path: Optional[Union[str, pathlib.Path]] = None) -> None:
         '''
-        Loads an instance from a file.
+        Extends `ReilBase.load` to handle `TF` objects.
 
         Arguments
------------
-        filename: the name of the file to be loaded.
+        ---------
+        filename:
+            The name of the file to be loaded.
 
-        path: path of the location of the file.
+        path:
+            Path of the location of the file.
 
-        Raises ValueError if the filename is not specified.
+        Raises
+        ------
+        ValueError:
+            The filename is not specified.
         '''
         _path = path if path is not None else '.'
-        self._graph = tf.Graph()
+        self._graph = tf.Graph()  # type: ignore
         with self._graph.as_default():
             self._session = keras.backend.get_session()
             self._model = keras.models.load_model(
                 pathlib.Path(_path, f'{filename}.tf', filename))
             self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path)  # , histogram_freq=1)  # , write_images=True)
-            self._learning_rate_scheduler = keras.callbacks.LearningRateScheduler(
-                self._learning_rate_scheduler)
+                log_dir=self._tensorboard_path)
+            # , histogram_freq=1)  # , write_images=True)
+            self._learning_rate_scheduler = \
+                keras.callbacks.LearningRateScheduler(
+                    self._learning_rate_scheduler)

@@ -12,4 +12,4 @@ Classes
 
 '''
 
-from .warfarin_stats import WarfarinStats
+from .warfarin_stats import WarfarinStats  # noqa: W0611

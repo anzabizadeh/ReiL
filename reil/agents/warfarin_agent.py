@@ -4,8 +4,6 @@ WarfarinAgent class
 =================
 
 An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
-
-
 '''
 
 import collections
@@ -13,31 +11,60 @@ import functools
 from math import exp, log, sqrt
 from typing import Any, Dict, List, Optional, Tuple
 
-from typing_extensions import Literal
-
 from reil import agents
 from reil.datatypes.reildata import ReilData
+from typing_extensions import Literal
 
 DoseInterval = collections.namedtuple('DoseInterval', 'dose, interval')
 
 
 class DosingProtocol:
+    '''
+    Base class for all dosing protocol objects.
+    '''
+
     def __init__(self) -> None:
         pass
 
     def prescribe(self,
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]) -> Tuple[float, int, Dict[str, Any]]:
+                  additional_info: Dict[str, Any]
+                  ) -> Tuple[float, int, Dict[str, Any]]:
+        '''
+        Prescribe a dose for the given `patient` and `additional_info`.
+
+        Arguments
+        ---------
+        patient:
+            A dictionary of patient characteristics necessary to make dosing
+            decisions.
+
+        additional_info:
+            A dictionary of information being communicated between protocols at
+            each call to `prescribe`. These additional information are
+            protocol-dependent.
+
+        Returns
+        -------
+        :
+            The prescribed dose along with updated `additional_info`.
+        '''
         raise NotImplementedError
 
     def reset(self) -> None:
+        '''Reset the dosing protocol'''
         pass
 
 
 class Aurora(DosingProtocol):
-    def prescribe(self,
+    '''
+    Aurora Dosing Protocol, based on Ravvaz et al. (2017)
+    '''
+
+    def prescribe(self,  # noqa: C901
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]) -> Tuple[float, int, Dict[str, Any]]:
+                  additional_info: Dict[str, Any]
+                  ) -> Tuple[float, int, Dict[str, Any]]:
         today = patient['day']
         INRs = patient['INRs']
         previous_INR = INRs[-1]
@@ -76,7 +103,8 @@ class Aurora(DosingProtocol):
                     previous_INR, previous_dose)
         elif today == 4:
             raise ValueError(
-                'Cannot use Aurora on day 4. Dose on day 4 equals dose on day 3.')
+                'Cannot use Aurora on day 4. '
+                'Dose on day 4 equals dose on day 3.')
         else:  # maintenance dosing
             if 2 <= previous_INR <= 3:
                 number_of_stable_days += self._stable_days(
@@ -87,8 +115,8 @@ class Aurora(DosingProtocol):
                     number_of_stable_days)
             else:
                 number_of_stable_days = 0
-                new_dose, next_interval, skip_dose, red_flag = self.aurora_dosing_table(
-                    previous_INR, previous_dose)
+                new_dose, next_interval, skip_dose, red_flag = \
+                    self.aurora_dosing_table(previous_INR, previous_dose)
                 if red_flag:
                     next_dose = 0.0
                     next_interval = 2
@@ -109,11 +137,57 @@ class Aurora(DosingProtocol):
 
     @staticmethod
     def _stable_days(INR_start: float, INR_end: float, interval: int) -> int:
+        '''
+        Interpolate the INR values in the range and compute the number of days
+        in therapeutic range of [2, 3].
+
+        Arguments
+        ---------
+        INR_start:
+            INR at the beginning of the period.
+
+        INR_end:
+            INR at the end of the period.
+
+        interval:
+            The number of days from start to end.
+
+        Returns
+        -------
+        :
+            The number of days in therapeuric range (TTR).
+
+        Notes
+        -----
+        This method excludes `INR_start` and includes `INR_end` in
+        computing TTR.
+
+        '''
         return sum(2 <= INR_end + (INR_start - INR_end) * i / interval <= 3
                    for i in range(1, interval+1))
 
     @staticmethod
-    def aurora_dosing_table(current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
+    def aurora_dosing_table(
+            current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
+        '''
+        Determine the dosing information, based on Aurora dosing table.
+
+        Arguments
+        ---------
+        current_INR:
+            The latest value of INR.
+
+        dose:
+            The latest dose prescribed.
+
+        Returns
+        -------
+        :
+            * The next dose
+            * The time of the next test (in days).
+            * The number of doses to skip.
+            * Red flag for too high INR values.
+        '''
         skip_dose = 0
         red_flag = False
         if current_INR < 1.50:
@@ -146,14 +220,41 @@ class Aurora(DosingProtocol):
 
     @staticmethod
     def aurora_retesting_table(number_of_stable_days: int) -> int:
+        '''
+        Determine when the next test should be based on current number of
+        stable days.
+
+        Arguments
+        ---------
+        number_of_stable_days:
+            Number of consecutive stable days.
+
+        Returns
+        -------
+        :
+            The time of the next test (in days).
+        '''
         retesting_table = {1: 1, 2: 5, 7: 7, 14: 14, 28: 28}
         return retesting_table[max(
-            map(lambda x: x if x <= number_of_stable_days else 1, retesting_table))]
+            map(lambda x: x if x <= number_of_stable_days else 1,
+                retesting_table))]
 
 
 class IWPC(DosingProtocol):
+    '''
+    IWPC dosing protocol ('pharmacogenetic', 'clinical', 'modified').
+    '''
+
     def __init__(self,
-                 method: Literal['pharmacogenetic', 'clinical', 'modified'] = 'pharmacogenetic') -> None:
+                 method: Literal['pharmacogenetic',
+                                 'clinical',
+                                 'modified'] = 'pharmacogenetic') -> None:
+        '''
+        Arguments
+        ---------
+        method:
+            One of 'pharmacogenetic', 'clinical', 'modified'.
+        '''
         if method.lower() == 'clinical':
             self._method = self.clinical
         elif method.lower() == 'modified':
@@ -165,8 +266,8 @@ class IWPC(DosingProtocol):
 
     def prescribe(self,
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]) -> Tuple[float, int, Dict[str, Any]]:
-
+                  additional_info: Dict[str, Any]
+                  ) -> Tuple[float, int, Dict[str, Any]]:
         if self._doses:
             dose = self._doses.pop()
             interval = 1
@@ -182,6 +283,28 @@ class IWPC(DosingProtocol):
 
     @staticmethod
     def clinical(patient: Dict[str, Any]) -> Tuple[float, int]:
+        '''
+        Determine warfarin dose using clinical IWPC formula.
+
+        Arguments
+        ---------
+        patient:
+            A dictionary of patient characteristics including:
+            * age
+            * height (in)
+            * weight (lb)
+            * race ('Asian', 'Black', etc.)
+            * amiodarone ('yes', 'no')
+
+        Returns
+        -------
+        :
+            The dose and time for the next test.
+
+        Notes
+        -----
+        This method always returns 2 (days) for the next test.
+        '''
         weekly_dose = (4.0376
                        - 0.2546 * (patient['age'] // 10)
                        # in to cm
@@ -190,8 +313,10 @@ class IWPC(DosingProtocol):
                        + 0.0134 * patient['weight'] * 0.454
                        - 0.6752 * (patient['race'] == 'Asian')
                        + 0.4060 * (patient['race'] == 'Black')
-                       # + 0.0443 * (patient['race'] not in  [...])  # missing or mixed race
-                       # Enzyme inducer status (Fluvastatin is reductant not an inducer!)
+                       # # missing or mixed race
+                       # + 0.0443 * (patient['race'] not in  [...])
+                       # Enzyme inducer status
+                       # (Fluvastatin is reductant not an inducer!)
                        + 1.2799 * 0
                        - 0.5695 * (patient['amiodarone'] == 'Yes')) ** 2
 
@@ -200,8 +325,33 @@ class IWPC(DosingProtocol):
     # only the initial dose (day <= 2)
     @staticmethod
     def pg(patient: Dict[str, Any]) -> Tuple[float, int]:
+        '''
+        Determine warfarin dose using pharmacogenetic IWPC formula.
+
+        Arguments
+        ---------
+        patient:
+            A dictionary of patient characteristics including:
+            * age
+            * height (in)
+            * weight (lb)
+            * VKORC1 ('G/G', 'G/A', 'A/A', etc.)
+            * CYP2C9 ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3',...)
+            * race ('Asian', 'Black', etc.)
+            * amiodarone ('yes', 'no')
+
+        Returns
+        -------
+        :
+            The dose and time for the next test.
+
+        Notes
+        -----
+        This method always returns 2 (days) for the next test.
+        '''
         weekly_dose = (5.6044
-                       # Based on Ravvaz (EU-PACT (page 18) uses year, Ravvaz (page 10 of annex) uses decades!
+                       # Based on Ravvaz (EU-PACT (page 18) uses year, Ravvaz
+                       # (page 10 of annex) uses decades!
                        - 0.2614 * (patient['age'] // 10)
                        + 0.0087 * patient['height'] * 2.54  # in to cm
                        + 0.0128 * patient['weight'] * 0.454  # lb to kg
@@ -219,13 +369,16 @@ class IWPC(DosingProtocol):
                        # Not in EU-PACT
                        - 0.2188 * \
                        int(patient['CYP2C9'] not in [
-                           '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3', '*1/*1'])
+                           '*1/*1', '*1/*2', '*1/*3',
+                           '*2/*2', '*2/*3', '*3/*3'])
                        # Not in EU-PACT
                        - 0.1092 * (patient['race'] == 'Asian')
                        # Not in EU-PACT
                        - 0.2760 * (patient['race'] == 'Black')
-                       # - 1.0320 * (patient['race'] not in  [...])  # missing or mixed race - Not in EU-PACT
-                       # Enzyme inducer status (Fluvastatin is reductant not an inducer!) (comment by Ravvaz)
+                       # # missing or mixed race - Not in EU-PACT
+                       # - 1.0320 * (patient['race'] not in  [...])
+                       # Enzyme inducer status(Fluvastatin is reductant
+                       # not an inducer!) (comment by Ravvaz)
                        + 1.1816 * 0
                        - 0.5503 * (patient['amiodarone'] == 'Yes')) ** 2
 
@@ -233,8 +386,33 @@ class IWPC(DosingProtocol):
 
     @staticmethod
     def modified_pg(patient: Dict[str, Any]) -> Tuple[List[float], int]:
+        '''
+        Determine warfarin dose using the modified pharmacogenetic IWPC
+        formula.
+
+        Arguments
+        ---------
+        patient:
+            A dictionary of patient characteristics including:
+            * age
+            * height (in)
+            * weight (lb)
+            * VKORC1 ('G/G', 'G/A', 'A/A', etc.)
+            * CYP2C9 ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3',...)
+            * amiodarone ('yes', 'no')
+
+        Returns
+        -------
+        :
+            A list of dose and time for the next test.
+
+        Notes
+        -----
+        This method always returns 1 (day) for the next test.
+        '''
         weekly_dose = (5.6044
-                       # Based on Ravvaz (EU-PACT (page 18) uses year, Ravvaz (page 10 of annex) uses decades!
+                       # Based on Ravvaz (EU-PACT (page 18) uses year,
+                       # Ravvaz (page 10 of annex) uses decades!
                        - 0.2614 * (patient['age'] / 10)
                        # in to cm
                        + 0.0087 * patient['height'] * 2.54
@@ -259,7 +437,8 @@ class IWPC(DosingProtocol):
         LD3 = weekly_dose / ((1 - exp(-24*k[patient['CYP2C9']])) * (
             1 + exp(-24*k[patient['CYP2C9']]) + exp(-48*k[patient['CYP2C9']])))
         # The following dose calculation is based on EU-PACT report page 19
-        # Ravvaz uses the same formula, but uses weekly dose. However, EU-PACT explicitly mentions "predicted daily dose (D)"
+        # Ravvaz uses the same formula, but uses weekly dose. However,
+        # EU-PACT explicitly mentions "predicted daily dose (D)"
         doses = [(1.5 * LD3 - 0.5 * weekly_dose) / 7,
                  LD3 / 7,
                  (0.5 * LD3 + 0.5 * weekly_dose) / 7]
@@ -267,50 +446,59 @@ class IWPC(DosingProtocol):
         return doses, 1
 
     def reset(self) -> None:
+        '''Reset the dosing protocol'''
         self._doses = []
 
 
 class Lenzini(DosingProtocol):
+    '''Lenzini warfarin dosing protocol based on Lenzini (2010).'''
+
     def prescribe(self,
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]) -> Tuple[float, int, Dict[str, Any]]:
+                  additional_info: Dict[str, Any]
+                  ) -> Tuple[float, int, Dict[str, Any]]:
         if patient['day'] != 4:
             raise ValueError('Lenzini can only be called on day 4.')
 
-        dose = exp(3.10894
-                   - 0.00767 * patient['age']
-                   - 0.51611 * log(patient['INRs'][-1])  # Natural log
-                   - 0.23032 * (1 * (patient['VKORC1'] == 'G/A')  # Heterozygous
-                                + 2 * (patient['VKORC1'] == 'A/A'))  # Homozygous
-                   - 0.14745 * (1 * (patient['CYP2C9'] in ['*1/*2', '*2/*3'])  # Heterozygous
-                                + 2 * (patient['CYP2C9'] == '*2/*2'))  # Homozygous
-                   - 0.30770 * (1 * (patient['CYP2C9'] in ['*1/*3', '*2/*3'])  # Heterozygous
-                                + 2 * (patient['CYP2C9'] == '*3/*3'))  # Homozygous
-                   + 0.24597 * \
-                   sqrt(patient['height'] * 2.54 * \
-                        patient['weight'] * 0.454 / 3600)  # BSA
-                   + 0.26729 * 2.5  # target INR
-                   - 0.10350 * (patient['amiodarone'] == 'Yes')
-                   + 0.01690 * patient['Doses'][-2]
-                   + 0.02018 * patient['Doses'][-3]
-                   # available if INR is measured on day 5
-                   + 0.01065 * patient['Doses'][-4]
-                   ) / 7
+        dose = exp(
+            3.10894
+            - 0.00767 * patient['age']
+            - 0.51611 * log(patient['INRs'][-1])  # Natural log
+            - 0.23032 * (1 * (patient['VKORC1'] == 'G/A')  # Heterozygous
+                         + 2 * (patient['VKORC1'] == 'A/A'))  # Homozygous
+            - 0.14745 * (1 * (patient['CYP2C9'] in ['*1/*2', '*2/*3'])  # Het.
+                         + 2 * (patient['CYP2C9'] == '*2/*2'))  # Homozygous
+            - 0.30770 * (1 * (patient['CYP2C9'] in ['*1/*3', '*2/*3'])  # Het.
+                         + 2 * (patient['CYP2C9'] == '*3/*3'))  # Homozygous
+            + 0.24597 * \
+            sqrt(patient['height'] * 2.54 * \
+                 patient['weight'] * 0.454 / 3600)  # BSA
+            + 0.26729 * 2.5  # target INR
+            - 0.10350 * (patient['amiodarone'] == 'Yes')
+            + 0.01690 * patient['Doses'][-2]
+            + 0.02018 * patient['Doses'][-3]
+            # available if INR is measured on day 5
+            + 0.01065 * patient['Doses'][-4]
+        ) / 7
 
         return dose, 2, {}
 
 
 class Intermountain(DosingProtocol):
-    # based on https://www.ahajournals.org/doi/10.1161/circulationaha.107.737312
-    # supplements Appendix B
+    '''
+    Intermountain warfarin dosing protocol based on
+    https://www.ahajournals.org/doi/10.1161/circulationaha.107.737312
+    supplements Appendix B
+    '''
+
     def __init__(self, enforce_day_ge_8: bool = True) -> None:
         super().__init__()
         self._enforce_day_ge_8 = enforce_day_ge_8
 
     def prescribe(self,
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]) -> Tuple[float, int, Dict[str, Any]]:
-
+                  additional_info: Dict[str, Any]
+                  ) -> Tuple[float, int, Dict[str, Any]]:
         dose_interval_list = additional_info.get('dose_interval_list', [])
         last_zone = additional_info.get('last_zone', '')
         previous_INR = patient['INRs'][-1]
@@ -324,13 +512,15 @@ class Intermountain(DosingProtocol):
             if self._enforce_day_ge_8 and today == 8:
                 dose_list = patient['Doses']
                 interval_list = patient['Intervals']
-                dose_list = functools.reduce(lambda x, y: x+y,
-                                             ([dose_list[-i]]*interval_list[-i]
-                                              for i in range(len(interval_list), 0, -1)))
+                dose_list = functools.reduce(
+                    lambda x, y: x+y,
+                    ([dose_list[-i]]*interval_list[-i]
+                     for i in range(len(interval_list), 0, -1)))
 
                 if len(dose_list) < 3:
                     raise ValueError(
-                        'Intermountain requires doses for days 5 to 7 for dosing on day 8.')
+                        'Intermountain requires doses for days 5 to 7 '
+                        'for dosing on day 8.')
 
                 previous_dose = sum(dose_list[-3:])/3
             else:
@@ -341,20 +531,51 @@ class Intermountain(DosingProtocol):
 
         else:
             if dose_interval_list[0].interval == -1:
-                dose_interval_list, last_zone = self.intermountain_dosing_table(
-                    previous_INR, last_zone, dose_interval_list[0].dose)
+                dose_interval_list, last_zone = \
+                    self.intermountain_dosing_table(
+                        previous_INR, last_zone, dose_interval_list[0].dose)
 
         additional_info['last_zone'] = last_zone
         additional_info['dose_interval_list'] = dose_interval_list[1:]
 
-        return dose_interval_list[0].dose, dose_interval_list[0].interval, additional_info
+        return (dose_interval_list[0].dose,
+                dose_interval_list[0].interval, additional_info)
 
-    @staticmethod
+    @staticmethod  # noqa: C901
     def intermountain_dosing_table(
             INR: float,
             last_zone: str,
             daily_dose: float) -> Tuple[List[DoseInterval], str]:
+        '''
+        Determine the dosing information, based on Intermountain dosing table.
 
+        Arguments
+        ---------
+        current_INR:
+            The latest value of INR.
+
+        last_zone:
+            The last zone the patient was in.
+            * action point low
+            * red zone low
+            * yellow zone low
+            * green zone
+            * yellow zone high
+            * red zone high
+            * action point high
+
+        daily_dose:
+            The latest daily dose prescribed.
+
+        Returns
+        -------
+        :
+            * A list of `DoseInterval`s. It always includes the new daily dose
+              and the new next test (in days). If an immediate dose is
+              necessary, the first item will be the immediate dose and the next
+              test day.
+            * The new zone that patient's INR falls into.
+        '''
         zone = Intermountain.zone(INR)
 
         weekly_dose = daily_dose * 7
@@ -419,6 +640,26 @@ class Intermountain(DosingProtocol):
 
     @staticmethod
     def zone(INR: float) -> str:
+        '''
+        Determine the zone based on patient's INR.
+
+        Arguments
+        ---------
+        INR:
+            the value of a patient's INR.
+
+        Returns
+        -------
+        :
+            Name of the dose, one of:
+            * action point low
+            * red zone low
+            * yellow zone low
+            * green zone
+            * yellow zone high
+            * red zone high
+            * action point high
+        '''
         if INR < 1.60:
             z = 'action point low'
         elif INR < 1.80:
@@ -438,19 +679,51 @@ class Intermountain(DosingProtocol):
 
 
 class CompositeDosingProtocol:
+    '''
+    A dosing protocol class that can contain three dosing protocols for
+    `initial`, `adjustment` and `maintenance` phases of dosing.
+    '''
+
     def __init__(self,
                  initial_protocol: DosingProtocol,
                  adjustment_protocol: DosingProtocol,
                  maintenance_protocol: DosingProtocol) -> None:
+        '''
+        Arguments
+        ---------
+        initial_protocol:
+            A dosing protocol for the initial phase of dosing.
+
+        adjustment_protocol
+            A dosing protocol for the adjustment phase of dosing.
+
+        maintenance_protocol
+            A dosing protocol for the maintenance phase of dosing.
+        '''
         self._initial_protocol = initial_protocol
         self._adjustment_protocol = adjustment_protocol
         self._maintenance_protocol = maintenance_protocol
         self._additional_info = {}
 
     def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
+        '''
+        Prescribe a dose and next test (in days) for the given `patient`.
+
+        Arguments
+        ---------
+        patient:
+            A dictionary of patient characteristics necessary to make dosing
+            decisions.
+
+        Returns
+        -------
+        :
+            The prescribed dose and the time of the next test (in days).
+        '''
         raise NotImplementedError
 
     def reset(self) -> None:
+        '''Reset the dosing protocol.'''
         self._initial_protocol.reset()
         self._adjustment_protocol.reset()
         self._maintenance_protocol.reset()
@@ -458,25 +731,35 @@ class CompositeDosingProtocol:
 
 
 class AAA(CompositeDosingProtocol):
+    '''
+    A composite dosing protocol with `Aurora` in all phases.
+    '''
+
     def __init__(self) -> None:
         aurora_instance = Aurora()
         super().__init__(aurora_instance, aurora_instance, aurora_instance)
 
     def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
-        dose, interval, self._additional_info = self._initial_protocol.prescribe(
-            patient, self._additional_info)
+        dose, interval, self._additional_info = \
+            self._initial_protocol.prescribe(patient, self._additional_info)
 
         return dose, interval
 
 
 class CAA(CompositeDosingProtocol):
+    '''
+    A composite dosing protocol with clinical `IWPC` in initial phase, and
+    `Aurora` in adjustment and maintenance phases.
+    '''
+
     def __init__(self) -> None:
         iwpc_instance = IWPC('clinical')
         aurora_instance = Aurora()
         super().__init__(iwpc_instance, aurora_instance, aurora_instance)
 
     def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
-        fn = self._initial_protocol if patient['day'] <= 2 else self._adjustment_protocol
+        fn = (self._initial_protocol if patient['day'] <= 2
+              else self._adjustment_protocol)
         dose, interval, self._additional_info = fn.prescribe(
             patient, self._additional_info)
 
@@ -484,13 +767,19 @@ class CAA(CompositeDosingProtocol):
 
 
 class PGAA(CompositeDosingProtocol):
+    '''
+    A composite dosing protocol with pharmacogenetic `IWPC` in initial phase,
+    and `Aurora` in adjustment and maintenance phases.
+    '''
+
     def __init__(self) -> None:
         iwpc_instance = IWPC('pharmacogenetic')
         aurora_instance = Aurora()
         super().__init__(iwpc_instance, aurora_instance, aurora_instance)
 
     def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
-        fn = self._initial_protocol if patient['day'] <= 2 else self._adjustment_protocol
+        fn = (self._initial_protocol if patient['day'] <= 2
+              else self._adjustment_protocol)
         dose, interval, self._additional_info = fn.prescribe(
             patient, self._additional_info)
 
@@ -498,6 +787,11 @@ class PGAA(CompositeDosingProtocol):
 
 
 class PGPGA(CompositeDosingProtocol):
+    '''
+    A composite dosing protocol with modified `IWPC` in initial phase,
+    `Lenzini` in adjustment phase, and `Aurora` in maintenance phase.
+    '''
+
     def __init__(self) -> None:
         iwpc_instance = IWPC('modified')
         lenzini_instance = Lenzini()
@@ -519,11 +813,17 @@ class PGPGA(CompositeDosingProtocol):
 
 
 class PGPGI(CompositeDosingProtocol):
+    '''
+    A composite dosing protocol with modified `IWPC` in initial phase,
+    `Lenzini` in adjustment phase, and `Intermountain` in maintenance phase.
+    '''
+
     def __init__(self) -> None:
         iwpc_instance = IWPC('modified')
         lenzini_instance = Lenzini()
         intermountain_instance = Intermountain(enforce_day_ge_8=False)
-        super().__init__(iwpc_instance, lenzini_instance, intermountain_instance)
+        super().__init__(
+            iwpc_instance, lenzini_instance, intermountain_instance)
 
     def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
         if patient['day'] <= 3:
@@ -543,24 +843,19 @@ class WarfarinAgent(agents.NoLearnAgent):
     '''
     An `agent` that prescribes dose for a warfarin `subject`,
     based on the dosing protocols defined in Ravvaz et al (2017).
-
-    Methods
------------
-    act: returns an `action` based on the given `state`.
-
-    reset: Resets the dosing algorithm to day 1.
     '''
-    def __init__(self,
-                 study_arm: Literal['aaa', 'caa', 'pgaa', 'pgpgi', 'pgpga'] = 'aaa',
-                 name: str = 'warfarin_agent'):
-        '''
-        Initializes the warfarin `agent`.
 
-        Arguments
------------
-        study_arm: one of available study arms: aaa, caa, pgaa, pgpgi, pgpga
+    def __init__(self,
+                 study_arm: Literal['aaa', 'caa', 'pgaa',
+                                    'pgpgi', 'pgpga'] = 'aaa',
+                 **kwargs: Any):
         '''
-        super().__init__(name=name)
+        Arguments
+        ---------
+        study_arm:
+            One of available study arms: aaa, caa, pgaa, pgpgi, pgpga
+        '''
+        super().__init__(**kwargs)
 
         if study_arm.lower() in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
             self._protocol = AAA()
@@ -578,12 +873,24 @@ class WarfarinAgent(agents.NoLearnAgent):
             actions: Optional[Tuple[ReilData, ...]] = None,
             epoch: Optional[int] = 0) -> ReilData:
         '''
-        Generates the dosing `action` based on the `state` and current dosing 
+        Generate the dosing `action` based on the `state` and current dosing
         protocol.
 
         Arguments
------------
-        state: the state for which an action is chosen.
+        ---------
+        state:
+            The state for which the action should be returned.
+
+        actions:
+            The set of possible actions to choose from.
+
+        epoch:
+            The epoch in which the agent is acting.
+
+        Returns
+        -------
+        :
+            The action
         '''
         patient = state.value
         patient['day'] += 1
@@ -591,9 +898,12 @@ class WarfarinAgent(agents.NoLearnAgent):
         dose, interval = self._protocol.prescribe(patient)
 
         # Cuts out the dose if it is >15.0
-        return ReilData(
-            [{'name': 'dose', 'value': min(dose, 15.0), 'lower': 0.0, 'upper': 15.0},
-             {'name': 'interval', 'value': min(interval, 28), 'lower': 1, 'upper': 28}])
+        return ReilData([
+            {'name': 'dose', 'value': min(dose, 15.0),
+             'lower': 0.0, 'upper': 15.0},
+            {'name': 'interval', 'value': min(interval, 28),
+             'lower': 1, 'upper': 28}
+        ])
 
     def reset(self):
         '''Resets the agent at the end of a learning epoch.'''
@@ -625,32 +935,39 @@ class WarfarinAgent(agents.NoLearnAgent):
 #     if patient['day'] <= 2:
 #         self._dose = 10.0 if patient['age'] < 65.0 else 5.0
 #     elif patient['day'] <= 4:
-#         day_2_INR = patient['INRs'][-1] if patient['day'] == 3 else patient['INRs'][-2]
+#         day_2_INR = (patient['INRs'][-1] if patient['day'] == 3
+#                      else patient['INRs'][-2])
 #         if day_2_INR >= 2.0:
 #             self._dose = 5.0
 #             if day_2_INR <= 3.0:
 #                 self._early_therapeutic = True
 
-#             self._number_of_stable_days, next_test = self._aurora_retesting_table(
-#                 patient['INRs'][-1], self._number_of_stable_days, self._early_therapeutic)
+#             self._number_of_stable_days, next_test = \
+#                 self._aurora_retesting_table(patient['INRs'][-1],
+#                                              self._number_of_stable_days,
+#                                              self._early_therapeutic)
 #         else:
 #             self._dose, next_test, _, _ = self._aurora_dosing_table(
 #                 day_2_INR, self._dose)
 #     else:
-#         self._number_of_stable_days, next_test = self._aurora_retesting_table(
-#             patient['INRs'][-1], self._number_of_stable_days, self._early_therapeutic)
+#         self._number_of_stable_days, next_test = \
+#             self._aurora_retesting_table(
+#               patient['INRs'][-1],
+#               self._number_of_stable_days,
+#               self._early_therapeutic)
 
 #     if next_test == -1:
-#         self._early_therapeutic = False
+# #         self._early_therapeutic = False
 #         self._number_of_stable_days = 0
-#         self._dose, next_test, self._skip_dose, self._red_flag = self._aurora_dosing_table(
-#             patient['INRs'][-1], self._dose)
+#         self._dose, next_test, self._skip_dose, self._red_flag = \
+#           self._aurora_dosing_table(patient['INRs'][-1], self._dose)
 
 #     self._retest_day = patient['day'] + next_test
 
 #     return self._dose if self._skip_dose == 0 else 0.0
 
-# def _aurora_dosing_table(self, current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
+# def _aurora_dosing_table(self,
+#     current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
 #     skip_dose = 0
 #     red_flag = False
 #     if current_INR < 1.50:
@@ -698,7 +1015,8 @@ class WarfarinAgent(agents.NoLearnAgent):
 #         max_gap = 26
 #     if 2.0 <= current_INR <= 3.0:
 #         number_of_stable_days = min(
-#             number_of_stable_days + next_test[number_of_stable_days], max_gap)
+#             number_of_stable_days + next_test[number_of_stable_days],
+#             max_gap)
 #     else:
 #         return -1, -1
 

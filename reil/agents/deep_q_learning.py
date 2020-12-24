@@ -8,18 +8,21 @@ A Q-learning `agent` with a Neural Network Q-function approximator.
 
 from typing import Any
 
-from reil import agents, learners
-from reil.utils import buffers, exploration_strategies
+from reil.agents import QLearning
+from reil.datatypes.buffers import VanillaExperienceReplay
+from reil.learners import Dense
+from reil.utils.exploration_strategies import ExplorationStrategy
 
 
-class DeepQLearning(agents.QLearning):
+class DeepQLearning(QLearning):
     '''
     A Deep Q-learning `agent`.
     '''
+
     def __init__(self,
-                 learner: learners.Dense,
-                 buffer: buffers.VanillaExperienceReplay,
-                 exploration_strategy: exploration_strategies.ExplorationStrategy,
+                 learner: Dense,
+                 buffer: VanillaExperienceReplay,
+                 exploration_strategy: ExplorationStrategy,
                  method: str = 'backward',
                  **kwargs: Any):
         '''
@@ -34,8 +37,8 @@ class DeepQLearning(agents.QLearning):
 
         exploration_strategy:
             An `ExplorationStrategy` object that determines
-            whether the `action` should be exploratory or not for a given `state` at
-            a given `epoch`.
+            whether the `action` should be exploratory or not for a given
+            `state` at a given `epoch`.
 
         method:
             Either 'forward' or 'backward' Q-learning.

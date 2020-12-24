@@ -7,22 +7,25 @@ This module provides different learners in reinforcement learning context.
 
 Classes
 -------
-Learner: the super class of all learner classes
+Learner:
+    The base class of all `learner` classes
 
-Dense: a fully-connected neural net
+Dense:
+    A fully-connected neural net
 
-QLookupTable: a simple lookup table for Q-learning
+QLookupTable:
+    A simple lookup table for Q-learning
 
-LearningRateScheduler: base class for learning rate schedulers
+LearningRateScheduler:
+    Base class for learning rate schedulers
 
-ConstantLearningRate: a class that returns a constant learning rate
-
-
+ConstantLearningRate:
+    A class that returns a constant learning rate
 '''
 
-from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
-                                                    LearningRateScheduler)
+from .learning_rate_schedulers import (  # noqa: W0611
+    LearningRateScheduler, ConstantLearningRate)
 
-from reil.learners.learner import Learner
-from reil.learners.fully_connected_neural_net import Dense
-from reil.learners.lookup_table import QLookupTable, TableEntry
+from .learner import Learner  # noqa: W0611
+from .lookup_table import QLookupTable, TableEntry  # noqa: W0611
+from .fully_connected_neural_net import Dense  # noqa: W0611

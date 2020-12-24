@@ -4,8 +4,6 @@ RandomAgent class
 =================
 
 An agent that randomly chooses an action
-
-
 '''
 
 import random
@@ -19,10 +17,6 @@ from reil.utils import functions
 class RandomAgent(agents.NoLearnAgent):
     '''
     An agent that acts randomly.
-
-    Methods
------------
-    act: return an action randomly.
     '''
 
     def __init__(self,
@@ -38,10 +32,20 @@ class RandomAgent(agents.NoLearnAgent):
         Return a random action.
 
         Arguments
------------
-        state: the state for which the action should be returned.
+        ---------
+        state:
+            The state for which the action should be returned.
 
-        actions: the set of possible actions to choose from.
+        actions:
+            The set of possible actions to choose from.
+
+        epoch:
+            The epoch in which the agent is acting.
+
+        Returns
+        -------
+        :
+            The action
         '''
         return random.choice(functions.get_argument(
             actions, self._default_actions))

@@ -22,7 +22,8 @@ class HambergPKPDFixedMaxTime(HealthMathModel):
         self._Q = 0.131    # (L/h)
         self._lambda = 3.61
 
-        # bioavilability fraction 0-1 (from: "Applied Pharmacokinetics & Pharmacodynamics 4th edition, p.717", some other references)
+        # bioavilability fraction 0-1 (from: "Applied Pharmacokinetics &
+        # Pharmacodynamics 4th edition, p.717", some other references)
         self._F = 0.9
 
         self._ka = 2  # absorption rate (1/hr)
@@ -64,7 +65,8 @@ class HambergPKPDFixedMaxTime(HealthMathModel):
         self._last_computed_day = 1
         self._A = np.array([0.0] + [1.0] * 8)
 
-        # prepend time 0 to the list of times for deSolve initial conditions (remove when returning list of times)
+        # prepend time 0 to the list of times for deSolve
+        # initial conditions (remove when returning list of times)
         len_times = self._max_time + 1
         times = list(range(len_times))
         # times also equals the time-step for deSolve
@@ -78,20 +80,27 @@ class HambergPKPDFixedMaxTime(HealthMathModel):
         beta = (b - math.sqrt(b ** 2 - 4*c)) / 2
 
         # 2-compartment model
-        part_1 = np.array(list(((k21 - alpha) / ((self._ka - alpha)*(beta - alpha)))
-                               * temp for temp in (math.exp(-alpha * t) for t in times)))
-        part_2 = np.array(list(((k21 - beta) / ((self._ka - beta)*(alpha - beta)))
-                               * temp for temp in (math.exp(-beta * t) for t in times)))
-        part_3 = np.array(list(((k21 - self._ka) / ((self._ka - alpha)*(self._ka - beta)))
-                               * temp for temp in (math.exp(-self._ka * t) for t in times)))
+        part_1 = np.array(
+            list(((k21 - alpha) / ((self._ka - alpha)*(beta - alpha)))
+                 * temp for temp in (math.exp(-alpha * t) for t in times)))
+        part_2 = np.array(
+            list(((k21 - beta) / ((self._ka - beta)*(alpha - beta)))
+                 * temp for temp in (math.exp(-beta * t) for t in times)))
+        part_3 = np.array(
+            list(((k21 - self._ka) / ((self._ka - alpha)*(self._ka - beta)))
+                 * temp for temp in (math.exp(-self._ka * t) for t in times)))
 
-        multiplication_term = ((self._ka * self._F / 2) /
-                               self._V1) * (part_1 + part_2 + part_3).clip(min=1e-5)  # type:ignore
+        multiplication_term = (
+            (self._ka * self._F / 2) /
+            self._V1) * (part_1 + part_2 + part_3).clip(min=1e-5)
 
         if self._randomized:
-            self._Cs_error = np.exp(np.random.normal(0, 0.09, len_times))  # type:ignore
-            self._Cs_error_ss = np.exp(np.random.normal(0, 0.30, len_times))  # type:ignore
-            self._exp_e_INR = np.exp(np.random.normal(0, 0.0325, len_times))  # type:ignore
+            self._Cs_error = np.exp(  # type:ignore
+                np.random.normal(0, 0.09, len_times))
+            self._Cs_error_ss = np.exp(  # type:ignore
+                np.random.normal(0, 0.30, len_times))
+            self._exp_e_INR = np.exp(  # type:ignore
+                np.random.normal(0, 0.0325, len_times))
         else:
             self._Cs_error = self._Cs_error_ss = np.ones(len_times)
             self._exp_e_INR = np.ones(len_times)
@@ -111,8 +120,10 @@ class HambergPKPDFixedMaxTime(HealthMathModel):
     def run(self, **inputs) -> Dict[str, Any]:
         '''
         inputs should include:
-            - a dictionary called "dose" with days for each dose as keys and the amount of dose as values.
-            - a list called "measurement_days" that shows INRs of which days should be returned.
+        - a dictionary called "dose" with days for each dose as keys and
+          the amount of dose as values.
+        - a list called "measurement_days" that shows INRs of which days
+          should be returned.
         '''
         self.dose = inputs.get('dose', {})
 
@@ -139,29 +150,36 @@ class HambergPKPDFixedMaxTime(HealthMathModel):
                     Cs = self._Cs(dose=v, t0=range_start, zero_padding=False)
                     range_end = min(
                         range_start + Cs.shape[0], self._max_time + 1)
-                    self._total_Cs[range_start:range_end] += Cs[:range_end-range_start]
+                    self._total_Cs[range_start:range_end] += \
+                        Cs[:range_end-range_start]
                     self._last_computed_day = min(day, self._last_computed_day)
 
     def _Cs(self, dose: float, t0: int, zero_padding: bool = True) -> np.array:
         # C_s_pred = dose * self._multiplication_term
 
         # if t0 == 0:  # non steady-state
-        #     C_s_error = np.array([exp(gauss(0, 0.09)) for _ in range(len(C_s_pred))]) if self._randomized \
+        #     C_s_error = np.array([exp(gauss(0, 0.09))
+        #                           for _ in range(len(C_s_pred))]) \
+        #                   if self._randomized \
         #         else np.ones(len(C_s_pred))  # Sadjad
         # else:  # steady-state
-        #     C_s_error = np.array([exp(gauss(0, 0.30)) for _ in range(len(C_s_pred))]) if self._randomized \
+        #     C_s_error = np.array([exp(gauss(0, 0.30)) 
+        #                           for _ in range(len(C_s_pred))]) \
+        #                   if self._randomized \
         #         else np.ones(len(C_s_pred))
 
         # C_s = np.multiply(C_s_pred, C_s_error).clip(min=0)
 
-        # return np.pad(C_s, (t0, 0), 'constant', constant_values=(0,))[:self._max_time+1]
+        # return np.pad(C_s, (t0, 0), 'constant', 
+        #     constant_values=(0,))[:self._max_time+1]
 
         if t0 == 0:
             C_s = dose * self._multiplication_term_err
         else:
             C_s = dose * self._multiplication_term_err_ss
 
-        return np.concatenate((np.array([0]*t0), C_s[:-t0])) if zero_padding else C_s
+        return np.concatenate(
+            (np.array([0]*t0), C_s[:-t0])) if zero_padding else C_s
 
     def INR(self, days: Union[int, List[int]]) -> List[float]:
         if isinstance(days, int):

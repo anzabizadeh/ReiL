@@ -4,8 +4,6 @@ UserAgent class
 ===============
 
 An agent that prints the state and asks the user for action.
-
-
 '''
 from typing import Any, Optional, Tuple
 
@@ -17,11 +15,8 @@ from reil.utils import functions
 class UserAgent(agents.NoLearnAgent):
     '''
     An agent that acts based on user input.
+    '''
 
-    Methods
------------
-    act: return user's chosen action.
-    ''' 
     def __init__(self,
                  default_actions: Tuple[ReilData, ...] = (),
                  **kwargs: Any):
@@ -32,13 +27,23 @@ class UserAgent(agents.NoLearnAgent):
             actions: Optional[Tuple[ReilData, ...]] = None,
             epoch: int = 0) -> ReilData:
         '''
-        Return an action based user input.
+        Return a random action.
 
         Arguments
------------
-        state: the state for which the action should be returned.
+        ---------
+        state:
+            The state for which the action should be returned.
 
-        actions: the set of possible actions to choose from.
+        actions:
+            The set of possible actions to choose from.
+
+        epoch:
+            The epoch in which the agent is acting.
+
+        Returns
+        -------
+        :
+            The action
         '''
         possible_actions = functions.get_argument(
             actions, self._default_actions)

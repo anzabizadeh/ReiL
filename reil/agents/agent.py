@@ -4,7 +4,7 @@ Agent class
 ===========
 
 This `agent` class is the base class of all agent classes that can learn from
-`history`. 
+`history`.
 '''
 
 import pathlib
@@ -39,8 +39,8 @@ class Agent(agents.NoLearnAgent):
 
         exploration_strategy:
             an `ExplorationStrategy` object that determines
-            whether the `action` should be exploratory or not for a given `state`
-            at a given `epoch`.
+            whether the `action` should be exploratory or not for a given
+            `state` at a given `epoch`.
 
         discount_factor:
             by what factor should future rewards be discounted?
@@ -55,14 +55,16 @@ class Agent(agents.NoLearnAgent):
             how to choose the `action` if more than one is candidate
             to be chosen.
         '''
+        self._tie_breaker: Literal['first', 'last', 'random']
+
         super().__init__(default_actions, tie_breaker, **kwargs)
 
         self.training_mode = training_mode
         self._learner = learner
         if not 0.0 <= discount_factor <= 1.0:
             self._logger.warning(
-                f'{self.__class__.__qualname__} discount_factor'
-                f' should be in [0.0, 1.0]. Got {discount_factor}. Set to 1.0.')
+                f'{self.__class__.__qualname__} discount_factor should be in'
+                f' [0.0, 1.0]. Got {discount_factor}. Set to 1.0.')
         self._discount_factor = min(discount_factor, 1.0)
         self._exploration_strategy = exploration_strategy
 
@@ -93,7 +95,7 @@ class Agent(agents.NoLearnAgent):
             possible_actions = functions.get_argument(
                 actions, self._default_actions)
             action = self._break_tie(
-                possible_actions, self._tie_breaker)  # type: ignore
+                possible_actions, self._tie_breaker)
         else:
             action = super().act(state, actions, epoch)
 
@@ -141,7 +143,7 @@ class Agent(agents.NoLearnAgent):
         Raises
         ------
             ValueError
-                if the filename is not specified.
+                Filename is not specified.
         '''
         super().load(filename, path)
 
@@ -151,7 +153,8 @@ class Agent(agents.NoLearnAgent):
     def save(self,
              filename: Optional[str] = None,
              path: Optional[Union[str, pathlib.Path]] = None,
-             data_to_save: Optional[List[str]] = None) -> Tuple[pathlib.Path, str]:
+             data_to_save: Optional[List[str]] = None
+             ) -> Tuple[pathlib.Path, str]:
         '''
         Save the object to a file.
 
@@ -170,14 +173,16 @@ class Agent(agents.NoLearnAgent):
         Returns
         -------
         :
-            a `Path` object to the location of the saved file and its name as `str`
+            a `Path` object to the location of the saved file and its name as
+            `str`
         '''
         pickle_data = functions.get_argument(data_to_save, self.__dict__)
         save_learner = '_learner' in pickle_data
         if save_learner:
             pickle_data['_learner'] = type(self._learner)
 
-        _path, _filename = super().save(filename, path, data_to_save=pickle_data)
+        _path, _filename = super().save(
+            filename, path, data_to_save=pickle_data)
 
         if save_learner:
             self._learner.save(_filename, _path / 'learner')
@@ -199,5 +204,8 @@ class Agent(agents.NoLearnAgent):
         -------
         :
             a `TrainingData` object that contains `X` and 'y` vectors
+
+
+        :meta public:
         '''
         raise NotImplementedError

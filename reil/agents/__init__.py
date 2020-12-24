@@ -30,11 +30,6 @@ UserAgent
 WarfarinAgent
     an agent based on Ravvaz et al (2016) paper for Warfarin Dosing
 
-WarfarinClusterAgent
-    an agent whose actions are based on clustering of observations.
-    Note: This agent will no longer run due to changes in the module
-    implementation.
-
 Types
 -----
 TrainingData
@@ -44,14 +39,13 @@ TrainingData
 AgentType
     a type variable that is bound to `Agent`.
 '''
-from .no_learn_agent import NoLearnAgent, TrainingData
-from .agent import Agent
-from .q_learning import QLearning
-from .deep_q_learning import DeepQLearning
-from .random_agent import RandomAgent
-from .user_agent import UserAgent
-from .warfarin_agent import WarfarinAgent
-# from .warfarin_cluster_based_agent import WarfarinClusterAgent
+from .no_learn_agent import NoLearnAgent, TrainingData  # noqa: W0611
+from .agent import Agent  # noqa: W0611
+from .q_learning import QLearning  # noqa: W0611
+from .deep_q_learning import DeepQLearning  # noqa: W0611
+from .random_agent import RandomAgent  # noqa: W0611
+from .user_agent import UserAgent  # noqa: W0611
+from .warfarin_agent import WarfarinAgent  # noqa: W0611
 
 from typing import TypeVar
 

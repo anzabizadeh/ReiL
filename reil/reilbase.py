@@ -18,13 +18,16 @@ import dill
 from ruamel.yaml import YAML
 
 
-
 def get_argument(x: Any, y: Any) -> Any:
+    '''
+    :meta private:
+    '''
     return x if x is not None else y
+
 
 class ReilBase:
     '''
-    The base class of all classes in `reil` package.
+    The base class of all classes in the `ReiL` package.
     '''
 
     def __init__(self,
@@ -39,23 +42,32 @@ class ReilBase:
         Arguments
         ---------
         name:
-            An optional name for the instance that can be used to `save` the instance.
+            An optional name for the instance that can be used to `save` the
+            instance.
+
         path:
             An optional path to be used to `save` the instance.
+
         logger_name:
             Name of the `logger` that records logging messages.
+
         logger_level:
             Level of logging.
+
         logger_filename:
             An optional filename to be used by the logger.
-        persistent_attributes:
-            A list of attributes that should be preserved when loading an instance.
 
-            For example, one might need to `load` an instance, but keep the name of the current instance.
+        persistent_attributes:
+            A list of attributes that should be preserved when loading an
+            instance.
+
+            For example, one might need to `load` an instance, but keep the
+            name of the current instance.
 
             Example
             -------
-            >>> instance = ReilBase(name='my_instance', persistent_attributes=['name'])
+            >>> instance = ReilBase(name='my_instance',
+            ...                     persistent_attributes=['name'])
             >>> another_instance = ReilBase(name='another_instance')
             >>> another_instance.save('another_instance')
             >>> instance._name
@@ -68,7 +80,8 @@ class ReilBase:
 
         kwargs:
             Any other attributes to set for the object.
-            Note that `ReilBase` accepts any attribute and adds an underscore before its name.
+            Note that `ReilBase` accepts any attribute and adds an
+            underscore before its name.
 
             Example
             -------
@@ -79,8 +92,9 @@ class ReilBase:
         self._name = get_argument(name, __name__.lower())
         self._path = pathlib.Path(get_argument(path, '.'))
 
-        self._persistent_attributes = ['_'+p
-                                       for p in get_argument(persistent_attributes, [])]
+        self._persistent_attributes = [
+            '_' + p
+            for p in get_argument(persistent_attributes, [])]
 
         self._logger_name = get_argument(logger_name, __name__)
         self._logger_level = get_argument(logger_level, logging.WARNING)
@@ -94,8 +108,9 @@ class ReilBase:
         self.set_params(**kwargs)
 
     @classmethod
-    def from_pickle(cls, filename: str,
-                    path: Optional[Union[pathlib.Path, str]] = None) -> ReilBase:
+    def from_pickle(
+            cls, filename: str,
+            path: Optional[Union[pathlib.Path, str]] = None) -> ReilBase:
         '''
         Load a pickled instance.
 
@@ -227,8 +242,8 @@ class ReilBase:
             Name of the object to be created.
 
         args:
-            A yaml tree section that contains arguments and values to create the
-            object.
+            A yaml tree section that contains arguments and values to create
+            the object.
 
         Returns
         -------
@@ -276,28 +291,35 @@ class ReilBase:
 
         Raises
         ------
-            ValueError
-                if the filename is not specified.
+        ValueError
+            filename is not specified.
 
-            RuntimeError
-                if the file cannot be loaded.
+        RuntimeError
+            Corrupted or inaccessible data file.
         '''
         _path = pathlib.Path(get_argument(path, self._path))
 
         with open(_path / f'{filename}.pkl', 'rb') as f:
             try:
-                data = dill.load(f)  # type: ignore
+                data = dill.load(f)
             except EOFError:
                 try:
-                    # self._logger.info(f'First attempt failed to load {_path / f"{filename}.pkl"}.')
+                    # self._logger.info(
+                    #     'First attempt failed to load '
+                    #     f'{_path / f"{filename}.pkl"}.')
                     time.sleep(1)
-                    data = dill.load(f)  # type: ignore
+                    data = dill.load(f)
                 except EOFError:
-                    # self._logger.exception(f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
+                    # self._logger.exception(
+                    #     'Corrupted or inaccessible data file: '
+                    #     f'{_path / f"{filename}.pkl"}')
                     raise RuntimeError(
-                        f'Corrupted or inaccessible data file: {_path / f"{filename}.pkl"}')
+                        f'Corrupted or inaccessible data file: '
+                        f'{_path / f"{filename}.pkl"}')
 
-            # self._logger.info(f'Changing the logger from {self._logger_name} to {data["_logger_name"]}.')
+            # self._logger.info(
+            #     'Changing the logger from '
+            #     f'{self._logger_name} to {data["_logger_name"]}.')
 
             persistent_attributes = self._persistent_attributes + \
                 ['_persistent_attributes', 'version']
@@ -318,7 +340,8 @@ class ReilBase:
     def save(self,
              filename: Optional[str] = None,
              path: Optional[Union[str, pathlib.Path]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None) -> Tuple[pathlib.Path, str]:
+             data_to_save: Optional[Tuple[str, ...]] = None
+             ) -> Tuple[pathlib.Path, str]:
         '''
         Save the object to a file.
 
@@ -337,7 +360,8 @@ class ReilBase:
         Returns
         -------
         :
-            a `Path` object to the location of the saved file and its name as `str`
+            a `Path` object to the location of the saved file and its name
+            as `str`
         '''
         if data_to_save is None:
             data = self.__dict__.copy()
@@ -354,7 +378,7 @@ class ReilBase:
 
         _path.mkdir(parents=True, exist_ok=True)
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
-            dill.dump(data, f, dill.HIGHEST_PROTOCOL)  # type: ignore
+            dill.dump(data, f, dill.HIGHEST_PROTOCOL)
 
         return _path, _filename
 

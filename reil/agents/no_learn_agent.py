@@ -17,6 +17,7 @@ from typing_extensions import Literal
 TrainingData = Tuple[Tuple[ReilData, ...], Tuple[float, ...]]
 T = TypeVar('T')
 
+
 class NoLearnAgent(stateful.Stateful):
     '''
     The base class of all `agent` classes. This class does not support any
@@ -40,7 +41,7 @@ class NoLearnAgent(stateful.Stateful):
         Raises
         ------
         ValueError:
-            if `tie_breaker` is not one of 'first', 'last', and 'random'.
+            `tie_breaker` is not one of 'first', 'last', and 'random'.
         '''
         super().__init__(**kwargs)
 
@@ -50,7 +51,7 @@ class NoLearnAgent(stateful.Stateful):
         if tie_breaker not in ['first', 'last', 'random']:
             raise ValueError(
                 'Tie breaker should be one of first, last, or random options.')
-        self._tie_breaker = tie_breaker
+        self._tie_breaker: Literal['first', 'last', 'random'] = tie_breaker
 
     def act(self,
             state: ReilData,
@@ -81,7 +82,7 @@ class NoLearnAgent(stateful.Stateful):
         result = self.best_actions(state, possible_actions)
 
         if len(result) > 1:
-            action = self._break_tie(result, self._tie_breaker)  # type: ignore
+            action = self._break_tie(result, self._tie_breaker)
         else:
             action = result[0]
 
@@ -127,6 +128,9 @@ class NoLearnAgent(stateful.Stateful):
         -------
         :
             One of the items from the list
+
+
+        :meta public:
         '''
         if method == 'first':
             action = input_tuple[0]
