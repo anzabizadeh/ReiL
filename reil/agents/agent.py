@@ -7,8 +7,9 @@ This `agent` class is the base class of all agent classes that can learn from
 `history`.
 '''
 
+from collections import defaultdict
 import pathlib
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
 from reil import agents, stateful
 from reil.datatypes.reildata import ReilData
@@ -28,8 +29,10 @@ class Agent(agents.NoLearnAgent):
                  exploration_strategy: ExplorationStrategy,
                  discount_factor: float = 1.0,
                  default_actions: Tuple[ReilData, ...] = (),
-                 training_mode: bool = False,
                  tie_breaker: Literal['first', 'last', 'random'] = 'random',
+                 training_trigger: Literal[
+                     'none', 'termination',
+                     'state', 'action', 'reward'] = 'termination',
                  **kwargs: Any):
         '''
         Arguments
@@ -48,18 +51,22 @@ class Agent(agents.NoLearnAgent):
         default_actions:
             a tuple of default actions.
 
-        training_mode:
-            whether the agent is in training mode or not.
-
         tie_breaker:
             how to choose the `action` if more than one is candidate
             to be chosen.
+
+        training_trigger:
+            When to learn from observations. This arguments is used in
+            `observe` method to determine when `learn` method should be called.
+            `none` avoids any call to `learn`; `state`, `action` and `reward`
+            trigger the `learn` method after receiving their corresponding
+            value; `termination` waits until `.close()` method of the generator
+            is called.
         '''
         self._tie_breaker: Literal['first', 'last', 'random']
 
         super().__init__(default_actions, tie_breaker, **kwargs)
 
-        self.training_mode = training_mode
         self._learner = learner
         if not 0.0 <= discount_factor <= 1.0:
             self._logger.warning(
@@ -67,9 +74,12 @@ class Agent(agents.NoLearnAgent):
                 f' [0.0, 1.0]. Got {discount_factor}. Set to 1.0.')
         self._discount_factor = min(discount_factor, 1.0)
         self._exploration_strategy = exploration_strategy
+        self._training_trigger = training_trigger
+        self._history: Dict[int, stateful.History] = defaultdict(list)
 
     def act(self,
             state: ReilData,
+            subject_id: int,
             actions: Optional[Tuple[ReilData, ...]] = None,
             epoch: int = 0) -> ReilData:
         '''
@@ -80,51 +90,44 @@ class Agent(agents.NoLearnAgent):
         state:
             the state for which the action should be returned.
 
+        subject_id:
+            the ID of the `subject` on which action should occur.
+
         actions:
             the set of possible actions to choose from.
 
         epoch:
             the epoch in which the agent is acting.
 
+        Raises
+        ------
+        ValueError
+            Subject with `subject_id` not found.
+
         Returns
         -------
         :
             the action
         '''
-        if self.training_mode and self._exploration_strategy.explore(epoch):
+        if subject_id not in self._entity_list:
+            raise ValueError(f'Subject with ID={subject_id} not found.')
+
+        if (self._training_trigger != 'none' and
+                self._exploration_strategy.explore(epoch)):
             possible_actions = functions.get_argument(
                 actions, self._default_actions)
             action = self._break_tie(
                 possible_actions, self._tie_breaker)
         else:
-            action = super().act(state, actions, epoch)
+            action = super().act(state=state, subject_id=subject_id,
+                                 actions=actions, epoch=epoch)
 
         return action
-
-    def learn(self, history: stateful.History) -> None:
-        '''
-        Learn using history.
-
-        Arguments
-        ---------
-        history:
-            a `History` object from which the `agent` learns.
-        '''
-        if not self.training_mode:
-            raise ValueError('Not in training mode!')
-
-        if history is not None:
-            X, Y = self._prepare_training(history)
-        else:
-            X, Y = cast(agents.TrainingData, ([], []))
-
-        if X:
-            self._learner.learn(X, Y)
 
     def reset(self):
         '''Reset the agent at the end of a learning epoch.'''
         super().reset()
-        if self.training_mode:
+        if self._training_trigger != 'none':
             self._learner.reset()
 
     def load(self, filename: str,
@@ -209,3 +212,94 @@ class Agent(agents.NoLearnAgent):
         :meta public:
         '''
         raise NotImplementedError
+
+    def learn(self, history: stateful.History) -> None:
+        '''
+        Learn using history.
+
+        Arguments
+        ---------
+        subject_id:
+            the ID of the `subject` whose history is being used for learning.
+
+        next_state:
+            The new `state` of the `subject` after taking `agent`'s action.
+            Some methods
+        '''
+        if history is not None:
+            X, Y = self._prepare_training(history)
+        else:
+            X, Y = cast(agents.TrainingData, ([], []))
+
+        if X:
+            self._learner.learn(X, Y)
+
+    def observe(self, subject_id: int, stat_name: Optional[str],
+                ) -> Generator[Union[ReilData, None], Any, None]:
+        '''
+        Create a generator to interact with the subject (`subject_id`).
+        Extends `NoLearnAgent.observe`.
+
+        This method creates a generator for `subject_id` that
+        receives `state`, yields `action` and receives `reward`
+        until it is closed. When `.close()` is called on the generator,
+        `statistics` are calculated.
+
+        Arguments
+        ---------
+        subject_id:
+            the ID of the `subject` on which action happened.
+
+        stat_name:
+            The name of the `statistic` that should be computed at the end of
+            each trajectory.
+
+        Raises
+        ------
+        ValueError
+            Subject with `subject_id` not found.
+        '''
+        if subject_id not in self._entity_list:
+            raise ValueError(f'Subject with ID={subject_id} not found.')
+
+        history: stateful.History = []
+        new_observation = stateful.Observation()
+        while True:
+            try:
+                new_observation = stateful.Observation()
+                temp = yield
+                new_observation.state = cast(ReilData, temp['state'])
+                actions: Tuple[ReilData, ...] = temp['actions']
+                epoch: int = temp['epoch']
+
+                if self._training_trigger == 'state':
+                    self.learn([history[-1], new_observation])
+
+                if actions is not None:
+                    new_observation.action = self.act(
+                        state=new_observation.state, subject_id=subject_id,
+                        actions=actions, epoch=epoch)
+
+                    if self._training_trigger == 'action':
+                        self.learn([history[-1], new_observation])
+
+                    new_observation.reward = (yield new_observation.action)
+
+                    history.append(new_observation)
+
+                    if self._training_trigger == 'reward':
+                        self.learn(history[-2:])
+                else:
+                    yield
+
+            except GeneratorExit:
+                if new_observation.reward is None:  # terminated early!
+                    history.append(new_observation)
+
+                if self._training_trigger == 'termination':
+                    self.learn(history)
+
+                if stat_name is not None:
+                    self.statistic.append(stat_name, subject_id)
+
+                return
