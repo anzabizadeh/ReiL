@@ -106,6 +106,8 @@ class FrozenLake(MNKBoard, Subject):
             _id: ID of the player.
             action: the location in which the piece is set. Can be either in index format or row column format.
         '''
+        Subject.take_effect(self, action, _id)
+
         row, column = self._player_location
         max_row = self._dim[0] - 1
         max_column = self._dim[1] - 1
@@ -131,7 +133,9 @@ class FrozenLake(MNKBoard, Subject):
 
     def reset(self):
         '''Clear the board and update board_status.'''
+        Subject.reset(self)
         MNKBoard.reset(self)
+
         self._player_location = self._start
         MNKBoard.set_piece(self, player=1,
                            row=self._player_location[0],

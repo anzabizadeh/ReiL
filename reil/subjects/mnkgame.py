@@ -70,6 +70,7 @@ class MNKGame(MNKBoard, Subject):
         _id:
             ID of the player who sets the piece.
         '''
+        Subject.take_effect(self, action, _id)
         self.set_piece(_id, index=cast(int, action.value['square']))
 
     def default_reward(self, _id: Optional[int] = None) -> ReilData:
@@ -86,6 +87,7 @@ class MNKGame(MNKBoard, Subject):
 
     def reset(self):
         '''Clear the board and update board_status.'''
+        Subject.reset(self)
         MNKBoard.reset(self)
         self._board_status = None
 
