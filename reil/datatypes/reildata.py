@@ -736,13 +736,13 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
                     raise ValueError(
                         'Cannot have items with same names.'
                         ' Use update() if you need to update an item.')
-            new_data = list(other._data)
+            new_data = other._data
         else:
             raise TypeError(
                 'Concatenation of type ReilData'
                 f' and {type(other)} not implemented!')
 
-        return ReilData(list(self._data) + new_data)
+        return ReilData(itertools.chain(self._data, new_data))
 
     def __neg__(self) -> ReilData:
         temp = [v.as_dict()
