@@ -7,7 +7,7 @@ The base class of all `agent` classes.
 '''
 
 import random
-from typing import Any, Optional, Tuple, TypeVar
+from typing import Any, Generator, Optional, Tuple, TypeVar, Union, cast
 
 from reil import stateful
 from reil.datatypes.reildata import ReilData
@@ -46,8 +46,8 @@ class NoLearnAgent(stateful.Stateful):
         super().__init__(**kwargs)
 
         self._default_actions = default_actions
+        self._training_trigger = 'none'
 
-        self.training_mode = False
         if tie_breaker not in ['first', 'last', 'random']:
             raise ValueError(
                 'Tie breaker should be one of first, last, or random options.')
@@ -55,6 +55,7 @@ class NoLearnAgent(stateful.Stateful):
 
     def act(self,
             state: ReilData,
+            subject_id: int,
             actions: Optional[Tuple[ReilData, ...]] = None,
             epoch: int = 0) -> ReilData:
         '''
@@ -109,6 +110,61 @@ class NoLearnAgent(stateful.Stateful):
             A list of best actions.
         '''
         raise NotImplementedError
+
+    def observe(self, subject_id: int, stat_name: str,
+                ) -> Generator[Union[ReilData, None], Any, None]:
+        '''
+        Create a generator to interact with the subject (`subject_id`).
+
+        This method creates a generator for `subject_id` that
+        receives `state`, yields `action` and receives `reward`
+        until it is closed. When `.close()` is called on the generator,
+        `statistics` are calculated.
+
+        Arguments
+        ---------
+        subject_id:
+            the ID of the `subject` on which action happened.
+
+        stat_name:
+            The name of the `statistic` that should be computed at the end of
+            each trajectory.
+
+        Raises
+        ------
+        ValueError
+            Subject with `subject_id` not found.
+        '''
+        if subject_id not in self._entity_list:
+            raise ValueError(f'Subject with ID={subject_id} not found.')
+
+        history: stateful.History = []
+        new_observation = stateful.Observation()
+        while True:
+            try:
+                new_observation = stateful.Observation()
+                temp = yield
+                new_observation.state = cast(ReilData, temp['state'])
+                actions: Tuple[ReilData, ...] = temp['actions']
+                epoch: int = temp['epoch']
+
+                if actions is not None:
+                    new_observation.action = self.act(
+                        state=new_observation.state, subject_id=subject_id,
+                        actions=actions, epoch=epoch)
+
+                    new_observation.reward = (yield new_observation.action)
+
+                history.append(new_observation)
+
+            except GeneratorExit:
+                if new_observation.reward is None:  # terminated early!
+                    history.append(new_observation)
+
+                # self._computed_stats.append(
+                #     self.statistic(stat_name, subject_id))
+
+                return
 
     @staticmethod
     def _break_tie(input_tuple: Tuple[T, ...],
