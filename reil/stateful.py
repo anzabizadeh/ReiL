@@ -8,47 +8,28 @@ The base class of all stateful classes in `reil` package.
 Methods
 -------
 state:
-    the state of the subject as an ReilData. Different state definitions
-    can be introduced using `add_state_definition` method. _id is
-    available, in case in the implementation, State is agent-dependent.
+    the state of the entity (`agent` or `subject`) as an ReilData. Different
+    state definitions can be introduced using `state.add_definition` method.
+    _id is available, in case in the implementation, state is caller-dependent.
     (For example in games with partial map visibility).
     For subjects that are turn-based, it is a good practice to check
     that an agent is retrieving the state only when it is the agent's
     turn.
 
-default_state:
-    the default state definition provided by the subject.
-    This can be a more efficient implementation of the state, when it is
-    possible.
-
-complete_state:
-    returns an ReilData consisting of all available state
-    components. _id is available, in case in the implementation, State is
-    agent-dependent.
-
 statistic:
-    computes the value of the given statistic for the agent `_id`
+    compute the value of the given statistic for the entity `_id`
     based on the statistic definition `name`. It should normally be called
-    after each sampled path (trajectory).
+    after each sampled path (trajectory). Different statistic definitions
+    can be introduced using `statistic.add_definition` method.
 
-default_statistic:
-    returns the default statistic for the agent `_id`. This
-    can be a more efficient implementation of the statistic, when possible.
+_extract_sub_components:
+    Extract methods that begin with `_sub_comp_`.
 
-add_state_definition:
-    add a new state definition consisting of a `name`,
-    and a list of state components. Each element in the list can be
-    string representing component's name, a tuple representing name and
-    positional arguments,  a tuple representing name and keyword
-    arguments, or a tuple representing name, positional and keyword arguments.
+register:
+    Register an external `entity` (`agents` for `subjects` and vice versa.)
 
-add_statistic_definition:
-    add a new statistic definition consisting of a
-    `name`, and statistic function, and a state definition name.
-
-_generate_state_components:
-    used by the subject during the `__init__`
-    to create state components.
+deregister:
+    Deregister an external `entity` (`agents` for `subjects` and vice versa.)
 '''
 
 from __future__ import annotations
@@ -56,15 +37,12 @@ from __future__ import annotations
 import dataclasses
 import functools
 import pathlib
-# from collections import namedtuple
-from typing import Any, Dict, List, Optional
+from reil.datatypes.components import Statistic
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from reil import reilbase
-from reil.datatypes import ReilData
-from reil.datatypes import (PrimaryComponent, SecondayComponent,
+from reil.datatypes import (PrimaryComponent, ReilData, SecondayComponent,
                             SubComponentInfo)
-
-# from reil.stats import reil_functions
 
 
 @dataclasses.dataclass
@@ -75,12 +53,132 @@ class Observation:
 
 
 History = List[Observation]
-# StateComponentFunction = Callable[...,
-#                                   Union[Dict[str, Any], ReilData]]
-# StateComponentTuple = namedtuple('StateComponentTuple', ('func', 'kwargs'),
-#                                  defaults=({}))
-# ComponentInfo = Union[str, Tuple[str, Dict[str, Any]]]
 
+
+class EntityRegister:
+    '''
+    Create and maintain a list of registered `entities`.
+
+
+    :meta private:
+    '''
+
+    def __init__(self, min_entity_count: int, max_entity_count: int,
+                 unique_entities: bool = True):
+        '''
+        Arguments
+        ---------
+        min_entity_count:
+            The minimum number of `entities` needed to be registered so that
+            the current `instance` is ready for interaction.
+
+        max_entity_count:
+            The maximum number of `entities` that can interact with this
+            instance.
+
+        unique_entities:
+            If `True`, each `entity` can be registered only once.
+        '''
+        self._id_list: List[int] = []
+        self._entity_list: List[str] = []
+        self._min_entity_count = min_entity_count
+        self._max_entity_count = max_entity_count
+        self._unique_entities = unique_entities
+
+    @property
+    def ready(self) -> bool:
+        '''
+        Determine if enough `entities` are registered.
+
+        Returns
+        -------
+        :
+            `True` if enough `entities` are registered, else `False`.
+        '''
+        return len(self._id_list) >= self._min_entity_count
+
+    def append(self, entity_name: str, _id: Optional[int] = None) -> int:
+        '''
+        Add a new `entity` to the end of the list.
+
+        Parameters
+        ----------
+        entity_name:
+            The name of the `entity` to add.
+
+        _id:
+            If provided, method tries to register the `entity` with the given
+            ID.
+
+        Returns
+        -------
+        :
+            The ID assigned to the `entity`.
+
+        Raises
+        ------
+        ValueError:
+            Capacity is reached. No new `entities` can be registered.
+
+        ValueError:
+            ID is already taken.
+
+        ValueError:
+            `entity_name` is already registered with a different ID.
+        '''
+        if (0 < self._max_entity_count < len(self._id_list)):
+            raise ValueError('Capacity is reached. No new entities can be'
+                             ' registered.')
+
+        new_id = cast(int, _id)
+        if self._unique_entities:
+            if entity_name in self._entity_list:
+                current_id = self._id_list[
+                    self._entity_list.index(entity_name)]
+                if _id is None or _id == current_id:
+                    return current_id
+                else:
+                    raise ValueError(
+                        f'{entity_name} is already registered with '
+                        f'ID: {current_id}.')
+            elif _id is None:
+                new_id = max(self._id_list, default=0) + 1
+            elif _id in self._id_list:
+                raise ValueError(f'{_id} is already taken.')
+            # else:
+            #     new_id = _id
+        elif _id is None:
+            new_id = max(self._id_list, default=0) + 1
+        elif _id in self._id_list:
+            current_entity = self._entity_list[
+                self._id_list.index(_id)]
+            if entity_name == current_entity:
+                return _id
+            else:
+                raise ValueError(f'{_id} is already taken.')
+        # else:
+        #     new_id = _id
+
+        self._entity_list.append(entity_name)
+        self._id_list.append(new_id)
+
+        return new_id
+
+    def remove(self, _id: int):
+        '''
+        Remove the `entity` registered by ID=`_id`.
+
+        Arguments
+        ---------
+        _id:
+            ID of the `entity` to remove.
+        '''
+        entity_name = self._entity_list[self._id_list.index(_id)]
+        self._entity_list.remove(entity_name)
+        self._id_list.remove(_id)
+
+    def __contains__(self, _id: int) -> bool:
+        return _id in self._id_list
 
 class Stateful(reilbase.ReilBase):
     '''
@@ -88,6 +186,9 @@ class Stateful(reilbase.ReilBase):
     '''
 
     def __init__(self,
+                 min_entity_count: int = 1,
+                 max_entity_count: int = -1,
+                 unique_entities: bool = True,
                  name: Optional[str] = None,
                  path: Optional[pathlib.Path] = None,
                  logger_name: Optional[str] = None,
@@ -105,69 +206,23 @@ class Stateful(reilbase.ReilBase):
                          **kwargs)
 
         self.sub_comp_list = self._extract_sub_components()
-        self._state = PrimaryComponent(self.sub_comp_list)
-        self._statistic = SecondayComponent(name='statistic',
-                                            primary_component=self._state)
+        self.state = PrimaryComponent(
+            self.sub_comp_list, self._default_state_definition)
+        self.statistic = Statistic(
+            name='statistic', primary_component=self.state,
+            default_definition=self._default_statistic_definition)
 
-        # self._state_definitions: Dict[
-        #     str,
-        #     List[StateComponentTuple]] = {'default': []}
-        # self._statistic_definitions: Dict[
-        #     str,
-        #     Tuple[reil_functions.ReilFunction, str]] = {}
+        self._entity_list = EntityRegister(min_entity_count=min_entity_count,
+                                           max_entity_count=max_entity_count,
+                                           unique_entities=unique_entities)
 
-        # self._available_state_components: Dict[str,
-        #                                        StateComponentFunction] = {}
+    def _default_state_definition(
+            self, _id: Optional[int] = None) -> ReilData:
+        return ReilData.single_base(name='default_state', value=None)
 
-    def state(self,
-              name: str = 'default',
-              _id: Optional[int] = None) -> ReilData:
-        '''
-        Return the current state of the instance.
-
-        Return the state based on the state definition `name`,
-        and optional `_id` of the caller.
-
-        Arguments
-        ---------
-        name:
-            Name of the state definition. If omitted, output of the
-            `default_state` method will be returned.
-
-        _id:
-            ID of the agent that calls the state method. In a multi-agent
-            setting, e.g. an RTS game with fog of war, agents would see the
-            world differently.
-
-        Returns
-        -------
-        :
-            State of the instance.
-        '''
-        return self._state(name, _id)
-
-    def statistic(self,
-                  name: str = 'default',
-                  _id: Optional[int] = None) -> ReilData:
-        '''
-        Return the statistic that caller `_id` has requested, based on the
-        statistic definition `name`.
-
-        Arguments
-        ---------
-        name:
-            Name of the statistic definition. If omitted, output of the
-            `default_statistic` method will be returned.
-
-        _id:
-            ID of the agent that calls the retrieves the statistic.
-
-        Returns
-        -------
-        :
-            The requested statistic.
-        '''
-        return self._statistic(name, _id)
+    def _default_statistic_definition(
+            self, _id: Optional[int] = None) -> Tuple[ReilData, float]:
+        return (self._default_state_definition(_id), 0.0)
 
     def _extract_sub_components(self) -> Dict[str, SubComponentInfo]:
         '''
@@ -239,6 +294,108 @@ class Stateful(reilbase.ReilBase):
                 sub_comp_list[k[10:]] = (f, tuple(keywords))
 
         return sub_comp_list
+
+    def register(self, entity_name: str, _id: Optional[int] = None) -> int:
+        '''
+        Register an `entity` and return its ID. If the `entity` is new, a new ID
+        is generated and the `entity_name` is added to the list of
+        registered entities.
+
+        Arguments
+        ---------
+        entity_name:
+            The name of the `entity` to be registered.
+
+        _id:
+            The ID of the entity to be used. If not provided, instance will
+            assign an ID to the `entity`.
+
+        Returns
+        -------
+        :
+            ID of the registered `entity`.
+
+        Raises
+        ------
+        ValueError:
+            Attempt to register an already registered `entity` with a new ID.
+
+        ValueError:
+            Attempt to register an `entity` with an already assigned ID.
+
+        ValueError:
+            Reached max capacity.
+        '''
+        return self._entity_list.append(entity_name=entity_name, _id=_id)
+
+    def deregister(self, entity_id: int) -> None:
+        '''
+        Deregister an `entity` given its ID.
+
+        Arguments
+        ---------
+        entity_id:
+            The ID of the `entity` to be deregistered.
+        '''
+        self._entity_list.remove(entity_id)
+
+
+# StateComponentFunction = Callable[...,
+#                                   Union[Dict[str, Any], ReilData]]
+# StateComponentTuple = namedtuple('StateComponentTuple', ('func', 'kwargs'),
+#                                  defaults=({}))
+# ComponentInfo = Union[str, Tuple[str, Dict[str, Any]]]
+
+# def statistic(self,
+#               name: str = 'default',
+#               _id: Optional[int] = None) -> ReilData:
+#     '''
+#     Return the statistic that caller `_id` has requested, based on the
+#     statistic definition `name`.
+
+#     Arguments
+#     ---------
+#     name:
+#         Name of the statistic definition. If omitted, output of the
+#         `default_statistic` method will be returned.
+
+#     _id:
+#         ID of the caller the retrieves the statistic.
+
+#     Returns
+#     -------
+#     :
+#         The requested statistic.
+#     '''
+#     return self._statistic(name, _id)
+
+
+# def state(self,
+#           name: str = 'default',
+#           _id: Optional[int] = None) -> ReilData:
+#     '''
+#     Return the current state of the instance.
+
+#     Return the state based on the state definition `name`,
+#     and optional `_id` of the caller.
+
+#     Arguments
+#     ---------
+#     name:
+#         Name of the state definition. If omitted, output of the
+#         `default_state` method will be returned.
+
+#     _id:
+#         ID of the agent that calls the state method. In a multi-agent
+#         setting, e.g. an RTS game with fog of war, agents would see the
+#         world differently.
+
+#     Returns
+#     -------
+#     :
+#         State of the instance.
+#     '''
+#     return self._state(name, _id)
 
 # def state(self,
 #           name: str = 'default',
