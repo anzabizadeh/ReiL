@@ -7,6 +7,7 @@ A datatype that accepts initial value and feature generator, and generates
 new values. This datatype uses `Entity` to specify an `agent` or a `subject`.
 '''
 import dataclasses
+from typing import Optional, Tuple
 
 from typing_extensions import Literal
 
@@ -18,8 +19,9 @@ class Entity:
     Used in `InteractionProtocol`.
     '''
     name: str
-    statistic_name: str
-    aggregator_name: str
+    statistic_name: Optional[str] = None
+    groupby: Optional[Tuple[str, ...]] = None
+    aggregators: Optional[Tuple[str, ...]] = None
 
 
 @dataclasses.dataclass
