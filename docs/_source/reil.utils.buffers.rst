@@ -1,7 +1,7 @@
-reil.utils.buffers package
+reil.datatypes.buffers package
 ==========================
 
-.. automodule:: reil.utils.buffers
+.. automodule:: reil.datatypes.buffers
    :members:
    :undoc-members:
    :inherited-members:
@@ -13,7 +13,7 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   reil.utils.buffers.buffer
-   reil.utils.buffers.circular_buffer
-   reil.utils.buffers.endless_buffer
-   reil.utils.buffers.vanilla_experience_replay
+   reil.datatypes.buffers.buffer
+   reil.datatypes.buffers.circular_buffer
+   reil.datatypes.buffers.endless_buffer
+   reil.datatypes.buffers.vanilla_experience_replay

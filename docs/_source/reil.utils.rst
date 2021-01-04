@@ -13,7 +13,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   reil.utils.buffers
+   reil.datatypes.buffers
 
 Submodules
 ----------

@@ -1,4 +1,4 @@
-.. automodule:: reil.utils.buffers.circular_buffer
+.. automodule:: reil.datatypes.buffers.circular_buffer
    :members:
    :undoc-members:
    :inherited-members:

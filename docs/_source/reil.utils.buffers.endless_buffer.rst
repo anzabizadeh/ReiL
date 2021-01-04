@@ -1,4 +1,4 @@
-.. automodule:: reil.utils.buffers.endless_buffer
+.. automodule:: reil.datatypes.buffers.endless_buffer
    :members:
    :undoc-members:
    :inherited-members:
