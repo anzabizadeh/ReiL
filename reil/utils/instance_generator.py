@@ -8,6 +8,7 @@ an iterator.
 '''
 
 from __future__ import annotations
+import os
 
 import pathlib
 from typing import Any, Callable, Generic, Tuple, TypeVar, Union
@@ -91,15 +92,8 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     def __iter__(self):
         return self
 
-    def __next__(self) -> Tuple[int, T]:  # noqa: C901
-        try:
-            end = self._instance_counter_stops[self._stops_index]
-        except IndexError:
-            if self._auto_rewind:
-                self.rewind()
-                end = self._instance_counter_stops[self._stops_index]
-            else:
-                raise StopIteration
+    def __next__(self) -> Tuple[int, T]:
+        end = self._get_end()
 
         self._instance_counter += 1
 
@@ -108,36 +102,56 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             self._stops_index += 1
 
             if self._stops_index <= self._last_stop_index:
-                if self._instance_counter_stops[self._stops_index] == -1:
-                    self._stop_check: Callable[
-                        [int, int], bool] = lambda current, end: False
-                else:
-                    self._stop_check: Callable[
-                        [int, int], bool] = lambda current, end: current > end
-            raise StopIteration
-        else:
-            current_instance = self._filename_pattern.format(
-                n=self._instance_counter)
-            new_instance = True
-            if self._use_existing_instances:
-                try:
-                    self._object.load(path=self._save_path,
-                                      filename=current_instance)
-                    new_instance = False
-                except FileNotFoundError:
-                    self._object.reset()
-            else:
-                self._object.reset()
+                self._determine_stop_check()
 
-            if self._save_instances and new_instance:
-                if self._overwrite_instances:
-                    self._object.save(path=self._save_path,
-                                      filename=current_instance)
-                else:
-                    raise FileExistsError(
-                        f'File {current_instance} already exists.')
+            raise StopIteration
+
+        else:
+            self._generate_new_instance()
 
         return (self._instance_counter, self._object)
+
+    def _get_end(self):
+        try:
+            end = self._instance_counter_stops[self._stops_index]
+        except IndexError:
+            if self._auto_rewind:
+                self.rewind()
+                end = self._instance_counter_stops[self._stops_index]
+            else:
+                raise StopIteration
+        return end
+
+    def _determine_stop_check(self):
+        if self._instance_counter_stops[self._stops_index] == -1:
+            self._stop_check: Callable[
+                [int, int], bool] = lambda current, end: False
+        else:
+            self._stop_check: Callable[
+                [int, int], bool] = lambda current, end: current >= end
+
+    def _generate_new_instance(self):
+        current_instance = self._filename_pattern.format(
+                n=self._instance_counter)
+        new_instance = True
+        if self._use_existing_instances:
+            try:
+                self._object.load(path=self._save_path,
+                                  filename=current_instance)
+                new_instance = False
+            except FileNotFoundError:
+                self._object.reset()
+        else:
+            self._object.reset()
+        if self._save_instances and new_instance:
+            if (not self._overwrite_instances and
+                    os.path.isfile(pathlib.Path(
+                        self._save_path, f'{current_instance}.pkl'))):
+                raise FileExistsError(
+                        f'File {current_instance} already exists.')
+            else:
+                self._object.save(path=self._save_path,
+                                  filename=current_instance)
 
     def rewind(self) -> None:
         '''
@@ -145,12 +159,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         '''
         self._instance_counter = self._first_instance_number - 1
         self._stops_index = 0
-        if self._instance_counter_stops[self._stops_index] == -1:
-            self._stop_check: Callable[
-                [int, int], bool] = lambda current, end: False
-        else:
-            self._stop_check: Callable[
-                [int, int], bool] = lambda current, end: current > end
+        self._determine_stop_check()
 
     def is_terminated(self) -> bool:
         return self._stops_index > self._last_stop_index
