@@ -11,7 +11,9 @@ and `statistic`.
 import dataclasses
 import functools
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, DefaultDict, Dict, List, Optional, Tuple, Union, cast
+
+import pandas as pd
 
 from reil.datatypes import ReilData
 from reil.stats import ReilFunction
@@ -28,7 +30,8 @@ class SubComponentInstance:
     '''
     name: str
     fn: Optional[Callable[..., Any]] = None
-    args: Union[str, Dict[str, Any]] = dataclasses.field(default_factory=dict)
+    args: Union[str, Tuple[str, ...], Dict[str, Any]
+                ] = dataclasses.field(default_factory=dict)
 
 
 class PrimaryComponent:
@@ -39,6 +42,7 @@ class PrimaryComponent:
     def __init__(
         self,
         available_sub_components: Optional[Dict[str, SubComponentInfo]] = None,
+        default_definition: Optional[Callable[[Optional[int]], ReilData]] = None
     ) -> None:
         '''
         Parameters
@@ -53,6 +57,8 @@ class PrimaryComponent:
 
         if available_sub_components is not None:
             self.sub_components = available_sub_components
+
+        self._default = default_definition
 
     @property
     def sub_components(self) -> Dict[str, SubComponentInfo]:
@@ -75,6 +81,19 @@ class PrimaryComponent:
             raise ValueError('Available sub components list is already set. '
                              'Cannot modify it.')
         self._available_sub_components = sub_components
+
+    def set_default_definition(
+            self, default_definition: Callable[[Optional[int]], ReilData]
+    ) -> None:
+        '''Add a new component definition.
+
+        Parameters
+        ----------
+        default_definition:
+            A function that can optionally accept `_id`, and returns a
+            `ReilData`.
+        '''
+        self._default = default_definition
 
     def add_definition(self,
                        name: str,
@@ -104,6 +123,11 @@ class PrimaryComponent:
             Unknown keyword argument.
         '''
         _name = name.lower()
+
+        if _name == 'default':
+            raise ValueError('Use `set_default_definition` for the default '
+                             'definition')
+
         if _name in self._definitions:
             raise ValueError(f'Definition {name} already exists.')
 
@@ -153,7 +177,10 @@ class PrimaryComponent:
         :
             The component with the default definition.
         '''
-        raise NotImplementedError
+        if self._default is not None:
+            return self._default(_id)
+
+        raise AttributeError('Default definition not found.')
 
     def __call__(self, name: str, _id: Optional[int] = None) -> ReilData:
         '''
@@ -178,11 +205,14 @@ class PrimaryComponent:
         ValueError
             Definition not found.
         '''
+        if name == 'default':
+            try:
+                return self.default(_id)
+            except AttributeError:
+                pass
+
         if name not in self._definitions:
             raise ValueError(f'Definition {name} not found.')
-
-        if name == 'default':
-            return self.default(_id)
 
         return ReilData(
             d.fn(_id=_id, **d.args)
@@ -198,6 +228,9 @@ class SecondayComponent:
     def __init__(self,
                  name: str,
                  primary_component: Optional[PrimaryComponent] = None,
+                 default_definition: Optional[Callable[[
+                     Optional[int]], ReilData]] = None,
+                 enabled: bool = True
                  ) -> None:
         '''
 
@@ -209,11 +242,25 @@ class SecondayComponent:
         primary_component:
             An instance of a `PrimaryComponent` from which component
             definitions are used.
+
+        default_definition:
+            The `default` definition.
+
+        enabled:
+            Whether to return the computed value or `None`.
         '''
         self._name = name
         self._primary_component = primary_component
+        self._default = default_definition
+        self._enabled = enabled
 
         self._definitions: Dict[str, SubComponentInstance] = defaultdict(None)
+
+    def enable(self) -> None:
+        self._enabled = True
+
+    def disable(self) -> None:
+        self._enabled = False
 
     def set_primary_component(
             self,
@@ -236,6 +283,19 @@ class SecondayComponent:
                              'Cannot modify it.')
 
         self._primary_component = primary_component
+
+    def set_default_definition(
+            self, default_definition: Callable[[Optional[int]], ReilData]
+    ) -> None:
+        '''Add a new component definition.
+
+        Parameters
+        ----------
+        default_definition:
+            A function that can optionally accept `_id`, and returns a
+            `ReilData`.
+        '''
+        self._default = default_definition
 
     def add_definition(self,
                        name: str,
@@ -265,16 +325,22 @@ class SecondayComponent:
             Undefined primary component name.
         '''
         _name = name.lower()
+        _primary_component_name = primary_component_name.lower()
+
+        if _name == 'default':
+            raise ValueError('Use `set_default_definition` for the default '
+                             'definition')
+
         if _name in self._definitions:
             raise ValueError(f'Definition {name} already exists.')
 
-        if primary_component_name not in self._primary_component.definitions:
-            raise ValueError(f'Undefined {primary_component_name}.')
+        if _primary_component_name not in self._primary_component.definitions:
+            raise ValueError(f'Undefined {_primary_component_name}.')
 
         self._definitions[_name] = SubComponentInstance(
-            name=name,
+            name=_name,
             fn=fn,
-            args=primary_component_name)
+            args=_primary_component_name)
 
     def default(self, _id: Optional[int] = None) -> ReilData:
         '''
@@ -290,9 +356,14 @@ class SecondayComponent:
         :
             The component with the default definition.
         '''
-        raise NotImplementedError
+        if self._default is not None:
+            return self._default(_id)
 
-    def __call__(self, name: str, _id: Optional[int] = None) -> ReilData:
+        raise AttributeError('Default definition not found.')
+
+    def __call__(self,
+                 name: str,
+                 _id: Optional[int] = None) -> Union[ReilData, None]:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -315,18 +386,259 @@ class SecondayComponent:
         ValueError
             Definition not found.
         '''
+        if not self._enabled:
+            return None
+
         _name = name.lower()
-        if _name not in self._definitions:
-            raise ValueError(f'Definition {name} not found.')
 
         if _name == 'default':
-            return self.default(_id)
+            try:
+                return self.default(_id)
+            except AttributeError:
+                pass
+
+        if _name not in self._definitions:
+            raise ValueError(f'Definition {name} not found.')
 
         d = self._definitions[_name]
 
         return ReilData.single_base(name=self._name,
                                     value=d.fn(self._primary_component(
                                         name=cast(str, d.args), _id=_id)))
+
+
+class Statistic(SecondayComponent):
+    '''
+    A component similar to `SecondaryComponent`, but with history and
+    aggregator.
+    '''
+
+    def __init__(self,
+                 name: str,
+                 primary_component: Optional[PrimaryComponent] = None,
+                 default_definition: Optional[Callable[[
+                     Optional[int]], Tuple[ReilData, float]]] = None,
+                 enabled: bool = True
+                 ) -> None:
+        '''
+
+        Parameters
+        ----------
+        name:
+            The name of the secondary component.
+
+        primary_component:
+            An instance of a `PrimaryComponent` from which component
+            definitions are used.
+
+        default_definition:
+            The `default` definition.
+
+        enabled:
+            Whether to return the computed value or `None`.
+        '''
+        super().__init__(name=name,
+                         primary_component=primary_component,
+                         enabled=enabled)
+        self._default = default_definition
+        self._history: Dict[int,
+                            List[Tuple[ReilData, float]]] = DefaultDict(list)
+        self._history_none: List[Tuple[ReilData, float]] = []
+
+    def enable(self) -> None:
+        self._enabled = True
+
+    def disable(self) -> None:
+        self._enabled = False
+
+    def set_primary_component(
+            self,
+            primary_component: PrimaryComponent) -> None:
+        '''Set the primary component.
+
+        Parameters
+        ----------
+        primary_component:
+            An instance of a `PrimaryComponent` from which component
+            definitions are used.
+
+        Raises
+        ------
+        ValueError
+            Primary component is already set.
+        '''
+        if self._primary_component is not None:
+            raise ValueError('Primary component is already set. '
+                             'Cannot modify it.')
+
+        self._primary_component = primary_component
+
+    def add_definition(self,
+                       name: str,
+                       fn: ReilFunction,
+                       stat_component: str,
+                       aggregation_component: str) -> None:
+        '''
+        Add a new component definition.
+
+        Parameters
+        ----------
+        name:
+            The name of the new component.
+
+        fn:
+            The function that will receive the primary component instance and
+            computes the value of the secondary component.
+
+        stat_component:
+            The component name that will be used by `fn`.
+
+        aggregation_component:
+            The component name that will be used to do aggregation.
+
+        Raises
+        ------
+        ValueError
+            Definition already exists for this name.
+
+        ValueError
+            Undefined primary component name.
+        '''
+        _name = name.lower()
+        _stat_component = stat_component.lower()
+        _aggregation_component = aggregation_component.lower()
+        if _name == 'default':
+            raise ValueError('Use `set_default_definition` for the default '
+                             'definition')
+
+        if _name in self._definitions:
+            raise ValueError(f'Definition {name} already exists.')
+
+        if _stat_component not in self._primary_component.definitions:
+            raise ValueError(f'Undefined {_stat_component}.')
+
+        if _aggregation_component not in self._primary_component.definitions:
+            raise ValueError(f'Undefined {_aggregation_component}.')
+
+        self._definitions[_name] = SubComponentInstance(
+            name=_name,
+            fn=fn,
+            args=(_aggregation_component, _stat_component))
+
+    def default(self, _id: Optional[int] = None) -> Tuple[ReilData, float]:
+        '''
+        Generate the default component definition.
+
+        Parameters
+        ----------
+        _id:
+            ID of the caller object
+
+        Returns
+        -------
+        :
+            The component with the default definition.
+        '''
+        if self._default is not None:
+            return self._default(_id)
+
+        raise AttributeError('Default definition not found.')
+
+    def __call__(
+            self,
+            name: str,
+            _id: Optional[int] = None) -> Union[Tuple[ReilData, float], None]:
+        '''
+        Generate the component based on the specified `name` for the
+        specified caller.
+
+        Parameters
+        ----------
+        name:
+            The name of the component definition.
+
+        _id:
+            ID of the caller.
+
+        Returns
+        -------
+        :
+            The component with the specified definition `name`.
+
+        Raises
+        ------
+        ValueError
+            Definition not found.
+        '''
+        if not self._enabled:
+            return None
+
+        _name = name.lower()
+
+        if _name == 'default':
+            try:
+                return self.default(_id)
+            except AttributeError:
+                pass
+
+        if _name not in self._definitions:
+            raise ValueError(f'Definition {name} not found.')
+
+        d = self._definitions[_name]
+        agg, comp_name = cast(Tuple[str, str], d.args)
+
+        return (self._primary_component(name=agg, _id=_id),
+                d.fn(self._primary_component(name=comp_name, _id=_id)))
+
+    def append(self,
+               name: str,
+               _id: Optional[int] = None) -> None:
+        '''
+        Generate the stat and append it to the history.
+
+        Arguments
+        ---------
+        name:
+            The name of the component definition.
+
+        _id:
+            ID of the caller.
+
+        Raises
+        ------
+        ValueError
+            Definition not found.
+        '''
+        s = self.__call__(name, _id)
+        if s is not None:
+            if _id is None:
+                self._history_none.append(s)
+            else:
+                self._history[_id].append(s)
+
+    def aggregate(self,
+                  aggregators: Tuple[str, ...],
+                  groupby: Optional[List[str]] = None,
+                  _id: Optional[int] = None,
+                  reset_history: bool = False):
+        temp = self._history_none if _id is None else self._history[_id]
+        if not temp:
+            return None
+
+        df = pd.DataFrame({'instance_id': i,  # type: ignore
+                           **x[0].value,
+                           'value': x[1]}
+                          for i, x in enumerate(temp))
+        temp_group_by = ['instance_id'] if groupby is None else list(groupby)
+        grouped_df = df.groupby(temp_group_by)
+        result = grouped_df['value'].agg(aggregators)
+
+        if reset_history:
+            self._history: Dict[
+                int, List[Tuple[ReilData, float]]] = DefaultDict(list)
+            self._history_none: List[Tuple[ReilData, float]] = []
+
+        return result
 
 
 if __name__ == '__main__':  # noqa: C901
