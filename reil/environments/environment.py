@@ -8,7 +8,7 @@ on one or more `subjects`.
 '''
 import pathlib
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
 from reil import agents as rlagents
 from reil import stateful
@@ -61,15 +61,13 @@ class Environment(stateful.Stateful):
         self._agents: Dict[str, rlagents.AgentType] = {}
         self._subjects: Dict[str, rlsubjects.SubjectType] = {}
         self._instance_generators: Dict[str, EntityGenerator] = {}
-        self._assignment_list: Dict[AgentSubjectTuple, Union[int, None]] = \
-            defaultdict(lambda: None)
+        self._assignment_list: Dict[
+            AgentSubjectTuple,
+            Tuple[Union[int, None], Union[int, None]]] = \
+            defaultdict(lambda: (None, None))
         self._epochs: Dict[str, int] = defaultdict(int)
-        self._history: Dict[AgentSubjectTuple, stateful.History] = defaultdict(
-            lambda: [stateful.Observation()])
-        self._agent_statistics: Dict[AgentSubjectTuple, List[ReilData]] = \
-            defaultdict(list)
-        self._subject_statistics: Dict[AgentSubjectTuple, List[ReilData]] = \
-            defaultdict(list)
+        self._agent_observers: Dict[
+            Tuple[str, str], Generator[Union[ReilData, None], Any, None]] = {}
 
         if entity_dict is not None:
             self.add(entity_dict)
@@ -203,19 +201,22 @@ class Environment(stateful.Stateful):
         raise NotImplementedError
 
     @staticmethod
-    def interact_once(agent_id: int,
-                      agent_instance: rlagents.Agent,
-                      subject_instance: rlsubjects.Subject,
-                      protocol: InteractionProtocol,
-                      epoch: int
-                      ) -> Tuple[ReilData, ReilData, Union[ReilData, None]]:
+    def interact_once(
+        agent_id: int,
+        agent_observer: Generator[Union[ReilData, None], Any, None],
+        subject_instance: rlsubjects.Subject,
+        protocol: InteractionProtocol,
+        epoch: int) -> None:
         '''
         Allow `agent` and `subject` to interact once.
 
         Attributes
         ----------
         agent_id:
-            Agent's ID by which it is registered at the subject.
+            Agent's ID by which it is registered at the `subject`.
+
+        subject_id:
+            Subject's ID by which it is registered at the `agent`.
 
         agent_instance:
             An instance of an `agent` that takes the action.
@@ -243,31 +244,32 @@ class Environment(stateful.Stateful):
         If the subject is terminated or no possible actions are available,
         `None` is returned for action.
         '''
-        reward = subject_instance.reward(
-            name=protocol.reward_function_name, _id=agent_id)
+        agent_observer.send(subject_instance.reward(
+            name=protocol.reward_function_name, _id=agent_id))
 
         state = subject_instance.state(name=protocol.state_name, _id=agent_id)
-        if not subject_instance.is_terminated(agent_id):
+
+        terminated = subject_instance.is_terminated(agent_id)
+
+        if terminated:
+            agent_observer.close()
+        else:
             possible_actions = subject_instance.possible_actions(agent_id)
             if possible_actions:
-                action = agent_instance.act(state, actions=possible_actions,
-                                            epoch=epoch)
-                subject_instance.take_effect(action, agent_id)
-            else:
-                action = None
-        else:
-            action = None
-
-        return reward, state, action
+                action = agent_observer.send({'state': state,
+                                              'actions': possible_actions,
+                                              'epoch': epoch})
+                subject_instance.take_effect(cast(ReilData, action), agent_id)
 
     @classmethod
-    def interact_n_times(cls,
-                         agent_id: int,
-                         agent_instance: rlagents.Agent,
-                         subject_instance: rlsubjects.Subject,
-                         protocol: InteractionProtocol,
-                         epoch: int,
-                         times: int = 1) -> stateful.History:
+    def interact_n_times(
+            cls,
+            agent_id: int,
+            agent_observer: Generator[Union[ReilData, None], Any, None],
+            subject_instance: rlsubjects.Subject,
+            protocol: InteractionProtocol,
+            epoch: int,
+            times: int = 1) -> None:
         '''
         Allow `agent` and `subject` to interact at most `times` times.
 
@@ -275,6 +277,9 @@ class Environment(stateful.Stateful):
         ----------
         agent_id:
             Agent's ID by which it is registered at the subject.
+
+        subject_id:
+            Subject's ID by which it is registered at the `agent`.
 
         agent_instance:
             An instance of an `agent` that takes the action.
@@ -306,32 +311,18 @@ class Environment(stateful.Stateful):
         be truncated and returned. In other words, the output will not
         necessarily have a lenght of "times".
         '''
-        if subject_instance.is_terminated():
-            return []
-
-        trajectory = [stateful.Observation() for _ in range(times + 1)]
-        for i in range(times):
-            reward, state, action = cls.interact_once(
-                agent_id, agent_instance, subject_instance, protocol, epoch)
-
-            trajectory[i].reward = reward
-            trajectory[i+1].state = state
-            trajectory[i+1].action = action
-
-            if action is None:
-                if subject_instance.is_terminated(agent_id):
-                    trajectory[i+1].reward = None
-                    return trajectory[:i+2]
-
-        return trajectory
+        for _ in range(times):
+            cls.interact_once(agent_id, agent_observer,
+                              subject_instance, protocol, epoch)
 
     @classmethod
-    def interact_while(cls,
-                       agent_id: int,
-                       agent_instance: rlagents.Agent,
-                       subject_instance: rlsubjects.Subject,
-                       protocol: InteractionProtocol,
-                       epoch: int) -> stateful.History:
+    def interact_while(
+        cls,
+        agent_id: int,
+        agent_observer: Generator[Union[ReilData, None], Any, None],
+        subject_instance: rlsubjects.Subject,
+        protocol: InteractionProtocol,
+        epoch: int) -> None:
         '''
         Allow `agent` and `subject` to interact until `subject` is terminated.
 
@@ -366,39 +357,9 @@ class Environment(stateful.Stateful):
         For `instance generators`, only the current
         instance is run to termination, not the whole generator.
         '''
-        trajectory = [stateful.Observation()]
-
         while not subject_instance.is_terminated(agent_id):
-            reward, state, action = cls.interact_once(
-                agent_id, agent_instance, subject_instance, protocol, epoch)
-
-            trajectory[-1].reward = reward
-            trajectory.append(stateful.Observation(state=state, action=action))
-
-        return trajectory
-
-    def append_observations(self,
-                            agent_name: str,
-                            subject_name: str,
-                            observations: stateful.History) -> None:
-        '''
-        Append observations to the history of the given `agent` and `subject`.
-
-        Arguments
-        ---------
-        agent_name:
-            Name of the `agent` that the observations belong to.
-
-        subject_name:
-            Name of the `subject` that the observations belong to.
-
-        observations:
-            A `History` of `agent`/ `subject` interactions.
-        '''
-        if observations:
-            self._history[(agent_name, subject_name)][-1].reward = \
-                observations[0].reward
-            self._history[(agent_name, subject_name)].extend(observations[1:])
+            cls.interact_once(agent_id, agent_observer,
+                              subject_instance, protocol, epoch)
 
     def assert_protocol(self, protocol: InteractionProtocol) -> None:
         '''
@@ -434,26 +395,88 @@ class Environment(stateful.Stateful):
         # if (protocol.agent_name in self._instance_generators or
         #     protocol.subject_name in self._instance_generators) and
 
-    def register_agents(self) -> None:
+    def register(self,
+                 interaction_protocol: InteractionProtocol,
+                 get_agent_observer: bool = False) -> None:
         '''
-        Register all `agents` in the interaction sequence in their
-        corresponding `subjects`.
+        Register the `agent` and `subject` of an interaction protocol.
+
+        Arguments
+        ---------
+        interaction_protocol:
+            The protocol whose `agent` and `subject` should be registered.
+
+        get_agent_observer:
+            If `True`, the method calls the `observe` method of the `agent`
+            with `subject_id`, and adds the resulting generator to the list
+            of observers.
 
         Notes
         -----
-        When registration happens for the first time, the agents
-        get any ID that subjects provide. However, in the follow up
-        registrations, `agents` attempt to register with the same ID to
+        When registration happens for the first time, agents and subjects
+        get any ID that the counterpart provides. However, in the follow up
+        registrations, `entities` attempt to register with the same ID to
         have access to the same information.
         '''
-        raise NotImplementedError
+        a_name = interaction_protocol.agent.name
+        a_stat = interaction_protocol.agent.statistic_name
+        s_name = interaction_protocol.subject.name
+        a_s_name = (a_name, s_name)
 
-    def _reset_subject(self, subject_name: str) -> None:
+        a_id, s_id = self._assignment_list[a_s_name]
+        a_id = self._subjects[s_name].register(entity_name=a_name, _id=a_id)
+        s_id = self._agents[a_name].register(entity_name=s_name, _id=s_id)
+
+        self._assignment_list[a_s_name] = (a_id, s_id)
+
+        if get_agent_observer:
+            self._agent_observers[a_s_name] = \
+                self._agents[a_name].observe(s_id, a_stat)
+            # self._agent_observers[a_s_name].send(None)
+
+    def close_agent_observer(self, protocol: InteractionProtocol) -> None:
+        '''
+        Close an `agent_observer` corresponding to `protocol`.
+
+        Before closing the observer, the final `reward` and `state` of the
+        system are passed on to the observer.
+
+        Attributes
+        -----------
+        protocol:
+            The protocol whose `agent_observer` should be closed.
+
+        Notes
+        -----
+        This method should only be used if a `subject` is terminated.
+        Otherwise, the `agent_observer` might be expecting to receive different
+        values, and it will corrupt the training data for the `agent`.
+        '''
+        agent_name = protocol.agent.name
+        subject_name = protocol.subject.name
+        r_func_name = protocol.reward_function_name
+        state_name = protocol.state_name
+        a_s_names = (agent_name, subject_name)
+
+        a_id, _ = cast(Tuple[int, int],
+                       self._assignment_list[a_s_names])
+        reward = self._subjects[subject_name].reward(
+            name=r_func_name, _id=a_id)
+        state = self._subjects[subject_name].state(
+            name=state_name, _id=a_id)
+
+        self._agent_observers[a_s_names].send(reward)
+        self._agent_observers[a_s_names].send({'state': state,
+                                               'actions': None,
+                                               'epoch': None})
+        self._agent_observers[a_s_names].close()
+
+    def reset_subject(self, subject_name: str) -> None:
         '''
         When a `subject` is terminated for all interacting `agents`, this
-        function is called to reset the subject.
+        function is called to reset the `subject`.
 
-        If the subject is an `InstanceGenerator`, a new instance is created.
+        If the `subject` is an `InstanceGenerator`, a new instance is created.
         If reset is successful, `epoch` is incremented by one.
 
         Attributes
@@ -461,35 +484,41 @@ class Environment(stateful.Stateful):
         subject_name:
             Name of the `subject` that is terminated.
 
-
-        :meta private:
+        Notes
+        -----
+        `Environment.reset_subject` only resets the `subject`. It does not
+        get the statistics for that `subject`.
         '''
         if subject_name in self._instance_generators:
             # get a new instance if possible,
             # if not instance generator returns StopIteration.
             # So, increment epoch by 1, then if the generator is not
             # terminated, get a new instance.
+            # If the generator is terminated, check if it is finite. If
+            # infinite, call it again to get a subject. If not, disable reward
+            # for the current subject, so that agent_observer does not raise
+            # exception.
             try:
                 _, self._subjects[subject_name] = cast(
                     Tuple[int, rlsubjects.SubjectType],
                     next(self._instance_generators[subject_name]))
             except StopIteration:
-                # TODO: self._aggregated
                 self._epochs[subject_name] += 1
-                if not self._instance_generators[subject_name].is_terminated():
+                if self._instance_generators[subject_name].is_terminated():
+                    self._subjects[subject_name].reward.disable()
+                    # if self._instance_generators[subject_name].is_finite:
+                    #     self._subjects[subject_name].reward.disable()
+                    # else:
+                    #     _, self._subjects[subject_name] = cast(
+                    #         Tuple[int, rlsubjects.SubjectType],
+                    #         next(self._instance_generators[subject_name]))
+                else:
                     _, self._subjects[subject_name] = cast(
                         Tuple[int, rlsubjects.SubjectType],
                         next(self._instance_generators[subject_name]))
         else:
             self._epochs[subject_name] += 1
             self._subjects[subject_name].reset()
-
-    def manage_terminated_subjects(self) -> None:
-        '''
-        Go over all `subjects`. If terminated, collect terminal rewards,
-        calculate stats, train related `agents`, and reset the `subject`.
-        '''
-        raise NotImplementedError
 
     def load(self,
              entity_name: Union[List[str], str] = 'all',
@@ -596,6 +625,9 @@ class Environment(stateful.Stateful):
                         path=_path / f'{_filename}.data', filename=obj)
 
         return _path, _filename
+
+    def report_statistics(self):
+        raise NotImplementedError
 
     def __repr__(self) -> str:
         try:
