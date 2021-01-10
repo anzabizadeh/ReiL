@@ -155,7 +155,7 @@ class NoLearnAgent(stateful.Stateful):
 
                     new_observation.reward = (yield new_observation.action)
 
-                history.append(new_observation)
+                    history.append(new_observation)
 
             except GeneratorExit:
                 if new_observation.reward is None:  # terminated early!
