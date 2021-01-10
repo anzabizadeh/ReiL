@@ -8,6 +8,7 @@ The base class for reinforcement learning
 
 from __future__ import annotations
 
+import copy
 import importlib
 import logging
 import pathlib
@@ -16,13 +17,6 @@ from typing import Any, Dict, List, Optional, OrderedDict, Tuple, Union
 
 import dill
 from ruamel.yaml import YAML
-
-
-def get_argument(x: Any, y: Any) -> Any:
-    '''
-    :meta private:
-    '''
-    return x if x is not None else y
 
 
 class ReilBase:
@@ -89,15 +83,15 @@ class ReilBase:
             >>> instance._my_attr
             test
         '''
-        self._name = get_argument(name, __name__.lower())
-        self._path = pathlib.Path(get_argument(path, '.'))
+        self._name = name or __name__.lower()
+        self._path = pathlib.Path(path or '.')
 
         self._persistent_attributes = [
             '_' + p
-            for p in get_argument(persistent_attributes, [])]
+            for p in (persistent_attributes or [])]
 
-        self._logger_name = get_argument(logger_name, __name__)
-        self._logger_level = get_argument(logger_level, logging.WARNING)
+        self._logger_name = logger_name or __name__
+        self._logger_level = logger_level or logging.WARNING
         self._logger_filename = logger_filename
 
         self._logger = logging.getLogger(self._logger_name)
@@ -164,7 +158,7 @@ class ReilBase:
         :
             The generated instance.
         '''
-        _path = pathlib.Path(get_argument(path, '.'))
+        _path = pathlib.Path(path or '.')
         _filename = filename if filename.endswith((
             '.yaml', '.yml')) else f'{filename}.yaml'
 
@@ -297,39 +291,35 @@ class ReilBase:
         RuntimeError
             Corrupted or inaccessible data file.
         '''
-        _path = pathlib.Path(get_argument(path, self._path))
+        _path = pathlib.Path(path or self._path)
 
         with open(_path / f'{filename}.pkl', 'rb') as f:
             try:
                 data = dill.load(f)
             except EOFError:
                 try:
-                    # self._logger.info(
-                    #     'First attempt failed to load '
-                    #     f'{_path / f"{filename}.pkl"}.')
+                    self._logger.info(
+                        'First attempt failed to load '
+                        f'{_path / f"{filename}.pkl"}.')
                     time.sleep(1)
                     data = dill.load(f)
                 except EOFError:
-                    # self._logger.exception(
-                    #     'Corrupted or inaccessible data file: '
-                    #     f'{_path / f"{filename}.pkl"}')
+                    self._logger.exception(
+                        'Corrupted or inaccessible data file: '
+                        f'{_path / f"{filename}.pkl"}')
                     raise RuntimeError(
                         f'Corrupted or inaccessible data file: '
                         f'{_path / f"{filename}.pkl"}')
 
-            # self._logger.info(
-            #     'Changing the logger from '
-            #     f'{self._logger_name} to {data["_logger_name"]}.')
+            self._logger.info(
+                'Changing the logger from '
+                f'{self._logger_name} to {data["_logger_name"]}.')
 
             persistent_attributes = self._persistent_attributes + \
-                ['_persistent_attributes', 'version']
+                ['_persistent_attributes']
             for key, value in data.items():
                 if key not in persistent_attributes:
                     self.__dict__[key] = value
-
-            # TODO: classes should use `loaded_version` to compare old vs new
-            # and modify attributes if necessary.
-            self.loaded_version = data.get('version')
 
             self._logger = logging.getLogger(self._logger_name)
             self._logger.setLevel(self._logger_level)
@@ -364,21 +354,26 @@ class ReilBase:
             as `str`
         '''
         if data_to_save is None:
-            data = self.__dict__.copy()
+            data = self.__dict__
         else:
             data = dict((d, self.__dict__[d])
                         for d in list(data_to_save) + ['_name', '_path'])
 
+        temp = None
         if '_logger' in data:
+            temp = copy.deepcopy(self._logger)
             data.pop('_logger')
 
-        _filename: str = get_argument(filename, self._name)
+        _filename: str = filename or self._name
         _path: pathlib.Path = pathlib.Path(
-            get_argument(path, self._path))
+            path or self._path)
 
         _path.mkdir(parents=True, exist_ok=True)
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
             dill.dump(data, f, dill.HIGHEST_PROTOCOL)
+
+        if temp:
+            self._logger = temp
 
         return _path, _filename
 
