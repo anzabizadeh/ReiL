@@ -7,14 +7,13 @@ This `agent` class is the base class of all agent classes that can learn from
 `history`.
 '''
 
-from collections import defaultdict
 import pathlib
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
+from collections import defaultdict
+from typing import Any, Dict, Generator, Optional, Tuple, Union, cast
 
 from reil import agents, stateful
 from reil.datatypes.reildata import ReilData
 from reil.learners.learner import Learner
-from reil.utils import functions
 from reil.utils.exploration_strategies import ExplorationStrategy
 from typing_extensions import Literal
 
@@ -114,8 +113,7 @@ class Agent(agents.NoLearnAgent):
 
         if (self._training_trigger != 'none' and
                 self._exploration_strategy.explore(epoch)):
-            possible_actions = functions.get_argument(
-                actions, self._default_actions)
+            possible_actions = actions or self._default_actions
             action = self._break_tie(
                 possible_actions, self._tie_breaker)
         else:
@@ -156,7 +154,7 @@ class Agent(agents.NoLearnAgent):
     def save(self,
              filename: Optional[str] = None,
              path: Optional[Union[str, pathlib.Path]] = None,
-             data_to_save: Optional[List[str]] = None
+             data_to_save: Optional[Tuple[str, ...]] = None
              ) -> Tuple[pathlib.Path, str]:
         '''
         Save the object to a file.
@@ -179,13 +177,13 @@ class Agent(agents.NoLearnAgent):
             a `Path` object to the location of the saved file and its name as
             `str`
         '''
-        pickle_data = functions.get_argument(data_to_save, self.__dict__)
-        save_learner = '_learner' in pickle_data
+        data = list(data_to_save or self.__dict__)
+        save_learner = '_learner' in data
         if save_learner:
-            pickle_data['_learner'] = type(self._learner)
+            data.remove('_learner')
 
         _path, _filename = super().save(
-            filename, path, data_to_save=pickle_data)
+            filename, path, data_to_save=cast(Tuple, data))
 
         if save_learner:
             self._learner.save(_filename, _path / 'learner')
