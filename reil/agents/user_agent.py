@@ -5,7 +5,7 @@ UserAgent class
 
 An agent that prints the state and asks the user for action.
 '''
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, cast
 
 from reil import agents
 from reil.datatypes.reildata import ReilData
@@ -45,13 +45,13 @@ class UserAgent(agents.NoLearnAgent):
         :
             The action
         '''
-        possible_actions = functions.get_argument(
-            actions, self._default_actions)
+        possible_actions = actions or self._default_actions
 
         action = None
         while action is None:
             for i, a in enumerate(possible_actions):
                 print(f'{i}. {a.value}')
-            action = input(f'Choose action for this state: {state.value}')
+            action = int(input(
+                f'Choose action number for this state: {state.value}'))
 
         return possible_actions[action]

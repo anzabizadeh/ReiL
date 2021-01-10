@@ -77,8 +77,7 @@ class NoLearnAgent(stateful.Stateful):
         :
             The action
         '''
-        possible_actions = functions.get_argument(
-            actions, self._default_actions)
+        possible_actions = actions or self._default_actions
 
         result = self.best_actions(state, possible_actions)
 

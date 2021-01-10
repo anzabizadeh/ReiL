@@ -48,5 +48,4 @@ class RandomAgent(agents.NoLearnAgent):
         :
             The action
         '''
-        return random.choice(functions.get_argument(
-            actions, self._default_actions))
+        return random.choice(actions or self._default_actions)
