@@ -26,6 +26,7 @@ class RandomAgent(agents.NoLearnAgent):
 
     def act(self,
             state: ReilData,
+            subject_id: int,
             actions: Optional[Tuple[ReilData, ...]] = None,
             epoch: int = 0) -> ReilData:
         '''
