@@ -49,7 +49,3 @@ def in_range(r: Tuple[float, float], x: Iterable[float]) -> int:
 def interpolate(start: float, end: float, steps: int) -> Iterable[float]:
     return (start + (end - start) / steps * j
             for j in range(1, steps + 1))
-
-
-def get_argument(x: Any, y: Any) -> Any:
-    return x if x is not None else y
