@@ -236,9 +236,9 @@ class Environment(stateful.Stateful):
                 'yes': counts the average number of steps in each episode.
                 'no': doesn't count.
         '''
-        _episodes = utils.get_argument(episodes, self._episodes)
-        _max_steps = utils.get_argument(max_steps, self._max_steps)
-        if utils.get_argument(termination, self._termination).lower() == 'all':
+        _episodes = episodes or self._episodes
+        _max_steps = max_steps or self._max_steps
+        if (termination or self._termination).lower() == 'all':
             def termination_func(x: bool, y: rlsubjects.Subject) -> bool:
                 return x & y.is_terminated
             list_of_subjects: List[Subject] = list(self._subjects.values())
@@ -250,22 +250,22 @@ class Environment(stateful.Stateful):
             list_of_subjects: List[Subject] = list(self._subjects.values())
             reduce_initial_val = False
 
-        _reset = utils.get_argument(reset, self._reset).lower()
-        _learning_method = utils.get_argument(
-            learning_method, self._learning_method).lower()
-        _reporting = utils.get_argument(reporting, 'none').lower()
+        _reset = (reset or self._reset).lower()
+        _learning_method = (
+            learning_method or self._learning_method).lower()
+        _reporting = (reporting or 'none').lower()
 
-        _tally = utils.get_argument(tally, 'no').lower() == 'yes'
+        _tally = tally
         win_count: Dict[str, int] = dict((agent, 0) for agent in self._agents)
 
-        _step_count = utils.get_argument(step_count, 'no').lower() == 'yes'
+        _step_count = step_count
 
-        if _learning_method == 'none':
-            for agent in self._agents.values():
-                agent.training_mode = False
-        else:
-            for agent in self._agents.values():
-                agent.training_mode = True
+        # if _learning_method == 'none':
+        #     for agent in self._agents.values():
+        #         agent.training_mode = False
+        # else:
+        #     for agent in self._agents.values():
+        #         agent.training_mode = True
 
         report_string = ''
         steps = 0
@@ -371,7 +371,7 @@ class Environment(stateful.Stateful):
             stats_func: a dictionary that contains functions to calculate stats.
         '''
 
-        _max_steps = utils.get_argument(max_steps, self._max_steps)
+        _max_steps = max_steps or self._max_steps
         _training_mode: Dict[AgentSubjectTuple, bool] = defaultdict(lambda: True)
         for a_s_tuple in test_mode:
             _training_mode[a_s_tuple] = False
@@ -386,12 +386,12 @@ class Environment(stateful.Stateful):
         for a_s_tuple in return_output:
             _return_output[a_s_tuple] = True
 
-        _stats = utils.get_argument(stats, defaultdict(list))
+        _stats = stats or defaultdict(list)
 
         if stats_func is None and stats is not None:
             self._logger.exception('stats are provided, but no stats_func is provided.')
             raise ValueError('stats are provided, but no stats_func is provided.')
-        temp = utils.get_argument(stats_func, lambda _: None)
+        temp = stats_func or lambda _: None
         if isinstance(temp, Callable):
             _stats_func = dict((agent_subject_tuple, temp) for agent_subject_tuple in self._assignment_list)
         else:
@@ -596,7 +596,7 @@ class Environment(stateful.Stateful):
             object_name: if specified, that object (agent or subject) is being loaded from file. 'all' loads an environment. (Default = 'all')
         Raises ValueError if the filename is not specified.
         '''
-        _filename: str = utils.get_argument(filename, self._name)
+        _filename: str = filename or self._name
         _path = pathlib.Path(path if path is not None else self._path)
 
         if object_name == 'all':
@@ -636,7 +636,7 @@ class Environment(stateful.Stateful):
             object_name: if specified, that object (agent or subject) is being saved to file. 'all' saves the environment. (Default = 'all')
         Raises ValueError if the filename is not specified.
         '''
-        _filename = utils.get_argument(filename, self._name)
+        _filename = filename or self._name
         _path = pathlib.Path(path if path is not None else self._path)
 
         if data_to_save == 'all':
