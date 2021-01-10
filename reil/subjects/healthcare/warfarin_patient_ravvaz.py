@@ -38,8 +38,6 @@ class WarfarinPatientRavvaz(Patient):
                  model: HealthMathModel,
                  randomized: bool = True,
                  **feature_values: Any) -> None:
-        for f in self.feature_set.values():
-            f.randomized = randomized
         '''
         Parameters
         ----------
@@ -124,6 +122,9 @@ class WarfarinPatientRavvaz(Patient):
                 categories=('normal', 'sensitive', 'highly sensitive'),
                 generator=lambda f: f.value)
         }
+
+        for f in self.feature_set.values():
+            f.randomized = randomized
 
         # Since EC_50 is not set (it depends on other features),
         # super().__init__() fails to setup the model.
