@@ -475,6 +475,20 @@ class Statistic(SecondayComponent):
 
         self._primary_component = primary_component
 
+    def set_default_definition(
+            self, default_definition: Callable[[Optional[int]],
+                                               Tuple[ReilData, float]]
+    ) -> None:
+        '''Add a new component definition.
+
+        Parameters
+        ----------
+        default_definition:
+            A function that can optionally accept `_id`, and returns a
+            `ReilData`.
+        '''
+        self._default = default_definition
+
     def add_definition(self,
                        name: str,
                        fn: "ReilFunction",
