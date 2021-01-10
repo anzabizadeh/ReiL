@@ -6,6 +6,7 @@ Environment class
 The base class of all learning environments in which one or more `agents` act
 on one or more `subjects`.
 '''
+import inspect
 import pathlib
 from collections import defaultdict
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
@@ -14,7 +15,6 @@ from reil import agents as rlagents
 from reil import stateful
 from reil import subjects as rlsubjects
 from reil.datatypes import InteractionProtocol, ReilData
-from reil.utils import functions
 from reil.utils import instance_generator as rlgenerator
 
 AgentSubjectTuple = Tuple[str, str]
@@ -40,8 +40,6 @@ class Environment(stateful.Stateful):
     state. If the subject is an instance generator, then the generator should
     reach to terminal state, not just its current instance.
     '''
-    # TODO: Statistics aggregators are not supported yet!
-    # TODO: simulate_passes and simulate_one_pass do not return anything!
 
     def __init__(self,
                  entity_dict: Optional[
@@ -119,7 +117,7 @@ class Environment(stateful.Stateful):
                 _obj = obj
             if isinstance(_obj, rlgenerator.InstanceGenerator):
                 self._instance_generators.update({name: _obj})
-            elif isinstance(_obj, rlagents.Agent):
+            elif isinstance(_obj, rlagents.NoLearnAgent):
                 self._agents.update({name: _obj})
             elif isinstance(_obj, rlsubjects.Subject):
                 self._subjects.update({name: _obj})
@@ -205,7 +203,8 @@ class Environment(stateful.Stateful):
         agent_id: int,
         agent_observer: Generator[Union[ReilData, None], Any, None],
         subject_instance: rlsubjects.Subject,
-        protocol: InteractionProtocol,
+        state_name: str,
+        reward_function_name: str,
         epoch: int) -> None:
         '''
         Allow `agent` and `subject` to interact once.
@@ -225,9 +224,11 @@ class Environment(stateful.Stateful):
             An instance of a `subject` that computes reward, determines
             possible actions, and takes the action.
 
-        protocol:
-            An `InteractionProtocol` that specifies the state and reward
-            function definitions.
+        state_name:
+            A string that specifies the state definition.
+
+        reward_function_name:
+            A string that specifies the reward function definition.
 
         epoch:
             The epoch of of the current run. This value is used by the `agent`
@@ -241,25 +242,21 @@ class Environment(stateful.Stateful):
 
         Notes
         -----
-        If the subject is terminated or no possible actions are available,
-        `None` is returned for action.
+        This method does not check whether the `subject` is terminated.
+
+        If no possible actions are available, `None` will be returned for
+        action.
         '''
         agent_observer.send(subject_instance.reward(
-            name=protocol.reward_function_name, _id=agent_id))
+            name=reward_function_name, _id=agent_id))
 
-        state = subject_instance.state(name=protocol.state_name, _id=agent_id)
-
-        terminated = subject_instance.is_terminated(agent_id)
-
-        if terminated:
-            agent_observer.close()
-        else:
-            possible_actions = subject_instance.possible_actions(agent_id)
-            if possible_actions:
-                action = agent_observer.send({'state': state,
-                                              'actions': possible_actions,
-                                              'epoch': epoch})
-                subject_instance.take_effect(cast(ReilData, action), agent_id)
+        state = subject_instance.state(name=state_name, _id=agent_id)
+        possible_actions = subject_instance.possible_actions(agent_id)
+        if possible_actions:
+            action = agent_observer.send({'state': state,
+                                          'actions': possible_actions,
+                                          'epoch': epoch})
+            subject_instance.take_effect(cast(ReilData, action), agent_id)
 
     @classmethod
     def interact_n_times(
@@ -267,7 +264,8 @@ class Environment(stateful.Stateful):
             agent_id: int,
             agent_observer: Generator[Union[ReilData, None], Any, None],
             subject_instance: rlsubjects.Subject,
-            protocol: InteractionProtocol,
+            state_name: str,
+            reward_function_name: str,
             epoch: int,
             times: int = 1) -> None:
         '''
@@ -288,9 +286,11 @@ class Environment(stateful.Stateful):
             An instance of a `subject` that computes reward, determines
             possible actions, and takes the action.
 
-        protocol:
-            An `InteractionProtocol` that specifies the state and reward
-            function definitions.
+        state_name:
+            A string that specifies the state definition.
+
+        reward_function_name:
+            A string that specifies the reward function definition.
 
         epoch:
             The epoch of of the current run. This value is used by the `agent`
@@ -312,17 +312,18 @@ class Environment(stateful.Stateful):
         necessarily have a lenght of "times".
         '''
         for _ in range(times):
-            cls.interact_once(agent_id, agent_observer,
-                              subject_instance, protocol, epoch)
+            cls.interact_once(agent_id, agent_observer, subject_instance,
+                              state_name, reward_function_name, epoch)
 
     @classmethod
     def interact_while(
-        cls,
-        agent_id: int,
-        agent_observer: Generator[Union[ReilData, None], Any, None],
-        subject_instance: rlsubjects.Subject,
-        protocol: InteractionProtocol,
-        epoch: int) -> None:
+            cls,
+            agent_id: int,
+            agent_observer: Generator[Union[ReilData, None], Any, None],
+            subject_instance: rlsubjects.Subject,
+            state_name: str,
+            reward_function_name: str,
+            epoch: int) -> None:
         '''
         Allow `agent` and `subject` to interact until `subject` is terminated.
 
@@ -338,9 +339,11 @@ class Environment(stateful.Stateful):
             An instance of a subject that computes reward,
             determines possible actions, and takes the action.
 
-        protocol:
-            An `InteractionProtocol` that specifies the state and reward
-            function definitions.
+        state_name:
+            A string that specifies the state definition.
+
+        reward_function_name:
+            A string that specifies the reward function definition.
 
         epoch:
             The epoch of of the current run. This value is used by the agent
@@ -358,8 +361,8 @@ class Environment(stateful.Stateful):
         instance is run to termination, not the whole generator.
         '''
         while not subject_instance.is_terminated(agent_id):
-            cls.interact_once(agent_id, agent_observer,
-                              subject_instance, protocol, epoch)
+            cls.interact_once(agent_id, agent_observer, subject_instance,
+                              state_name, reward_function_name, epoch)
 
     def assert_protocol(self, protocol: InteractionProtocol) -> None:
         '''
@@ -432,7 +435,6 @@ class Environment(stateful.Stateful):
         if get_agent_observer:
             self._agent_observers[a_s_name] = \
                 self._agents[a_name].observe(s_id, a_stat)
-            # self._agent_observers[a_s_name].send(None)
 
     def close_agent_observer(self, protocol: InteractionProtocol) -> None:
         '''
@@ -458,6 +460,10 @@ class Environment(stateful.Stateful):
         state_name = protocol.state_name
         a_s_names = (agent_name, subject_name)
 
+        if inspect.getgeneratorstate(
+                self._agent_observers[a_s_names]) != inspect.GEN_SUSPENDED:
+            return
+
         a_id, _ = cast(Tuple[int, int],
                        self._assignment_list[a_s_names])
         reward = self._subjects[subject_name].reward(
@@ -471,7 +477,7 @@ class Environment(stateful.Stateful):
                                                'epoch': None})
         self._agent_observers[a_s_names].close()
 
-    def reset_subject(self, subject_name: str) -> None:
+    def reset_subject(self, subject_name: str) -> bool:
         '''
         When a `subject` is terminated for all interacting `agents`, this
         function is called to reset the `subject`.
@@ -483,6 +489,12 @@ class Environment(stateful.Stateful):
         ----------
         subject_name:
             Name of the `subject` that is terminated.
+        
+        Returns
+        -------
+        :
+            `True` if the `instance_generator` for the `subject` is still
+            active, `False` if it hit `StopIteration`.
 
         Notes
         -----
@@ -502,6 +514,7 @@ class Environment(stateful.Stateful):
                 _, self._subjects[subject_name] = cast(
                     Tuple[int, rlsubjects.SubjectType],
                     next(self._instance_generators[subject_name]))
+
             except StopIteration:
                 self._epochs[subject_name] += 1
                 if self._instance_generators[subject_name].is_terminated():
@@ -516,9 +529,12 @@ class Environment(stateful.Stateful):
                     _, self._subjects[subject_name] = cast(
                         Tuple[int, rlsubjects.SubjectType],
                         next(self._instance_generators[subject_name]))
+                return False
         else:
             self._epochs[subject_name] += 1
             self._subjects[subject_name].reset()
+
+        return True
 
     def load(self,
              entity_name: Union[List[str], str] = 'all',
@@ -541,7 +557,7 @@ class Environment(stateful.Stateful):
         ValueError
             The filename is not specified.
         '''
-        _filename: str = functions.get_argument(filename, self._name)
+        _filename: str = filename or self._name
         _path = pathlib.Path(path if path is not None else self._path)
 
         if entity_name == 'all':
@@ -593,8 +609,8 @@ class Environment(stateful.Stateful):
         ValueError
             The filename is not specified.
         '''
-        _filename = functions.get_argument(filename, self._name)
-        _path = pathlib.Path(path if path is not None else self._path)
+        _filename = filename or self._name
+        _path = pathlib.Path(path or self._path)
 
         if data_to_save == 'all':
             self._env_data: Dict[str, List[Any]] = defaultdict(list)
