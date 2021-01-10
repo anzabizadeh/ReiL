@@ -6,17 +6,16 @@ PrimaryComponent and SecondayComponent classes
 A datatype used to specify entity components, such as `state`, `reward`,
 and `statistic`.
 '''
-
+from __future__ import annotations
 
 import dataclasses
 import functools
 from collections import defaultdict
-from typing import Any, Callable, DefaultDict, Dict, List, Optional, Tuple, Union, cast
+from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Tuple,
+                    Union, cast)
 
 import pandas as pd
-
 from reil.datatypes import ReilData
-from reil.stats import ReilFunction
 
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
 
@@ -41,8 +40,10 @@ class PrimaryComponent:
 
     def __init__(
         self,
+        object_ref: object,
         available_sub_components: Optional[Dict[str, SubComponentInfo]] = None,
-        default_definition: Optional[Callable[[Optional[int]], ReilData]] = None
+        default_definition: Optional[Callable[[
+            Optional[int]], ReilData]] = None
     ) -> None:
         '''
         Parameters
@@ -58,6 +59,7 @@ class PrimaryComponent:
         if available_sub_components is not None:
             self.sub_components = available_sub_components
 
+        self.object_ref = object_ref
         self._default = default_definition
 
     @property
@@ -215,7 +217,7 @@ class PrimaryComponent:
             raise ValueError(f'Definition {name} not found.')
 
         return ReilData(
-            d.fn(_id=_id, **d.args)
+            d.fn(self.object_ref, _id=_id, **d.args)
             for d in self._definitions[name.lower()])
 
 
@@ -299,7 +301,7 @@ class SecondayComponent:
 
     def add_definition(self,
                        name: str,
-                       fn: ReilFunction,
+                       fn: "ReilFunction",
                        primary_component_name: str = 'default') -> None:
         '''
         Add a new component definition.
@@ -475,7 +477,7 @@ class Statistic(SecondayComponent):
 
     def add_definition(self,
                        name: str,
-                       fn: ReilFunction,
+                       fn: "ReilFunction",
                        stat_component: str,
                        aggregation_component: str) -> None:
         '''
@@ -610,6 +612,108 @@ class Statistic(SecondayComponent):
             Definition not found.
         '''
         s = self.__call__(name, _id)
+        if s is not None:
+            if _id is None:
+                self._history_none.append(s)
+            else:
+                self._history[_id].append(s)
+
+    def aggregate(self,
+                  aggregators: Tuple[str, ...],
+                  groupby: Optional[List[str]] = None,
+                  _id: Optional[int] = None,
+                  reset_history: bool = False):
+        temp = self._history_none if _id is None else self._history[_id]
+        if not temp:
+            return None
+
+        df = pd.DataFrame({'instance_id': i,  # type: ignore
+                           **x[0].value,
+                           'value': x[1]}
+                          for i, x in enumerate(temp))
+        temp_group_by = ['instance_id'] if groupby is None else list(groupby)
+        grouped_df = df.groupby(temp_group_by)
+        result = grouped_df['value'].agg(aggregators)
+
+        if reset_history:
+            self._history: Dict[
+                int, List[Tuple[ReilData, float]]] = DefaultDict(list)
+            self._history_none: List[Tuple[ReilData, float]] = []
+
+        return result
+
+
+class MockStatistic:
+    '''
+    A component that mocks `Statistic` class, and uses another object's
+    `Statistic` methods, except for `append` and `aggregate`.
+    '''
+
+    def __init__(self, obj) -> None:
+        '''
+
+        Parameters
+        ----------
+        obj:
+            The object that provides actual `Statistic` capabilities.
+        '''
+        self._obj = obj
+        self._history: Dict[int,
+                            List[Tuple[ReilData, float]]] = DefaultDict(list)
+        self._history_none: List[Tuple[ReilData, float]] = []
+
+    def set_object(self, obj) -> None:
+        self._obj = obj
+
+    def enable(self) -> None:
+        return self._obj.statistic.enable()
+
+    def disable(self) -> None:
+        return self._obj.statistic.disable()
+
+    def set_primary_component(
+            self,
+            primary_component: PrimaryComponent) -> None:
+        return self._obj.statistic.set_primary_component(primary_component)
+
+    def add_definition(self,
+                       name: str,
+                       fn: "ReilFunction",
+                       stat_component: str,
+                       aggregation_component: str) -> None:
+        return self._obj.statistic.add_definition(
+            name, fn, stat_component, aggregation_component)
+
+    def default(self, _id: Optional[int] = None) -> Tuple[ReilData, float]:
+        return self._obj.statistic.default(_id)
+
+    def __call__(
+            self,
+            name: str,
+            _id: Optional[int] = None) -> Union[Tuple[ReilData, float], None]:
+        return self._obj.statistic.__call__(name, _id)
+
+    def append(self,
+               name: str,
+               _id: Optional[int] = None) -> None:
+        '''
+        Generate the stat and append it to the history.
+
+        Arguments
+        ---------
+        name:
+            The name of the component definition.
+
+        _id:
+            ID of the caller.
+
+        Raises
+        ------
+        ValueError
+            Definition not found.
+        '''
+        s = self._obj.statistic.__call__(name, _id)
+        # print(s[0].value, s[1])
         if s is not None:
             if _id is None:
                 self._history_none.append(s)

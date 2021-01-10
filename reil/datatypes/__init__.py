@@ -58,6 +58,6 @@ from .feature import Feature, FeatureType  # noqa: W0611
 from .interaction_protocol import Entity, InteractionProtocol  # noqa: W0611
 
 from .components import (PrimaryComponent, SecondayComponent,  # noqa: W0611
-                         SubComponentInfo)
+                         Statistic, MockStatistic, SubComponentInfo)
 
 import reil.datatypes.buffers  # noqa: W0611
