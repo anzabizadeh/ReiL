@@ -8,12 +8,13 @@ an iterator.
 '''
 
 from __future__ import annotations
-import os
 
+import os
 import pathlib
 from typing import Any, Callable, Generic, Tuple, TypeVar, Union
 
 from reil import reilbase
+from reil.datatypes.components import MockStatistic
 
 T = TypeVar('T', bound=reilbase.ReilBase)
 
@@ -86,6 +87,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         self._last_stop_index = len(self._instance_counter_stops) - 1
 
         self.is_finite = -1 not in instance_counter_stops and not auto_rewind
+        self.statistic = MockStatistic(self._object)
 
         self.rewind()
 
@@ -104,9 +106,11 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             if self._stops_index <= self._last_stop_index:
                 self._determine_stop_check()
 
+            self._partially_terminated = True
             raise StopIteration
 
         else:
+            self._partially_terminated = False
             self._generate_new_instance()
 
         return (self._instance_counter, self._object)
@@ -143,6 +147,9 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
                 self._object.reset()
         else:
             self._object.reset()
+
+        self.statistic.set_object(self._object)
+
         if self._save_instances and new_instance:
             if (not self._overwrite_instances and
                     os.path.isfile(pathlib.Path(
@@ -159,10 +166,14 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         '''
         self._instance_counter = self._first_instance_number - 1
         self._stops_index = 0
+        self._partially_terminated = False
         self._determine_stop_check()
 
-    def is_terminated(self) -> bool:
-        return self._stops_index > self._last_stop_index
+    def is_terminated(self, fully: bool = True) -> bool:
+        if fully:
+            return self._stops_index > self._last_stop_index
+        else:
+            return self._partially_terminated
 
     def __repr__(self) -> str:
         try:
