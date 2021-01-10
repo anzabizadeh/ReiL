@@ -10,9 +10,12 @@ import pathlib
 from typing import Any, Dict, List, Optional, Tuple
 
 from reil import subjects
-from reil.datatypes import reildata
-from reil.utils import action_generator
+from reil.datatypes import ReilData
+from reil.stats import reil_functions
 from reil.subjects import healthcare
+from reil.subjects.subject import Subject
+from reil.utils import action_generator
+from typing_extensions import Literal
 
 
 class Warfarin(subjects.Subject):
@@ -60,6 +63,102 @@ class Warfarin(subjects.Subject):
         self._patient = patient
         self._action_generator = action_generator
         self._max_day = max_day
+        patient_basic = (('age', {}), ('CYP2C9', {}),
+                         ('VKORC1', {}), ('sensitivity', {}))
+        patient_extra = (('weight', {}), ('height', {}),
+                         ('gender', {}), ('tobaco', {}),
+                         ('amiodarone', {}), ('fluvastatin', {}))
+
+        reward_sq_dist = reil_functions.NormalizedSquareDistance(
+            name='sq_dist', arguments=('daily_INR',),  # type: ignore
+            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=True)
+
+        reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
+            name='sq_dist_interpolation',
+            arguments=('INR', 'interval'),  # type: ignore
+            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+            center=2.5, band_width=1.0, exclude_first=True)
+
+        reward_PTTR = reil_functions.PercentInRange(
+            name='PTTR', arguments=('daily_INR',),  # type: ignore
+            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+            acceptable_range=(2, 3), exclude_first=True)
+
+        reward_PTTR_interpolation = reil_functions.PercentInRange(
+            name='PTTR', arguments=('INR', 'interval'),  # type: ignore
+            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+            acceptable_range=(2, 3), exclude_first=True)
+
+        statistic_PTTR = reil_functions.PercentInRange(
+            name='PTTR', arguments=('daily_INR',),  # type: ignore
+            length=-1, multiplier=1.0, retrospective=True, interpolate=False,
+            acceptable_range=(2, 3), exclude_first=True)
+
+        self.state.add_definition('patient_basic',
+                                  *patient_basic)
+
+        self.state.add_definition('patient',
+                                  *patient_basic,
+                                  *patient_extra)
+
+        self.state.add_definition('patient_w_dosing',
+                                  *patient_basic,
+                                  *patient_extra,
+                                  ('day', {}),
+                                  ('dose', {'length': -1}),
+                                  ('INR', {'length': -1}),
+                                  ('interval', {'length': -1}))
+
+        for i in (1, 5, 10):
+            self.state.add_definition(f'patient_w_dosing_{i:02}',
+                                    *patient_basic,
+                                    *patient_extra,
+                                    ('day', {}),
+                                    ('dose', {'length': i}),
+                                    ('INR', {'length': i}),
+                                    ('interval', {'length': i}))
+
+        self.state.add_definition('patient_w_full_dosing',
+                                  *patient_basic,
+                                  *patient_extra,
+                                  ('day', {}),
+                                  ('daily_dose', {'length': -1}),
+                                  ('daily_INR', {'length': -1}),
+                                  ('interval', {'length': -1}))
+
+        self.state.add_definition('daily_INR',
+                                  ('daily_INR', {'length': -1}))
+
+        self.state.add_definition('Measured_INR_2',
+                                  ('INR', {'length': 2}),
+                                  ('interval', {'length': 1}))
+
+        self.state.add_definition('INR_within_2',
+                                  ('INR_within', {'length': 1}))
+
+        self.reward.add_definition(
+            'no_reward', lambda _: 0.0, 'Measured_INR_2')
+
+        self.reward.add_definition(
+            'sq_dist_exact', reward_sq_dist, 'INR_within_2')
+
+        self.reward.add_definition(
+            'sq_dist_interpolation', reward_sq_dist_interpolation,
+            'Measured_INR_2')
+
+        self.reward.add_definition(
+            'PTTR_exact', reward_PTTR, 'INR_within_2')
+
+        self.reward.add_definition(
+            'PTTR_interpolation', reward_PTTR_interpolation, 'Measured_INR_2')
+
+        self.statistic.add_definition(
+            'PTTR_exact_basic', statistic_PTTR, 'daily_INR', 'patient_basic')
+
+        self.statistic.add_definition(
+            'PTTR_exact', statistic_PTTR, 'daily_INR', 'patient')
+
         self.reset()
 
     @staticmethod
@@ -82,43 +181,14 @@ class Warfarin(subjects.Subject):
         return self._day >= self._max_day
 
     def possible_actions(
-            self, _id: Optional[int] = None) -> Tuple[reildata.ReilData, ...]:
+            self, _id: Optional[int] = None) -> Tuple[ReilData, ...]:
         return self._action_generator.possible_actions(
             self.state('default', _id))
-    # if self._action_type == 'dose' and self._current_dose < self._max_dose:
-    #     return self._possible_actions[
-    #         :int(self._current_dose/self._dose_steps) + 1]
-    # elif (self._action_type == 'interval' and
-    #         self._current_interval < self._max_interval):
-    #     return self._possible_actions[
-    #         :int(self._current_interval/self._interval_steps)]
-    # elif (self._current_dose < self._max_dose or
-    #         self._current_interval < self._max_interval):
-    #     self._generate_possible_actions(
-    #         dose_cap=self._current_dose, interval_cap=self._current_interval)
-
-    # return self._possible_actions
-
-    def default_state(self, _id: Optional[int] = None) -> reildata.ReilData:
-        index = self._decision_points_index - 1
-        return self._state_normal_fixed + reildata.ReilData([
-            {'name': 'dose',
-             'value': (self._decision_points_dose_history[index],),
-             'lower': self._action_generator.lower['dose'],
-             'upper': self._action_generator.upper['dose']},
-            {'name': 'INR',
-             'value': (self._decision_points_INR_history[index],),
-             'lower': 0.0,
-             'upper': 15.0},
-            {'name': 'interval',
-             'value': (self._decision_points_interval_history[index],),
-             'lower': self._action_generator.lower['interval'],
-             'upper': self._action_generator.upper['interval']}],
-            lazy_evaluation=True)
 
     def take_effect(self,
-                    action: reildata.ReilData,
-                    _id: Optional[int] = None) -> None:
+                    action: ReilData,
+                    _id: int = 0) -> None:
+        Subject.take_effect(self, action, _id)
         current_dose = float(action.value['dose'])
         current_interval = min(int(action.value['interval']),
                                self._max_day - self._day)
@@ -146,23 +216,25 @@ class Warfarin(subjects.Subject):
             self._full_INR_history[self._day]
 
     def reset(self) -> None:
+        Subject.reset(self)
         self._patient.generate()
 
-        self._day = 0
+        self._day: int = 0
         self._full_INR_history = [0.0] * self._max_day
         self._full_dose_history = [0.0] * self._max_day
         self._decision_points_INR_history = [0.0] * (self._max_day + 1)
         self._decision_points_dose_history = [0.0] * self._max_day
         self._decision_points_interval_history: List[int] = [1] * self._max_day
-        self._decision_points_index = 0
+        self._decision_points_index: int = 0
 
         self._full_INR_history[0] = self._patient.model(
             measurement_days=[0])['INR'][-1]
         self._decision_points_INR_history[0] = self._full_INR_history[0]
 
+    def _default_state_definition(
+            self, _id: Optional[int] = None) -> ReilData:
         patient_features = self._patient.feature_set
-
-        self._state_normal_fixed = reildata.ReilData([
+        return ReilData([
             {'name': 'age',
              'value': patient_features['age'].value,
              'lower': patient_features['age'].lower,
@@ -188,35 +260,38 @@ class Warfarin(subjects.Subject):
                 'value': temp.value,
                 'categories': temp.categories}
 
-    def _sub_comp_age(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_age(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._numerical_sub_comp('age')
 
-    def _sub_comp_weight(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_weight(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._numerical_sub_comp('weight')
 
-    def _sub_comp_height(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_height(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._numerical_sub_comp('height')
 
-    def _sub_comp_gender(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_gender(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._categorical_sub_comp('gender')
 
-    def _sub_comp_race(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_race(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._categorical_sub_comp('race')
 
-    def _sub_comp_tobaco(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_tobaco(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._categorical_sub_comp('tobaco')
 
-    def _sub_comp_amiodarone(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_amiodarone(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._categorical_sub_comp('amiodarone')
 
-    def _sub_comp_fluvastatin(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_fluvastatin(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._categorical_sub_comp('fluvastatin')
 
-    def _sub_comp_CYP2C9(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_CYP2C9(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._categorical_sub_comp('CYP2C9')
 
-    def _sub_comp_VKORC1(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_VKORC1(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return self._categorical_sub_comp('VKORC1')
+
+    def _sub_comp_sensitivity(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
+        return self._categorical_sub_comp('sensitivity')
 
     def _get_history(
             self, list_name: str, length: int) -> Tuple[List[Any], Any, Any]:
@@ -224,43 +299,50 @@ class Warfarin(subjects.Subject):
             raise ValueError('length should be a positive integer, or '
                              '-1 for full length output.')
 
-        _list, index, filler = {
-            'INR': (self._decision_points_INR_history,
-                    self._decision_points_index,
-                    0.0),
-            'daily_INR': (self._full_INR_history,
-                          self._day + 1,
-                          0.0),
-            'dose': (self._decision_points_dose_history,
-                     self._decision_points_index,
-                     0.0),
-            'daily_dose': (self._full_dose_history,
-                           self._day,
-                           0.0),
-            'interval': (self._decision_points_interval_history,
-                         self._decision_points_index,
-                         1)
-        }[list_name]
+        if list_name == 'INR':
+            _list = self._decision_points_INR_history
+            index = self._decision_points_index + 1
+            filler = 0.0
+            lower, upper = 0.0, 15.0
+        elif list_name == 'daily_INR':
+            _list = self._full_INR_history
+            index = self._day + 1
+            filler = 0.0
+            lower, upper = 0.0, 15.0
+        elif list_name == 'dose':
+            _list = self._decision_points_dose_history
+            index = self._decision_points_index
+            filler = 0.0
+            lower = self._action_generator.lower['dose']
+            upper = self._action_generator.upper['dose']
+        elif list_name == 'daily_dose':
+            _list = self._full_dose_history
+            index = self._day
+            filler = 0.0
+            lower = self._action_generator.lower['dose']
+            upper = self._action_generator.upper['dose']
+        elif list_name == 'interval':
+            _list = self._decision_points_interval_history
+            index = self._decision_points_index
+            filler = 1
+            lower = self._action_generator.lower['interval']
+            upper = self._action_generator.upper['interval']
+        else:
+            return [], None, None
 
         if length == -1:
             result = _list[:index]
         else:
-            result = [filler] * (length - index) + _list[-length:]
-
-        if list_name in ['INR', 'daily_INR']:
-            lower, upper = 0.0, 15.0
-        elif list_name in ['dose', 'daily_dose']:
-            lower = self._action_generator.lower['dose']
-            upper = self._action_generator.upper['dose']
-        elif list_name == 'interval':
-            lower = self._action_generator.lower['interval']
-            upper = self._action_generator.upper['interval']
-        else:
-            lower, upper = None, None
+            if length > index:
+                i1, i2 = length - index, 0
+            else:
+                i1, i2 = 0, index-length
+            result = [filler] * i1 + _list[i2:index] # type: ignore
 
         return result, lower, upper
 
-    def _sub_comp_dose(self, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_dose(
+            self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
         name = 'dose'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
@@ -268,7 +350,8 @@ class Warfarin(subjects.Subject):
                 'lower': lower,
                 'upper': upper}
 
-    def _sub_comp_INR(self, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_INR(
+            self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
         name = 'INR'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
@@ -277,7 +360,7 @@ class Warfarin(subjects.Subject):
                 'upper': upper}
 
     def _sub_comp_interval(
-            self, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
+            self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
         name = 'interval'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
@@ -285,14 +368,14 @@ class Warfarin(subjects.Subject):
                 'lower': lower,
                 'upper': upper}
 
-    def _sub_comp_day(self, **kwargs: Any) -> Dict[str, Any]:
+    def _sub_comp_day(self, _id: int, **kwargs: Any) -> Dict[str, Any]:
         return {'name': 'day',
                 'value': self._day if 0 <= self._day < self._max_day else None,
                 'lower': 0,
                 'upper': self._max_day - 1}
 
     def _sub_comp_daily_dose(
-            self, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
+            self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
         name = 'daily_dose'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
@@ -301,9 +384,20 @@ class Warfarin(subjects.Subject):
                 'upper': upper}
 
     def _sub_comp_daily_INR(
-            self, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
+            self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
         name = 'daily_INR'
         value, lower, upper = self._get_history(name, length)
+        return {'name': name,
+                'value': tuple(value),
+                'lower': lower,
+                'upper': upper}
+
+    def _sub_comp_INR_within(
+            self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
+        name = 'daily_INR'
+        l, _, _ = self._get_history('interval', length)
+        value, lower, upper = self._get_history(name, sum(l))
+
         return {'name': name,
                 'value': tuple(value),
                 'lower': lower,
@@ -320,12 +414,46 @@ class Warfarin(subjects.Subject):
 
     def __repr__(self) -> str:
         try:
-            temp = [', '.join((str(k), ': ', str(v)))
-                    for k, v in self._patient.feature_set.items()]
+            temp = ', '.join(''.join(
+                (str(k), ': ',
+                 ('{:4.2f}' if v.is_numerical else '{}').format(v.value)))
+                for k, v in self._patient.feature_set.items())
         except (AttributeError, ValueError, KeyError):
             temp = ''
 
-        return (f'\t{self.__class__.__qualname__}\t{temp}')
+        return (f'{self.__class__.__qualname__} [{temp}]')
+
+    # if self._action_type == 'dose' and self._current_dose < self._max_dose:
+    #     return self._possible_actions[
+    #         :int(self._current_dose/self._dose_steps) + 1]
+    # elif (self._action_type == 'interval' and
+    #         self._current_interval < self._max_interval):
+    #     return self._possible_actions[
+    #         :int(self._current_interval/self._interval_steps)]
+    # elif (self._current_dose < self._max_dose or
+    #         self._current_interval < self._max_interval):
+    #     self._generate_possible_actions(
+    #         dose_cap=self._current_dose, interval_cap=self._current_interval)
+
+    # return self._possible_actions
+
+    # def default_state(self, _id: Optional[int] = None) -> reildata.ReilData:
+    #     index = self._decision_points_index - 1
+    #     return self._state_normal_fixed + reildata.ReilData([
+    #         {'name': 'dose',
+    #          'value': (self._decision_points_dose_history[index],),
+    #          'lower': self._action_generator.lower['dose'],
+    #          'upper': self._action_generator.upper['dose']},
+    #         {'name': 'INR',
+    #          'value': (self._decision_points_INR_history[index],),
+    #          'lower': 0.0,
+    #          'upper': 15.0},
+    #         {'name': 'interval',
+    #          'value': (self._decision_points_interval_history[index],),
+    #          'lower': self._action_generator.lower['interval'],
+    #          'upper': self._action_generator.upper['interval']}],
+    #         lazy_evaluation=True)
+
 
 # def stats(self, stats_list: Tuple[str, ...]) -> Dict[str, Any]:
 #     results = {}
