@@ -105,54 +105,79 @@ class EnvironmentStaticMap(environments.Environment):
         simulate interactions accordingly.
         '''
         for protocol in self._interaction_sequence:
-            self.manage_terminated_subjects()
-            agent_name = protocol.agent.name
             subject_name = protocol.subject.name
+
+            if self._subjects[subject_name].is_terminated(None):
+                continue
+                # if (subject_name in self._instance_generators and
+                #     not self._instance_generators[subject_name].is_terminated()):
+                #     self._subjects[subject_name] = next(
+                #         self._instance_generators[subject_name])
+                # else:
+
+            agent_name = protocol.agent.name
             a_s_name = (agent_name, subject_name)
             unit = protocol.unit
-            agent_id, _ = cast(
-                Tuple[int, int],
-                self._assignment_list[a_s_name])
-            agent_observer = self._agent_observers[a_s_name]
+            state_name = protocol.state_name
+            reward_function_name = protocol.reward_function_name
+            agent_id, _ = cast(Tuple[int, int],
+                               self._assignment_list[a_s_name])
 
             if unit == 'interaction':
-                self.interact_n_times(
-                    agent_id=agent_id,
-                    agent_observer=agent_observer,
-                    subject_instance=self._subjects[subject_name],
-                    protocol=protocol,
-                    epoch=self._epochs[subject_name],
-                    times=protocol.n)
+                if protocol.n == 1:
+                    self.interact_once(
+                        agent_id=agent_id,
+                        agent_observer=self._agent_observers[a_s_name],
+                        subject_instance=self._subjects[subject_name],
+                        state_name=state_name,
+                        reward_function_name=reward_function_name,
+                        epoch=self._epochs[subject_name])
+                else:
+                    self.interact_n_times(
+                        agent_id=agent_id,
+                        agent_observer=self._agent_observers[a_s_name],
+                        subject_instance=self._subjects[subject_name],
+                        state_name=state_name,
+                        reward_function_name=reward_function_name,
+                        epoch=self._epochs[subject_name],
+                        times=protocol.n)
+
+                if self._subjects[subject_name].is_terminated(None):
+                    self.check_subject(subject_name)
 
             elif unit in ['instance', 'epoch']:
                 # For epoch, simulate the current instance, then in the next if
                 # statement, simulate the rest of the generated instances.
                 self.interact_while(
                     agent_id=agent_id,
-                    agent_observer=agent_observer,
+                    agent_observer=self._agent_observers[a_s_name],
                     subject_instance=self._subjects[subject_name],
-                    protocol=protocol,
+                    state_name=state_name,
+                    reward_function_name=reward_function_name,
                     epoch=self._epochs[subject_name])
+
+                if (unit == 'epoch'
+                        and subject_name in self._instance_generators):
+                    while self.check_subject(subject_name):
+                        # for _, instance in self._instance_generators[subject_name]:
+                        #     self._subjects[subject_name] = \
+                        #         cast(rlsubjects.Subject, instance)
+
+                        #     self.register(protocol, True)
+                        self.interact_while(
+                            agent_id=agent_id,
+                            agent_observer=self._agent_observers[a_s_name],
+                            subject_instance=self._subjects[subject_name],
+                            state_name=state_name,
+                            reward_function_name=reward_function_name,
+                            epoch=self._epochs[subject_name])
+
+                else:
+                    self.check_subject(subject_name)
+
             else:
                 raise ValueError(f'Unknown protocol unit: {unit}.')
 
-            if (unit == 'epoch'
-                    and subject_name in self._instance_generators):
-                while not self._instance_generators[subject_name].is_terminated():
-                # for _, instance in self._instance_generators[subject_name]:
-                #     self._subjects[subject_name] = \
-                #         cast(rlsubjects.Subject, instance)
-
-                #     self.register(protocol, True)
-                    self.manage_terminated_subjects()
-                    agent_observer = self._agent_observers[a_s_name]
-
-                    self.interact_while(
-                        agent_id=agent_id,
-                        agent_observer=agent_observer,
-                        subject_instance=self._subjects[subject_name],
-                        protocol=protocol,
-                        epoch=self._epochs[subject_name])
 
     def simulate_to_termination(self) -> None:
         '''
@@ -192,21 +217,29 @@ class EnvironmentStaticMap(environments.Environment):
 
         self.report_statistics(True)
 
-    def manage_terminated_subjects(self) -> None:
+    def check_subject(self, subject_name: str) -> bool:
         '''
         Go over all `subjects`. If terminated, close related `agent_observers`,
         reset the `subject`, and create new `agent_observers`.
         '''
-        terminated_protocols = (p for p in self._interaction_sequence
-                                if self._subjects[
-                                    p.subject.name].is_terminated(None))
+        # print(self._subjects[subject_name])
+        affected_protocols = list(p for p in self._interaction_sequence
+                                  if p.subject.name == subject_name)
 
-        for protocol in terminated_protocols:
-            self.close_agent_observer(protocol)
-            self.reset_subject(protocol.subject.name)
-            self.register(protocol, get_agent_observer=True)
+        success: bool = True
+        if affected_protocols:
+            for p in affected_protocols:
+                self.close_agent_observer(p)
 
-    def reset_subject(self, subject_name: str) -> None:
+            success = self.reset_subject(subject_name)
+
+            if success:
+                for p in affected_protocols:
+                    self.register(p, get_agent_observer=True)
+
+        return success
+
+    def reset_subject(self, subject_name: str) -> bool:
         '''
         Extends `Environment.reset_subject()`.
         '''
@@ -218,9 +251,12 @@ class EnvironmentStaticMap(environments.Environment):
             p.subject.statistic_name is not None)
 
         for e in entities:
-            self._subjects[subject_name].statistic.append(*e)
+            if subject_name in self._instance_generators:
+                self._instance_generators[subject_name].statistic.append(*e)
+            else:
+                self._subjects[subject_name].statistic.append(*e)
 
-        super().reset_subject(subject_name)
+        return super().reset_subject(subject_name)
 
     def report_statistics(self, reset_history: bool = False):
         entities = set(
@@ -232,8 +268,12 @@ class EnvironmentStaticMap(environments.Environment):
 
         for e in entities:
             print(e)
-            print(self._subjects[e[0]].statistic.aggregate(
-                e[1], e[2], e[3], reset_history=reset_history))
+            if e[0] in self._instance_generators:
+                print(self._instance_generators[e[0]].statistic.aggregate(
+                    e[1], e[2], e[3], reset_history=reset_history))
+            else:
+                print(self._subjects[e[0]].statistic.aggregate(
+                    e[1], e[2], e[3], reset_history=reset_history))
 
         entities = set(
             (p.agent.name, p.agent.aggregators, p.agent.groupby,
@@ -244,5 +284,9 @@ class EnvironmentStaticMap(environments.Environment):
 
         for e in entities:
             print(e)
-            print(self._agents[e[0]].statistic.aggregate(
-                e[1], e[2], e[3], reset_history=reset_history))
+            if e[0] in self._instance_generators:
+                print(self._instance_generators[e[0]].statistic.aggregate(
+                    e[1], e[2], e[3], reset_history=reset_history))
+            else:
+                print(self._agents[e[0]].statistic.aggregate(
+                    e[1], e[2], e[3], reset_history=reset_history))
