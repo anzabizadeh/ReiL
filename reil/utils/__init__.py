@@ -29,7 +29,6 @@ MNKBoard:
 WekaClusterer:
     A clustering class based on Weka's clustering capabilities (disabled)
 '''
-
 import reil.utils.exploration_strategies
 import reil.utils.functions  # noqa: W0611
 
