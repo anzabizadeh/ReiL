@@ -171,7 +171,8 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
     def is_terminated(self, fully: bool = True) -> bool:
         if fully:
-            return self._stops_index > self._last_stop_index
+            return not self._auto_rewind and (self._stops_index >
+                                              self._last_stop_index)
         else:
             return self._partially_terminated
 
