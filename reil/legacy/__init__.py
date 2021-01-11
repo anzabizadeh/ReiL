@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 legacy classes for reinforcement learning
-========================================
+=========================================
 
 This module provides classes that are no longer supported.
 

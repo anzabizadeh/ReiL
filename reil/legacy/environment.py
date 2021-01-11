@@ -3,7 +3,8 @@
 environment class
 =================
 
-This `environment` class provides a learning environment for any reinforcement learning agent on any subject.
+This `environment` class provides a learning environment for any reinforcement
+learning agent on any subject.
 
 
 '''

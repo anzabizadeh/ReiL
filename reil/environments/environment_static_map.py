@@ -7,12 +7,12 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-from typing import Any, Dict, Generator, Optional, Tuple, Union, cast
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 from reil import agents as rlagents
 from reil import environments
 from reil import subjects as rlsubjects
-from reil.datatypes import InteractionProtocol, ReilData
+from reil.datatypes import InteractionProtocol
 from reil.utils import instance_generator as rlgenerator
 
 AgentSubjectTuple = Tuple[str, str]
@@ -109,11 +109,6 @@ class EnvironmentStaticMap(environments.Environment):
 
             if self._subjects[subject_name].is_terminated(None):
                 continue
-                # if (subject_name in self._instance_generators and
-                #     not self._instance_generators[subject_name].is_terminated()):
-                #     self._subjects[subject_name] = next(
-                #         self._instance_generators[subject_name])
-                # else:
 
             agent_name = protocol.agent.name
             a_s_name = (agent_name, subject_name)
@@ -159,11 +154,6 @@ class EnvironmentStaticMap(environments.Environment):
                 if (unit == 'epoch'
                         and subject_name in self._instance_generators):
                     while self.check_subject(subject_name):
-                        # for _, instance in self._instance_generators[subject_name]:
-                        #     self._subjects[subject_name] = \
-                        #         cast(rlsubjects.Subject, instance)
-
-                        #     self.register(protocol, True)
                         self.interact_while(
                             agent_id=agent_id,
                             agent_observer=self._agent_observers[a_s_name],
@@ -177,7 +167,6 @@ class EnvironmentStaticMap(environments.Environment):
 
             else:
                 raise ValueError(f'Unknown protocol unit: {unit}.')
-
 
     def simulate_to_termination(self) -> None:
         '''

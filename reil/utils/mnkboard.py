@@ -293,7 +293,7 @@ class MNKBoard:
             The number of columns. If omitted, it will be infered from the
             `board` size and `m`.
         '''
-        _n = math.ceil(len(board) / m) if n is None else n
+        _n = n or math.ceil(len(board) / m)
 
         return [board[row*_n:(row+1)*_n] for row in range(m)]
 

@@ -3,7 +3,8 @@
 experiment class
 =================
 
-This `environment` class provides an experimentation environment for any reinforcement learning agent on any subject. 
+This `environment` class provides an experimentation environment for any
+reinforcement learning agent on any subject. 
 
 
 '''

@@ -1,4 +1,4 @@
-.. automodule:: reil.subjects.iterable_subject
+.. automodule:: reil.legacy.weka_clustering
    :members:
    :undoc-members:
    :inherited-members:

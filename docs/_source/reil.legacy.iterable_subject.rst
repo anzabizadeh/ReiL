@@ -1,4 +1,4 @@
-.. automodule:: reil.environments.submit_project
+.. automodule:: reil.legacy.iterable_subject
    :members:
    :undoc-members:
    :inherited-members:

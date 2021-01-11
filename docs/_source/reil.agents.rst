@@ -20,4 +20,3 @@ Submodules
    reil.agents.random_agent
    reil.agents.user_agent
    reil.agents.warfarin_agent
-   reil.agents.warfarin_cluster_based_agent

@@ -634,7 +634,7 @@ class Statistic(SecondayComponent):
 
     def aggregate(self,
                   aggregators: Tuple[str, ...],
-                  groupby: Optional[List[str]] = None,
+                  groupby: Optional[Tuple[str, ...]] = None,
                   _id: Optional[int] = None,
                   reset_history: bool = False):
         temp = self._history_none if _id is None else self._history[_id]
@@ -736,7 +736,7 @@ class MockStatistic:
 
     def aggregate(self,
                   aggregators: Tuple[str, ...],
-                  groupby: Optional[List[str]] = None,
+                  groupby: Optional[Tuple[str, ...]] = None,
                   _id: Optional[int] = None,
                   reset_history: bool = False):
         temp = self._history_none if _id is None else self._history[_id]
@@ -760,7 +760,7 @@ class MockStatistic:
 
 
 if __name__ == '__main__':  # noqa: C901
-    from reil.stats import Arguments, NormalizedSquareDistance
+    from reil.utils.reil_functions import Arguments, NormalizedSquareDistance
 
     def aggregation_function(x):
         v = {

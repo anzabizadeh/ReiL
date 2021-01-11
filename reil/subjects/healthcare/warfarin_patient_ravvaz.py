@@ -85,7 +85,8 @@ class WarfarinPatientRavvaz(Patient):
                 probabilities=(0.9998, 0.0002),
                 generator=random_categorical),
             'CYP2C9': Feature.categorical(  # Aurora Avatar Population
-                categories=('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'),
+                categories=('*1/*1', '*1/*2', '*1/*3',
+                            '*2/*2', '*2/*3', '*3/*3'),
                 probabilities=(0.6739, 0.1486, 0.0925, 0.0651, 0.0197, 2e-4),
                 generator=random_categorical),
             'VKORC1': Feature.categorical(  # Aurora Avatar Population

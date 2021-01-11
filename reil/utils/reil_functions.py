@@ -75,7 +75,7 @@ class NormalizedSquareDistance(ReilFunction):
 
     def _default_function(
             self, y: List[Any], x: Optional[List[Any]] = None) -> float:
-        _x = [1] * (len(y) - 1) if x is None else x
+        _x = x or [1] * (len(y) - 1)
 
         if len(y) != len(_x) + 1:
             raise ValueError(
@@ -104,7 +104,7 @@ class PercentInRange(ReilFunction):
 
     def _default_function(
             self, y: List[Any], x: Optional[List[Any]] = None) -> float:
-        _x = [1] * (len(y) - 1) if x is None else x
+        _x = x or [1] * (len(y) - 1)
         if len(y) != len(_x) + 1:
             raise ValueError(
                 'y should have exactly one item more than x.')
@@ -238,7 +238,7 @@ class Functions:
 
         INR_mid = sum(INR_range) / 2.0
 
-        _intervals = [1] * (len(INRs) - 1) if intervals is None else intervals
+        _intervals = intervals or [1] * (len(INRs) - 1)
 
         if len(INRs) != len(_intervals) + 1:
             raise ValueError(

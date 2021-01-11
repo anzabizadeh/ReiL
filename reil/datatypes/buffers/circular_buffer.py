@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 CircularBuffer class
-===================
+====================
 
 A `Buffer` that overflows!
 '''
@@ -22,7 +22,6 @@ class CircularBuffer(Buffer[T]):
     def add(self, data: Dict[str, T]) -> None:
         '''
         Add a new item to the buffer.
-
 
         Arguments
         ---------

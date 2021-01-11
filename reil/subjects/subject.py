@@ -6,10 +6,10 @@ subject class
 This `subject` class is the base class of all subject classes.
 '''
 
-from reil.datatypes import ReilData, SecondayComponent
 from typing import Any, Optional, Tuple, TypeVar
 
 from reil import stateful
+from reil.datatypes import ReilData, SecondayComponent
 
 
 class Subject(stateful.Stateful):
@@ -35,8 +35,8 @@ class Subject(stateful.Stateful):
 
         self._sequential_interaction = sequential_interaction
         self.reward = SecondayComponent(name='reward',
-                                         primary_component=self.state,
-                                         enabled=False)
+                                        primary_component=self.state,
+                                        enabled=False)
 
     def _default_reward_definition(
             self, _id: Optional[int] = None) -> ReilData:

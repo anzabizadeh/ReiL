@@ -200,12 +200,12 @@ class Environment(stateful.Stateful):
 
     @staticmethod
     def interact_once(
-        agent_id: int,
-        agent_observer: Generator[Union[ReilData, None], Any, None],
-        subject_instance: rlsubjects.Subject,
-        state_name: str,
-        reward_function_name: str,
-        epoch: int) -> None:
+            agent_id: int,
+            agent_observer: Generator[Union[ReilData, None], Any, None],
+            subject_instance: rlsubjects.Subject,
+            state_name: str,
+            reward_function_name: str,
+            epoch: int) -> None:
         '''
         Allow `agent` and `subject` to interact once.
 
@@ -489,7 +489,7 @@ class Environment(stateful.Stateful):
         ----------
         subject_name:
             Name of the `subject` that is terminated.
-        
+
         Returns
         -------
         :

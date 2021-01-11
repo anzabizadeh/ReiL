@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 WarfarinAgent class
-=================
+===================
 
 An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 '''
@@ -290,11 +290,11 @@ class IWPC(DosingProtocol):
         ---------
         patient:
             A dictionary of patient characteristics including:
-            * age
-            * height (in)
-            * weight (lb)
-            * race ('Asian', 'Black', etc.)
-            * amiodarone ('yes', 'no')
+            - age
+            - height (in)
+            - weight (lb)
+            - race ('Asian', 'Black', etc.)
+            - amiodarone ('yes', 'no')
 
         Returns
         -------
@@ -332,13 +332,13 @@ class IWPC(DosingProtocol):
         ---------
         patient:
             A dictionary of patient characteristics including:
-            * age
-            * height (in)
-            * weight (lb)
-            * VKORC1 ('G/G', 'G/A', 'A/A', etc.)
-            * CYP2C9 ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3',...)
-            * race ('Asian', 'Black', etc.)
-            * amiodarone ('yes', 'no')
+            - age
+            - height (in)
+            - weight (lb)
+            - VKORC1 ('G/G', 'G/A', 'A/A', etc.)
+            - CYP2C9 ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3',...)
+            - race ('Asian', 'Black', etc.)
+            - amiodarone ('yes', 'no')
 
         Returns
         -------
@@ -394,12 +394,12 @@ class IWPC(DosingProtocol):
         ---------
         patient:
             A dictionary of patient characteristics including:
-            * age
-            * height (in)
-            * weight (lb)
-            * VKORC1 ('G/G', 'G/A', 'A/A', etc.)
-            * CYP2C9 ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3',...)
-            * amiodarone ('yes', 'no')
+            - age
+            - height (in)
+            - weight (lb)
+            - VKORC1 ('G/G', 'G/A', 'A/A', etc.)
+            - CYP2C9 ('*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3',...)
+            - amiodarone ('yes', 'no')
 
         Returns
         -------
@@ -486,9 +486,9 @@ class Lenzini(DosingProtocol):
 
 class Intermountain(DosingProtocol):
     '''
-    Intermountain warfarin dosing protocol based on
-    https://www.ahajournals.org/doi/10.1161/circulationaha.107.737312
+    Intermountain warfarin dosing protocol based on `Anderson et al. (2007)
     supplements Appendix B
+    <https://www.ahajournals.org/doi/10.1161/circulationaha.107.737312>`_
     '''
 
     def __init__(self, enforce_day_ge_8: bool = True) -> None:

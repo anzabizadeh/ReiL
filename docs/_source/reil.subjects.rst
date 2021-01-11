@@ -22,7 +22,6 @@ Submodules
    :maxdepth: 4
 
    reil.subjects.frozen_lake
-   reil.subjects.iterable_subject
    reil.subjects.mnkgame
    reil.subjects.subject
    reil.subjects.tic_tac_toe

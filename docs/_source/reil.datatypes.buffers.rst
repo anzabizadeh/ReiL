@@ -1,5 +1,5 @@
 reil.datatypes.buffers package
-==========================
+==============================
 
 .. automodule:: reil.datatypes.buffers
    :members:

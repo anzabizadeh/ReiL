@@ -18,7 +18,6 @@ Subpackages
    reil.environments
    reil.learners
    reil.legacy
-   reil.stats
    reil.subjects
    reil.utils
 

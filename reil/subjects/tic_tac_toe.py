@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 TicTacToe class
-==============
+===============
 
 The standard Tic-Tac-Toe game.
 '''
@@ -9,7 +9,7 @@ import random
 from typing import Any, Optional
 
 from reil import subjects
-from reil.datatypes import reildata
+from reil.datatypes import ReilData
 
 
 class TicTacToe(subjects.MNKGame):
@@ -26,7 +26,7 @@ class TicTacToe(subjects.MNKGame):
     def __init__(self, **kwargs: Any):
         super().__init__(m=3, n=3, k=3, players=2, **kwargs)
 
-    def default_state(self, _id: Optional[int] = None) -> reildata.ReilData:
+    def default_state(self, _id: Optional[int] = None) -> ReilData:
         def modify(i, _id) -> float:
             if i == _id:
                 return 1
@@ -34,7 +34,7 @@ class TicTacToe(subjects.MNKGame):
                 return 0
             return -1
 
-        return reildata.ReilData.single_numerical(
+        return ReilData.single_numerical(
             name='state',
             value=tuple(modify(i, _id)
                         for i in self._board),

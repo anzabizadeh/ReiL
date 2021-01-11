@@ -11,7 +11,6 @@ from typing import Any, Optional, Tuple
 
 from reil import agents
 from reil.datatypes.reildata import ReilData
-from reil.utils import functions
 
 
 class RandomAgent(agents.NoLearnAgent):

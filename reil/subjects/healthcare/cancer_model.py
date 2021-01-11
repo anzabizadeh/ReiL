@@ -3,29 +3,30 @@
 cancer_model class
 ==================
 
-This `cancer_model` class implements a four-state nonlinear cancer chemotherapy model proposed by Lisette et al. (2003).
-
-
+This `cancer_model` class implements a four-state nonlinear cancer
+chemotherapy model proposed by Lisette et al. (2003).
 '''
 
 from reil.subjects.healthcare import Patient
 from reil.datatypes import Feature
+from reil.utils import functions
+
 
 class CancerPatient(Patient):
     feature_set = {
         'age': Feature.numerical(  # Aurora population
             lower=18.0, upper=100.0, mean=67.30, stdev=13.43,
-            generator=random_truncated_normal),
+            generator=functions.random_truncated_normal),
         'weight': Feature.numerical(  # lb  - Aurora population
             lower=70.0, upper=500.0, mean=199.24, stdev=54.71,
-            generator=random_truncated_normal),
+            generator=functions.random_truncated_normal),
         'height': Feature.numerical(  # in - Aurora population
             lower=45.0, upper=85.0, mean=66.78, stdev=4.31,
-            generator=random_truncated_normal),
+            generator=functions.random_truncated_normal),
         'gender': Feature.categorical(  # Aurora population
             categories=('Female', 'Male'),
             probabilities=(0.5314, 0.4686),
-            generator=random_categorical)}
+            generator=functions.random_categorical)}
 
     '''
     Four-state nonlinear cancer chemotherapy model.

@@ -1,6 +1,14 @@
+# -*- coding: utf-8 -*-
+'''
+functions module
+================
+
+Contains some useful functions.
+'''
+
 import math
 import random
-from typing import Any, Iterable, Tuple
+from typing import Iterable, Tuple
 
 import numpy as np
 from reil.datatypes import Feature

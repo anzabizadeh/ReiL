@@ -1,4 +1,4 @@
-.. automodule:: reil.environments.experiment
+.. automodule:: reil.legacy.experiment
    :members:
    :undoc-members:
    :inherited-members:

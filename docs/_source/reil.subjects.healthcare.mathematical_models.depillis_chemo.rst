@@ -1,4 +1,4 @@
-.. automodule:: reil.agents.warfarin_cluster_based_agent
+.. automodule:: reil.subjects.healthcare.mathematical_models.depillis_chemo
    :members:
    :undoc-members:
    :inherited-members:

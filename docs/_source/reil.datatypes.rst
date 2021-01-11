@@ -7,13 +7,21 @@ reil.datatypes package
    :inherited-members:
    :show-inheritance:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   reil.datatypes.buffers
+
 Submodules
 ----------
 
 .. toctree::
    :maxdepth: 4
 
+   reil.datatypes.components
    reil.datatypes.feature
    reil.datatypes.interaction_protocol
    reil.datatypes.reildata
-   reil.datatypes.rldata_old

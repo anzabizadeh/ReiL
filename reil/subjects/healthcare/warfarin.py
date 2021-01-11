@@ -9,16 +9,12 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 import pathlib
 from typing import Any, Dict, List, Optional, Tuple
 
-from reil import subjects
 from reil.datatypes import ReilData
-from reil.utils import reil_functions
-from reil.subjects import healthcare
-from reil.subjects.subject import Subject
-from reil.utils import action_generator
-from typing_extensions import Literal
+from reil.subjects import Subject, healthcare
+from reil.utils import action_generator, reil_functions
 
 
-class Warfarin(subjects.Subject):
+class Warfarin(Subject):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model.
     '''
@@ -112,12 +108,12 @@ class Warfarin(subjects.Subject):
 
         for i in (1, 5, 10):
             self.state.add_definition(f'patient_w_dosing_{i:02}',
-                                    *patient_basic,
-                                    *patient_extra,
-                                    ('day', {}),
-                                    ('dose', {'length': i}),
-                                    ('INR', {'length': i}),
-                                    ('interval', {'length': i}))
+                                      *patient_basic,
+                                      *patient_extra,
+                                      ('day', {}),
+                                      ('dose', {'length': i}),
+                                      ('INR', {'length': i}),
+                                      ('interval', {'length': i}))
 
         self.state.add_definition('patient_w_full_dosing',
                                   *patient_basic,
@@ -337,7 +333,7 @@ class Warfarin(subjects.Subject):
                 i1, i2 = length - index, 0
             else:
                 i1, i2 = 0, index-length
-            result = [filler] * i1 + _list[i2:index] # type: ignore
+            result = [filler] * i1 + _list[i2:index]  # type: ignore
 
         return result, lower, upper
 

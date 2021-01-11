@@ -232,7 +232,7 @@ class Agent(agents.NoLearnAgent):
         if X:
             self._learner.learn(X, Y)
 
-    def observe(self, subject_id: int, stat_name: Optional[str],
+    def observe(self, subject_id: int, stat_name: Optional[str],  # noqa: C901
                 ) -> Generator[Union[ReilData, None], Any, None]:
         '''
         Create a generator to interact with the subject (`subject_id`).

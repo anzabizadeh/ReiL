@@ -178,6 +178,7 @@ class EntityRegister:
     def __contains__(self, _id: int) -> bool:
         return _id in self._id_list
 
+
 class Stateful(reilbase.ReilBase):
     '''
     The base class of all stateful classes in the `ReiL` package.
@@ -205,7 +206,8 @@ class Stateful(reilbase.ReilBase):
 
         self.sub_comp_list = self._extract_sub_components()
         self.state = PrimaryComponent(self,
-            self.sub_comp_list, self._default_state_definition)
+                                      self.sub_comp_list,
+                                      self._default_state_definition)
         self.statistic = Statistic(
             name='statistic', primary_component=self.state,
             default_definition=self._default_statistic_definition)
@@ -296,8 +298,8 @@ class Stateful(reilbase.ReilBase):
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         '''
-        Register an `entity` and return its ID. If the `entity` is new, a new ID
-        is generated and the `entity_name` is added to the list of
+        Register an `entity` and return its ID. If the `entity` is new, a new
+        ID is generated and the `entity_name` is added to the list of
         registered entities.
 
         Arguments
@@ -350,5 +352,7 @@ class Stateful(reilbase.ReilBase):
         #              comp[0].keywords, None))
 
         self.state.object_ref = self
-        self.state.set_default_definition(self._default_state_definition)
-        self.statistic.set_default_definition(self._default_statistic_definition)
+        self.state.set_default_definition(
+            self._default_state_definition)
+        self.statistic.set_default_definition(
+            self._default_statistic_definition)

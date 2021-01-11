@@ -7,14 +7,6 @@ reil.utils package
    :inherited-members:
    :show-inheritance:
 
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   reil.datatypes.buffers
-
 Submodules
 ----------
 
@@ -26,5 +18,4 @@ Submodules
    reil.utils.functions
    reil.utils.instance_generator
    reil.utils.mnkboard
-   reil.utils.patient_old
-   reil.utils.weka_clustering
+   reil.utils.reil_functions

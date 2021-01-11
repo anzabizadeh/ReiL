@@ -11,7 +11,6 @@ from typing import Any, Generator, Optional, Tuple, TypeVar, Union, cast
 
 from reil import stateful
 from reil.datatypes.reildata import ReilData
-from reil.utils import functions
 from typing_extensions import Literal
 
 TrainingData = Tuple[Tuple[ReilData, ...], Tuple[float, ...]]

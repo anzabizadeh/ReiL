@@ -5,11 +5,10 @@ UserAgent class
 
 An agent that prints the state and asks the user for action.
 '''
-from typing import Any, Optional, Tuple, cast
+from typing import Any, Optional, Tuple
 
 from reil import agents
 from reil.datatypes.reildata import ReilData
-from reil.utils import functions
 
 
 class UserAgent(agents.NoLearnAgent):

@@ -1,4 +1,4 @@
-.. automodule:: reil.utils.patient_old
+.. automodule:: reil.legacy.environment
    :members:
    :undoc-members:
    :inherited-members:

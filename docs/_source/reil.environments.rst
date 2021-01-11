@@ -15,5 +15,3 @@ Submodules
 
    reil.environments.environment
    reil.environments.environment_static_map
-   reil.environments.experiment
-   reil.environments.submit_project
