@@ -233,9 +233,8 @@ class EnvironmentStaticMap(environments.Environment):
 
             success = self.reset_subject(subject_name)
 
-            if success:
-                for p in affected_protocols:
-                    self.register(p, get_agent_observer=True)
+            for p in affected_protocols:
+                self.register(p, get_agent_observer=True)
 
         return success
 
