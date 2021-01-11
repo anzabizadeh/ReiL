@@ -29,11 +29,13 @@ MNKBoard:
 WekaClusterer:
     A clustering class based on Weka's clustering capabilities (disabled)
 '''
-import reil.utils.exploration_strategies
+import reil.utils.exploration_strategies  # noqa: W0611
 import reil.utils.functions  # noqa: W0611
+import reil.utils.reil_functions  # noqa: W0611
 
 from .action_generator import (ActionGenerator,  # noqa: W0611
                                CategoricalComponent,
                                NumericalComponent)
+
 from .instance_generator import InstanceGenerator  # noqa: W0611
 from .mnkboard import MNKBoard  # noqa: W0611

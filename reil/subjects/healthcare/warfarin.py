@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from reil import subjects
 from reil.datatypes import ReilData
-from reil.stats import reil_functions
+from reil.utils import reil_functions
 from reil.subjects import healthcare
 from reil.subjects.subject import Subject
 from reil.utils import action_generator

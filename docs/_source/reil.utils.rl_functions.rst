@@ -1,4 +1,4 @@
-.. automodule:: reil.stats.stats
+.. automodule:: reil.utils.reil_functions
    :members:
    :undoc-members:
    :inherited-members:
