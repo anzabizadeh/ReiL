@@ -115,7 +115,7 @@ class Dense(learners.Learner[float]):
                               learners.ConstantLearningRate):
                 self._learning_rate_scheduler = \
                     keras.callbacks.LearningRateScheduler(
-                        self._learning_rate.new_rate, verbose=1)
+                        self._learning_rate.new_rate, verbose=0)
                 self._callbacks.append(self._learning_rate_scheduler)
 
     def predict(self, X: Tuple[ReilData, ...]) -> Tuple[float, ...]:
@@ -167,7 +167,7 @@ class Dense(learners.Learner[float]):
                     initial_epoch=self._epoch, epochs=self._epoch+1,
                     callbacks=self._callbacks,
                     validation_split=self._validation_split,
-                    verbose=2)
+                    verbose=0)
 
     def reset(self) -> None:
         '''
