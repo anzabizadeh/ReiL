@@ -12,7 +12,7 @@ from typing import Optional, Tuple
 from typing_extensions import Literal
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Entity:
     '''
     The datatype to specify an `agent` or a `subject`.

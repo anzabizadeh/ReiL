@@ -7,8 +7,10 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
+from collections import namedtuple
 from typing import Any, Dict, Optional, Tuple, Union, cast
 
+import pandas as pd
 from reil import agents as rlagents
 from reil import environments
 from reil import subjects as rlsubjects
@@ -233,48 +235,75 @@ class EnvironmentStaticMap(environments.Environment):
         '''
         entities = set(
             (p.subject.statistic_name,
-             self._assignment_list[(p.agent.name, p.subject.name)][0])
+             self._assignment_list[(p.agent.name, p.subject.name)][1])
             for p in self.interaction_sequence
             if p.subject.name == subject_name and
             p.subject.statistic_name is not None)
 
         for e in entities:
-            if subject_name in self._instance_generators:
-                self._instance_generators[subject_name].statistic.append(*e)
-            else:
-                self._subjects[subject_name].statistic.append(*e)
+            self._instance_generators.get(
+                subject_name,
+                self._subjects[subject_name]).statistic.append(*e)
 
         return super().reset_subject(subject_name)
 
-    def report_statistics(self, reset_history: bool = False):
+    def report_statistics(self,
+                          unstack: bool = True,
+                          reset_history: bool = True
+                          ) -> Dict[Tuple[str, str], pd.DataFrame]:
+        '''Generate statistics for agents and subjects.
+
+        Parameters
+        ----------
+        reset_history:
+            Whether to clear up the history after computing stats.
+
+        Returns
+        -------
+        :
+            A dictionary with state, subject pairs as keys and dataframes as
+            values.
+        '''
+        StatInfo = namedtuple(
+            'StatInfo', ('obj', 'entity_name', 'assigned_to', 'a_s_name',
+                         'aggregators', 'groupby'))
+
         entities = set(
-            (p.subject.name, p.subject.aggregators, p.subject.groupby,
-             self._assignment_list[(p.agent.name, p.subject.name)][0])
+            StatInfo('_agents', p.agent.name, p.subject.name,
+                     (p.agent.name, p.subject.name),
+                     p.agent.aggregators, p.agent.groupby)
             for p in self.interaction_sequence
-            if p.subject.statistic_name is not None and
-            p.subject.aggregators is not None)
+            if (p.agent.statistic_name is not None and
+                p.agent.aggregators is not None))
 
-        for e in entities:
-            print(e)
-            if e[0] in self._instance_generators:
-                print(self._instance_generators[e[0]].statistic.aggregate(
-                    e[1], e[2], e[3], reset_history=reset_history))
-            else:
-                print(self._subjects[e[0]].statistic.aggregate(
-                    e[1], e[2], e[3], reset_history=reset_history))
-
-        entities = set(
-            (p.agent.name, p.agent.aggregators, p.agent.groupby,
-             self._assignment_list[(p.agent.name, p.subject.name)][1])
+        entities.update(set(
+            StatInfo('_subjects', p.subject.name, p.agent.name,
+                     (p.agent.name, p.subject.name),
+                     p.subject.aggregators, p.subject.groupby)
             for p in self.interaction_sequence
-            if p.agent.statistic_name is not None and
-            p.agent.aggregators is not None)
+            if (p.subject.statistic_name is not None and
+                p.subject.aggregators is not None)))
 
-        for e in entities:
-            print(e)
-            if e[0] in self._instance_generators:
-                print(self._instance_generators[e[0]].statistic.aggregate(
-                    e[1], e[2], e[3], reset_history=reset_history))
-            else:
-                print(self._agents[e[0]].statistic.aggregate(
-                    e[1], e[2], e[3], reset_history=reset_history))
+        transform = (
+            lambda x: x.unstack().reset_index().rename(
+                columns={'level_0': 'aggregator', 0: 'value'})
+            if unstack else lambda x: x)
+
+        result = dict(
+            (e.a_s_name,
+             transform(
+                 self._instance_generators.get(
+                     e.entity_name,
+                     self.__dict__[e.obj][e.entity_name]
+                 ).statistic.aggregate(
+                     e.aggregators, e.groupby,
+                     self._assignment_list[e.a_s_name][e.a_s_name.index(
+                         e.entity_name)],
+                     reset_history=reset_history)
+             ).assign(
+                 entity=e.entity_name,
+                 assigned_to=e.assigned_to,
+                 epoch=self._epochs[e.a_s_name[1]]))
+            for e in entities)
+
+        return result
