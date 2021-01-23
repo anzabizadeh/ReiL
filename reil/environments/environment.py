@@ -52,9 +52,7 @@ class Environment(stateful.Stateful):
             a dictionary that contains `agents`, `subjects`, and
             `generators`.
         '''
-        super().__init__(name=kwargs.get('name', __name__),
-                         logger_name=kwargs.get('logger_name', __name__),
-                         **kwargs)
+        super().__init__(**kwargs)
 
         self._agents: Dict[str, rlagents.AgentType] = {}
         self._subjects: Dict[str, rlsubjects.SubjectType] = {}
@@ -536,7 +534,7 @@ class Environment(stateful.Stateful):
 
         return True
 
-    def load(self,
+    def load(self,  # noqa: C901
              entity_name: Union[List[str], str] = 'all',
              filename: Optional[str] = None,
              path: Optional[Union[pathlib.Path, str]] = None) -> None:
@@ -562,29 +560,51 @@ class Environment(stateful.Stateful):
 
         if entity_name == 'all':
             super().load(filename=_filename, path=_path)
+            self._instance_generators: Dict[str, EntityGenerator] = {}
             self._agents: Dict[str, rlagents.AgentType] = {}
             self._subjects: Dict[str, rlsubjects.SubjectType] = {}
+
+            for name, obj_type in self._env_data['instance_generators']:
+                self._instance_generators[name] = obj_type.from_pickle(
+                    path=(_path / f'{_filename}.instance_generators'),
+                    filename=name)
+
             for name, obj_type in self._env_data['agents']:
-                self._agents[name] = obj_type.from_pickle(
-                    path=(_path / f'{_filename}.data'), filename=name)
+                if name in self._instance_generators:
+                    self._agents[name] = \
+                        self._instance_generators[name]._object
+                else:
+                    self._agents[name] = obj_type.from_pickle(
+                        path=(_path / f'{_filename}.agents'), filename=name)
+
             for name, obj_type in self._env_data['subjects']:
-                self._subjects[name] = obj_type.from_pickle(
-                    path=(_path / f'{_filename}.data'), filename=name)
+                if name in self._instance_generators:
+                    self._subjects[name] = \
+                        self._instance_generators[name]._object
+                else:
+                    self._subjects[name] = obj_type.from_pickle(
+                        path=(_path / f'{_filename}.subjects'), filename=name)
 
             del self._env_data
 
         else:
             for obj in entity_name:
+                if obj in self._instance_generators:
+                    self._instance_generators[obj].load(
+                        path=(_path / f'{_filename}.instance_generators'),
+                        filename=obj)
+                    self._instance_generators[obj].reset()
+
                 if obj in self._agents:
                     self._agents[obj].load(
-                        path=(_path / f'{_filename}.data'), filename=obj)
+                        path=(_path / f'{_filename}.agents'), filename=obj)
                     self._agents[obj].reset()
                 elif obj in self._subjects:
                     self._subjects[obj].load(
-                        path=(_path / f'{_filename}.data'), filename=obj)
+                        path=(_path / f'{_filename}.subjects'), filename=obj)
                     self._subjects[obj].reset()
 
-    def save(self,
+    def save(self,  # noqa: C901
              filename: Optional[str] = None,
              path: Optional[Union[pathlib.Path, str]] = None,
              data_to_save: Union[List[str], str] = 'all'
@@ -613,32 +633,78 @@ class Environment(stateful.Stateful):
         _path = pathlib.Path(path or self._path)
 
         if data_to_save == 'all':
+            open_observers = set(a_s_names
+                                 for a_s_names in self._agent_observers
+                                 if inspect.getgeneratorstate(
+                                     self._agent_observers[a_s_names]
+                                 ) not in [inspect.GEN_CREATED or
+                                           inspect.GEN_CLOSED])
+            if open_observers:
+                raise RuntimeError('Cannot save an environment in '
+                                   'the middle of a simulation. '
+                                   'These agent/subject interactions '
+                                   'are still underway:\n'
+                                   f'{open_observers}')
+
+            temp, self._agent_observers = (  # type: ignore
+                self._agent_observers, None)
+
             self._env_data: Dict[str, List[Any]] = defaultdict(list)
 
-            for name, agent in self._agents.items():
-                _, fn = agent.save(
-                    path=_path / f'{_filename}.data', filename=name)
-                self._env_data['agents'].append((fn, type(agent)))
+            try:
+                for name, entity in self._instance_generators.items():
+                    _, filename = entity.save(
+                        path=_path / f'{_filename}.instance_generators',
+                        filename=name)
+                    self._env_data['instance_generators'].append(
+                        (filename, type(entity)))
 
-            for name, subject in self._subjects.items():
-                _, fn = subject.save(
-                    path=_path / f'{_filename}.data', filename=name)
-                self._env_data['subjects'].append((fn, type(subject)))
+                for name, agent in self._agents.items():
+                    if name in self._instance_generators:
+                        self._env_data['agents'].append((name, None))
+                    else:
+                        _, filename = agent.save(
+                            path=_path / f'{_filename}.agents', filename=name)
+                        self._env_data['agents'].append(
+                            (filename, type(agent)))
 
-            super().save(
-                filename=_filename, path=_path,
-                data_to_save=tuple(v for v in self.__dict__
-                                   if v not in ('_agents', '_subjects')))
+                for name, subject in self._subjects.items():
+                    if name in self._instance_generators:
+                        self._env_data['subjects'].append((name, None))
+                    else:
+                        _, filename = subject.save(
+                            path=_path / f'{_filename}.subjects',
+                            filename=name)
+                        self._env_data['subjects'].append(
+                            (filename, type(subject)))
 
-            del self._env_data
+                super().save(
+                    filename=_filename, path=_path,
+                    data_to_save=tuple(v for v in self.__dict__
+                                       if v not in ('_agents',
+                                                    '_subjects',
+                                                    '_instance_generators')))
+
+                del self._env_data
+
+            finally:
+                self._agent_observers = temp
+
         else:
             for obj in data_to_save:
-                if obj in self._agents:
+                if obj in self._instance_generators:
+                    self._instance_generators[obj].save(
+                        path=_path / f'{_filename}.instance_generators',
+                        filename=obj)
+                elif obj in self._agents:
                     self._agents[obj].save(
-                        path=_path / f'{_filename}.data', filename=obj)
+                        path=_path / f'{_filename}.agents', filename=obj)
                 elif obj in self._subjects:
                     self._subjects[obj].save(
-                        path=_path / f'{_filename}.data', filename=obj)
+                        path=_path / f'{_filename}.subjects', filename=obj)
+                else:
+                    self._logger.warning(f'Cannot save {obj} individually. '
+                                         'Try saving the whole environment.')
 
         return _path, _filename
 

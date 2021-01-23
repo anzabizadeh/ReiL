@@ -74,9 +74,7 @@ class Environment(stateful.Stateful):
                 'every step': learn after every move.
                 'history': learn after each episode.
         '''
-        super().__init__(name=kwargs.get('name', __name__),
-                         logger_name=kwargs.get('logger_name', __name__),
-                         **kwargs)
+        super().__init__(**kwargs)
 
         self._agents = {}
         self._subjects = {}

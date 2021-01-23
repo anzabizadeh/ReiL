@@ -54,7 +54,7 @@ class ConstantEpsilonGreedy(ExplorationStrategy):
     An epsilon greedy object with constant epsilon.
     '''
 
-    def __init__(self, epsilon: float) -> None:
+    def __init__(self, epsilon: float = 0.0) -> None:
         '''
         Arguments
         ---------
@@ -109,6 +109,10 @@ class VariableEpsilonGreedy(ExplorationStrategy):
                             'For constant epsilon, '
                             'use `ConstantEpsilonGreedy` class.')
         self._epsilon = epsilon
+
+    @classmethod
+    def _empty_instance(cls):
+        return cls(lambda e: 0.0)
 
     def explore(self, epoch: int) -> bool:
         '''

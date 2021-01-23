@@ -5,8 +5,7 @@ Learner class
 
 The base class for all `learner` classes.
 '''
-import pathlib
-from typing import Any, Generic, Optional, Tuple, TypeVar, Union
+from typing import Any, Generic, Tuple, TypeVar
 
 from reil import learners, reilbase
 from reil.datatypes import ReilData
@@ -34,13 +33,8 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
         self._learning_rate = learning_rate
 
     @classmethod
-    def from_pickle(cls,
-                    filename: str,
-                    path: Optional[Union[pathlib.Path, str]] = None):
-        instance = cls(learning_rate=learners.ConstantLearningRate(0.0))
-        instance.load(filename=filename, path=path)
-
-        return instance
+    def _empty_instance(cls):
+        return cls(learning_rate=learners.ConstantLearningRate(0.0))
 
     def predict(self, X: Tuple[ReilData, ...]) -> Tuple[LabelType, ...]:
         '''

@@ -188,21 +188,9 @@ class Stateful(reilbase.ReilBase):
                  min_entity_count: int = 1,
                  max_entity_count: int = -1,
                  unique_entities: bool = True,
-                 name: Optional[str] = None,
-                 path: Optional[pathlib.Path] = None,
-                 logger_name: Optional[str] = None,
-                 logger_level: Optional[int] = None,
-                 logger_filename: Optional[str] = None,
-                 persistent_attributes: Optional[List[str]] = None,
                  **kwargs: Any):
 
-        super().__init__(name=name,
-                         path=path,
-                         logger_name=logger_name,
-                         logger_level=logger_level,
-                         logger_filename=logger_filename,
-                         persistent_attributes=persistent_attributes,
-                         **kwargs)
+        super().__init__(**kwargs)
 
         self.sub_comp_list = self._extract_sub_components()
         self.state = PrimaryComponent(self,
@@ -342,17 +330,37 @@ class Stateful(reilbase.ReilBase):
 
     def load(self, filename: str,
              path: Optional[Union[str, pathlib.Path]]) -> None:
+
         super().load(filename, path=path)
 
-        # # Reassign reference to `self` in sub components that use `partial`.
-        # for comp in self.state.sub_components.values():
-        #     if isinstance(comp[0], functools.partial):
-        #         comp[0].__setstate__(
-        #             (comp[0].func, (self, *comp[0].args[1:]),
-        #              comp[0].keywords, None))
-
         self.state.object_ref = self
+        self.statistic.set_primary_component(self.state)
         self.state.set_default_definition(
             self._default_state_definition)
         self.statistic.set_default_definition(
             self._default_statistic_definition)
+
+    def save(self,
+             filename: Optional[str] = None,
+             path: Optional[Union[str, pathlib.Path]] = None,
+             data_to_save: Optional[Tuple[str, ...]] = None
+             ) -> Tuple[pathlib.Path, str]:
+
+        object_ref_temp, self.state.object_ref = self.state.object_ref, None
+        state_default, self.state._default = self.state._default, None
+
+        prim_comp, self.statistic._primary_component = (  # type: ignore
+            self.statistic._primary_component, None)
+        statistic_default, self.statistic._default = (
+            self.statistic._default, None)
+
+        try:
+            f, p = super().save(filename, path=path, data_to_save=data_to_save)
+        finally:
+            self.state.object_ref = object_ref_temp
+            self.state._default = state_default
+
+            self.statistic._primary_component = prim_comp
+            self.statistic._default = statistic_default
+
+        return f, p

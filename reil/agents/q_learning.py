@@ -67,6 +67,14 @@ class QLearning(agents.Agent):
         self._buffer = buffer
         self._buffer.setup(buffer_names=['X', 'Y'])
 
+    @classmethod
+    def _empty_instance(cls):
+        class MockBuffer:
+            def setup(self, **kwargs):
+                pass
+
+        return cls(None, MockBuffer(), None)  # type: ignore
+
     def _q(self,
            state: Union[Tuple[ReilData, ...], ReilData],
            action: Optional[Union[Tuple[ReilData, ...], ReilData]] = None

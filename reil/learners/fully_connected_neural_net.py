@@ -220,15 +220,19 @@ class Dense(learners.Learner[float]):
         ValueError:
             The filename is not specified.
         '''
-        _path = path if path is not None else '.'
+        _path = path or '.'
         self._graph = tf.Graph()  # type: ignore
         with self._graph.as_default():
             self._session = keras.backend.get_session()
             self._model = keras.models.load_model(
-                pathlib.Path(_path, f'{filename}.tf', filename))
+                pathlib.Path(_path, 'learner', filename))
+
             self._tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self._tensorboard_path)
-            # , histogram_freq=1)  # , write_images=True)
-            self._learning_rate_scheduler = \
-                keras.callbacks.LearningRateScheduler(
-                    self._learning_rate_scheduler)
+
+            if not isinstance(self._learning_rate,
+                              learners.ConstantLearningRate):
+                self._learning_rate_scheduler = \
+                    keras.callbacks.LearningRateScheduler(
+                        self._learning_rate.new_rate, verbose=0)
+                self._callbacks.append(self._learning_rate_scheduler)

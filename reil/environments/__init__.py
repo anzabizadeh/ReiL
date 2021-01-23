@@ -16,5 +16,6 @@ EnvironmentStaticMap:
     An environment with static interaction map.
 '''
 
-from .environment import Environment  # noqa: W0611
+from .environment import (  # noqa: W0611
+    Environment, Entity, EntityGenerator, AgentSubjectTuple)
 from .environment_static_map import EnvironmentStaticMap  # noqa: W0611

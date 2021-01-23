@@ -83,7 +83,7 @@ class ReilBase:
             >>> instance._my_attr
             test
         '''
-        self._name = name or __name__.lower()
+        self._name = name or self.__class__.__qualname__.lower()
         self._path = pathlib.Path(path or '.')
 
         self._persistent_attributes = [
@@ -100,6 +100,10 @@ class ReilBase:
             self._logger.addHandler(logging.FileHandler(self._logger_filename))
 
         self.set_params(**kwargs)
+
+    @classmethod
+    def _empty_instance(cls):
+        return cls()
 
     @classmethod
     def from_pickle(
@@ -121,7 +125,7 @@ class ReilBase:
         :
             A `ReilBase` instance.
         '''
-        instance = cls()
+        instance = cls._empty_instance()
         instance._logger_name = __name__
         instance._logger_level = logging.WARNING
         instance._logger_filename = None

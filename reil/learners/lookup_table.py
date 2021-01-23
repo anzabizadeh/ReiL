@@ -70,6 +70,10 @@ class QLookupTable(learners.Learner[float]):
         # It creates entries as soon as they are looked up.
         self._table: LookupTable[float] = LookupTable()
 
+    @classmethod
+    def _empty_instance(cls):
+        return cls(None)  # type: ignore
+
     def predict(self, X: Tuple[ReilData, ...]) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.

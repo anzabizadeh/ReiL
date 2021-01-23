@@ -9,22 +9,22 @@ This `agent` class is the base class of all agent classes that can learn from
 
 import pathlib
 from collections import defaultdict
-from typing import Any, Dict, Generator, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, Generic, Optional, Tuple, Union, cast
 
 from reil import agents, stateful
 from reil.datatypes.reildata import ReilData
-from reil.learners.learner import Learner
+from reil.learners.learner import Learner, LabelType
 from reil.utils.exploration_strategies import ExplorationStrategy
 from typing_extensions import Literal
 
 
-class Agent(agents.NoLearnAgent):
+class Agent(agents.NoLearnAgent, Generic[LabelType]):
     '''
     The base class of all agent classes that learn from history.
     '''
 
     def __init__(self,
-                 learner: Learner,
+                 learner: Learner[LabelType],
                  exploration_strategy: ExplorationStrategy,
                  discount_factor: float = 1.0,
                  default_actions: Tuple[ReilData, ...] = (),
@@ -66,7 +66,7 @@ class Agent(agents.NoLearnAgent):
 
         super().__init__(default_actions, tie_breaker, **kwargs)
 
-        self._learner = learner
+        self._learner: Learner[LabelType] = learner
         if not 0.0 <= discount_factor <= 1.0:
             self._logger.warning(
                 f'{self.__class__.__qualname__} discount_factor should be in'
@@ -75,6 +75,10 @@ class Agent(agents.NoLearnAgent):
         self._exploration_strategy = exploration_strategy
         self._training_trigger = training_trigger
         self._history: Dict[int, stateful.History] = defaultdict(list)
+
+    @classmethod
+    def _empty_instance(cls):
+        return cls(None)  # type: ignore
 
     def act(self,
             state: ReilData,
@@ -149,7 +153,8 @@ class Agent(agents.NoLearnAgent):
         super().load(filename, path)
 
         # when loading, self._learner is the object type, not an instance.
-        self._learner = self._learner.from_pickle(filename, path)
+        self._learner = cast(Learner[LabelType],
+                             self._learner.from_pickle(filename, path))
 
     def save(self,
              filename: Optional[str] = None,
@@ -180,15 +185,18 @@ class Agent(agents.NoLearnAgent):
         data = list(data_to_save or self.__dict__)
         save_learner = '_learner' in data
         if save_learner:
-            data.remove('_learner')
+            temp, self._learner = (  # type: ignore
+                self._learner, type(self._learner))
 
-        _path, _filename = super().save(
-            filename, path, data_to_save=cast(Tuple, data))
+        try:
+            _path, _filename = super().save(
+                filename, path, data_to_save=cast(Tuple, data))
+        finally:
+            if save_learner:
+                self._learner = temp  # type: ignore
+                self._learner.save(_filename, _path / 'learner')
 
-        if save_learner:
-            self._learner.save(_filename, _path / 'learner')
-
-        return _path, _filename
+            return _path, _filename
 
     def _prepare_training(self,
                           history: stateful.History) -> agents.TrainingData:
@@ -230,7 +238,7 @@ class Agent(agents.NoLearnAgent):
             X, Y = cast(agents.TrainingData, ([], []))
 
         if X:
-            self._learner.learn(X, Y)
+            self._learner.learn(X, cast(Tuple[LabelType, ...], Y))
 
     def observe(self, subject_id: int, stat_name: Optional[str],  # noqa: C901
                 ) -> Generator[Union[ReilData, None], Any, None]:

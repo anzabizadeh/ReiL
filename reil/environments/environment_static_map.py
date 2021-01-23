@@ -11,19 +11,11 @@ from collections import namedtuple
 from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import pandas as pd
-from reil import agents as rlagents
-from reil import environments
-from reil import subjects as rlsubjects
 from reil.datatypes import InteractionProtocol
-from reil.utils import instance_generator as rlgenerator
-
-AgentSubjectTuple = Tuple[str, str]
-Entity = Union[rlagents.Agent, rlsubjects.Subject]
-EntityGenerator = Union[rlgenerator.InstanceGenerator[rlagents.Agent],
-                        rlgenerator.InstanceGenerator[rlsubjects.Subject]]
+from reil.environments import Entity, EntityGenerator, Environment
 
 
-class EnvironmentStaticMap(environments.Environment):
+class EnvironmentStaticMap(Environment):
     '''
     Provide an interaction and learning environment for `agents` and
     `subjects`, based on a static interaction sequence.

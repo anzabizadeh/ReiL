@@ -49,6 +49,10 @@ class Warfarin(Subject):
 
         super().__init__(max_agent_count=1, **kwargs)
 
+        self._patient = patient
+        if not self._patient:
+            return
+
         if 'dose' not in action_generator.components:
             raise ValueError(
                 'action_generator should have a "dose" component.')
@@ -56,7 +60,6 @@ class Warfarin(Subject):
             raise ValueError(
                 'action_generator should have an "interval" component.')
 
-        self._patient = patient
         self._action_generator = action_generator
         self._max_day = max_day
         patient_basic = (('age', {}), ('CYP2C9', {}),
@@ -156,6 +159,10 @@ class Warfarin(Subject):
             'PTTR_exact', statistic_PTTR, 'daily_INR', 'patient')
 
         self.reset()
+
+    @classmethod
+    def _empty_instance(cls):
+        return cls(None, None)  # type: ignore
 
     @staticmethod
     def generate_dose_actions(min_dose: float = 0.0,

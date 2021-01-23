@@ -91,6 +91,15 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
         self.rewind()
 
+        if self._object:
+            self._logger.warning('Instance Generator initialized with None.')
+            self._object._name = self._filename_pattern.format(
+                n=self._instance_counter)
+
+    @classmethod
+    def _empty_instance(cls):
+        return cls(None)
+
     def __iter__(self):
         return self
 
@@ -148,6 +157,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         else:
             self._object.reset()
 
+        self._object._name = current_instance
         self.statistic.set_object(self._object)
 
         if self._save_instances and new_instance:

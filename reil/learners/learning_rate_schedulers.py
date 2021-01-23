@@ -37,6 +37,10 @@ class LearningRateScheduler(reilbase.ReilBase):
         self.initial_lr = initial_lr
         self._lambda_func = new_rate_function
 
+    @classmethod
+    def _empty_instance(cls):
+        return cls(0.0, lambda e, lr: lr)
+
     def new_rate(self, epoch: int, current_lr: float) -> float:
         '''
         Determine the new rate based on `epoch` and current learning rate.
