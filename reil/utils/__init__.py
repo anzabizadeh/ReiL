@@ -38,4 +38,5 @@ from .action_generator import (ActionGenerator,  # noqa: W0611
                                NumericalComponent)
 
 from .instance_generator import InstanceGenerator  # noqa: W0611
+from .output_writer import OutputWriter  #noqa: W0611
 from .mnkboard import MNKBoard  # noqa: W0611
