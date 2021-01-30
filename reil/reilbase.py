@@ -360,8 +360,8 @@ class ReilBase:
         if data_to_save is None:
             data = self.__dict__
         else:
-            data = dict((d, self.__dict__[d])
-                        for d in list(data_to_save) + ['_name', '_path'])
+            data = {d: self.__dict__[d]
+                    for d in list(data_to_save) + ['_name', '_path']}
 
         temp = None
         if '_logger' in data:

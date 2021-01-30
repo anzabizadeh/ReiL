@@ -75,7 +75,7 @@ class EndlessBuffer(Buffer[T]):
         super().reset()
         if self._buffer_names is not None:
             self._buffer = cast(Dict[str, List[T]],
-                                dict((name, [])
-                                     for name in self._buffer_names))
+                                {name: []
+                                 for name in self._buffer_names})
         else:
             self._buffer = None

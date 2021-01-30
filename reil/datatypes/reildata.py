@@ -580,8 +580,8 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
             Names of the elements and their values.
         '''
         if self._value is None:
-            self._value = dict((v.name, v.value)
-                               for v in self._data)
+            self._value = {v.name: v.value
+                           for v in self._data}
 
         return self._value
 
@@ -597,10 +597,9 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
             as keys.
         '''
         if self._lower is None:
-            self._lower = dict(
-                (v.name, cast(Numerical, v.lower))  # type: ignore
-                for v in self._data
-                if hasattr(v, 'lower'))
+            self._lower = {v.name: cast(Numerical, v.lower)  # type: ignore
+                           for v in self._data
+                           if hasattr(v, 'lower')}
 
         return self._lower
 
@@ -616,10 +615,9 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
             as keys.
         '''
         if self._upper is None:
-            self._upper = dict(
-                (v.name, cast(Numerical, v.upper))  # type: ignore
-                for v in self._data
-                if hasattr(v, 'upper'))
+            self._upper = {v.name: cast(Numerical, v.upper)  # type: ignore
+                           for v in self._data
+                           if hasattr(v, 'upper')}
 
         return self._upper
 
@@ -635,10 +633,11 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
             their names as keys.
         '''
         if self._categories is None:
-            self._categories = dict(
-                (v.name, cast(Categorical, v.categories))  # type: ignore
-                for v in self._data
-                if hasattr(v, 'categories'))
+            self._categories = {v.name:
+                                cast(Tuple[Categorical, ...],
+                                     v.categories)  # type: ignore
+                                for v in self._data
+                                if hasattr(v, 'categories')}
 
         return self._categories
 

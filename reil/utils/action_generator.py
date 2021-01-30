@@ -239,21 +239,21 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
 
     @property
     def lower(self) -> Dict[str, Numerical]:
-        return dict((component.name, component.lower)  # type: ignore
-                    for component in self._components.values()
-                    if hasattr(component, 'lower'))
+        return {component.name: component.lower  # type: ignore
+                for component in self._components.values()
+                if hasattr(component, 'lower')}
 
     @property
     def upper(self) -> Dict[str, Numerical]:
-        return dict((component.name, component.upper)  # type: ignore
-                    for component in self._components.values()
-                    if hasattr(component, 'upper'))
+        return {component.name: component.upper  # type: ignore
+                for component in self._components.values()
+                if hasattr(component, 'upper')}
 
     @property
     def categories(self) -> Dict[str, Tuple[Categorical, ...]]:
-        return dict((component.name, component.categories)  # type: ignore
-                    for component in self._components.values()
-                    if hasattr(component, 'categories'))
+        return {component.name: component.categories  # type: ignore
+                for component in self._components.values()
+                if hasattr(component, 'categories')}
 
     def reset(self) -> None:
         ''' Resets the generator.'''

@@ -197,8 +197,8 @@ class Warfarin(Subject):
                                self._max_day - self._day)
 
         INRs_temp = self._patient.model(
-            dose=dict(((i + self._day, current_dose)
-                       for i in range(current_interval))),
+            dose={i: current_dose
+                  for i in range(self._day, self._day + current_interval)},
             measurement_days=list(
                 range(self._day + 1, self._day + current_interval + 1)))['INR']
 

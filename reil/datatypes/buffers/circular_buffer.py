@@ -56,10 +56,10 @@ class CircularBuffer(Buffer[T]):
                               self._buffer_index + count + 1)
             slice_post = slice(
                 max(0, count - (self._buffer_size - self._buffer_index) + 1))
-            return dict((name, tuple(
+            return {name: tuple(
                 buffer[slice_pre] +
-                buffer[slice_post]))
-                for name, buffer in self._buffer.items())
+                buffer[slice_post])
+                for name, buffer in self._buffer.items()}
         else:
             return super()._pick_old(count)
 
@@ -77,10 +77,10 @@ class CircularBuffer(Buffer[T]):
         else:
             slice_pre = slice(-(count - self._buffer_index - 1), None)
             slice_post = slice(self._buffer_index + 1)
-            return dict((name, tuple(
+            return {name: tuple(
                 buffer[slice_pre] +
-                buffer[slice_post]))
-                for name, buffer in self._buffer.items())
+                buffer[slice_post])
+                for name, buffer in self._buffer.items()}
 
     def _pick_all(self) -> Dict[str, Tuple[T, ...]]:
         '''
@@ -89,10 +89,10 @@ class CircularBuffer(Buffer[T]):
         if self._buffer_full:
             slice_pre = slice(self._buffer_index + 1, None)
             slice_post = slice(self._buffer_index + 1)
-            return dict((name, tuple(
-                         buffer[slice_pre] +
-                         buffer[slice_post]))
-                        for name, buffer in self._buffer.items())
+            return {name: tuple(
+                buffer[slice_pre] +
+                buffer[slice_post])
+                for name, buffer in self._buffer.items()}
         else:
             return super()._pick_all()
 

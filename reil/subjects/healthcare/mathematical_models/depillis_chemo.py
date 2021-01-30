@@ -182,8 +182,8 @@ class DePillisChemo(HealthMathModel):
         :
             A dictionary with days as keys and doses as values.
         '''
-        return dict((t, info.dose)
-                    for t, info in self._dose_records.items())
+        return {t: info.dose
+                for t, info in self._dose_records.items()}
 
     @dose.setter
     def dose(self, dose: Dict[int, float]) -> None:

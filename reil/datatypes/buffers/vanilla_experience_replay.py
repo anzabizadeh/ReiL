@@ -105,7 +105,7 @@ class VanillaExperienceReplay(CircularBuffer[T]):
         if self._buffer_full:
             return super().pick(self._batch_size, 'random')
         else:
-            return dict((name, ()) for name in self._buffer)
+            return {name: () for name in self._buffer}
 
     def reset(self) -> None:
         '''

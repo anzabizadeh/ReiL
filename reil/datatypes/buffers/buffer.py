@@ -92,8 +92,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):
                 self._buffer_names = buffer_names
 
         if self._buffer_size is not None and self._buffer_names is not None:
-            self._buffer = dict((name, [0.0]*self._buffer_size)
-                                for name in self._buffer_names)
+            self._buffer = {name: [0.0]*self._buffer_size
+                            for name in self._buffer_names}
         else:
             self._buffer = None
 
@@ -197,8 +197,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):
             as values.
         '''
         s = slice(count)
-        return dict((name, tuple(buffer[s]))
-                    for name, buffer in self._buffer.items())
+        return {name: tuple(buffer[s])
+                for name, buffer in self._buffer.items()}
 
     def _pick_recent(self, count: int) -> Dict[str, Tuple[Any, ...]]:
         '''
@@ -216,8 +216,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):
             items as values.
         '''
         s = slice(self._buffer_index - count + 1, self._buffer_index + 1)
-        return dict((name, tuple(buffer[s]))
-                    for name, buffer in self._buffer.items())
+        return {name: tuple(buffer[s])
+                for name, buffer in self._buffer.items()}
 
     def _pick_random(self, count: int) -> Dict[str, Tuple[Any, ...]]:
         '''
@@ -236,8 +236,8 @@ class Buffer(reilbase.ReilBase, Generic[T]):
         '''
         index = np.random.choice(
             self._count, count, replace=False)
-        return dict((name, tuple(buffer[i] for i in index))
-                    for name, buffer in self._buffer.items())
+        return {name: tuple(buffer[i] for i in index)
+                for name, buffer in self._buffer.items()}
 
     def _pick_all(self) -> Dict[str, Tuple[Any, ...]]:
         '''
@@ -249,5 +249,5 @@ class Buffer(reilbase.ReilBase, Generic[T]):
             A dictionary with buffer names as keys and all items as values.
         '''
         s = slice(self._buffer_index + 1)
-        return dict((name, tuple(buffer[s]))
-                    for name, buffer in self._buffer.items())
+        return {name: tuple(buffer[s])
+                for name, buffer in self._buffer.items()}
