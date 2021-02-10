@@ -69,24 +69,42 @@ class Dense(learners.Learner[float]):
 
         if not 0.0 < validation_split < 1.0:
             raise ValueError('validation split should be in (0.0, 1.0).')
+
         self._validation_split = validation_split
 
-        self._tensorboard_path = tensorboard_path
+        self._callbacks = []
+        self._tensorboard_path = None
+        self._graph = tf.Graph()  # type: ignore
+        with self._graph.as_default():
+            self._session = tf.Session()  # type: ignore
 
+            self._model = keras.models.Sequential()
+
+            if tensorboard_path is not None:
+                self._tensorboard_path = pathlib.Path(
+                    'logs', tensorboard_path)
+                self._tensorboard = keras.callbacks.TensorBoard(
+                    log_dir=self._tensorboard_path)
+                # , histogram_freq=1)  #, write_images=True)
+                self._callbacks.append(self._tensorboard)
+
+            if not isinstance(self._learning_rate,
+                              learners.ConstantLearningRate):
+                learning_rate_scheduler = \
+                    keras.callbacks.LearningRateScheduler(
+                        self._learning_rate.new_rate, verbose=0)
+                self._callbacks.append(learning_rate_scheduler)
+
+        self._ann_ready = False
         if self._input_length is not None:
             self._generate_network()
-        else:
-            self._graph = None
 
     def _generate_network(self) -> None:
         '''
         Generate a multilayer neural net using `keras.Dense`.
         '''
 
-        self._graph = tf.Graph()  # type: ignore
         with self._graph.as_default():
-            self._session = tf.Session()  # type: ignore
-
             self._model = keras.models.Sequential()
             self._model.add(
                 keras.layers.Dense(self._hidden_layer_sizes[0],
@@ -102,21 +120,7 @@ class Dense(learners.Learner[float]):
             self._model.compile(optimizer=keras.optimizers.Adam(
                 learning_rate=self._learning_rate.initial_lr), loss='mae')
 
-            self._callbacks = []
-            if self._tensorboard_path is not None:
-                self._tensorboard_path = pathlib.Path(
-                    'logs', self._tensorboard_path)
-                self._tensorboard = keras.callbacks.TensorBoard(
-                    log_dir=self._tensorboard_path)
-                # , histogram_freq=1)  #, write_images=True)
-                self._callbacks.append(self._tensorboard)
-
-            if not isinstance(self._learning_rate,
-                              learners.ConstantLearningRate):
-                self._learning_rate_scheduler = \
-                    keras.callbacks.LearningRateScheduler(
-                        self._learning_rate.new_rate, verbose=0)
-                self._callbacks.append(self._learning_rate_scheduler)
+        self._ann_ready = True
 
     def predict(self, X: Tuple[ReilData, ...]) -> Tuple[float, ...]:
         '''
@@ -133,7 +137,7 @@ class Dense(learners.Learner[float]):
             The predicted `y`.
         '''
         _X = [x.normalized.flatten() for x in X]
-        if self._graph is None:
+        if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
 
@@ -156,7 +160,7 @@ class Dense(learners.Learner[float]):
             A list of float labels for the learning model.
         '''
         _X = [x.normalized.flatten() for x in X]
-        if self._graph is None:
+        if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
 
@@ -232,7 +236,7 @@ class Dense(learners.Learner[float]):
 
             if not isinstance(self._learning_rate,
                               learners.ConstantLearningRate):
-                self._learning_rate_scheduler = \
+                learning_rate_scheduler = \
                     keras.callbacks.LearningRateScheduler(
                         self._learning_rate.new_rate, verbose=0)
-                self._callbacks.append(self._learning_rate_scheduler)
+                self._callbacks.append(learning_rate_scheduler)
