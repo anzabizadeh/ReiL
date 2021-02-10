@@ -8,11 +8,12 @@ This class provides a learning environment for any reinforcement learning
 are determined by a fixed `interaction_sequence`.
 '''
 from collections import namedtuple
-from typing import Any, Dict, Optional, Tuple, Union, cast
+import pathlib
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import pandas as pd
 from reil.datatypes import InteractionProtocol
-from reil.environments import Entity, EntityGenerator, Environment
+from reil.environments import EntityType, EntityGenType, Environment
 
 
 class EnvironmentStaticMap(Environment):
@@ -23,7 +24,7 @@ class EnvironmentStaticMap(Environment):
 
     def __init__(self,
                  entity_dict: Optional[
-                     Dict[str, Union[Entity, EntityGenerator, str]]] = None,
+                     Dict[str, Union[EntityType, EntityGenType, str]]] = None,
                  interaction_sequence: Optional[
                      Tuple[InteractionProtocol, ...]] = None,
                  **kwargs: Any):
@@ -281,21 +282,45 @@ class EnvironmentStaticMap(Environment):
                 columns={'level_0': 'aggregator', 0: 'value'})
             if unstack else lambda x: x)
 
-        result = dict(
-            (e.a_s_name,
-             transform(
-                 self._instance_generators.get(
-                     e.entity_name,
-                     self.__dict__[e.obj][e.entity_name]
-                 ).statistic.aggregate(
-                     e.aggregators, e.groupby,
-                     self._assignment_list[e.a_s_name][e.a_s_name.index(
-                         e.entity_name)],
-                     reset_history=reset_history)
-             ).assign(
-                 entity=e.entity_name,
-                 assigned_to=e.assigned_to,
-                 epoch=self._epochs[e.a_s_name[1]]))
-            for e in entities)
+        result = {e.a_s_name:
+                  transform(
+                      self._instance_generators.get(
+                          e.entity_name,
+                          self.__dict__[e.obj][e.entity_name]
+                      ).statistic.aggregate(
+                          e.aggregators, e.groupby,
+                          self._assignment_list[e.a_s_name][e.a_s_name.index(
+                              e.entity_name)],
+                          reset_history=reset_history)
+                  ).assign(
+                      entity=e.entity_name,
+                      assigned_to=e.assigned_to,
+                      epoch=self._epochs[e.a_s_name[1]])
+                  for e in entities}
 
         return result
+
+    def load(self,  # noqa: C901
+             entity_name: Union[List[str], str] = 'all',
+             filename: Optional[str] = None,
+             path: Optional[Union[pathlib.Path, str]] = None) -> None:
+        '''
+        Load an entity or an `environment` from a file.
+
+        Arguments
+        ---------
+        filename:
+            The name of the file to be loaded.
+
+        entity_name:
+            If specified, that entity (`agent` or `subject`) is being
+            loaded from file. 'all' loads an `environment`.
+
+        Raises
+        ------
+        ValueError
+            The filename is not specified.
+        '''
+        super().load(entity_name=entity_name, filename=filename, path=path)
+        # To generate observers!
+        self.interaction_sequence = self.interaction_sequence
