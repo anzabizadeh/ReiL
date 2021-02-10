@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
 import pathlib
+import time
+from typing import Dict, Optional, Tuple, Union
+
 import pandas as pd
-from reil.environments.environment import AgentSubjectTuple
 
 
 class OutputWriter:
@@ -11,22 +12,44 @@ class OutputWriter:
                  columns: Optional[Tuple[str]] = None
                  ) -> None:
 
-        self._csv_filename = pathlib.Path(path, f'{filename}.csv')
-        self._filehandler = open(self._csv_filename, 'a+', newline='')
+        self._path = pathlib.Path(path)
+        self._csv_filename = filename if filename.endswith((
+            '.yaml', '.yml')) else f'{filename}.csv'
+        self._path.mkdir(parents=True, exist_ok=True)
+        # self._filehandler = open(
+        #     self._path / self._csv_filename, 'a+', newline='')
         if columns:
-            pd.DataFrame([], columns=columns).to_csv(
-                self._filehandler, header=True)
-            self._need_header = False
-        else:
-            self._need_header = True
+            with open(self._path / self._csv_filename, 'a+', newline='') as f:
+                pd.DataFrame([], columns=columns).to_csv(
+                    f, header=True)
 
-    def __del__(self) -> None:
-        self._filehandler.close()
+    # def __del__(self) -> None:
+    #     self._filehandler.close()
 
     def write_stats_output(
-            self, stats_output: Dict[AgentSubjectTuple, pd.DataFrame]) -> None:
+            self, stats_output: Dict[Tuple[str, str], pd.DataFrame]) -> None:
         '''Write stats to file.'''
-        for s in stats_output.values():
-            print(s)
-            s.to_csv(self._filehandler, mode='a+', header=self._need_header)
-            self._need_header = False
+        attempts = 0
+        while attempts < 5 and not self._write_stats_output(stats_output):
+            time.sleep(1)
+            attempts += 1
+
+        if attempts == 5:
+            with open(self._path / f'{self._csv_filename}_temp',
+                      'a+', newline='') as f:
+                for s in stats_output.values():
+                    print(s)
+                    s.to_csv(f, mode='a+', header=False)
+
+    def _write_stats_output(
+            self, stats_output: Dict[Tuple[str, str], pd.DataFrame]) -> bool:
+        '''Write stats to file.'''
+        try:
+            with open(self._path / self._csv_filename, 'a+', newline='') as f:
+                for s in stats_output.values():
+                    print(s)
+                    s.to_csv(f, mode='a+', header=False)
+        except (PermissionError,):
+            return False
+
+        return True
