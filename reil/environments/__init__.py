@@ -17,5 +17,5 @@ EnvironmentStaticMap:
 '''
 
 from .environment import (  # noqa: W0611
-    Environment, Entity, EntityGenerator, AgentSubjectTuple)
+    Environment, EntityType, EntityGenType, AgentSubjectTuple)
 from .environment_static_map import EnvironmentStaticMap  # noqa: W0611

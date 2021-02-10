@@ -18,9 +18,9 @@ from reil.datatypes import InteractionProtocol, ReilData
 from reil.utils import instance_generator as rlgenerator
 
 AgentSubjectTuple = Tuple[str, str]
-Entity = Union[rlagents.Agent, rlsubjects.Subject]
-EntityGenerator = Union[rlgenerator.InstanceGenerator[rlagents.Agent],
-                        rlgenerator.InstanceGenerator[rlsubjects.Subject]]
+EntityType = Union[rlagents.Agent, rlsubjects.Subject]
+EntityGenType = Union[rlgenerator.InstanceGenerator[rlagents.Agent],
+                      rlgenerator.InstanceGenerator[rlsubjects.Subject]]
 
 
 class Environment(stateful.Stateful):
@@ -43,7 +43,7 @@ class Environment(stateful.Stateful):
 
     def __init__(self,
                  entity_dict: Optional[
-                     Dict[str, Union[Entity, EntityGenerator, str]]] = None,
+                     Dict[str, Union[EntityType, EntityGenType, str]]] = None,
                  **kwargs: Any):
         '''
         Arguments
@@ -56,7 +56,7 @@ class Environment(stateful.Stateful):
 
         self._agents: Dict[str, rlagents.AgentType] = {}
         self._subjects: Dict[str, rlsubjects.SubjectType] = {}
-        self._instance_generators: Dict[str, EntityGenerator] = {}
+        self._instance_generators: Dict[str, EntityGenType] = {}
         self._assignment_list: Dict[
             AgentSubjectTuple,
             Tuple[Union[int, None], Union[int, None]]] = \
@@ -69,7 +69,7 @@ class Environment(stateful.Stateful):
             self.add(entity_dict)
 
     def add(self,
-            entity_dict: Dict[str, Union[Entity, EntityGenerator, str]]
+            entity_dict: Dict[str, Union[EntityType, EntityGenType, str]]
             ) -> None:
         '''
         Add `agents` and `subjects` to the environment.
@@ -560,7 +560,7 @@ class Environment(stateful.Stateful):
 
         if entity_name == 'all':
             super().load(filename=_filename, path=_path)
-            self._instance_generators: Dict[str, EntityGenerator] = {}
+            self._instance_generators: Dict[str, EntityGenType] = {}
             self._agents: Dict[str, rlagents.AgentType] = {}
             self._subjects: Dict[str, rlsubjects.SubjectType] = {}
 
