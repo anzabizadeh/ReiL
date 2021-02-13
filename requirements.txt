@@ -33,6 +33,7 @@ tensorboard==1.15.0
 tensorflow-gpu==1.15.0
 tensorflow-estimator==1.15.1
 termcolor
+typing_extensions
 versioneer
 Werkzeug
 wrapt
