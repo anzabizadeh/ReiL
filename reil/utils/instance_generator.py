@@ -164,8 +164,16 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             if (not self._overwrite_instances and
                     os.path.isfile(pathlib.Path(
                         self._save_path, f'{current_instance}.pkl'))):
-                raise FileExistsError(
-                        f'File {current_instance} already exists.')
+                if self._use_existing_instances:
+                    # This extra test is useful when multiple instances
+                    # generators are active. One might create the instance and
+                    # save it, while others are trying to create it. In such
+                    # case, other generators raise exception, but should not!
+                    self._object.load(path=self._save_path,
+                                      filename=current_instance)
+                else:
+                    raise FileExistsError(
+                            f'File {current_instance} already exists.')
             else:
                 self._object.save(path=self._save_path,
                                   filename=current_instance)
