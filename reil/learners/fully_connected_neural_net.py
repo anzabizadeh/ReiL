@@ -28,7 +28,7 @@ class Dense(learners.Learner[float]):
                  validation_split: float = 0.3,
                  hidden_layer_sizes: Tuple[int, ] = (1,),
                  input_length: Optional[int] = None,
-                 tensorboard_path: Optional[Union[str, pathlib.Path]] = None,
+                 tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
                  **kwargs: Any) -> None:
         '''
         Arguments
@@ -81,7 +81,7 @@ class Dense(learners.Learner[float]):
             self._model = keras.models.Sequential()
 
             if tensorboard_path is not None:
-                self._tensorboard_path = pathlib.Path(
+                self._tensorboard_path = pathlib.PurePath(
                     'logs', tensorboard_path)
                 self._tensorboard = keras.callbacks.TensorBoard(
                     log_dir=self._tensorboard_path)

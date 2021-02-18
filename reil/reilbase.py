@@ -26,7 +26,7 @@ class ReilBase:
 
     def __init__(self,
                  name: Optional[str] = None,
-                 path: Optional[pathlib.Path] = None,
+                 path: Optional[pathlib.PurePath] = None,
                  logger_name: Optional[str] = None,
                  logger_level: Optional[int] = None,
                  logger_filename: Optional[str] = None,
@@ -84,7 +84,7 @@ class ReilBase:
             test
         '''
         self._name = name or self.__class__.__qualname__.lower()
-        self._path = pathlib.Path(path or '.')
+        self._path = pathlib.PurePath(path or '.')
 
         self._persistent_attributes = [
             '_' + p
@@ -296,6 +296,7 @@ class ReilBase:
             Corrupted or inaccessible data file.
         '''
         _path = pathlib.Path(path or self._path)
+        full_path = _path / f"{filename}.pkl"
 
         with open(_path / f'{filename}.pkl', 'rb') as f:
             try:
@@ -304,16 +305,16 @@ class ReilBase:
                 try:
                     self._logger.info(
                         'First attempt failed to load '
-                        f'{_path / f"{filename}.pkl"}.')
+                        f'{full_path}.')
                     time.sleep(1)
                     data = dill.load(f)
                 except EOFError:
                     self._logger.exception(
                         'Corrupted or inaccessible data file: '
-                        f'{_path / f"{filename}.pkl"}')
+                        f'{full_path}')
                     raise RuntimeError(
                         f'Corrupted or inaccessible data file: '
-                        f'{_path / f"{filename}.pkl"}')
+                        f'{full_path}')
 
             self._logger.info(
                 'Changing the logger from '

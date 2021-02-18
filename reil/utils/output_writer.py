@@ -8,11 +8,11 @@ import pandas as pd
 class OutputWriter:
     def __init__(self,
                  filename: str,
-                 path: Union[str, pathlib.Path] = '.',
+                 path: Union[str, pathlib.PurePath] = '.',
                  columns: Optional[Tuple[str]] = None
                  ) -> None:
 
-        self._path = pathlib.Path(path)
+        self._path = pathlib.PurePath(path)
         self._csv_filename = filename if filename.endswith((
             '.yaml', '.yml')) else f'{filename}.csv'
         self._path.mkdir(parents=True, exist_ok=True)

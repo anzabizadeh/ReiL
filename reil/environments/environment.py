@@ -556,7 +556,7 @@ class Environment(stateful.Stateful):
             The filename is not specified.
         '''
         _filename: str = filename or self._name
-        _path = pathlib.Path(path if path is not None else self._path)
+        _path = pathlib.Path(path or self._path)
 
         if entity_name == 'all':
             super().load(filename=_filename, path=_path)

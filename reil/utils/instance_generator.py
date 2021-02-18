@@ -36,7 +36,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
                  save_instances: bool = False,
                  overwrite_instances: bool = False,
                  use_existing_instances: bool = True,
-                 save_path: Union[pathlib.Path, str] = '',
+                 save_path: Union[pathlib.PurePath, str] = '',
                  filename_pattern: str = '{n:04}',
                  **kwargs: Any):
         '''
