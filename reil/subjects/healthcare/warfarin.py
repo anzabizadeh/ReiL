@@ -69,28 +69,29 @@ class Warfarin(Subject):
                          ('amiodarone', {}), ('fluvastatin', {}))
 
         reward_sq_dist = reil_functions.NormalizedSquareDistance(
-            name='sq_dist', arguments=('daily_INR',),  # type: ignore
+            name='sq_dist', arguments=('daily_INR_history',),  # type: ignore
             length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
             center=2.5, band_width=1.0, exclude_first=True)
 
         reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
             name='sq_dist_interpolation',
-            arguments=('INR', 'interval'),  # type: ignore
+            arguments=('INR_history', 'interval_history'),  # type: ignore
             length=2, multiplier=-1.0, retrospective=True, interpolate=True,
             center=2.5, band_width=1.0, exclude_first=True)
 
         reward_PTTR = reil_functions.PercentInRange(
-            name='PTTR', arguments=('daily_INR',),  # type: ignore
+            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
             length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
             acceptable_range=(2, 3), exclude_first=True)
 
         reward_PTTR_interpolation = reil_functions.PercentInRange(
-            name='PTTR', arguments=('INR', 'interval'),  # type: ignore
+            name='PTTR',
+            arguments=('INR_history', 'interval_history'),  # type: ignore
             length=2, multiplier=-1.0, retrospective=True, interpolate=True,
             acceptable_range=(2, 3), exclude_first=True)
 
         statistic_PTTR = reil_functions.PercentInRange(
-            name='PTTR', arguments=('daily_INR',),  # type: ignore
+            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
             length=-1, multiplier=1.0, retrospective=True, interpolate=False,
             acceptable_range=(2, 3), exclude_first=True)
 
@@ -105,33 +106,33 @@ class Warfarin(Subject):
                                   *patient_basic,
                                   *patient_extra,
                                   ('day', {}),
-                                  ('dose', {'length': -1}),
-                                  ('INR', {'length': -1}),
-                                  ('interval', {'length': -1}))
+                                  ('dose_history', {'length': -1}),
+                                  ('INR_history', {'length': -1}),
+                                  ('interval_history', {'length': -1}))
 
         for i in (1, 5, 10):
             self.state.add_definition(f'patient_w_dosing_{i:02}',
                                       *patient_basic,
                                       *patient_extra,
                                       ('day', {}),
-                                      ('dose', {'length': i}),
-                                      ('INR', {'length': i}),
-                                      ('interval', {'length': i}))
+                                      ('dose_history', {'length': i}),
+                                      ('INR_history', {'length': i}),
+                                      ('interval_history', {'length': i}))
 
         self.state.add_definition('patient_w_full_dosing',
                                   *patient_basic,
                                   *patient_extra,
                                   ('day', {}),
-                                  ('daily_dose', {'length': -1}),
-                                  ('daily_INR', {'length': -1}),
-                                  ('interval', {'length': -1}))
+                                  ('daily_dose_history', {'length': -1}),
+                                  ('daily_INR_history', {'length': -1}),
+                                  ('interval_history', {'length': -1}))
 
         self.state.add_definition('daily_INR',
-                                  ('daily_INR', {'length': -1}))
+                                  ('daily_INR_history', {'length': -1}))
 
         self.state.add_definition('Measured_INR_2',
-                                  ('INR', {'length': 2}),
-                                  ('interval', {'length': 1}))
+                                  ('INR_history', {'length': 2}),
+                                  ('interval_history', {'length': 1}))
 
         self.state.add_definition('INR_within_2',
                                   ('INR_within', {'length': 1}))
@@ -302,29 +303,29 @@ class Warfarin(Subject):
             raise ValueError('length should be a positive integer, or '
                              '-1 for full length output.')
 
-        if list_name == 'INR':
+        if list_name == 'INR_history':
             _list = self._decision_points_INR_history
             index = self._decision_points_index + 1
             filler = 0.0
             lower, upper = 0.0, 15.0
-        elif list_name == 'daily_INR':
+        elif list_name == 'daily_INR_history':
             _list = self._full_INR_history
             index = self._day + 1
             filler = 0.0
             lower, upper = 0.0, 15.0
-        elif list_name == 'dose':
+        elif list_name == 'dose_history':
             _list = self._decision_points_dose_history
             index = self._decision_points_index
             filler = 0.0
             lower = self._action_generator.lower['dose']
             upper = self._action_generator.upper['dose']
-        elif list_name == 'daily_dose':
+        elif list_name == 'daily_dose_history':
             _list = self._full_dose_history
             index = self._day
             filler = 0.0
             lower = self._action_generator.lower['dose']
             upper = self._action_generator.upper['dose']
-        elif list_name == 'interval':
+        elif list_name == 'interval_history':
             _list = self._decision_points_interval_history
             index = self._decision_points_index
             filler = 1
@@ -344,27 +345,27 @@ class Warfarin(Subject):
 
         return result, lower, upper
 
-    def _sub_comp_dose(
+    def _sub_comp_dose_history(
             self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
-        name = 'dose'
+        name = 'dose_history'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
                 'value': tuple(value),
                 'lower': lower,
                 'upper': upper}
 
-    def _sub_comp_INR(
+    def _sub_comp_INR_history(
             self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
-        name = 'INR'
+        name = 'INR_history'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
                 'value': tuple(value),
                 'lower': lower,
                 'upper': upper}
 
-    def _sub_comp_interval(
+    def _sub_comp_interval_history(
             self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
-        name = 'interval'
+        name = 'interval_history'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
                 'value': tuple(value),
@@ -377,18 +378,18 @@ class Warfarin(Subject):
                 'lower': 0,
                 'upper': self._max_day - 1}
 
-    def _sub_comp_daily_dose(
+    def _sub_comp_daily_dose_history(
             self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
-        name = 'daily_dose'
+        name = 'daily_dose_history'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
                 'value': tuple(value),
                 'lower': lower,
                 'upper': upper}
 
-    def _sub_comp_daily_INR(
+    def _sub_comp_daily_INR_history(
             self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
-        name = 'daily_INR'
+        name = 'daily_INR_history'
         value, lower, upper = self._get_history(name, length)
         return {'name': name,
                 'value': tuple(value),
@@ -398,7 +399,7 @@ class Warfarin(Subject):
     def _sub_comp_INR_within(
             self, _id: int, length: int = 1, **kwargs: Any) -> Dict[str, Any]:
         name = 'daily_INR'
-        l, _, _ = self._get_history('interval', length)
+        l, _, _ = self._get_history('interval_history', length)
         value, lower, upper = self._get_history(name, sum(l))
 
         return {'name': name,
