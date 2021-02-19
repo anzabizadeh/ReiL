@@ -15,7 +15,7 @@ class OutputWriter:
         self._path = pathlib.PurePath(path)
         self._csv_filename = filename if filename.endswith((
             '.yaml', '.yml')) else f'{filename}.csv'
-        self._path.mkdir(parents=True, exist_ok=True)
+        pathlib.Path(self._path).mkdir(parents=True, exist_ok=True)
         # self._filehandler = open(
         #     self._path / self._csv_filename, 'a+', newline='')
         if columns:
