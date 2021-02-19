@@ -135,7 +135,7 @@ class Warfarin(Subject):
                                   ('interval_history', {'length': 1}))
 
         self.state.add_definition('INR_within_2',
-                                  ('INR_within', {'length': 1}))
+                                  ('daily_INR_history', {'length': -1}))
 
         self.reward.add_definition(
             'no_reward', lambda _: 0.0, 'Measured_INR_2')
