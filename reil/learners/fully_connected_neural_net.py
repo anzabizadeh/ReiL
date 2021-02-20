@@ -23,13 +23,14 @@ class Dense(learners.Learner[float]):
     output.
     '''
 
-    def __init__(self,
-                 learning_rate: learners.LearningRateScheduler,
-                 validation_split: float = 0.3,
-                 hidden_layer_sizes: Tuple[int, ] = (1,),
-                 input_length: Optional[int] = None,
-                 tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
-                 **kwargs: Any) -> None:
+    def __init__(
+            self,
+            learning_rate: learners.LearningRateScheduler,
+            validation_split: float = 0.3,
+            hidden_layer_sizes: Tuple[int, ] = (1,),
+            input_length: Optional[int] = None,
+            tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
+            **kwargs: Any) -> None:
         '''
         Arguments
         ---------
@@ -198,12 +199,16 @@ class Dense(learners.Learner[float]):
         ValueError:
             The filename is not specified.
         '''
-        path.mkdir(parents=True, exist_ok=True)
+        p, f = super().save(
+            filename, path,
+            tuple(attr for attr in self.__dict__.keys()
+                  if attr not in ('_session', '_graph', '_model')))
+
         with self._session.as_default():
             with self._graph.as_default():
-                self._model.save(path / filename)
+                self._model.save(p / f'{f}.tf')
 
-        return path, filename
+        return p, f
 
     def load(self,
              filename: str,
@@ -224,12 +229,14 @@ class Dense(learners.Learner[float]):
         ValueError:
             The filename is not specified.
         '''
+        super().load(filename, path)
+
         _path = path or '.'
         self._graph = tf.Graph()  # type: ignore
         with self._graph.as_default():
             self._session = keras.backend.get_session()
             self._model = keras.models.load_model(
-                pathlib.Path(_path, 'learner', filename))
+                pathlib.Path(_path, f'{filename}.tf'))
 
             self._tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self._tensorboard_path)

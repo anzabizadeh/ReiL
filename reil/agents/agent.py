@@ -150,11 +150,13 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
             ValueError
                 Filename is not specified.
         '''
-        super().load(filename, path)
+        _path = pathlib.Path(path or self._path)
+        super().load(filename, _path)
 
         # when loading, self._learner is the object type, not an instance.
-        self._learner = cast(Learner[LabelType],
-                             self._learner.from_pickle(filename, path))
+        self._learner = cast(
+            Learner[LabelType],
+            self._learner.from_pickle(filename, _path / 'learner'))
 
     def save(self,
              filename: Optional[str] = None,
@@ -188,15 +190,20 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
             temp, self._learner = (  # type: ignore
                 self._learner, type(self._learner))
 
+        _path = pathlib.Path(path or self._path)
+        _filename = filename or self._name
+
         try:
-            _path, _filename = super().save(
-                filename, path, data_to_save=cast(Tuple, data))
-        finally:
+            super().save(
+                _filename, _path, data_to_save=cast(Tuple, data))
             if save_learner:
                 self._learner = temp  # type: ignore
                 self._learner.save(_filename, _path / 'learner')
+        finally:
+            if save_learner:
+                self._learner = temp  # type: ignore
 
-            return _path, _filename
+        return _path, _filename
 
     def _prepare_training(self,
                           history: stateful.History) -> agents.TrainingData:
