@@ -295,42 +295,46 @@ class ReilBase:
         RuntimeError
             Corrupted or inaccessible data file.
         '''
-        _path = pathlib.Path(path or self._path)
-        full_path = _path / f"{filename}.pkl"
+        _filename = filename if filename.endswith(
+            '.pkl') else f'{filename}.pkl'
+        full_path = pathlib.Path(path or self._path) / _filename
 
-        with open(_path / f'{filename}.pkl', 'rb') as f:
-            try:
-                data = dill.load(f)
-            except EOFError:
+        data = None
+        for i in range(5):
+            with open(full_path, 'rb') as f:
                 try:
-                    self._logger.info(
-                        'First attempt failed to load '
-                        f'{full_path}.')
-                    time.sleep(1)
                     data = dill.load(f)
                 except EOFError:
-                    self._logger.exception(
-                        'Corrupted or inaccessible data file: '
-                        f'{full_path}')
-                    raise RuntimeError(
-                        f'Corrupted or inaccessible data file: '
-                        f'{full_path}')
+                    self._logger.info(
+                        f'Attempt {i+1} failed to load '
+                        f'{full_path}.')
+                    time.sleep(2)
+            if data is not None:
+                break
 
-            self._logger.info(
-                'Changing the logger from '
-                f'{self._logger_name} to {data["_logger_name"]}.')
+        if data is None:
+            self._logger.exception(
+                'Corrupted or inaccessible data file: '
+                f'{full_path}')
+            raise RuntimeError(
+                f'Corrupted or inaccessible data file: '
+                f'{full_path}')
 
-            persistent_attributes = self._persistent_attributes + \
-                ['_persistent_attributes']
-            for key, value in data.items():
-                if key not in persistent_attributes:
-                    self.__dict__[key] = value
+        self._logger.info(
+            'Changing the logger from '
+            f'{self._logger_name} to {data["_logger_name"]}.')
 
-            self._logger = logging.getLogger(self._logger_name)
-            self._logger.setLevel(self._logger_level)
-            if self._logger_filename is not None:
-                self._logger.addHandler(
-                    logging.FileHandler(self._logger_filename))
+        persistent_attributes = self._persistent_attributes + \
+            ['_persistent_attributes']
+        for key, value in data.items():
+            if key not in persistent_attributes:
+                self.__dict__[key] = value
+
+        self._logger = logging.getLogger(self._logger_name)
+        self._logger.setLevel(self._logger_level)
+        if self._logger_filename is not None:
+            self._logger.addHandler(
+                logging.FileHandler(self._logger_filename))
 
     def save(self,
              filename: Optional[str] = None,
