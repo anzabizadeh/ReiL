@@ -633,7 +633,7 @@ class Statistic(SecondayComponent):
                 self._history[_id].append(s)
 
     def aggregate(self,
-                  aggregators: Tuple[str, ...],
+                  aggregators: Optional[Tuple[str, ...]] = None,
                   groupby: Optional[Tuple[str, ...]] = None,
                   _id: Optional[int] = None,
                   reset_history: bool = False):
@@ -647,7 +647,7 @@ class Statistic(SecondayComponent):
                           for i, x in enumerate(temp))
         temp_group_by = ['instance_id'] if groupby is None else list(groupby)
         grouped_df = df.groupby(temp_group_by)
-        result = grouped_df['value'].agg(aggregators)
+        result = grouped_df['value'].agg(aggregators or (lambda x: x))
 
         if reset_history:
             self._history: Dict[
@@ -735,7 +735,7 @@ class MockStatistic:
                 self._history[_id].append(s)
 
     def aggregate(self,
-                  aggregators: Tuple[str, ...],
+                  aggregators: Optional[Tuple[str, ...]] = None,
                   groupby: Optional[Tuple[str, ...]] = None,
                   _id: Optional[int] = None,
                   reset_history: bool = False):
@@ -749,7 +749,7 @@ class MockStatistic:
                           for i, x in enumerate(temp))
         temp_group_by = ['instance_id'] if groupby is None else list(groupby)
         grouped_df = df.groupby(temp_group_by)
-        result = grouped_df['value'].agg(aggregators)
+        result = grouped_df['value'].agg(aggregators or (lambda x: x))
 
         if reset_history:
             self._history: Dict[

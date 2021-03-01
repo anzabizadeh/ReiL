@@ -266,16 +266,14 @@ class EnvironmentStaticMap(Environment):
                      (p.agent.name, p.subject.name),
                      p.agent.aggregators, p.agent.groupby)
             for p in self.interaction_sequence
-            if (p.agent.statistic_name is not None and
-                p.agent.aggregators is not None))
+            if p.agent.statistic_name is not None)
 
         entities.update(set(
             StatInfo('_subjects', p.subject.name, p.agent.name,
                      (p.agent.name, p.subject.name),
                      p.subject.aggregators, p.subject.groupby)
             for p in self.interaction_sequence
-            if (p.subject.statistic_name is not None and
-                p.subject.aggregators is not None)))
+            if p.subject.statistic_name is not None))
 
         transform = (
             lambda x: x.unstack().reset_index().rename(
