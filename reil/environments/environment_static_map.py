@@ -196,7 +196,7 @@ class EnvironmentStaticMap(Environment):
                             f'interaction_sequence: {infinites}')
 
         while not all(self._instance_generators[s].is_terminated()
-                      for s in self._subjects):
+                      for s in subjects_in_use):
             self.simulate_one_pass()
 
         self.report_statistics(True)
