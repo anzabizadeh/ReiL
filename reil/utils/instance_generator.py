@@ -91,8 +91,9 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
         self.rewind()
 
-        if self._object:
-            self._logger.warning('Instance Generator initialized with None.')
+        if self._object is None:
+            self._logger.info('Instance Generator initialized with None.')
+        else:
             self._object._name = self._filename_pattern.format(
                 n=self._instance_counter)
 
