@@ -108,7 +108,7 @@ class ReilBase:
     @classmethod
     def from_pickle(
             cls, filename: str,
-            path: Optional[Union[pathlib.Path, str]] = None) -> ReilBase:
+            path: Optional[Union[pathlib.PurePath, str]] = None) -> ReilBase:
         '''
         Load a pickled instance.
 
@@ -141,7 +141,7 @@ class ReilBase:
     @classmethod
     def from_yaml_file(cls, node_reference: Tuple[str, ...],
                        filename: str,
-                       path: Optional[Union[pathlib.Path, str]] = None):
+                       path: Optional[Union[pathlib.PurePath, str]] = None):
         '''
         Create an instance based on a yaml file.
 
@@ -275,7 +275,7 @@ class ReilBase:
             self.__dict__[f'_{key}'] = value
 
     def load(self, filename: str,
-             path: Optional[Union[str, pathlib.Path]] = None) -> None:
+             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Load an object from a file.
 
@@ -338,9 +338,9 @@ class ReilBase:
 
     def save(self,
              filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.Path]] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
              data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.Path, str]:
+             ) -> Tuple[pathlib.PurePath, str]:
         '''
         Save the object to a file.
 
@@ -373,9 +373,8 @@ class ReilBase:
             temp = copy.deepcopy(self._logger)
             data.pop('_logger')
 
-        _filename: str = filename or self._name
-        _path: pathlib.Path = pathlib.Path(
-            path or self._path)
+        _filename = filename or self._name
+        _path = pathlib.Path(path or self._path)
 
         _path.mkdir(parents=True, exist_ok=True)
         with open(_path / f'{_filename}.pkl', 'wb+') as f:
@@ -384,7 +383,7 @@ class ReilBase:
         if temp:
             self._logger = temp
 
-        return _path, _filename
+        return pathlib.PurePath(_path), _filename
 
     def reset(self) -> None:
         ''' Reset the object.'''
