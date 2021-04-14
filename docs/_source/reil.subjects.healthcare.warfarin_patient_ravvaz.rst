@@ -1,4 +1,4 @@
-.. automodule:: reil.subjects.healthcare.warfarin_patient_ravvaz
+.. automodule:: reil.subjects.healthcare.patient_warfarin_ravvaz
    :members:
    :undoc-members:
    :inherited-members:

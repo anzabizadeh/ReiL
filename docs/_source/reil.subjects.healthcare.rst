@@ -25,4 +25,4 @@ Submodules
    reil.subjects.healthcare.constrained_cancer_model
    reil.subjects.healthcare.patient
    reil.subjects.healthcare.warfarin
-   reil.subjects.healthcare.warfarin_patient_ravvaz
+   reil.subjects.healthcare.patient_warfarin_ravvaz

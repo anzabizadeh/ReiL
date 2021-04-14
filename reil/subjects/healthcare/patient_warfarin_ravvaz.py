@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-WarfarinPatientRavvaz class
+PatientWarfarinRavvaz class
 ===========================
 
 A warfarin patient class with features and parameters of Ravvaz et al. 2016.
@@ -40,7 +40,7 @@ log_2_20 = math.log(2.20)
 sqrt_0_409 = math.sqrt(0.409)
 
 
-class WarfarinPatientRavvaz(Patient):
+class PatientWarfarinRavvaz(Patient):
     def __init__(self,
                  model: HealthMathModel,
                  randomized: bool = True,
