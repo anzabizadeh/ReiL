@@ -8,7 +8,7 @@ The base class for all `learner` classes.
 from typing import Any, Generic, Tuple, TypeVar
 
 from reil import learners, reilbase
-from reil.datatypes import ReilData
+from reil.datatypes import FeatureArray
 
 LabelType = TypeVar('LabelType')
 
@@ -36,14 +36,14 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
     def _empty_instance(cls):
         return cls(learning_rate=learners.ConstantLearningRate(0.0))
 
-    def predict(self, X: Tuple[ReilData, ...]) -> Tuple[LabelType, ...]:
+    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[LabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `ReilData` as inputs to the prediction model.
+            A list of `FeatureArray` as inputs to the prediction model.
 
         Returns
         -------
@@ -52,14 +52,15 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
         '''
         raise NotImplementedError
 
-    def learn(self, X: Tuple[ReilData, ...], Y: Tuple[LabelType, ...]) -> None:
+    def learn(
+        self, X: Tuple[FeatureArray, ...], Y: Tuple[LabelType, ...]) -> None:
         '''
         Learn using the training set `X` and `Y`.
 
         Arguments
         ---------
         X:
-            A list of `ReilData` as inputs to the learning model.
+            A list of `FeatureArray` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.

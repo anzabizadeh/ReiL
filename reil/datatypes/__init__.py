@@ -25,19 +25,20 @@ InteractionProtocol:
     A datatype to specifies how an `agent` and a `subject`
     interact in an `environment`.
 
-ReilData:
+FeatureArray:
     The main datatype used to communicate `state`s, `action`s, and `reward`s,
-    between objects in `reil`. `ReilData` is basically a tuple that contains
-    instances of `BaseData`, `CategoricalData`, and `NumericalData`.
+    between objects in `reil`. `FeatureArray` is basically a dictionary that
+    contains instances of `Feature`.
 
-BaseData:
-    An immutable dataclass that accepts name, value, and normalizer.
+Feature:
+    An immutable dataclass that accepts name, value, and is_numerical.
 
-CategoricalData:
-    Extends `BaseData` by adding a list of categories.
+Categorical:
+    A factory class that creates `Feature` objects with categories.
 
-NumericalData:
-    Extends `BaseData` by adding lower and upper bounds for the value.
+Numerical:
+    A factory class that creates `Feature` objects with lower and upper
+    bounds.
 
 PrimaryComponent:
     A datatype that is being used mostly by children of `Stateful` to include
@@ -51,10 +52,9 @@ SecondayComponent:
     them.
 '''
 
-from .reildata import (BaseData, CategoricalData, NumericalData,  # noqa: W0611
-                       ReilData)
+from .feature import (Feature, FeatureGenerator,  # noqa: W0611
+                       FeatureArray)
 
-from .feature import Feature, FeatureType  # noqa: W0611
 from .interaction_protocol import Entity, InteractionProtocol  # noqa: W0611
 
 from .components import (PrimaryComponent, SecondayComponent,  # noqa: W0611

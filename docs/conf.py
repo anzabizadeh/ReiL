@@ -45,7 +45,9 @@ autodoc_member_order = 'bysource'
 # ]
 
 autodoc_type_aliases = {
-    'reil.datatypes.reildata.ReilData': 'ReilData'
+    'reil.datatypes.feature.Feature': 'Feature',
+    'reil.datatypes.feature.FeatureArray': 'FeatureArray',
+    'reil.datatypes.feature.FeatureGenerator': 'FeatureGenerator'
 }
 
 autoclass_content = 'both'
@@ -77,7 +79,8 @@ html_theme_options = {
     'navigation_depth': 4,
     'includehidden': True,
     'titles_only': False,
-    'gitlab_url': 'https://research-git.uiowa.edu/sanzabizadeh/Reinforcement-Learning'
+    'gitlab_url':
+        'https://research-git.uiowa.edu/sanzabizadeh/Reinforcement-Learning'
 }
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

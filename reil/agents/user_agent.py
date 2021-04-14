@@ -8,7 +8,7 @@ An agent that prints the state and asks the user for action.
 from typing import Any, Optional, Tuple
 
 from reil import agents
-from reil.datatypes.reildata import ReilData
+from reil.datatypes import FeatureArray
 
 
 class UserAgent(agents.NoLearnAgent):
@@ -17,14 +17,14 @@ class UserAgent(agents.NoLearnAgent):
     '''
 
     def __init__(self,
-                 default_actions: Tuple[ReilData, ...] = (),
+                 default_actions: Tuple[FeatureArray, ...] = (),
                  **kwargs: Any):
         super().__init__(default_actions=default_actions, **kwargs)
 
     def act(self,
-            state: ReilData,
-            actions: Optional[Tuple[ReilData, ...]] = None,
-            epoch: int = 0) -> ReilData:
+            state: FeatureArray,
+            actions: Optional[Tuple[FeatureArray, ...]] = None,
+            epoch: int = 0) -> FeatureArray:
         '''
         Return a random action.
 

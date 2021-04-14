@@ -34,10 +34,8 @@ Types
 -----
 TrainingData
     a type alias for training data, consisting of a tuple of
-    `ReilData` for X matrix and a tuple of floats for Y vector.
+    `FeatureArray` for X matrix and a tuple of floats for Y vector.
 
-AgentType
-    a type variable that is bound to `Agent`.
 '''
 from .no_learn_agent import NoLearnAgent, TrainingData  # noqa: W0611
 from .agent import Agent  # noqa: W0611
@@ -46,7 +44,3 @@ from .deep_q_learning import DeepQLearning  # noqa: W0611
 from .random_agent import RandomAgent  # noqa: W0611
 from .user_agent import UserAgent  # noqa: W0611
 from .warfarin_agent import WarfarinAgent  # noqa: W0611
-
-from typing import TypeVar
-
-AgentType = TypeVar('AgentType', bound=Agent)

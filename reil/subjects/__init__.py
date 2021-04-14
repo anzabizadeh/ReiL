@@ -21,15 +21,16 @@ TicTacToe:
 
 FrozenLake:
     (disabled)
-    A frozen lake with cracks in it! (uses legacy ValueSet instead of ReilData)
+    A frozen lake with cracks in it! (uses legacy ValueSet instead of
+    FeatureArray)
 
 WindyGridworld:
     (disabled)
     A grid with displacement of `agent` (as if wind blows)
-    (uses legacy ValueSet instead of ReilData)
+    (uses legacy ValueSet instead of FeatureArray)
 '''
 
-from .subject import Subject, SubjectType  # noqa: W0611
+from .subject import Subject  # noqa: W0611
 from .mnkgame import MNKGame  # noqa: W0611
 from .tic_tac_toe import TicTacToe  # noqa: W0611
 # from .windy_gridworld import WindyGridworld  # noqa: W0611

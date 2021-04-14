@@ -17,11 +17,11 @@ WarfarinPatientRavvaz:
 
 CancerModel:
     A 4-ordinary differential equation model of cancer.
-    (uses legacy ValueSet instead of ReilData)
+    (uses legacy ValueSet instead of FeatureArray)
 
 ConstrainedCancerModel:
     A constrained version of CancerModel.
-    (uses legacy ValueSet instead of ReilData)
+    (uses legacy ValueSet instead of FeatureArray)
 
 Warfarin:
     A `Subject` for warfarin that uses `WarfarinPatientRavvaz` and

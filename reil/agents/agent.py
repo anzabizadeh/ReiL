@@ -9,10 +9,10 @@ This `agent` class is the base class of all agent classes that can learn from
 
 import pathlib
 from collections import defaultdict
-from typing import Any, Dict, Generator, Generic, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, Generic, Optional, Tuple, Union
 
 from reil import agents, stateful
-from reil.datatypes.reildata import ReilData
+from reil.datatypes import FeatureArray
 from reil.learners.learner import Learner, LabelType
 from reil.utils.exploration_strategies import ExplorationStrategy
 from typing_extensions import Literal
@@ -27,7 +27,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                  learner: Learner[LabelType],
                  exploration_strategy: ExplorationStrategy,
                  discount_factor: float = 1.0,
-                 default_actions: Tuple[ReilData, ...] = (),
+                 default_actions: Tuple[FeatureArray, ...] = (),
                  tie_breaker: Literal['first', 'last', 'random'] = 'random',
                  training_trigger: Literal[
                      'none', 'termination',
@@ -81,10 +81,10 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
         return cls(None)  # type: ignore
 
     def act(self,
-            state: ReilData,
+            state: FeatureArray,
             subject_id: int,
-            actions: Optional[Tuple[ReilData, ...]] = None,
-            epoch: int = 0) -> ReilData:
+            actions: Optional[Tuple[FeatureArray, ...]] = None,
+            epoch: int = 0) -> FeatureArray:
         '''
         Return an action based on the given state.
 
@@ -133,7 +133,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
             self._learner.reset()
 
     def load(self, filename: str,
-             path: Optional[Union[str, pathlib.Path]] = None) -> None:
+             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Load an object from a file.
 
@@ -154,15 +154,14 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
         super().load(filename, _path)
 
         # when loading, self._learner is the object type, not an instance.
-        self._learner = cast(
-            Learner[LabelType],
-            self._learner.from_pickle(filename, _path / 'learner'))
+        self._learner = self._learner.from_pickle(  # type: ignore
+            filename, _path / 'learner')
 
     def save(self,
              filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.Path]] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
              data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.Path, str]:
+             ) -> Tuple[pathlib.PurePath, str]:
         '''
         Save the object to a file.
 
@@ -195,7 +194,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
 
         try:
             super().save(
-                _filename, _path, data_to_save=cast(Tuple, data))
+                _filename, _path, data_to_save=tuple(data))
             if save_learner:
                 self._learner = temp  # type: ignore
                 self._learner.save(_filename, _path / 'learner')
@@ -242,13 +241,13 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
         if history is not None:
             X, Y = self._prepare_training(history)
         else:
-            X, Y = cast(agents.TrainingData, ([], []))
+            X, Y = [], []
 
         if X:
-            self._learner.learn(X, cast(Tuple[LabelType, ...], Y))
+            self._learner.learn(X, Y)  # type: ignore
 
     def observe(self, subject_id: int, stat_name: Optional[str],  # noqa: C901
-                ) -> Generator[Union[ReilData, None], Any, None]:
+                ) -> Generator[Union[FeatureArray, None], Any, None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
         Extends `NoLearnAgent.observe`.
@@ -281,8 +280,8 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
             try:
                 new_observation = stateful.Observation()
                 temp = yield
-                new_observation.state = cast(ReilData, temp['state'])
-                actions: Tuple[ReilData, ...] = temp['actions']
+                new_observation.state = temp['state']
+                actions: Tuple[FeatureArray, ...] = temp['actions']
                 epoch: int = temp['epoch']
 
                 if self._training_trigger == 'state':
@@ -290,7 +289,8 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
 
                 if actions is not None:
                     new_observation.action = self.act(
-                        state=new_observation.state, subject_id=subject_id,
+                        state=new_observation.state,  # type: ignore
+                        subject_id=subject_id,
                         actions=actions, epoch=epoch)
 
                     if self._training_trigger == 'action':

@@ -8,14 +8,17 @@ A Q-learning `agent`.
 
 '''
 
-from typing import Any, Optional, Tuple, Union, cast
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 from reil import agents, stateful
-from reil.datatypes import ReilData
+from reil.datatypes import FeatureArray
 from reil.datatypes.buffers import Buffer
 from reil.learners import Learner
 from reil.utils.exploration_strategies import ExplorationStrategy
+
+
+Feature_or_Tuple_of_Feature = Union[Tuple[FeatureArray, ...], FeatureArray]
 
 
 class QLearning(agents.Agent):
@@ -53,7 +56,7 @@ class QLearning(agents.Agent):
             how to choose the `action` if more than one is candidate
             to be chosen.
         '''
-        super().__init__(learner=cast(Learner[float], learner),
+        super().__init__(learner=learner,
                          exploration_strategy=exploration_strategy,
                          **kwargs)
 
@@ -76,8 +79,8 @@ class QLearning(agents.Agent):
         return cls(None, MockBuffer(), None)  # type: ignore
 
     def _q(self,
-           state: Union[Tuple[ReilData, ...], ReilData],
-           action: Optional[Union[Tuple[ReilData, ...], ReilData]] = None
+           state: Feature_or_Tuple_of_Feature,
+           action: Optional[Feature_or_Tuple_of_Feature] = None
            ) -> Tuple[float, ...]:
         '''
         Return the Q-value of `state` `action` pairs.
@@ -100,13 +103,14 @@ class QLearning(agents.Agent):
 
         :meta public:
         '''
-        state_list = [state] if isinstance(state, ReilData) else state
+        state_list = [state] if isinstance(state, FeatureArray) else state
         len_state = len(state_list)
 
         if action is None:
             action_list = self._default_actions
         else:
-            action_list = [action] if isinstance(action, ReilData) else action
+            action_list = ([action] if isinstance(action, FeatureArray)
+                           else action)
 
         len_action = len(action_list)
 
@@ -124,9 +128,9 @@ class QLearning(agents.Agent):
                 'State and action should be of the same size'
                 ' or at least one should be of size one.')
 
-        return cast(Tuple[float, ...], self._learner.predict(X))
+        return self._learner.predict(X)
 
-    def _max_q(self, state: Union[Tuple[ReilData, ...], ReilData]) -> float:
+    def _max_q(self, state: Feature_or_Tuple_of_Feature) -> float:
         '''
         Return `max(Q)` of one state or a list of states.
 
@@ -167,11 +171,11 @@ class QLearning(agents.Agent):
         '''
         if self._method == 'forward':
             for i in range(len(history)-1):
-                state = cast(ReilData, history[i].state)
-                action = cast(ReilData, history[i].action)
-                reward = cast(float, history[i].reward[0].value)
+                state = history[i].state
+                action = history[i].action
+                reward = history[i].reward['reward'].value
                 try:
-                    max_q = self._max_q(cast(ReilData, history[i+1].state))
+                    max_q = self._max_q(history[i+1].state)  # type: ignore
                     new_q = reward + self._discount_factor*max_q
                 except IndexError:
                     new_q = reward
@@ -182,9 +186,9 @@ class QLearning(agents.Agent):
         else:  # backward
             q_list = [0.0] * len(history)
             for i in range(len(history)-2, -1, -1):
-                state = cast(ReilData, history[i].state)
-                action = cast(ReilData, history[i].action)
-                reward = cast(float, history[i].reward[0].value)
+                state = history[i].state
+                action = history[i].action
+                reward = history[i].reward['reward'].value
                 q_list[i] = reward + self._discount_factor*q_list[i+1]
 
                 self._buffer.add(
@@ -195,9 +199,9 @@ class QLearning(agents.Agent):
         return temp['X'], temp['Y']
 
     def best_actions(self,
-                     state: ReilData,
-                     actions: Optional[Tuple[ReilData, ...]] = None
-                     ) -> Tuple[ReilData, ...]:
+                     state: FeatureArray,
+                     actions: Optional[Tuple[FeatureArray, ...]] = None
+                     ) -> Tuple[FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
 

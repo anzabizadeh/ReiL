@@ -10,10 +10,10 @@ import random
 from typing import Any, Generator, Optional, Tuple, TypeVar, Union, cast
 
 from reil import stateful
-from reil.datatypes.reildata import ReilData
+from reil.datatypes import FeatureArray
 from typing_extensions import Literal
 
-TrainingData = Tuple[Tuple[ReilData, ...], Tuple[float, ...]]
+TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[float, ...]]
 T = TypeVar('T')
 
 
@@ -24,7 +24,7 @@ class NoLearnAgent(stateful.Stateful):
     '''
 
     def __init__(self,
-                 default_actions: Tuple[ReilData, ...] = (),
+                 default_actions: Tuple[FeatureArray, ...] = (),
                  tie_breaker: Literal['first', 'last', 'random'] = 'random',
                  **kwargs: Any):
         '''
@@ -53,10 +53,10 @@ class NoLearnAgent(stateful.Stateful):
         self._tie_breaker: Literal['first', 'last', 'random'] = tie_breaker
 
     def act(self,
-            state: ReilData,
+            state: FeatureArray,
             subject_id: int,
-            actions: Optional[Tuple[ReilData, ...]] = None,
-            epoch: int = 0) -> ReilData:
+            actions: Optional[Tuple[FeatureArray, ...]] = None,
+            epoch: int = 0) -> FeatureArray:
         '''
         Return an action based on the given state.
 
@@ -88,9 +88,9 @@ class NoLearnAgent(stateful.Stateful):
         return action
 
     def best_actions(self,
-                     state: ReilData,
-                     actions: Tuple[ReilData, ...],
-                     ) -> Tuple[ReilData, ...]:
+                     state: FeatureArray,
+                     actions: Tuple[FeatureArray, ...],
+                     ) -> Tuple[FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -110,7 +110,7 @@ class NoLearnAgent(stateful.Stateful):
         raise NotImplementedError
 
     def observe(self, subject_id: int, stat_name: str,
-                ) -> Generator[Union[ReilData, None], Any, None]:
+                ) -> Generator[Union[FeatureArray, None], Any, None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
 
@@ -142,8 +142,8 @@ class NoLearnAgent(stateful.Stateful):
             try:
                 new_observation = stateful.Observation()
                 temp = yield
-                new_observation.state = cast(ReilData, temp['state'])
-                actions: Tuple[ReilData, ...] = temp['actions']
+                new_observation.state = cast(FeatureArray, temp['state'])
+                actions: Tuple[FeatureArray, ...] = temp['actions']
                 epoch: int = temp['epoch']
 
                 if actions is not None:

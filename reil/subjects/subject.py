@@ -7,10 +7,10 @@ This `subject` class is the base class of all subject classes.
 '''
 
 import pathlib
-from typing import Any, Optional, Tuple, TypeVar, Union
+from typing import Any, Optional, Tuple, Union
 
 from reil import stateful
-from reil.datatypes import ReilData, SecondayComponent
+from reil.datatypes import Feature, FeatureArray, SecondayComponent
 
 
 class Subject(stateful.Stateful):
@@ -42,8 +42,9 @@ class Subject(stateful.Stateful):
             enabled=False)
 
     def _default_reward_definition(
-            self, _id: Optional[int] = None) -> ReilData:
-        return ReilData.single_base(name='default_reward', value=None)
+            self, _id: Optional[int] = None) -> FeatureArray:
+        return FeatureArray(
+            Feature.numerical(name='default_reward', value=0.0))
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''
@@ -65,7 +66,7 @@ class Subject(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    def possible_actions(self, _id: int = 0) -> Tuple[ReilData, ...]:
+    def possible_actions(self, _id: int = 0) -> Tuple[FeatureArray, ...]:
         '''
         Generate the list of possible actions.
 
@@ -79,9 +80,9 @@ class Subject(stateful.Stateful):
         :
             A list of possible actions for the `agent` with ID=_id.
         '''
-        return (ReilData.single_base(name='default_action'),)
+        return (FeatureArray(Feature(name='default_action')),)
 
-    def take_effect(self, action: ReilData, _id: int = 0) -> None:
+    def take_effect(self, action: FeatureArray, _id: int = 0) -> None:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
         the next state.
@@ -101,7 +102,7 @@ class Subject(stateful.Stateful):
         self.reward.disable()
 
     def load(self, filename: str,
-             path: Optional[Union[str, pathlib.Path]]) -> None:
+             path: Optional[Union[str, pathlib.PurePath]]) -> None:
 
         super().load(filename, path=path)
 
@@ -111,9 +112,9 @@ class Subject(stateful.Stateful):
 
     def save(self,
              filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.Path]] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
              data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.Path, str]:
+             ) -> Tuple[pathlib.PurePath, str]:
 
         prim_comp, self.reward._primary_component = (  # type: ignore
             self.reward._primary_component, None)
@@ -126,6 +127,3 @@ class Subject(stateful.Stateful):
             self.reward._default = reward_default
 
         return f, p
-
-
-SubjectType = TypeVar('SubjectType', bound=Subject)

@@ -8,10 +8,10 @@ DOI: 10.1038/sj.clpt.6100084
 '''
 import math
 from collections import namedtuple
-from reil.datatypes.feature import Feature
-from typing import Any, Callable, Dict, List, Union, cast
+from typing import Any, Callable, Dict, List, Union
 
 import numpy as np
+from reil.datatypes import Feature
 from reil.subjects.healthcare.mathematical_models import HealthMathModel
 
 DoseEffect = namedtuple('DoseEffect', ['dose', 'Cs'])
@@ -43,7 +43,7 @@ class HambergPKPD(HealthMathModel):
         self._cache_size = cache_size
         self._cached_cs = []
 
-    def setup(self, **arguments: Union[Feature[str], Feature[float]]) -> None:
+    def setup(self, **arguments: Feature) -> None:
         '''
         Set up the model.
 
@@ -65,22 +65,22 @@ class HambergPKPD(HealthMathModel):
             `CYP2C9` is not one of the acceptable values:
             *1/*1, *1/*2, *1/*3, *2/*2, *2/*3, *3/*3
         '''
-        age = cast(float, arguments['age'].value)
-        CYP2C9 = cast(str, arguments['CYP2C9'].value)
+        age = float(arguments['age'].value)  # type: ignore
+        CYP2C9 = str(arguments['CYP2C9'].value)
 
         # VKORC1 is not used inside this implementation of Hamberg. It
         # specifies the distribution of EC_50 which is being determined
         # in WarfarinPatient class.
 
-        MTT_1 = cast(float, arguments['MTT_1'].value)
-        MTT_2 = cast(float, arguments['MTT_2'].value)
+        MTT_1 = float(arguments['MTT_1'].value)  # type: ignore
+        MTT_2 = float(arguments['MTT_2'].value)  # type: ignore
 
-        self._EC_50_gamma = cast(
-            float, arguments['EC_50'].value) ** self._gamma
+        self._EC_50_gamma = float(
+            arguments['EC_50'].value) ** self._gamma  # type: ignore
 
-        cyp_1_1 = cast(float, arguments['cyp_1_1'].value)
-        V1 = cast(float, arguments['V1'].value)
-        V2 = cast(float, arguments['V2'].value)
+        cyp_1_1 = float(arguments['cyp_1_1'].value)  # type: ignore
+        V1 = float(arguments['V1'].value)  # type: ignore
+        V2 = float(arguments['V2'].value)  # type: ignore
 
         ktr1 = 6/MTT_1  # 1/hours; changed from 1/MTT_1
         ktr2 = 1/MTT_2  # 1/hours
@@ -231,15 +231,13 @@ class HambergPKPD(HealthMathModel):
         :
             A list of INRs for the specified days.
         '''
-        if isinstance(measurement_days, int):
-            days = [measurement_days]
-        else:
-            days = measurement_days
+        days = (measurement_days if hasattr(measurement_days, '__iter__')
+                else [measurement_days])
 
         if self._last_computed_day == 0:
             self._A = np.array([0.0] + [1.0] * 8)
 
-        max_days = max(days)
+        max_days = max(days)  # type: ignore
         self._list_of_INRs.extend(
             [0.0] * (max_days - len(self._list_of_INRs) + 1))
 
@@ -251,7 +249,7 @@ class HambergPKPD(HealthMathModel):
 
         self._last_computed_day = max_days
 
-        return [self._list_of_INRs[i] for i in days]
+        return [self._list_of_INRs[i] for i in days]  # type: ignore
 
     def _CS_function_generator(
             self, t_dose: int, dose: float) -> Callable[[int], float]:

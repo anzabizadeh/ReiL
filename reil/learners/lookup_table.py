@@ -12,7 +12,7 @@ import dataclasses
 from typing import Any, Dict, Generic, Tuple, TypeVar
 
 from reil import learners
-from reil.datatypes import ReilData
+from reil.datatypes import FeatureArray
 
 T = TypeVar('T')
 
@@ -74,14 +74,14 @@ class QLookupTable(learners.Learner[float]):
     def _empty_instance(cls):
         return cls(None)  # type: ignore
 
-    def predict(self, X: Tuple[ReilData, ...]) -> Tuple[float, ...]:
+    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `ReilData` as inputs to the prediction model.
+            A list of `FeatureArray` as inputs to the prediction model.
 
         Returns
         -------
@@ -97,14 +97,14 @@ class QLookupTable(learners.Learner[float]):
 
         return result
 
-    def learn(self, X: Tuple[ReilData, ...], Y: Tuple[float, ...]) -> None:
+    def learn(self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...]) -> None:
         '''
         Learn using the training set `X` and `Y`.
 
         Arguments
         ---------
         X:
-            A list of `ReilData` as inputs to the learning model.
+            A list of `FeatureArray` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.
@@ -118,7 +118,7 @@ class QLookupTable(learners.Learner[float]):
             self._table[Xi].N += 1
 
     # def load(self, filename: str,
-    #          path: Optional[Union[str, pathlib.Path]] = None) -> None:
+    #          path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
     #     temp = defaultdict(
     #         lambda: {'value': self._initial_estimate,
     #                  'N': 0})
@@ -129,8 +129,8 @@ class QLookupTable(learners.Learner[float]):
 
     # def save(self,
     #          filename: str,
-    #          path: Optional[Union[str, pathlib.Path]] = None
-    #          ) -> Tuple[pathlib.Path, str]:
+    #          path: Optional[Union[str, pathlib.PurePath]] = None
+    #          ) -> Tuple[pathlib.PurePath, str]:
     #     _path = pathlib.Path(path if path is not None else '')
     #     with open(_path / f'{filename}.csv', 'w') as f:
     #         w = csv.writer(f)

@@ -9,10 +9,11 @@ An agent for warfarin modeling based on the doses define in Ravvaz et al (2017)
 import collections
 import functools
 from math import exp, log, sqrt
+from reil.datatypes.feature import FeatureGenerator
 from typing import Any, Dict, List, Optional, Tuple
 
 from reil import agents
-from reil.datatypes.reildata import ReilData
+from reil.datatypes import FeatureArray
 from typing_extensions import Literal
 
 DoseInterval = collections.namedtuple('DoseInterval', 'dose, interval')
@@ -868,10 +869,15 @@ class WarfarinAgent(agents.NoLearnAgent):
         elif study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
             self._protocol = PGPGA()
 
+        self._dose_gen = FeatureGenerator.numerical(
+                name='dose', lower=0.0, upper=15.0)
+        self._interval_gen = FeatureGenerator(
+                name='interval', lower=1, upper=28)
+
     def act(self,
-            state: ReilData,
-            actions: Optional[Tuple[ReilData, ...]] = None,
-            epoch: Optional[int] = 0) -> ReilData:
+            state: FeatureArray,
+            actions: Optional[Tuple[FeatureArray, ...]] = None,
+            epoch: Optional[int] = 0) -> FeatureArray:
         '''
         Generate the dosing `action` based on the `state` and current dosing
         protocol.
@@ -898,11 +904,9 @@ class WarfarinAgent(agents.NoLearnAgent):
         dose, interval = self._protocol.prescribe(patient)
 
         # Cuts out the dose if it is >15.0
-        return ReilData([
-            {'name': 'dose', 'value': min(dose, 15.0),
-             'lower': 0.0, 'upper': 15.0},
-            {'name': 'interval', 'value': min(interval, 28),
-             'lower': 1, 'upper': 28}
+        return FeatureArray([
+            self._dose_gen(min(dose, 15.0)),
+            self._interval_gen(min(interval, 28))
         ])
 
     def reset(self):

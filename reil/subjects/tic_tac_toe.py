@@ -6,10 +6,11 @@ TicTacToe class
 The standard Tic-Tac-Toe game.
 '''
 import random
+from reil.datatypes.feature import FeatureGenerator
 from typing import Any, Optional
 
 from reil import subjects
-from reil.datatypes import ReilData
+from reil.datatypes import FeatureArray
 
 
 class TicTacToe(subjects.MNKGame):
@@ -25,8 +26,10 @@ class TicTacToe(subjects.MNKGame):
 
     def __init__(self, **kwargs: Any):
         super().__init__(m=3, n=3, k=3, players=2, **kwargs)
+        self._state_gen = FeatureGenerator.numerical(
+            name='state', lower=-1, upper=1)
 
-    def default_state(self, _id: Optional[int] = None) -> ReilData:
+    def default_state(self, _id: Optional[int] = None) -> FeatureArray:
         def modify(i, _id) -> float:
             if i == _id:
                 return 1
@@ -34,11 +37,8 @@ class TicTacToe(subjects.MNKGame):
                 return 0
             return -1
 
-        return ReilData.single_numerical(
-            name='state',
-            value=tuple(modify(i, _id)
-                        for i in self._board),
-            lower=-1, upper=1)
+        return FeatureArray(self._state_gen(tuple(modify(i, _id)
+                                                  for i in self._board)))
 
     def __repr__(self):
         return self.__class__.__qualname__

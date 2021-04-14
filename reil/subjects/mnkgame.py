@@ -7,11 +7,12 @@ This class emulates mnk game.
 '''
 
 
-from typing import Any, Optional, Tuple, Union, cast
-from reil.utils.mnkboard import MNKBoard
-from reil.subjects.subject import Subject
-from reil.datatypes import ReilData
 import random
+from typing import Any, Optional, Tuple, Union
+
+from reil.datatypes import Feature, FeatureArray, FeatureGenerator
+from reil.subjects.subject import Subject
+from reil.utils.mnkboard import MNKBoard
 
 
 class MNKGame(MNKBoard, Subject):
@@ -44,21 +45,20 @@ class MNKGame(MNKBoard, Subject):
         '''
         self._board_status = None
         self.set_params(**kwargs)
+        Subject.__init__(self, **kwargs)
         MNKBoard.__init__(self, m=m, n=n, k=k, players=players,
                           can_recapture=False, **kwargs)
-        Subject.__init__(self, **kwargs)
+        self._action_gen = FeatureGenerator.numerical(
+            name='square', lower=0, upper=len(self._board)-1)
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         return self._board_status is not None
 
-    def possible_actions(self, _id: int = None) -> Tuple[ReilData, ...]:
-        upper = len(self._board)-1
+    def possible_actions(self, _id: int = None) -> Tuple[FeatureArray, ...]:
+        return tuple(FeatureArray(self._action_gen(v))
+                     for v in self.get_action_set())
 
-        return tuple(ReilData.single_numerical(
-            name='square', value=v, lower=0, upper=upper)
-            for v in self.get_action_set())
-
-    def take_effect(self, action: ReilData, _id: int) -> None:
+    def take_effect(self, action: FeatureArray, _id: int) -> None:
         '''
         Set a piece for the given player on the board.
 
@@ -71,9 +71,10 @@ class MNKGame(MNKBoard, Subject):
             ID of the player who sets the piece.
         '''
         Subject.take_effect(self, action, _id)
-        self.set_piece(_id, index=cast(int, action.value['square']))
+        self.set_piece(_id, index=int(action.value['square']))
 
-    def default_reward(self, _id: Optional[int] = None) -> ReilData:
+    def _default_reward_definition(
+            self, _id: Optional[int] = None) -> FeatureArray:
         if self._board_status is None:
             r = 0
         elif self._board_status == _id:
@@ -83,7 +84,7 @@ class MNKGame(MNKBoard, Subject):
         else:
             r = 0
 
-        return ReilData.single_base(name='reward', value=r)
+        return FeatureArray(Feature.numerical(name='reward', value=r))
 
     def reset(self):
         '''Clear the board and update board_status.'''
@@ -249,6 +250,6 @@ if __name__ == '__main__':
         actions = board.possible_actions(player[current_player])
         board.take_effect(random.choice(actions), player[current_player])
         print(f'{board}\n',
-              board.reward('default', player['P1'])[0].value,
-              board.reward('default', player['P2'])[0].value)
+              board.reward('default', player['P1']).value,
+              board.reward('default', player['P2']).value)
         p = (p + 1) % 2

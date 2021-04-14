@@ -8,7 +8,7 @@ This class is the base class to model patients with different characteristics.
 
 from typing import Any, Dict
 
-from reil.datatypes import Feature
+from reil.datatypes import Feature, FeatureGenerator
 from reil.subjects.healthcare.mathematical_models import HealthMathModel
 
 
@@ -16,6 +16,7 @@ class Patient:
     '''
     Base class for patients in healthcare.
     '''
+    feature_gen_set: Dict[str, FeatureGenerator] = {}
     feature_set: Dict[str, Feature] = {}
 
     def __init__(self, model: HealthMathModel, **feature_values: Any) -> None:
@@ -30,11 +31,9 @@ class Patient:
             can be determined. For example, if "age" is one of the features,
             age=40.0 will set the initial age to 40.0.
         '''
-        for k, v in self.feature_set.items():
-            if k in feature_values:
-                self.feature_set[k] = v
-            else:
-                self.feature_set[k].generate()
+        for k in self.feature_gen_set:
+            self.feature_set[k] = self.feature_gen_set[k](
+                feature_values.get(k))
 
         self._model = model
         self._model.setup(**self.feature_set)
@@ -43,11 +42,11 @@ class Patient:
         '''
         Generate a new patient.
 
-        This method calls `generate` method of every `feature`, and then sets
+        This method calls every `feature`, and then sets
         up to `model` using the new values.
         '''
-        for v in self.feature_set.values():
-            v.generate()
+        for k in self.feature_gen_set:
+            self.feature_set[k] = self.feature_gen_set[k]()
 
         self._model.setup(**self.feature_set)
 

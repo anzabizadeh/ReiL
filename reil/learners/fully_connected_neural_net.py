@@ -11,7 +11,7 @@ from typing import Any, Optional, Tuple, Union
 import numpy as np
 import tensorflow as tf
 from reil import learners
-from reil.datatypes import ReilData
+from reil.datatypes import FeatureArray
 from tensorflow import keras  # type: ignore
 
 
@@ -123,14 +123,14 @@ class Dense(learners.Learner[float]):
 
         self._ann_ready = True
 
-    def predict(self, X: Tuple[ReilData, ...]) -> Tuple[float, ...]:
+    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `ReilData` as inputs to the prediction model.
+            A list of `FeatureArray` as inputs to the prediction model.
 
         Returns
         -------
@@ -148,14 +148,14 @@ class Dense(learners.Learner[float]):
 
         return result
 
-    def learn(self, X: Tuple[ReilData, ...], Y: Tuple[float, ...]) -> None:
+    def learn(self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...]) -> None:
         '''
         Learn using the training set `X` and `Y`.
 
         Arguments
         ---------
         X:
-            A list of `ReilData` as inputs to the learning model.
+            A list of `FeatureArray` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.
@@ -182,7 +182,8 @@ class Dense(learners.Learner[float]):
 
     def save(self,
              filename: str,
-             path: pathlib.Path) -> Tuple[pathlib.Path, str]:
+             path: Optional[Union[str, pathlib.PurePath]]
+             ) -> Tuple[pathlib.PurePath, str]:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
 
@@ -212,7 +213,7 @@ class Dense(learners.Learner[float]):
 
     def load(self,
              filename: str,
-             path: Optional[Union[str, pathlib.Path]] = None) -> None:
+             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Extends `ReilBase.load` to handle `TF` objects.
 
