@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 Patient class
-===========
+=============
 
 This class is the base class to model patients with different characteristics.
 '''
