@@ -10,7 +10,7 @@ This class emulates mnk game.
 import random
 from typing import Any, Optional, Tuple, Union
 
-from reil.datatypes import Feature, FeatureArray, FeatureGenerator
+from reil.datatypes import FeatureArray, FeatureGenerator
 from reil.subjects.subject import Subject
 from reil.utils.mnkboard import MNKBoard
 
@@ -74,7 +74,7 @@ class MNKGame(MNKBoard, Subject):
         self.set_piece(_id, index=int(action.value['square']))
 
     def _default_reward_definition(
-            self, _id: Optional[int] = None) -> FeatureArray:
+            self, _id: Optional[int] = None) -> int:
         if self._board_status is None:
             r = 0
         elif self._board_status == _id:
@@ -84,7 +84,7 @@ class MNKGame(MNKBoard, Subject):
         else:
             r = 0
 
-        return FeatureArray(Feature.numerical(name='reward', value=r))
+        return r
 
     def reset(self):
         '''Clear the board and update board_status.'''
@@ -250,6 +250,6 @@ if __name__ == '__main__':
         actions = board.possible_actions(player[current_player])
         board.take_effect(random.choice(actions), player[current_player])
         print(f'{board}\n',
-              board.reward('default', player['P1']).value,
-              board.reward('default', player['P2']).value)
+              board.reward('default', player['P1']),
+              board.reward('default', player['P2']))
         p = (p + 1) % 2

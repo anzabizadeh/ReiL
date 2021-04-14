@@ -42,9 +42,8 @@ class Subject(stateful.Stateful):
             enabled=False)
 
     def _default_reward_definition(
-            self, _id: Optional[int] = None) -> FeatureArray:
-        return FeatureArray(
-            Feature.numerical(name='default_reward', value=0.0))
+            self, _id: Optional[int] = None) -> float:
+        return 0.0
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''

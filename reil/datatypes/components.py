@@ -15,7 +15,7 @@ from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Tuple,
                     Union, cast)
 
 import pandas as pd
-from reil.datatypes import Feature, FeatureArray
+from reil.datatypes import FeatureArray
 
 
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
@@ -217,8 +217,9 @@ class PrimaryComponent:
         if name not in self._definitions:
             raise ValueError(f'Definition {name} not found.')
 
-        return FeatureArray(d.fn(self.object_ref, _id=_id, **d.args)
-                            for d in self._definitions[name.lower()])
+        return FeatureArray(d.fn(
+            self.object_ref, _id=_id, **d.args)  # type: ignore
+            for d in self._definitions[name.lower()])
 
 
 class SecondayComponent:
@@ -231,7 +232,7 @@ class SecondayComponent:
                  name: str,
                  primary_component: Optional[PrimaryComponent] = None,
                  default_definition: Optional[Callable[[
-                     Optional[int]], FeatureArray]] = None,
+                     Optional[int]], Any]] = None,
                  enabled: bool = True
                  ) -> None:
         '''
@@ -287,15 +288,14 @@ class SecondayComponent:
         self._primary_component = primary_component
 
     def set_default_definition(
-            self, default_definition: Callable[[Optional[int]], FeatureArray]
+            self, default_definition: Callable[[Optional[int]], Any]
     ) -> None:
         '''Add a new component definition.
 
         Parameters
         ----------
         default_definition:
-            A function that can optionally accept `_id`, and returns a
-            `FeatureArray`.
+            A function that can optionally accept `_id`, and returns a value.
         '''
         self._default = default_definition
 
@@ -344,7 +344,7 @@ class SecondayComponent:
             fn=fn,
             args=_primary_component_name)
 
-    def default(self, _id: Optional[int] = None) -> FeatureArray:
+    def default(self, _id: Optional[int] = None) -> Any:
         '''
         Generate the default component definition.
 
@@ -365,7 +365,7 @@ class SecondayComponent:
 
     def __call__(self,
                  name: str,
-                 _id: Optional[int] = None) -> Union[FeatureArray, None]:
+                 _id: Optional[int] = None) -> Any:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -403,10 +403,9 @@ class SecondayComponent:
             raise ValueError(f'Definition {name} not found.')
 
         d = self._definitions[_name]
+        p = self._primary_component(name=d.args, _id=_id)  # type: ignore
 
-        return FeatureArray(Feature.numerical(
-            name=self._name, value=d.fn(self._primary_component(
-                name=cast(str, d.args), _id=_id))))
+        return d.fn(p)
 
 
 class Statistic(SecondayComponent):
@@ -443,8 +442,9 @@ class Statistic(SecondayComponent):
                          primary_component=primary_component,
                          enabled=enabled)
         self._default = default_definition
-        self._history: Dict[int,
-                            List[Tuple[FeatureArray, float]]] = DefaultDict(list)
+        self._history: Dict[
+            int,
+            List[Tuple[FeatureArray, float]]] = DefaultDict(list)
         self._history_none: List[Tuple[FeatureArray, float]] = []
 
     def enable(self) -> None:
@@ -563,7 +563,8 @@ class Statistic(SecondayComponent):
     def __call__(
             self,
             name: str,
-            _id: Optional[int] = None) -> Union[Tuple[FeatureArray, float], None]:
+            _id: Optional[int] = None
+    ) -> Union[Tuple[FeatureArray, float], None]:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -672,8 +673,9 @@ class MockStatistic:
             The object that provides actual `Statistic` capabilities.
         '''
         self._obj = obj
-        self._history: Dict[int,
-                            List[Tuple[FeatureArray, float]]] = DefaultDict(list)
+        self._history: Dict[
+            int,
+            List[Tuple[FeatureArray, float]]] = DefaultDict(list)
         self._history_none: List[Tuple[FeatureArray, float]] = []
 
     def set_object(self, obj) -> None:
@@ -704,7 +706,8 @@ class MockStatistic:
     def __call__(
             self,
             name: str,
-            _id: Optional[int] = None) -> Union[Tuple[FeatureArray, float], None]:
+            _id: Optional[int] = None
+    ) -> Union[Tuple[FeatureArray, float], None]:
         return self._obj.statistic.__call__(name, _id)
 
     def append(self,
@@ -792,10 +795,10 @@ if __name__ == '__main__':  # noqa: C901
                                       exclude_first=True),
                                   'normal_state')
             print(state('normal_state', _id=1).value)
-            print(reward('normal_reward', _id=1).value)
+            print(reward('normal_reward', _id=1))
             self._INR = 1000
             print(state('normal_state', _id=1).value)
-            print(reward('normal_reward', _id=1).value)
+            print(reward('normal_reward', _id=1))
 
         def _sub_comp_age(self, _id, **kwargs):
             return {'name': 'age', 'value': 10}

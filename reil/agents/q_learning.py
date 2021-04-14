@@ -173,7 +173,7 @@ class QLearning(agents.Agent):
             for i in range(len(history)-1):
                 state = history[i].state
                 action = history[i].action
-                reward = history[i].reward['reward'].value
+                reward = history[i].reward
                 try:
                     max_q = self._max_q(history[i+1].state)  # type: ignore
                     new_q = reward + self._discount_factor*max_q
@@ -188,7 +188,7 @@ class QLearning(agents.Agent):
             for i in range(len(history)-2, -1, -1):
                 state = history[i].state
                 action = history[i].action
-                reward = history[i].reward['reward'].value
+                reward = history[i].reward
                 q_list[i] = reward + self._discount_factor*q_list[i+1]
 
                 self._buffer.add(

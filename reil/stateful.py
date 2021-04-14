@@ -48,7 +48,7 @@ from reil.datatypes.components import Statistic
 class Observation:
     state: Optional[FeatureArray] = None
     action: Optional[FeatureArray] = None
-    reward: Optional[FeatureArray] = None
+    reward: Optional[Any] = None
 
 
 History = List[Observation]
