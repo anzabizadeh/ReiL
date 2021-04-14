@@ -53,7 +53,8 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
         raise NotImplementedError
 
     def learn(
-        self, X: Tuple[FeatureArray, ...], Y: Tuple[LabelType, ...]) -> None:
+            self, X: Tuple[FeatureArray, ...], Y: Tuple[LabelType, ...]
+    ) -> None:
         '''
         Learn using the training set `X` and `Y`.
 

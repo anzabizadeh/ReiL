@@ -68,6 +68,12 @@ class testFeature(unittest.TestCase):
         categoricals = feature.FeatureGenerator.categorical(
             name='test', categories=tuple(self._categorical_data))
         rl_values = [categoricals(v) for v in self._categorical_data]
+        self.assertEqual(
+            rl_values[0].normalized,
+            tuple([1] + [0]*(len(self._categorical_data) - 2)))
+        self.assertEqual(
+            rl_values[-1].normalized,
+            tuple([0]*(len(self._categorical_data) - 1)))
 
         rl_new = sum(rl_values[1:], rl_values[0])
         self.assertEqual(rl_new.name, 'test')

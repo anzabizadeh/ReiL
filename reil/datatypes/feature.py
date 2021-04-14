@@ -246,12 +246,13 @@ class FeatureGenerator:
         if self.categories is None:
             return
 
-        cat_count = len(self.categories)
+        cat_count = len(self.categories) - 1
         normalizer = {}
-        for i, c in enumerate(self.categories):
+        for i, c in enumerate(self.categories[:-1]):
             temp = [0] * cat_count
             temp[i] = 1
             normalizer[c] = tuple(temp)
+        normalizer[self.categories[-1]] = tuple([0] * cat_count)
 
         self.__dict__['normalizer'] = normalizer
 
