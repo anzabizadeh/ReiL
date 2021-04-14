@@ -9,7 +9,7 @@ are determined by a fixed `interaction_sequence`.
 '''
 from collections import namedtuple
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from reil.datatypes import InteractionProtocol
@@ -110,13 +110,12 @@ class EnvironmentStaticMap(Environment):
             unit = protocol.unit
             state_name = protocol.state_name
             reward_function_name = protocol.reward_function_name
-            agent_id, _ = cast(Tuple[int, int],
-                               self._assignment_list[a_s_name])
+            agent_id, _ = self._assignment_list[a_s_name]
 
             if unit == 'interaction':
                 if protocol.n == 1:
                     self.interact_once(
-                        agent_id=agent_id,
+                        agent_id=agent_id,  # type: ignore
                         agent_observer=self._agent_observers[a_s_name],
                         subject_instance=self._subjects[subject_name],
                         state_name=state_name,
@@ -124,7 +123,7 @@ class EnvironmentStaticMap(Environment):
                         epoch=self._epochs[subject_name])
                 else:
                     self.interact_n_times(
-                        agent_id=agent_id,
+                        agent_id=agent_id,  # type: ignore
                         agent_observer=self._agent_observers[a_s_name],
                         subject_instance=self._subjects[subject_name],
                         state_name=state_name,
@@ -139,7 +138,7 @@ class EnvironmentStaticMap(Environment):
                 # For epoch, simulate the current instance, then in the next if
                 # statement, simulate the rest of the generated instances.
                 self.interact_while(
-                    agent_id=agent_id,
+                    agent_id=agent_id,  # type: ignore
                     agent_observer=self._agent_observers[a_s_name],
                     subject_instance=self._subjects[subject_name],
                     state_name=state_name,
@@ -150,7 +149,7 @@ class EnvironmentStaticMap(Environment):
                         and subject_name in self._instance_generators):
                     while self.check_subject(subject_name):
                         self.interact_while(
-                            agent_id=agent_id,
+                            agent_id=agent_id,  # type: ignore
                             agent_observer=self._agent_observers[a_s_name],
                             subject_instance=self._subjects[subject_name],
                             state_name=state_name,
@@ -301,7 +300,7 @@ class EnvironmentStaticMap(Environment):
     def load(self,  # noqa: C901
              entity_name: Union[List[str], str] = 'all',
              filename: Optional[str] = None,
-             path: Optional[Union[pathlib.Path, str]] = None) -> None:
+             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Load an entity or an `environment` from a file.
 

@@ -9,18 +9,18 @@ on one or more `subjects`.
 import inspect
 import pathlib
 from collections import defaultdict
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
-from reil import agents as rlagents
+from reil.agents import Agent, NoLearnAgent
 from reil import stateful
-from reil import subjects as rlsubjects
-from reil.datatypes import InteractionProtocol, ReilData
-from reil.utils import instance_generator as rlgenerator
+from reil.subjects import Subject
+from reil.datatypes import InteractionProtocol, FeatureArray
+from reil.utils import InstanceGenerator
 
 AgentSubjectTuple = Tuple[str, str]
-EntityType = Union[rlagents.Agent, rlsubjects.Subject]
-EntityGenType = Union[rlgenerator.InstanceGenerator[rlagents.Agent],
-                      rlgenerator.InstanceGenerator[rlsubjects.Subject]]
+EntityType = Union[Agent, Subject]
+EntityGenType = Union[InstanceGenerator[Agent],
+                      InstanceGenerator[Subject]]
 
 
 class Environment(stateful.Stateful):
@@ -54,8 +54,8 @@ class Environment(stateful.Stateful):
         '''
         super().__init__(**kwargs)
 
-        self._agents: Dict[str, rlagents.AgentType] = {}
-        self._subjects: Dict[str, rlsubjects.SubjectType] = {}
+        self._agents: Dict[str, Agent] = {}
+        self._subjects: Dict[str, Subject] = {}
         self._instance_generators: Dict[str, EntityGenType] = {}
         self._assignment_list: Dict[
             AgentSubjectTuple,
@@ -63,7 +63,8 @@ class Environment(stateful.Stateful):
             defaultdict(lambda: (None, None))
         self._epochs: Dict[str, int] = defaultdict(int)
         self._agent_observers: Dict[
-            Tuple[str, str], Generator[Union[ReilData, None], Any, None]] = {}
+            Tuple[str, str],
+            Generator[Union[FeatureArray, None], Any, None]] = {}
 
         if entity_dict is not None:
             self.add(entity_dict)
@@ -113,21 +114,21 @@ class Environment(stateful.Stateful):
                                      'and generators.')
             else:
                 _obj = obj
-            if isinstance(_obj, rlgenerator.InstanceGenerator):
+            if isinstance(_obj, InstanceGenerator):
                 self._instance_generators.update({name: _obj})
-            elif isinstance(_obj, rlagents.NoLearnAgent):
+            elif isinstance(_obj, NoLearnAgent):
                 self._agents.update({name: _obj})
-            elif isinstance(_obj, rlsubjects.Subject):
+            elif isinstance(_obj, Subject):
                 self._subjects.update({name: _obj})
             else:
                 raise TypeError(
                     f'entity {name} is niether an agent nor a subject.')
 
         for name, generator in self._instance_generators.items():
-            _, obj = next(generator)
-            if isinstance(obj, rlagents.Agent):
+            _, obj = next(generator)  # type: ignore
+            if isinstance(obj, Agent):
                 self._agents.update({name: obj})
-            elif isinstance(obj, rlsubjects.Subject):
+            elif isinstance(obj, Subject):
                 self._subjects.update({name: obj})
             else:
                 raise TypeError(
@@ -199,8 +200,8 @@ class Environment(stateful.Stateful):
     @staticmethod
     def interact_once(
             agent_id: int,
-            agent_observer: Generator[Union[ReilData, None], Any, None],
-            subject_instance: rlsubjects.Subject,
+            agent_observer: Generator[Union[FeatureArray, None], Any, None],
+            subject_instance: Subject,
             state_name: str,
             reward_function_name: str,
             epoch: int) -> None:
@@ -254,14 +255,14 @@ class Environment(stateful.Stateful):
             action = agent_observer.send({'state': state,
                                           'actions': possible_actions,
                                           'epoch': epoch})
-            subject_instance.take_effect(cast(ReilData, action), agent_id)
+            subject_instance.take_effect(action, agent_id)  # type: ignore
 
     @classmethod
     def interact_n_times(
             cls,
             agent_id: int,
-            agent_observer: Generator[Union[ReilData, None], Any, None],
-            subject_instance: rlsubjects.Subject,
+            agent_observer: Generator[Union[FeatureArray, None], Any, None],
+            subject_instance: Subject,
             state_name: str,
             reward_function_name: str,
             epoch: int,
@@ -317,8 +318,8 @@ class Environment(stateful.Stateful):
     def interact_while(
             cls,
             agent_id: int,
-            agent_observer: Generator[Union[ReilData, None], Any, None],
-            subject_instance: rlsubjects.Subject,
+            agent_observer: Generator[Union[FeatureArray, None], Any, None],
+            subject_instance: Subject,
             state_name: str,
             reward_function_name: str,
             epoch: int) -> None:
@@ -462,8 +463,7 @@ class Environment(stateful.Stateful):
                 self._agent_observers[a_s_names]) != inspect.GEN_SUSPENDED:
             return
 
-        a_id, _ = cast(Tuple[int, int],
-                       self._assignment_list[a_s_names])
+        a_id, _ = self._assignment_list[a_s_names]
         reward = self._subjects[subject_name].reward(
             name=r_func_name, _id=a_id)
         state = self._subjects[subject_name].state(
@@ -509,24 +509,17 @@ class Environment(stateful.Stateful):
             # for the current subject, so that agent_observer does not raise
             # exception.
             try:
-                _, self._subjects[subject_name] = cast(
-                    Tuple[int, rlsubjects.SubjectType],
-                    next(self._instance_generators[subject_name]))
+                _, self._subjects[subject_name] = next(
+                    self._instance_generators[subject_name])  # type: ignore
 
             except StopIteration:
                 self._epochs[subject_name] += 1
                 if self._instance_generators[subject_name].is_terminated():
                     self._subjects[subject_name].reward.disable()
-                    # if self._instance_generators[subject_name].is_finite:
-                    #     self._subjects[subject_name].reward.disable()
-                    # else:
-                    #     _, self._subjects[subject_name] = cast(
-                    #         Tuple[int, rlsubjects.SubjectType],
-                    #         next(self._instance_generators[subject_name]))
                 else:
-                    _, self._subjects[subject_name] = cast(
-                        Tuple[int, rlsubjects.SubjectType],
-                        next(self._instance_generators[subject_name]))
+                    _, self._subjects[subject_name] = next(
+                        self._instance_generators[subject_name]
+                        )  # type: ignore
                 return False
         else:
             self._epochs[subject_name] += 1
@@ -537,7 +530,7 @@ class Environment(stateful.Stateful):
     def load(self,  # noqa: C901
              entity_name: Union[List[str], str] = 'all',
              filename: Optional[str] = None,
-             path: Optional[Union[pathlib.Path, str]] = None) -> None:
+             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Load an entity or an `environment` from a file.
 
@@ -561,8 +554,8 @@ class Environment(stateful.Stateful):
         if entity_name == 'all':
             super().load(filename=_filename, path=_path)
             self._instance_generators: Dict[str, EntityGenType] = {}
-            self._agents: Dict[str, rlagents.AgentType] = {}
-            self._subjects: Dict[str, rlsubjects.SubjectType] = {}
+            self._agents: Dict[str, Agent] = {}
+            self._subjects: Dict[str, Subject] = {}
 
             for name, obj_type in self._env_data['instance_generators']:
                 self._instance_generators[name] = obj_type.from_pickle(
@@ -571,16 +564,16 @@ class Environment(stateful.Stateful):
 
             for name, obj_type in self._env_data['agents']:
                 if name in self._instance_generators:
-                    self._agents[name] = \
-                        self._instance_generators[name]._object
+                    self._agents[name] = (  # type: ignore
+                        self._instance_generators[name]._object)
                 else:
                     self._agents[name] = obj_type.from_pickle(
                         path=(_path / f'{_filename}.agents'), filename=name)
 
             for name, obj_type in self._env_data['subjects']:
                 if name in self._instance_generators:
-                    self._subjects[name] = \
-                        self._instance_generators[name]._object
+                    self._subjects[name] = (  # type: ignore
+                        self._instance_generators[name]._object)
                 else:
                     self._subjects[name] = obj_type.from_pickle(
                         path=(_path / f'{_filename}.subjects'), filename=name)
@@ -606,9 +599,9 @@ class Environment(stateful.Stateful):
 
     def save(self,  # noqa: C901
              filename: Optional[str] = None,
-             path: Optional[Union[pathlib.Path, str]] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
              data_to_save: Union[List[str], str] = 'all'
-             ) -> Tuple[pathlib.Path, str]:
+             ) -> Tuple[pathlib.PurePath, str]:
         '''
         Save an entity or the `environment` to a file.
 

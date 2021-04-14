@@ -6,7 +6,7 @@ EndlessBuffer class
 A `Buffer` without size limit.
 '''
 
-from typing import Dict, List, Optional, cast
+from typing import Dict, List, Optional
 
 from reil.datatypes.buffers import Buffer, PickModes, T
 
@@ -74,8 +74,7 @@ class EndlessBuffer(Buffer[T]):
         '''
         super().reset()
         if self._buffer_names is not None:
-            self._buffer = cast(Dict[str, List[T]],
-                                {name: []
-                                 for name in self._buffer_names})
+            self._buffer = {name: []
+                            for name in self._buffer_names}
         else:
             self._buffer = None
