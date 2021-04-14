@@ -7,9 +7,10 @@ This class creates a board for players to play the mnk game.
 '''
 
 import math
+from reil.datatypes.feature import FeatureGenerator
 from typing import Any, Iterator, List, Optional, Tuple, Union, overload
 
-from reil.datatypes import ReilData
+from reil.datatypes import FeatureArray
 
 
 class MNKBoard:
@@ -43,6 +44,8 @@ class MNKBoard:
         self._k = k
         self._players = players
         self._can_recapture = can_recapture
+        self._board_state_gen = FeatureGenerator.numerical(
+            name='state', lower=0, upper=self._players)
         self.reset()
 
     @overload
@@ -95,9 +98,10 @@ class MNKBoard:
         '''
         ...
 
-    def set_piece(self, player: int, index: Optional[int] = None,
-                  row: Optional[int] = None, column: Optional[int] = None
-                  ) -> None:
+    def set_piece(  # type: ignore
+            self, player: int, index: Optional[int] = None,
+            row: Optional[int] = None, column: Optional[int] = None
+            ) -> None:
         '''
         Set a piece for a player.
 
@@ -182,9 +186,10 @@ class MNKBoard:
         '''
         ...
 
-    def clear_square(self, index: Optional[int] = None,
-                     row: Optional[int] = None, column: Optional[int] = None
-                     ) -> None:
+    def clear_square(  # type: ignore
+            self, index: Optional[int] = None,
+            row: Optional[int] = None, column: Optional[int] = None
+            ) -> None:
         '''
         Set a piece for a player.
 
@@ -223,10 +228,8 @@ class MNKBoard:
 
     @property
     def board_state(self):
-        ''' Return the state of the board as a ReilData.'''
-        return ReilData.single_numerical(
-            name='state', value=tuple(self._board),
-            lower=0, upper=self._players)
+        ''' Return the state of the board as a FeatureArray.'''
+        return FeatureArray(self._board_state_gen(tuple(self._board)))
 
     def get_board(self,
                   as_list: bool = True) -> Union[List[int], List[List[int]]]:

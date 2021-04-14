@@ -17,7 +17,7 @@ Classes
 -------
 ActionGenerator:
     A class that accepts categorical and numerical components, and
-    generates lists of actions as `ReilData` objects.
+    generates lists of actions as `FeatureArray` objects.
 
 InstanceGenerator:
     Accepts any object derived from `ReilBase`, and generates instances.

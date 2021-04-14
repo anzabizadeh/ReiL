@@ -8,7 +8,7 @@ The base class of all stateful classes in `reil` package.
 Methods
 -------
 state:
-    the state of the entity (`agent` or `subject`) as an ReilData. Different
+    the state of the entity (`agent` or `subject`) as a FeatureArray. Different
     state definitions can be introduced using `state.add_definition` method.
     _id is available, in case in the implementation, state is caller-dependent.
     (For example in games with partial map visibility).
@@ -36,18 +36,19 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from reil.datatypes import Feature
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from reil import reilbase
-from reil.datatypes import PrimaryComponent, ReilData, SubComponentInfo
+from reil.datatypes import PrimaryComponent, FeatureArray, SubComponentInfo
 from reil.datatypes.components import Statistic
 
 
 @dataclasses.dataclass
 class Observation:
-    state: Optional[ReilData] = None
-    action: Optional[ReilData] = None
-    reward: Optional[ReilData] = None
+    state: Optional[FeatureArray] = None
+    action: Optional[FeatureArray] = None
+    reward: Optional[FeatureArray] = None
 
 
 History = List[Observation]
@@ -128,7 +129,7 @@ class EntityRegister:
             raise ValueError('Capacity is reached. No new entities can be'
                              ' registered.')
 
-        new_id = cast(int, _id)
+        new_id = int(_id)  # type: ignore
         if self._unique_entities:
             if entity_name in self._entity_list:
                 current_id = self._id_list[
@@ -205,11 +206,11 @@ class Stateful(reilbase.ReilBase):
                                            unique_entities=unique_entities)
 
     def _default_state_definition(
-            self, _id: Optional[int] = None) -> ReilData:
-        return ReilData.single_base(name='default_state', value=None)
+            self, _id: Optional[int] = None) -> FeatureArray:
+        return FeatureArray(Feature(name='default_state'))
 
     def _default_statistic_definition(
-            self, _id: Optional[int] = None) -> Tuple[ReilData, float]:
+            self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
         return (self._default_state_definition(_id), 0.0)
 
     def _extract_sub_components(self) -> Dict[str, SubComponentInfo]:
@@ -329,7 +330,7 @@ class Stateful(reilbase.ReilBase):
         self._entity_list.remove(entity_id)
 
     def load(self, filename: str,
-             path: Optional[Union[str, pathlib.Path]]) -> None:
+             path: Optional[Union[str, pathlib.PurePath]]) -> None:
 
         super().load(filename, path=path)
 
@@ -342,9 +343,9 @@ class Stateful(reilbase.ReilBase):
 
     def save(self,
              filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.Path]] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
              data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.Path, str]:
+             ) -> Tuple[pathlib.PurePath, str]:
 
         object_ref_temp, self.state.object_ref = self.state.object_ref, None
         state_default, self.state._default = self.state._default, None

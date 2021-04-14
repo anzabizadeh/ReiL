@@ -11,21 +11,21 @@ import random
 from typing import Iterable, Tuple
 
 import numpy as np
-from reil.datatypes import Feature
+from reil.datatypes import FeatureGenerator
 from scipy import stats
 
 
-def random_truncated_normal(f: Feature) -> float:
+def random_truncated_normal(f: FeatureGenerator) -> float:
     return min(max(
         np.random.normal(f.mean, f.stdev), f.lower),
         f.upper)
 
 
-def random_uniform(f: Feature):
+def random_uniform(f: FeatureGenerator):
     return np.random.uniform(f.lower, f.upper)
 
 
-def random_categorical(f: Feature):
+def random_categorical(f: FeatureGenerator):
     if f.probabilities is None:
         return random.choice(f.categories)  # type:ignore
     else:
@@ -33,15 +33,19 @@ def random_categorical(f: Feature):
             f.categories, 1, p=f.probabilities)[0]
 
 
-def random_truncated_lnorm(f: Feature) -> float:
+def random_truncated_lnorm(f: FeatureGenerator) -> float:
     # capture 50% of the data.
     # This restricts the log values to a "reasonable" range
-    quartileRange = (0.25, 0.75)
-    lnorm = stats.lognorm(f.stdev, scale=math.exp(f.mean))  # type:ignore
-    qValues = lnorm.ppf(quartileRange)
-    values = list(v for v in lnorm.rvs(size=1000)
-                  if (v > qValues[0]) & (v < qValues[1]))
-    return random.sample(values, 1)[0]
+    if f.randomized:
+        quartileRange = (0.25, 0.75)
+        lnorm = stats.lognorm(f.stdev, scale=math.exp(f.mean))  # type:ignore
+        qValues = lnorm.ppf(quartileRange)
+        values = list(v for v in lnorm.rvs(size=1000)
+                      if (v > qValues[0]) & (v < qValues[1]))
+
+        return random.sample(values, 1)[0]
+
+    return math.exp(f.mean + (f.stdev ** 2)/2)
 
 
 def square_dist(x: float, y: Iterable[float]) -> float:

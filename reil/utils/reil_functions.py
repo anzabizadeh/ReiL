@@ -5,7 +5,7 @@ import functools
 from collections import namedtuple
 from typing import Any, List, Optional, Tuple
 
-from reil.datatypes import ReilData
+from reil.datatypes import FeatureArray
 from reil.utils import functions
 
 # SOME THOUGHTS!
@@ -32,7 +32,7 @@ class ReilFunction:
         if not isinstance(self.arguments, Arguments):
             self.arguments = Arguments(*self.arguments)  # type: ignore
 
-    def __call__(self, args: ReilData) -> float:
+    def __call__(self, args: FeatureArray) -> float:
         temp = args.value
         y = temp[self.arguments.y]
         x = temp[self.arguments.x] if self.arguments.x is not None else None
