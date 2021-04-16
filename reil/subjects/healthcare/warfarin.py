@@ -6,13 +6,14 @@ warfarin class
 This `warfarin` class implements a two compartment PK/PD model for warfarin.
 '''
 
-import pathlib
-from reil.datatypes.feature import Feature, FeatureGenerator
-from typing import Any, List, Optional, Tuple, Union
+import functools
+import itertools
+from typing import Any, List, Optional, Tuple
 
 from reil.datatypes import FeatureArray
+from reil.datatypes.feature import Feature, FeatureGenerator
 from reil.subjects import Subject, healthcare
-from reil.utils import action_generator, reil_functions
+from reil.utils import reil_functions
 
 
 class Warfarin(Subject):
@@ -22,7 +23,8 @@ class Warfarin(Subject):
 
     def __init__(self,
                  patient: healthcare.Patient,
-                 action_generator: action_generator.ActionGenerator,
+                 dose_range: Tuple[float, float] = (0.0, 15.0),
+                 interval_range: Tuple[int, int] = (1, 28),
                  max_day: int = 90,
                  **kwargs: Any):
         '''
@@ -54,53 +56,42 @@ class Warfarin(Subject):
         if not self._patient:
             return
 
-        if 'dose' not in action_generator.components:
-            raise ValueError(
-                'action_generator should have a "dose" component.')
-        if 'interval' not in action_generator.components:
-            raise ValueError(
-                'action_generator should have an "interval" component.')
+        self._dose_range = dose_range
+        self._interval_range = interval_range
 
-        self._action_generator = action_generator
         self._max_day = max_day
 
-        self._generate_definitions()
+        self.feature_gen_set = {
+            name: FeatureGenerator.numerical(
+                name=name, lower=lower, upper=upper)
+            for name, lower, upper in (
+                ('INR_history', 0.0, 15.0),
+                ('daily_INR_history', 0.0, 15.0),
+                ('dose_history', *self._dose_range),
+                ('daily_dose_history', *self._dose_range),
+                ('interval_history', *self._interval_range),
+                ('dose', *self._dose_range),
+                ('interval', *self._interval_range),
+                ('day', 0, self._max_day - 1)
+            )
+        }
+
+        self._generate_state_defs()
+        self._generate_reward_defs()
+        self._generate_statistic_defs()
+        self._generate_action_defs()
 
         self.reset()
 
-    def _generate_definitions(self):
+    def _generate_state_defs(self):
         patient_basic = (('age', {}), ('CYP2C9', {}),
                          ('VKORC1', {}), ('sensitivity', {}))
         patient_extra = (('weight', {}), ('height', {}),
                          ('gender', {}), ('tobaco', {}),
                          ('amiodarone', {}), ('fluvastatin', {}))
 
-        reward_sq_dist = reil_functions.NormalizedSquareDistance(
-            name='sq_dist', arguments=('daily_INR_history',),  # type: ignore
-            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
-            center=2.5, band_width=1.0, exclude_first=True)
-
-        reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
-            name='sq_dist_interpolation',
-            arguments=('INR_history', 'interval_history'),  # type: ignore
-            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
-            center=2.5, band_width=1.0, exclude_first=True)
-
-        reward_PTTR = reil_functions.PercentInRange(
-            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
-            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
-            acceptable_range=(2, 3), exclude_first=True)
-
-        reward_PTTR_interpolation = reil_functions.PercentInRange(
-            name='PTTR',
-            arguments=('INR_history', 'interval_history'),  # type: ignore
-            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
-            acceptable_range=(2, 3), exclude_first=True)
-
-        statistic_PTTR = reil_functions.PercentInRange(
-            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
-            length=-1, multiplier=1.0, retrospective=True, interpolate=False,
-            acceptable_range=(2, 3), exclude_first=True)
+        self.state.add_definition('day',
+                                  ('day', {}))
 
         self.state.add_definition('patient_basic',
                                   *patient_basic)
@@ -144,6 +135,29 @@ class Warfarin(Subject):
         self.state.add_definition('INR_within_2',
                                   ('daily_INR_history', {'length': -1}))
 
+    def _generate_reward_defs(self):
+        reward_sq_dist = reil_functions.NormalizedSquareDistance(
+            name='sq_dist', arguments=('daily_INR_history',),  # type: ignore
+            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=True)
+
+        reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
+            name='sq_dist_interpolation',
+            arguments=('INR_history', 'interval_history'),  # type: ignore
+            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+            center=2.5, band_width=1.0, exclude_first=True)
+
+        reward_PTTR = reil_functions.PercentInRange(
+            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
+            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+            acceptable_range=(2, 3), exclude_first=True)
+
+        reward_PTTR_interpolation = reil_functions.PercentInRange(
+            name='PTTR',
+            arguments=('INR_history', 'interval_history'),  # type: ignore
+            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+            acceptable_range=(2, 3), exclude_first=True)
+
         self.reward.add_definition(
             'no_reward', lambda _: 0.0, 'Measured_INR_2')
 
@@ -160,54 +174,103 @@ class Warfarin(Subject):
         self.reward.add_definition(
             'PTTR_interpolation', reward_PTTR_interpolation, 'Measured_INR_2')
 
+    def _generate_statistic_defs(self):
+        statistic_PTTR = reil_functions.PercentInRange(
+            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
+            length=-1, multiplier=1.0, retrospective=True, interpolate=False,
+            acceptable_range=(2, 3), exclude_first=True)
+
         self.statistic.add_definition(
             'PTTR_exact_basic', statistic_PTTR, 'daily_INR', 'patient_basic')
 
         self.statistic.add_definition(
             'PTTR_exact', statistic_PTTR, 'daily_INR', 'patient')
 
-        lows = self._action_generator.lower
-        highs = self._action_generator.upper
-        self.feature_gen_set = {
-            name: FeatureGenerator.numerical(
-                name=name, lower=lower, upper=upper)
-            for name, lower, upper in (
-                ('INR_history', 0.0, 15.0),
-                ('daily_INR_history', 0.0, 15.0),
-                ('dose_history', lows['dose'], highs['dose']),
-                ('daily_dose_history', lows['dose'], highs['dose']),
-                ('interval_history', lows['interval'], highs['interval']),
-                ('day', 0, self._max_day - 1)
+    def _generate_action_defs(self):
+
+        dose_gen = self.feature_gen_set['dose']
+        interval_gen = self.feature_gen_set['interval']
+
+        def _actions(dose_values, interval_values):
+            actions = itertools.product(
+                (dose_gen(vi)
+                 for vi in dose_values),
+                (interval_gen(vi)
+                 for vi in interval_values)
             )
-        }
+
+            return tuple(FeatureArray(a) for a in actions)
+
+        caps = (5, 10, 15)
+        dose = {cap: tuple(self.generate_dose_values(0.0, cap, 0.5))
+                for cap in caps}
+
+        int_fixed = {i: (i,) for i in (1, 2, 3, 7)}
+        int_weekly = (7, 14, 21, 28)
+        int_free = tuple(range(1, 28))
+
+        dose_int_fixed = {(d[0], i[0]): _actions(d[1], i[1])
+                          for d, i in itertools.product(
+                              dose.items(), int_fixed.items())
+                          }
+
+        dose_int_free = {k: _actions(v, int_free)
+                         for k, v in dose.items()}
+
+        dose_int_weekly = {k: _actions(v, int_weekly)
+                           for k, v in dose.items()}
+
+        def _237(f: FeatureArray, cap):
+            day = f['day'].value
+            if day == 0:
+                return dose_int_fixed[cap, 2]
+            elif day == 2:
+                return dose_int_fixed[15, 3]
+            elif day >= 5:
+                return dose_int_fixed[15, 7]
+            else:
+                raise ValueError(f'Wrong day: {day}.')
+
+        for cap in caps:
+            self.possible_actions.add_definition(
+                f'daily_{cap:02}', lambda _: dose_int_fixed[cap, 1], 'day')
+
+            self.possible_actions.add_definition(
+                f'237_{cap:02}', functools.partial(_237, cap=cap), 'day')
+
+            self.possible_actions.add_definition(
+                f'free_{cap:02}', lambda _: dose_int_free[cap], 'day')
+
+            self.possible_actions.add_definition(
+                f'weekly_{cap:02}', lambda _: dose_int_weekly[cap], 'day')
 
     @classmethod
     def _empty_instance(cls):
         return cls(None, None)  # type: ignore
 
     @staticmethod
-    def generate_dose_actions(min_dose: float = 0.0,
-                              max_dose: float = 15.0,
-                              dose_increment: float = 0.5) -> List[float]:
+    def generate_dose_values(min_dose: float = 0.0,
+                             max_dose: float = 15.0,
+                             dose_increment: float = 0.5) -> List[float]:
 
         return list(min_dose + x * dose_increment
                     for x in range(
                         int((max_dose - min_dose)/dose_increment) + 1))
 
     @staticmethod
-    def generate_interval_actions(min_interval: int = 1,
-                                  max_interval: int = 28,
-                                  interval_increment: int = 1) -> List[int]:
+    def generate_interval_values(min_interval: int = 1,
+                                 max_interval: int = 28,
+                                 interval_increment: int = 1) -> List[int]:
 
         return list(range(min_interval, max_interval, interval_increment))
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         return self._day >= self._max_day
 
-    def possible_actions(
-            self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
-        return self._action_generator.possible_actions(
-            self.state('default', _id))
+    # def possible_actions(
+    #         self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
+    #     return self._action_generator.possible_actions(
+    #         self.state('default', _id))
 
     def take_effect(self,
                     action: FeatureArray,
@@ -371,15 +434,15 @@ class Warfarin(Subject):
         intervals = self._get_history('interval_history', length).value
         return self._get_history('daily_INR', sum(intervals))  # type: ignore
 
-    def load(self, filename: str,
-             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
-        '''
-        Extends super class's method to make sure 'action_generator' resets if
-        it is part of the 'persistent_attributes'.
-        '''
-        super().load(filename, path)
-        if '_action_generator' in self._persistent_attributes:
-            self._action_generator.reset()
+    # def load(self, filename: str,
+    #          path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    #     '''
+    #     Extends super class's method to make sure 'action_generator' resets
+    #     if it is part of the 'persistent_attributes'.
+    #     '''
+    #     super().load(filename, path)
+    #     if '_action_generator' in self._persistent_attributes:
+    #         self._action_generator.reset()
 
     def __repr__(self) -> str:
         try:

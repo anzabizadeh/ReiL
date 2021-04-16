@@ -41,9 +41,19 @@ class Subject(stateful.Stateful):
             default_definition=self._default_reward_definition,
             enabled=False)
 
+        self.possible_actions = SecondayComponent(
+            name='action',
+            primary_component=self.state,
+            default_definition=self._default_action_definition,
+            enabled=True)
+
     def _default_reward_definition(
             self, _id: Optional[int] = None) -> float:
         return 0.0
+
+    def _default_action_definition(
+            self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
+        return (FeatureArray(Feature(name='default_action')),)
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''
@@ -65,21 +75,21 @@ class Subject(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    def possible_actions(self, _id: int = 0) -> Tuple[FeatureArray, ...]:
-        '''
-        Generate the list of possible actions.
+    # def possible_actions(self, _id: int = 0) -> Tuple[FeatureArray, ...]:
+    #     '''
+    #     Generate the list of possible actions.
 
-        Arguments
-        ---------
-        _id:
-            ID of the `agent` that wants to act on the `subject`.
+    #     Arguments
+    #     ---------
+    #     _id:
+    #         ID of the `agent` that wants to act on the `subject`.
 
-        Returns
-        -------
-        :
-            A list of possible actions for the `agent` with ID=_id.
-        '''
-        return (FeatureArray(Feature(name='default_action')),)
+    #     Returns
+    #     -------
+    #     :
+    #         A list of possible actions for the `agent` with ID=_id.
+    #     '''
+    #     return (FeatureArray(Feature(name='default_action')),)
 
     def take_effect(self, action: FeatureArray, _id: int = 0) -> None:
         '''

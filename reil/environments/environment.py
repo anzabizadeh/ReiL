@@ -203,6 +203,7 @@ class Environment(stateful.Stateful):
             agent_observer: Generator[Union[FeatureArray, None], Any, None],
             subject_instance: Subject,
             state_name: str,
+            action_name: str,
             reward_function_name: str,
             epoch: int) -> None:
         '''
@@ -225,6 +226,9 @@ class Environment(stateful.Stateful):
 
         state_name:
             A string that specifies the state definition.
+
+        action_name:
+            A string that specifies the action definition.
 
         reward_function_name:
             A string that specifies the reward function definition.
@@ -250,7 +254,8 @@ class Environment(stateful.Stateful):
             name=reward_function_name, _id=agent_id))
 
         state = subject_instance.state(name=state_name, _id=agent_id)
-        possible_actions = subject_instance.possible_actions(agent_id)
+        possible_actions = subject_instance.possible_actions(
+            name=action_name, _id=agent_id)
         if possible_actions:
             action = agent_observer.send({'state': state,
                                           'actions': possible_actions,
@@ -264,6 +269,7 @@ class Environment(stateful.Stateful):
             agent_observer: Generator[Union[FeatureArray, None], Any, None],
             subject_instance: Subject,
             state_name: str,
+            action_name: str,
             reward_function_name: str,
             epoch: int,
             times: int = 1) -> None:
@@ -287,6 +293,9 @@ class Environment(stateful.Stateful):
 
         state_name:
             A string that specifies the state definition.
+
+        action_name:
+            A string that specifies the action definition.
 
         reward_function_name:
             A string that specifies the reward function definition.
@@ -312,7 +321,8 @@ class Environment(stateful.Stateful):
         '''
         for _ in range(times):
             cls.interact_once(agent_id, agent_observer, subject_instance,
-                              state_name, reward_function_name, epoch)
+                              state_name, action_name, reward_function_name,
+                              epoch)
 
     @classmethod
     def interact_while(
@@ -321,6 +331,7 @@ class Environment(stateful.Stateful):
             agent_observer: Generator[Union[FeatureArray, None], Any, None],
             subject_instance: Subject,
             state_name: str,
+            action_name: str,
             reward_function_name: str,
             epoch: int) -> None:
         '''
@@ -340,6 +351,9 @@ class Environment(stateful.Stateful):
 
         state_name:
             A string that specifies the state definition.
+
+        action_name:
+            A string that specifies the action definition.
 
         reward_function_name:
             A string that specifies the reward function definition.
@@ -361,7 +375,8 @@ class Environment(stateful.Stateful):
         '''
         while not subject_instance.is_terminated(agent_id):
             cls.interact_once(agent_id, agent_observer, subject_instance,
-                              state_name, reward_function_name, epoch)
+                              state_name, action_name, reward_function_name,
+                              epoch)
 
     def assert_protocol(self, protocol: InteractionProtocol) -> None:
         '''

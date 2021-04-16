@@ -109,6 +109,7 @@ class EnvironmentStaticMap(Environment):
             a_s_name = (agent_name, subject_name)
             unit = protocol.unit
             state_name = protocol.state_name
+            action_name = protocol.action_name
             reward_function_name = protocol.reward_function_name
             agent_id, _ = self._assignment_list[a_s_name]
 
@@ -119,6 +120,7 @@ class EnvironmentStaticMap(Environment):
                         agent_observer=self._agent_observers[a_s_name],
                         subject_instance=self._subjects[subject_name],
                         state_name=state_name,
+                        action_name=action_name,
                         reward_function_name=reward_function_name,
                         epoch=self._epochs[subject_name])
                 else:
@@ -127,6 +129,7 @@ class EnvironmentStaticMap(Environment):
                         agent_observer=self._agent_observers[a_s_name],
                         subject_instance=self._subjects[subject_name],
                         state_name=state_name,
+                        action_name=action_name,
                         reward_function_name=reward_function_name,
                         epoch=self._epochs[subject_name],
                         times=protocol.n)
@@ -142,6 +145,7 @@ class EnvironmentStaticMap(Environment):
                     agent_observer=self._agent_observers[a_s_name],
                     subject_instance=self._subjects[subject_name],
                     state_name=state_name,
+                    action_name=action_name,
                     reward_function_name=reward_function_name,
                     epoch=self._epochs[subject_name])
 
@@ -153,6 +157,7 @@ class EnvironmentStaticMap(Environment):
                             agent_observer=self._agent_observers[a_s_name],
                             subject_instance=self._subjects[subject_name],
                             state_name=state_name,
+                            action_name=action_name,
                             reward_function_name=reward_function_name,
                             epoch=self._epochs[subject_name])
 
