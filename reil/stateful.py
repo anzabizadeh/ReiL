@@ -129,7 +129,7 @@ class EntityRegister:
             raise ValueError('Capacity is reached. No new entities can be'
                              ' registered.')
 
-        new_id = int(_id)  # type: ignore
+        # new_id = int(_id)  # type: ignore
         if self._unique_entities:
             if entity_name in self._entity_list:
                 current_id = self._id_list[
@@ -140,14 +140,14 @@ class EntityRegister:
                     raise ValueError(
                         f'{entity_name} is already registered with '
                         f'ID: {current_id}.')
-            elif _id is None:
-                new_id = max(self._id_list, default=0) + 1
+            # elif _id is None:
+            #     new_id = max(self._id_list, default=0) + 1
             elif _id in self._id_list:
                 raise ValueError(f'{_id} is already taken.')
             # else:
             #     new_id = _id
-        elif _id is None:
-            new_id = max(self._id_list, default=0) + 1
+        # elif _id is None:
+        #     new_id = max(self._id_list, default=0) + 1
         elif _id in self._id_list:
             current_entity = self._entity_list[
                 self._id_list.index(_id)]
@@ -157,6 +157,8 @@ class EntityRegister:
                 raise ValueError(f'{_id} is already taken.')
         # else:
         #     new_id = _id
+
+        new_id = _id or max(self._id_list, default=0) + 1
 
         self._entity_list.append(entity_name)
         self._id_list.append(new_id)
