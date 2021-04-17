@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Union
 
 import numpy as np
 from reil.datatypes import Feature
-from reil.subjects.healthcare.mathematical_models import HealthMathModel
+from reil.healthcare.mathematical_models import HealthMathModel
 
 DoseEffect = namedtuple('DoseEffect', ['dose', 'Cs'])
 

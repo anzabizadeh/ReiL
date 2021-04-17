@@ -1,0 +1,204 @@
+# -*- coding: utf-8 -*-
+'''
+WarfarinAgent class
+===================
+
+An agent for warfarin modeling based on the protocols defined
+in Ravvaz et al (2017).
+'''
+
+from typing import Any, Optional, Tuple
+
+from reil import agents
+from reil.datatypes import FeatureArray
+from reil.datatypes.feature import FeatureGenerator
+from reil.healthcare.dosing_protocols.warfarin import (AAA, CAA, PGAA, PGPGA,
+                                                       PGPGI)
+from typing_extensions import Literal
+
+
+class WarfarinAgent(agents.NoLearnAgent):
+    '''
+    An `agent` that prescribes dose for a warfarin `subject`,
+    based on the dosing protocols defined in Ravvaz et al (2017).
+    '''
+
+    def __init__(self,
+                 study_arm: Literal['aaa', 'caa', 'pgaa',
+                                    'pgpgi', 'pgpga'] = 'aaa',
+                 **kwargs: Any):
+        '''
+        Arguments
+        ---------
+        study_arm:
+            One of available study arms: aaa, caa, pgaa, pgpgi, pgpga
+        '''
+        super().__init__(**kwargs)
+
+        if study_arm.lower() in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
+            self._protocol = AAA()
+        elif study_arm.lower() in ['caa', 'ravvaz caa', 'ravvaz_caa']:
+            self._protocol = CAA()
+        elif study_arm.lower() in ['pgaa', 'ravvaz pgaa', 'ravvaz_pgaa']:
+            self._protocol = PGAA()
+        elif study_arm.lower() in ['pgpgi', 'ravvaz pgpgi', 'ravvaz_pgpgi']:
+            self._protocol = PGPGI()
+        elif study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
+            self._protocol = PGPGA()
+
+        self._dose_gen = FeatureGenerator.numerical(
+                name='dose', lower=0.0, upper=15.0)
+        self._interval_gen = FeatureGenerator(
+                name='interval', lower=1, upper=28)
+
+    def act(self,
+            state: FeatureArray,
+            actions: Optional[Tuple[FeatureArray, ...]] = None,
+            epoch: Optional[int] = 0) -> FeatureArray:
+        '''
+        Generate the dosing `action` based on the `state` and current dosing
+        protocol.
+
+        Arguments
+        ---------
+        state:
+            The state for which the action should be returned.
+
+        actions:
+            The set of possible actions to choose from.
+
+        epoch:
+            The epoch in which the agent is acting.
+
+        Returns
+        -------
+        :
+            The action
+        '''
+        patient = state.value
+        patient['day'] += 1
+
+        dose, interval = self._protocol.prescribe(patient)
+
+        # Cuts out the dose if it is >15.0
+        return FeatureArray([
+            self._dose_gen(min(dose, 15.0)),
+            self._interval_gen(min(interval, 28))
+        ])
+
+    def reset(self):
+        '''Resets the agent at the end of a learning epoch.'''
+        self._protocol.reset()
+
+    def __repr__(self) -> str:
+        try:
+            return super().__repr__() + f' arm: {self._protocol}'
+        except NameError:
+            return super().__repr__()
+
+# Implementation that matches RAVVAZ dataset.
+# -------------------------------------------
+#
+# def aurora(self, patient: Dict[str, Any]) -> float:
+#     if self._red_flag:
+#         if self._retest_day > patient['day']:
+#             return_value = 0.0
+#         elif patient['INRs'][-1] > 3.0:
+#             self._retest_day = patient['day'] + 2
+#             return_value = 0.0
+#         else:
+#             self._red_flag = False
+#             self._retest_day = patient['day'] + 7
+#             return_value = self._dose
+#         return return_value
+
+#     next_test = 2
+#     if patient['day'] <= 2:
+#         self._dose = 10.0 if patient['age'] < 65.0 else 5.0
+#     elif patient['day'] <= 4:
+#         day_2_INR = (patient['INRs'][-1] if patient['day'] == 3
+#                      else patient['INRs'][-2])
+#         if day_2_INR >= 2.0:
+#             self._dose = 5.0
+#             if day_2_INR <= 3.0:
+#                 self._early_therapeutic = True
+
+#             self._number_of_stable_days, next_test = \
+#                 self._aurora_retesting_table(patient['INRs'][-1],
+#                                              self._number_of_stable_days,
+#                                              self._early_therapeutic)
+#         else:
+#             self._dose, next_test, _, _ = self._aurora_dosing_table(
+#                 day_2_INR, self._dose)
+#     else:
+#         self._number_of_stable_days, next_test = \
+#             self._aurora_retesting_table(
+#               patient['INRs'][-1],
+#               self._number_of_stable_days,
+#               self._early_therapeutic)
+
+#     if next_test == -1:
+# #         self._early_therapeutic = False
+#         self._number_of_stable_days = 0
+#         self._dose, next_test, self._skip_dose, self._red_flag = \
+#           self._aurora_dosing_table(patient['INRs'][-1], self._dose)
+
+#     self._retest_day = patient['day'] + next_test
+
+#     return self._dose if self._skip_dose == 0 else 0.0
+
+# def _aurora_dosing_table(self,
+#     current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
+#     skip_dose = 0
+#     red_flag = False
+#     if current_INR < 1.50:
+#         dose = dose * 1.15
+#         next_test = 7
+#     elif current_INR < 1.80:
+#         dose = dose * 1.10
+#         next_test = 7
+#     elif current_INR < 2.00:
+#         dose = dose * 1.075
+#         next_test = 7
+#     elif current_INR <= 3.00:
+#         next_test = 28
+#     elif current_INR < 3.40:
+#         dose = dose * 0.925
+#         next_test = 7
+#     elif current_INR < 4.00:
+#         dose = dose * 0.9
+#         next_test = 7
+#     elif current_INR <= 5.00:
+#         skip_dose = 1  # 2
+#         dose = dose * 0.875
+#         next_test = 7
+#     else:
+#         red_flag = True
+#         next_test = 2
+#         dose = dose * 0.85
+
+#     return dose, next_test, skip_dose, red_flag
+
+# def _aurora_retesting_table(self,
+#   current_INR: float, number_of_stable_days: int,
+#   early_therapeutic: bool = False) -> Tuple[int, int]:
+#     # next_test = {0: 1, 1: 1, 2: 5, 7: 7, 14: 14, 28: 28}
+#     # NOTE: When patient gets into the range early on
+#     #      (before the maintenance period), we have 1: 2,
+#     # but when patient is in maintenance,\
+#     # we have 1: 6. I track the former in the main aurora method.
+
+#     if early_therapeutic:
+#         next_test = {0: 1, 1: 2, 3: 4, 7: 6, 13: 6, 19: 13, 32: 27}
+#         max_gap = 32
+#     else:
+#         next_test = {0: 1, 1: 6, 7: 6, 13: 13, 26: 27}
+#         max_gap = 26
+#     if 2.0 <= current_INR <= 3.0:
+#         number_of_stable_days = min(
+#             number_of_stable_days + next_test[number_of_stable_days],
+#             max_gap)
+#     else:
+#         return -1, -1
+
+#     return number_of_stable_days, next_test[number_of_stable_days]

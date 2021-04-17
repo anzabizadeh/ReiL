@@ -27,9 +27,6 @@ UserAgent
     an agent that shows current state and asks for user's choice
     of action
 
-WarfarinAgent
-    an agent based on Ravvaz et al (2016) paper for Warfarin Dosing
-
 Types
 -----
 TrainingData
@@ -43,4 +40,3 @@ from .q_learning import QLearning  # noqa: W0611
 from .deep_q_learning import DeepQLearning  # noqa: W0611
 from .random_agent import RandomAgent  # noqa: W0611
 from .user_agent import UserAgent  # noqa: W0611
-from .warfarin_agent import WarfarinAgent  # noqa: W0611

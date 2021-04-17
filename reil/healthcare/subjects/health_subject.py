@@ -10,7 +10,8 @@ from typing import Any, List, Optional, Tuple
 
 from reil.datatypes import FeatureArray
 from reil.datatypes.feature import Feature, FeatureGenerator
-from reil.subjects import Subject, healthcare
+from reil.subjects import Subject
+from reil.healthcare import Patient
 
 
 class HealthSubject(Subject):
@@ -19,7 +20,7 @@ class HealthSubject(Subject):
     '''
 
     def __init__(self,
-                 patient: healthcare.Patient,
+                 patient: Patient,
                  measurement_name: str,
                  measurement_range: Tuple[float, float],
                  dose_range: Tuple[float, float],

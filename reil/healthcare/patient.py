@@ -9,7 +9,7 @@ This class is the base class to model patients with different characteristics.
 from typing import Any, Dict
 
 from reil.datatypes import Feature, FeatureGenerator
-from reil.subjects.healthcare.mathematical_models import HealthMathModel
+from reil.healthcare.mathematical_models import HealthMathModel
 
 
 class Patient:

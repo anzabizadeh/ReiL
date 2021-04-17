@@ -12,9 +12,9 @@ from typing import Any, Optional, Tuple
 
 from reil.datatypes import FeatureArray
 from reil.datatypes.feature import Feature
-from reil.subjects import healthcare
+from reil.healthcare import Patient
+from reil.healthcare.subjects import HealthSubject
 from reil.utils import reil_functions
-from reil.subjects.healthcare import HealthSubject
 
 
 class Warfarin(HealthSubject):
@@ -23,7 +23,7 @@ class Warfarin(HealthSubject):
     '''
 
     def __init__(self,
-                 patient: healthcare.Patient,
+                 patient: Patient,
                  INR_range: Tuple[float, float] = (0.0, 15.0),
                  dose_range: Tuple[float, float] = (0.0, 15.0),
                  interval_range: Tuple[int, int] = (1, 28),

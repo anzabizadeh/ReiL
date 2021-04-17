@@ -27,8 +27,8 @@ import math
 from typing import Any
 
 from reil.datatypes import FeatureGenerator
-from reil.subjects.healthcare import Patient
-from reil.subjects.healthcare.mathematical_models import HealthMathModel
+from reil.healthcare import Patient
+from reil.healthcare.mathematical_models import HealthMathModel
 from reil.utils.functions import (random_categorical, random_truncated_lnorm,
                                   random_truncated_normal)
 
