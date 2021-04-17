@@ -261,14 +261,11 @@ class Stateful(reilbase.ReilBase):
         'new valuenew valuenew value'}
         '''
         sub_comp_list = {}
-        for func_name, func in self.__class__.__dict__.items():
-            if callable(func) and func_name[:10] == '_sub_comp_':
+        for func_name, func in ((f, getattr(self, f).__func__)
+                                for f in dir(self)
+                                if f.startswith('_sub_comp_')):
+            if callable(func):
                 keywords = list(func.__code__.co_varnames)
-                # if 'self' in keywords:
-                #     keywords.remove('self')
-                #     f = functools.partial(v, self)
-                # else:
-                #     f = v
 
                 if 'kwargs' in keywords:
                     keywords.remove('kwargs')
