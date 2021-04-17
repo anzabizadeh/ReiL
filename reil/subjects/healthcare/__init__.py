@@ -25,6 +25,5 @@ Warfarin:
 
 from .patient import Patient  # noqa: W0611
 from .patient_warfarin_ravvaz import PatientWarfarinRavvaz  # noqa: W0611
-# from .cancer_model import CancerModel  # noqa: W0611
-# from .constrained_cancer_model import ConstrainedCancerModel  # noqa: W0611
+from .health_subject import HealthSubject  # noqa: W0611
 from .warfarin import Warfarin  # noqa: W0611
