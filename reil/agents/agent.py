@@ -274,6 +274,12 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
         if subject_id not in self._entity_list:
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
+        trigger = self._training_trigger
+        trigger_on_state = trigger == 'state'
+        trigger_on_action = trigger == 'action'
+        trigger_on_reward = trigger == 'reward'
+        trigger_on_termination = trigger == 'termination'
+
         history: stateful.History = []
         new_observation = stateful.Observation()
         while True:
@@ -284,7 +290,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                 actions: Tuple[FeatureArray, ...] = temp['actions']
                 epoch: int = temp['epoch']
 
-                if self._training_trigger == 'state':
+                if trigger_on_state:
                     self.learn([history[-1], new_observation])
 
                 if actions is not None:
@@ -293,14 +299,14 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                         subject_id=subject_id,
                         actions=actions, epoch=epoch)
 
-                    if self._training_trigger == 'action':
+                    if trigger_on_action:
                         self.learn([history[-1], new_observation])
 
                     new_observation.reward = (yield new_observation.action)
 
                     history.append(new_observation)
 
-                    if self._training_trigger == 'reward':
+                    if trigger_on_reward:
                         self.learn(history[-2:])
                 else:
                     yield
@@ -309,7 +315,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                 if new_observation.reward is None:  # terminated early!
                     history.append(new_observation)
 
-                if self._training_trigger == 'termination':
+                if trigger_on_termination:
                     self.learn(history)
 
                 if stat_name is not None:
