@@ -9,6 +9,7 @@ This `HealthSubject` class implements interaction with patients.
 from typing import Any, List, Optional, Tuple
 
 from reil.datatypes import FeatureArray
+from reil.datatypes import feature
 from reil.datatypes.feature import Feature, FeatureGenerator
 from reil.subjects import Subject
 from reil.healthcare import Patient
@@ -184,7 +185,10 @@ class HealthSubject(Subject):
     def _numerical_sub_comp(self, name):
         return self._patient.feature_set[name]
 
-    def _categorical_sub_comp(self, name):
+    def _categorical_sub_comp(self, name, missing=False):
+        if missing:
+            self._patient.feature_gen_set[name](feature.MISSING)
+
         return self._patient.feature_set[name]
 
     def _get_history(

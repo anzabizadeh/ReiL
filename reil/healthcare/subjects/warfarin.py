@@ -70,6 +70,9 @@ class Warfarin(HealthSubject):
                          ('gender', {}), ('tobaco', {}),
                          ('amiodarone', {}), ('fluvastatin', {}))
 
+        self.state.add_definition('age',
+                                  ('age', {}))
+
         self.state.add_definition('patient_basic',
                                   *patient_basic)
 
@@ -258,8 +261,16 @@ class Warfarin(HealthSubject):
     def _sub_comp_CYP2C9(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('CYP2C9')
 
+    def _sub_comp_CYP2C9_masked(self, _id: int, days: int,
+                                **kwargs: Any) -> Feature:
+        return self._categorical_sub_comp('CYP2C9', self._day < days)
+
     def _sub_comp_VKORC1(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('VKORC1')
+
+    def _sub_comp_VKORC1_masked(self, _id: int, days: int,
+                                **kwargs: Any) -> Feature:
+        return self._categorical_sub_comp('VKORC1', self._day < days)
 
     def _sub_comp_sensitivity(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('sensitivity')
