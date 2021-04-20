@@ -26,6 +26,8 @@ class WarfarinAgent(agents.NoLearnAgent):
     def __init__(self,
                  study_arm: Literal['aaa', 'caa', 'pgaa',
                                     'pgpgi', 'pgpga'] = 'aaa',
+                 dose_range: Tuple[float, float] = (0.0, 15.0),
+                 interval_range: Tuple[int, int] = (1, 28),
                  **kwargs: Any):
         '''
         Arguments
@@ -47,9 +49,9 @@ class WarfarinAgent(agents.NoLearnAgent):
             self._protocol = PGPGA()
 
         self._dose_gen = FeatureGenerator.numerical(
-                name='dose', lower=0.0, upper=15.0)
+            name='dose', lower=dose_range[0], upper=dose_range[1])
         self._interval_gen = FeatureGenerator(
-                name='interval', lower=1, upper=28)
+            name='interval', lower=interval_range[0], upper=interval_range[1])
 
     def act(self,
             state: FeatureArray,
@@ -80,10 +82,10 @@ class WarfarinAgent(agents.NoLearnAgent):
 
         dose, interval = self._protocol.prescribe(patient)
 
-        # Cuts out the dose if it is >15.0
         return FeatureArray([
-            self._dose_gen(min(dose, 15.0)),
-            self._interval_gen(min(interval, 28))
+            self._dose_gen(min(dose, self._dose_gen.upper or dose)),
+            self._interval_gen(
+                min(interval, self._interval_gen.upper or interval))
         ])
 
     def reset(self):
