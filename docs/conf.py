@@ -45,9 +45,9 @@ autodoc_member_order = 'bysource'
 # ]
 
 autodoc_type_aliases = {
-    'reil.datatypes.feature.Feature': 'Feature',
-    'reil.datatypes.feature.FeatureArray': 'FeatureArray',
-    'reil.datatypes.feature.FeatureGenerator': 'FeatureGenerator'
+    'Feature': 'reil.datatypes.feature.Feature',
+    'FeatureArray': 'reil.datatypes.feature.FeatureArray',
+    'FeatureGenerator': 'reil.datatypes.feature.FeatureGenerator',
 }
 
 autoclass_content = 'both'
