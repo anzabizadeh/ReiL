@@ -8,6 +8,7 @@ The base class for reinforcement learning
 
 from __future__ import annotations
 
+import bz2
 import copy
 import importlib
 import logging
@@ -31,6 +32,7 @@ class ReilBase:
                  logger_level: Optional[int] = None,
                  logger_filename: Optional[str] = None,
                  persistent_attributes: Optional[List[str]] = None,
+                 save_zipped: bool = True,
                  **kwargs: Any):
         '''
         Arguments
@@ -85,6 +87,7 @@ class ReilBase:
         '''
         self._name = name or self.__class__.__qualname__.lower()
         self._path = pathlib.PurePath(path or '.')
+        self._save_zipped = save_zipped
 
         self._persistent_attributes = [
             '_' + p
@@ -295,20 +298,25 @@ class ReilBase:
         RuntimeError
             Corrupted or inaccessible data file.
         '''
-        _filename = filename if filename.endswith(
-            '.pkl') else f'{filename}.pkl'
+        _filename = (filename if filename.endswith(('.pkl', '.pbz2'))
+                     else
+                     f'{filename}{".pbz2" if self._save_zipped else ".pkl"}')
         full_path = pathlib.Path(path or self._path) / _filename
 
         data = None
-        for i in range(5):
-            with open(full_path, 'rb') as f:
-                try:
-                    data = dill.load(f)
-                except EOFError:
-                    self._logger.info(
-                        f'Attempt {i+1} failed to load '
-                        f'{full_path}.')
-                    time.sleep(2)
+        for i in range(1, 6):
+            try:
+                if self._save_zipped:
+                    with bz2.BZ2File(full_path, 'r') as f:
+                        data = dill.load(f)
+                else:
+                    with open(full_path, 'rb') as f:
+                        data = dill.load(f)
+            except EOFError:
+                self._logger.info(
+                    f'Attempt {i} failed to load '
+                    f'{full_path}.')
+                time.sleep(2)
             if data is not None:
                 break
 
@@ -375,10 +383,14 @@ class ReilBase:
 
         _filename = filename or self._name
         _path = pathlib.Path(path or self._path)
-
         _path.mkdir(parents=True, exist_ok=True)
-        with open(_path / f'{_filename}.pkl', 'wb+') as f:
-            dill.dump(data, f, dill.HIGHEST_PROTOCOL)
+
+        if self._save_zipped:
+            with bz2.BZ2File(_path / f'{_filename}.pbz2', 'w') as f:
+                dill.dump(data, f, dill.HIGHEST_PROTOCOL)
+        else:
+            with open(_path / f'{_filename}.pkl', 'wb+') as f:
+                dill.dump(data, f, dill.HIGHEST_PROTOCOL)
 
         if temp:
             self._logger = temp
