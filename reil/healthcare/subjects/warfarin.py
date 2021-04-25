@@ -183,13 +183,19 @@ class Warfarin(HealthSubject):
 
             return tuple(FeatureArray(a) for a in actions)
 
-        caps = (5, 10, 15)
+        caps = tuple(i for i in (5.0, 10.0, 15.0)
+                     if self._dose_range[0] <= i <= self._dose_range[1])
         dose = {cap: tuple(self.generate_dose_values(0.0, cap, 0.5))
                 for cap in caps}
 
-        int_fixed = {i: (i,) for i in (1, 2, 3, 7)}
-        int_weekly = (7, 14, 21, 28)
-        int_free = tuple(range(1, 28))
+        int_fixed = {
+            i: (i,) for i in (1, 2, 3, 7)
+            if self._interval_range[0] <= i <= self._interval_range[1]}
+        int_weekly = tuple(
+            i for i in (7, 14, 21, 28)
+            if self._interval_range[0] <= i <= self._interval_range[1])
+        int_free = tuple(range(
+            self._interval_range[0], self._interval_range[0] + 1))
 
         dose_int_fixed = {(d[0], i[0]): _actions(d[1], i[1])
                           for d, i in itertools.product(
@@ -202,29 +208,32 @@ class Warfarin(HealthSubject):
         dose_int_weekly = {k: _actions(v, int_weekly)
                            for k, v in dose.items()}
 
+        max_cap = min(caps[-1], self._dose_range[1])
+
         def _237(f: FeatureArray, cap):
             day = f['day'].value
             if day == 0:
                 return dose_int_fixed[cap, 2]
             elif day == 2:
-                return dose_int_fixed[15, 3]
+                return dose_int_fixed[max_cap, 3]
             elif day >= 5:
-                return dose_int_fixed[15, 7]
+                return dose_int_fixed[max_cap, 7]
             else:
                 raise ValueError(f'Wrong day: {day}.')
 
         for cap in caps:
             self.possible_actions.add_definition(
-                f'daily_{cap:02}', lambda _: dose_int_fixed[cap, 1], 'day')
+                f'daily_{int(cap):02}',
+                lambda _: dose_int_fixed[cap, 1], 'day')
 
             self.possible_actions.add_definition(
-                f'237_{cap:02}', functools.partial(_237, cap=cap), 'day')
+                f'237_{int(cap):02}', functools.partial(_237, cap=cap), 'day')
 
             self.possible_actions.add_definition(
-                f'free_{cap:02}', lambda _: dose_int_free[cap], 'day')
+                f'free_{int(cap):02}', lambda _: dose_int_free[cap], 'day')
 
             self.possible_actions.add_definition(
-                f'weekly_{cap:02}', lambda _: dose_int_weekly[cap], 'day')
+                f'weekly_{int(cap):02}', lambda _: dose_int_weekly[cap], 'day')
 
     def _default_state_definition(
             self, _id: Optional[int] = None) -> FeatureArray:
