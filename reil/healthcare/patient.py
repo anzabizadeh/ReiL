@@ -16,9 +16,6 @@ class Patient:
     '''
     Base class for patients in healthcare.
     '''
-    feature_gen_set: Dict[str, FeatureGenerator] = {}
-    feature_set: Dict[str, Feature] = {}
-
     def __init__(self, model: HealthMathModel, **feature_values: Any) -> None:
         '''
         Parameters
@@ -31,6 +28,11 @@ class Patient:
             can be determined. For example, if "age" is one of the features,
             age=40.0 will set the initial age to 40.0.
         '''
+        if not hasattr(self, 'feature_gen_set'):
+            self.feature_gen_set: Dict[str, FeatureGenerator] = {}
+        if not hasattr(self, 'feature_set'):
+            self.feature_set: Dict[str, Feature] = {}
+
         for k in self.feature_gen_set:
             self.feature_set[k] = self.feature_gen_set[k](
                 feature_values.get(k))
