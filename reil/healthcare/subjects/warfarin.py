@@ -67,7 +67,7 @@ class Warfarin(HealthSubject):
         patient_basic = (('age', {}), ('CYP2C9', {}),
                          ('VKORC1', {}), ('sensitivity', {}))
         patient_extra = (('weight', {}), ('height', {}),
-                         ('gender', {}), ('tobaco', {}),
+                         ('gender', {}), ('race', {}), ('tobaco', {}),
                          ('amiodarone', {}), ('fluvastatin', {}))
 
         self.state.add_definition('age',
@@ -88,10 +88,17 @@ class Warfarin(HealthSubject):
                                   ('INR_history', {'length': -1}),
                                   ('interval_history', {'length': -1}))
 
-        for i in (1, 5, 10):
+        self.state.add_definition('patient_for_baseline',
+                                  *patient_basic,
+                                  *patient_extra,
+                                  ('day', {}),
+                                  ('dose_history', {'length': 4}),
+                                  ('INR_history', {'length': 4}),
+                                  ('interval_history', {'length': 4}))
+
+        for i in (1, 3, 5, 7, 9):
             self.state.add_definition(f'patient_w_dosing_{i:02}',
                                       *patient_basic,
-                                      *patient_extra,
                                       ('day', {}),
                                       ('dose_history', {'length': i}),
                                       ('INR_history', {'length': i}),

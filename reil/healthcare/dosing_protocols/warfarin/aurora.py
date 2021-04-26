@@ -20,10 +20,10 @@ class Aurora(DosingProtocol):
                   additional_info: Dict[str, Any]
                   ) -> Tuple[float, int, Dict[str, Any]]:
         today = patient['day']
-        INRs = patient['INRs']
+        INRs = patient['INR_history']
         previous_INR = INRs[-1]
-        previous_dose = patient['Doses'][-1]
-        previous_interval = patient['Intervals'][-1]
+        previous_dose = patient['dose_history'][-1]
+        previous_interval = patient['interval_history'][-1]
 
         red_flag = additional_info.get('red_flag', False)
         skip_dose = additional_info.get('skip_dose', 0)

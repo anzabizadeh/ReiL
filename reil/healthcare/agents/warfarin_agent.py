@@ -50,11 +50,12 @@ class WarfarinAgent(agents.NoLearnAgent):
 
         self._dose_gen = FeatureGenerator.numerical(
             name='dose', lower=dose_range[0], upper=dose_range[1])
-        self._interval_gen = FeatureGenerator(
+        self._interval_gen = FeatureGenerator.numerical(
             name='interval', lower=interval_range[0], upper=interval_range[1])
 
     def act(self,
             state: FeatureArray,
+            subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
             epoch: Optional[int] = 0) -> FeatureArray:
         '''
@@ -105,7 +106,7 @@ class WarfarinAgent(agents.NoLearnAgent):
 #     if self._red_flag:
 #         if self._retest_day > patient['day']:
 #             return_value = 0.0
-#         elif patient['INRs'][-1] > 3.0:
+#         elif patient['INR_history'][-1] > 3.0:
 #             self._retest_day = patient['day'] + 2
 #             return_value = 0.0
 #         else:
@@ -118,15 +119,15 @@ class WarfarinAgent(agents.NoLearnAgent):
 #     if patient['day'] <= 2:
 #         self._dose = 10.0 if patient['age'] < 65.0 else 5.0
 #     elif patient['day'] <= 4:
-#         day_2_INR = (patient['INRs'][-1] if patient['day'] == 3
-#                      else patient['INRs'][-2])
+#         day_2_INR = (patient['INR_history'][-1] if patient['day'] == 3
+#                      else patient['INR_history'][-2])
 #         if day_2_INR >= 2.0:
 #             self._dose = 5.0
 #             if day_2_INR <= 3.0:
 #                 self._early_therapeutic = True
 
 #             self._number_of_stable_days, next_test = \
-#                 self._aurora_retesting_table(patient['INRs'][-1],
+#                 self._aurora_retesting_table(patient['INR_history'][-1],
 #                                              self._number_of_stable_days,
 #                                              self._early_therapeutic)
 #         else:
@@ -135,7 +136,7 @@ class WarfarinAgent(agents.NoLearnAgent):
 #     else:
 #         self._number_of_stable_days, next_test = \
 #             self._aurora_retesting_table(
-#               patient['INRs'][-1],
+#               patient['INR_history'][-1],
 #               self._number_of_stable_days,
 #               self._early_therapeutic)
 
@@ -143,7 +144,7 @@ class WarfarinAgent(agents.NoLearnAgent):
 # #         self._early_therapeutic = False
 #         self._number_of_stable_days = 0
 #         self._dose, next_test, self._skip_dose, self._red_flag = \
-#           self._aurora_dosing_table(patient['INRs'][-1], self._dose)
+#           self._aurora_dosing_table(patient['INR_history'][-1], self._dose)
 
 #     self._retest_day = patient['day'] + next_test
 

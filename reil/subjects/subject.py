@@ -108,6 +108,7 @@ class Subject(stateful.Stateful):
 
     def reset(self) -> None:
         '''Reset the `subject`, so that it can resume accepting actions.'''
+        super().reset()
         self.reward.disable()
 
     def load(self, filename: str,

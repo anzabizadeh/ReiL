@@ -178,6 +178,13 @@ class EntityRegister:
         self._entity_list.remove(entity_name)
         self._id_list.remove(_id)
 
+    def clear(self):
+        '''
+        Clear the list.
+        '''
+        self._id_list: List[int] = []
+        self._entity_list: List[str] = []
+
     def __contains__(self, _id: int) -> bool:
         return _id in self._id_list
 
@@ -364,3 +371,7 @@ class Stateful(reilbase.ReilBase):
             self.statistic._default = statistic_default
 
         return f, p
+
+    def reset(self):
+        super().reset()
+        self._entity_list.clear()

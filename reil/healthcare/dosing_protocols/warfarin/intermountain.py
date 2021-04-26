@@ -31,7 +31,7 @@ class Intermountain(DosingProtocol):
                   ) -> Tuple[float, int, Dict[str, Any]]:
         dose_interval_list = additional_info.get('dose_interval_list', [])
         last_zone = additional_info.get('last_zone', '')
-        previous_INR = patient['INRs'][-1]
+        previous_INR = patient['INR_history'][-1]
 
         if not dose_interval_list:
             today = patient['day']
@@ -40,8 +40,8 @@ class Intermountain(DosingProtocol):
                 raise ValueError('Intermountain is only valid for day>=8.')
 
             if self._enforce_day_ge_8 and today == 8:
-                dose_list = patient['Doses']
-                interval_list = patient['Intervals']
+                dose_list = patient['dose_history']
+                interval_list = patient['interval_history']
                 dose_list = functools.reduce(
                     lambda x, y: x+y,
                     ([dose_list[-i]]*interval_list[-i]
@@ -54,7 +54,7 @@ class Intermountain(DosingProtocol):
 
                 previous_dose = sum(dose_list[-3:])/3
             else:
-                previous_dose = patient['Doses'][-1]
+                previous_dose = patient['dose_history'][-1]
 
             dose_interval_list, last_zone = self.intermountain_dosing_table(
                 previous_INR, last_zone, previous_dose)
