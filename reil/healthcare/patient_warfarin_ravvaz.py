@@ -44,6 +44,7 @@ class PatientWarfarinRavvaz(Patient):
     def __init__(self,
                  model: HealthMathModel,
                  randomized: bool = True,
+                 allow_missing_genotypes: bool = True,
                  **feature_values: Any) -> None:
         '''
         Parameters
@@ -113,13 +114,15 @@ class PatientWarfarinRavvaz(Patient):
                             '*2/*2', '*2/*3', '*3/*3'),
                 probabilities=(0.6739, 0.1486, 0.0925, 0.0651, 0.0197, 2e-4),
                 generator=random_categorical,
-                randomized=randomized),
+                randomized=randomized,
+                allow_missing=allow_missing_genotypes),
             'VKORC1': FeatureGenerator.categorical(
                 name='VKORC1',  # Aurora Avatar Population
                 categories=('G/G', 'G/A', 'A/A'),
                 probabilities=(0.3837, 0.4418, 0.1745),
                 generator=random_categorical,
-                randomized=randomized),
+                randomized=randomized,
+                allow_missing=allow_missing_genotypes),
 
             'MTT_1': FeatureGenerator.numerical(
                 name='MTT_1',  # Hamberg PK/PD

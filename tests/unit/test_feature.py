@@ -87,10 +87,10 @@ class testFeature(unittest.TestCase):
         self.assertEqual(rl_new.value, tuple(self._categorical_data))
         self.assertEqual(rl_new.is_numerical, False)
 
-    def test_accept_missing(self):
+    def test_allow_missing(self):
         categoricals = feature.FeatureGenerator.categorical(
             name='test', categories=tuple(self._categorical_data),
-            accept_missing=True)
+            allow_missing=True)
         rl_values = [categoricals(v) for v in self._categorical_data]
         self.assertEqual(
             rl_values[0].normalized,

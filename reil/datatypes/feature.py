@@ -187,7 +187,7 @@ class FeatureGenerator:
         default=None, init=False, repr=False, compare=False)
     randomized: Optional[bool] = True
     generator: Optional[Callable[[FeatureGenerator], Any]] = None
-    accept_missing: bool = False
+    allow_missing: bool = False
 
     @classmethod
     def numerical(
@@ -196,23 +196,23 @@ class FeatureGenerator:
         return cls(
             name=name, is_numerical=True, lower=lower, upper=upper, mean=mean,
             stdev=stdev, generator=generator, randomized=randomized,
-            accept_missing=False)
+            allow_missing=False)
 
     @classmethod
     def categorical(
                 cls, name, categories=None, probabilities=None,
-            generator=None, randomized=None, accept_missing=False):
+            generator=None, randomized=None, allow_missing=False):
         return cls(
             name=name, is_numerical=False,
             categories=categories, probabilities=probabilities,
             generator=generator, randomized=randomized,
-            accept_missing=accept_missing)
+            allow_missing=allow_missing)
 
     def __post_init__(self):
         if self.is_numerical:
             if self.categories is not None:
                 raise ValueError('Numerical type cannot have categories.')
-            if self.accept_missing:
+            if self.allow_missing:
                 raise TypeError('Only categorical type can accept '
                                 'missing values.')
 
@@ -254,8 +254,8 @@ class FeatureGenerator:
         if self.categories is None:
             return
 
-        accept_missing_offset = int(self.accept_missing)
-        cat_count = len(self.categories) - 1 + accept_missing_offset
+        allow_missing_offset = int(self.allow_missing)
+        cat_count = len(self.categories) - 1 + allow_missing_offset
         normalizer = {}
         for i, c in enumerate(self.categories[:-1]):
             temp = [0] * cat_count
@@ -263,10 +263,10 @@ class FeatureGenerator:
             normalizer[c] = tuple(temp)
 
         temp = [0] * cat_count
-        temp[-1] = accept_missing_offset
+        temp[-1] = allow_missing_offset
         normalizer[self.categories[-1]] = tuple(temp)
 
-        if self.accept_missing:
+        if self.allow_missing:
             normalizer[MISSING] = tuple([0] * cat_count)
 
         self.__dict__['normalizer'] = normalizer
@@ -297,7 +297,7 @@ class FeatureGenerator:
             normalized = None
         elif value in categories:
             normalized = normalizer[value]
-        elif self.accept_missing and value == MISSING:
+        elif self.allow_missing and value == MISSING:
             normalized = normalizer[value]
         else:
             try:
