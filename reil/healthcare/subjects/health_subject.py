@@ -133,8 +133,9 @@ class HealthSubject(Subject):
                     action: FeatureArray,
                     _id: int = 0) -> None:
         Subject.take_effect(self, action, _id)
-        current_dose = float(action.value['dose'])
-        current_interval = min(int(action.value['interval']),
+        action_temp = action.value
+        current_dose = float(action_temp['dose'])
+        current_interval = min(int(action_temp['interval']),
                                self._max_day - self._day)
 
         measurements_temp = self._patient.model(
