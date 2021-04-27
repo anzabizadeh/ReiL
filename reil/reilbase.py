@@ -312,7 +312,9 @@ class ReilBase:
                 else:
                     with open(full_path, 'rb') as f:
                         data = dill.load(f)
-            except EOFError:
+            except FileNotFoundError:
+                raise
+            except (EOFError, OSError):
                 self._logger.info(
                     f'Attempt {i} failed to load '
                     f'{full_path}.')
