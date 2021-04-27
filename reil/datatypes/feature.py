@@ -173,6 +173,11 @@ class FeatureGenerator:
     generator:
         A function that accepts a `FeatureGenerator` instance, and produces
         a value for the new `Feature`.
+
+    allow_missing:
+        If `True`, a categorical generator can generate a `MISSING` instance.
+        Also the normalized form will have one more categories to account for
+        `MISSING`.
     '''
     name: str
     is_numerical: bool = dataclasses.field(
@@ -521,6 +526,9 @@ class FeatureArray:
 
         return splitted_list
 
+    def __iter__(self):
+        return iter(self._data.values())
+
     def __getitem__(self, k: str):
         return self._data.__getitem__(k)
 
@@ -573,3 +581,34 @@ class FeatureArray:
 
     def __str__(self):
         return f"[{', '.join((d.__str__() for d in self._data.items()))}]"
+
+
+def change_to_missing(feature: Feature) -> Feature:
+    if feature.is_numerical:
+        raise TypeError('Only categorical features can have missing.')
+    categories = feature.categories
+    normalized = feature.normalized
+    if categories is None:
+        raise ValueError('No categories defined!')
+    if normalized is None:
+        raise ValueError('Cannot generate normal form for a feature '
+                         'without the normal form.')
+
+    if len(categories) != len(normalized):
+        raise TypeError('Feature is not allowed to have MISSING')
+
+    return FeatureGenerator.categorical(
+        name=feature.name, categories=categories, allow_missing=True)(MISSING)
+
+
+def change_array_to_missing(
+        features: FeatureArray, suppress_error: bool = True) -> FeatureArray:
+    def try_to_change(feature: Feature) -> Feature:
+        try:
+            return change_to_missing(feature)
+        except (TypeError, ValueError):
+            if suppress_error:
+                return feature
+            raise
+
+    return FeatureArray(try_to_change(f) for f in features)

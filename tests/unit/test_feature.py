@@ -140,6 +140,37 @@ class testFeature(unittest.TestCase):
             feature.FeatureArray([numericals(self._numerical_data[0])])
             )
 
+    def test_change_to_missing(self):
+        categoricals = feature.FeatureGenerator.categorical(
+            name='test', categories=tuple(self._categorical_data),
+            allow_missing=True)
+        self.assertEqual(
+            feature.change_to_missing(categoricals(
+                self._categorical_data[0])).normalized,
+            tuple([0]*len(self._categorical_data)))
+
+        array = feature.FeatureArray(
+            feature.FeatureGenerator.categorical(
+                name=v, categories=tuple(self._categorical_data),
+                allow_missing=True)(v)
+            for v in self._categorical_data)
+        missing_array = feature.change_array_to_missing(array)
+        self.assertEqual(
+            next(iter(missing_array)).normalized,
+            tuple([0]*len(self._categorical_data)))
+
+        with self.assertRaises(TypeError):
+            feature.change_to_missing(
+                feature.FeatureGenerator.categorical(
+                    name='test', categories=tuple(self._categorical_data),
+                    allow_missing=False)(self._categorical_data[0]))
+
+        with self.assertRaises(ValueError):
+            feature.change_to_missing(
+                feature.FeatureGenerator.categorical(
+                    name='test',
+                    allow_missing=True)(self._categorical_data[0]))
+
 
 if __name__ == "__main__":
     unittest.main()
