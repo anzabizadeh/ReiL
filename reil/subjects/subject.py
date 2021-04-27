@@ -75,22 +75,6 @@ class Subject(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    # def possible_actions(self, _id: int = 0) -> Tuple[FeatureArray, ...]:
-    #     '''
-    #     Generate the list of possible actions.
-
-    #     Arguments
-    #     ---------
-    #     _id:
-    #         ID of the `agent` that wants to act on the `subject`.
-
-    #     Returns
-    #     -------
-    #     :
-    #         A list of possible actions for the `agent` with ID=_id.
-    #     '''
-    #     return (FeatureArray(Feature(name='default_action')),)
-
     def take_effect(self, action: FeatureArray, _id: int = 0) -> None:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
