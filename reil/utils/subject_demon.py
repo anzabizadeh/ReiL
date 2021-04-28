@@ -1,29 +1,26 @@
 # -*- coding: utf-8 -*-
 '''
-subject class
-=============
+SubjectDemon class
+==================
 
-This `subject` class is the base class of all subject classes.
+`SubjectDemon` class changes the behavior of a given subject.
 '''
 
 import dataclasses
 import pathlib
 from typing import Any, Callable, Optional, Tuple, Union
 
-from reil.datatypes import FeatureArray
-from reil.reilbase import ReilBase
-from reil.subjects import Subject
+from reil import datatypes, reilbase, subjects
 
 
 @dataclasses.dataclass
 class Modifier:
     name: str
-    state_definition: str
-    condition: Callable[[FeatureArray], bool]
-    function: Callable[[FeatureArray], Any]
+    condition_state_definition: str
+    function: Callable[[datatypes.FeatureArray, datatypes.FeatureArray], Any]
 
 
-class SubjectDemon(ReilBase):
+class SubjectDemon(reilbase.ReilBase):
     '''
     This class accepts a regular subject, and intervenes in its interaction
     with the agents. It can modify `state` representation or change
@@ -32,7 +29,7 @@ class SubjectDemon(ReilBase):
 
     def __init__(
             self,
-            subject: Subject,
+            subject: subjects.Subject,
             action_modifier: Optional[Modifier] = None,
             state_modifier: Optional[Modifier] = None,
             **kwargs: Any):
@@ -63,7 +60,9 @@ class SubjectDemon(ReilBase):
         self._action_modifier = action_modifier
         self._state_modifier = state_modifier
 
-    def state(self, name: str, _id: Optional[int] = None) -> FeatureArray:
+    def state(self,
+              name: str,
+              _id: Optional[int] = None) -> datatypes.FeatureArray:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -87,12 +86,11 @@ class SubjectDemon(ReilBase):
             Definition not found.
         '''
         original_state = self._subject.state(name, _id)
-        if self._state_modifier is None:
-            return original_state
-
-        state = self._subject.state(self._state_modifier.state_definition, _id)
-        if self._state_modifier.condition(state):
-            return self._state_modifier.function(original_state)
+        if self._state_modifier is not None:
+            condition_state = self._subject.state(
+                self._state_modifier.condition_state_definition, _id)
+            return self._state_modifier.function(
+                condition_state, original_state)
 
         return original_state
 
@@ -122,13 +120,11 @@ class SubjectDemon(ReilBase):
             Definition not found.
         '''
         original_set = self._subject.possible_actions(name, _id)
-        if self._action_modifier is None:
-            return original_set
-
-        state = self._subject.state(
-            self._action_modifier.state_definition, _id)
-        if self._action_modifier.condition(state):
-            return self._action_modifier.function(original_set)
+        if self._action_modifier is not None:
+            condition_state = self._subject.state(
+                self._action_modifier.condition_state_definition, _id)
+            return self._action_modifier.function(
+                condition_state, original_set)
 
         return original_set
 

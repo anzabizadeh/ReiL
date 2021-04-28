@@ -8,7 +8,8 @@ Contains some useful functions.
 
 import math
 import random
-from typing import Iterable, Tuple
+from reil.datatypes.feature import FeatureArray
+from typing import Callable, Iterable, Optional, Tuple, TypeVar
 
 import numpy as np
 from reil.datatypes import FeatureGenerator
@@ -61,3 +62,44 @@ def in_range(r: Tuple[float, float], x: Iterable[float]) -> int:
 def interpolate(start: float, end: float, steps: int) -> Iterable[float]:
     return (start + (end - start) / steps * j
             for j in range(1, steps + 1))
+
+
+T = TypeVar('T')
+
+
+def generate_modifier(
+        operation: Callable[[T], T],
+        condition: Optional[Callable[[FeatureArray], bool]] = None
+) -> Callable[[FeatureArray, T], T]:
+    '''Generate a modifier function for states or actions
+
+    Parameters
+    ----------
+    operation:
+        What should happen to the input.
+
+    condition:
+        A function that accepts a state `FeatureArray`, and based on that
+        determines if the `operation` should be applied to the input.
+
+    Returns
+    -------
+    :
+        A function that accepts `condition_state` and `input` and returns the
+        modified `input`.
+    '''
+    if condition is None:
+        def no_condition_modifier(condition_state: FeatureArray,
+                                  input: T) -> T:
+            return operation(input)
+
+        return no_condition_modifier
+
+    def modifier(condition_state: FeatureArray,
+                 input: T) -> T:
+        if condition(condition_state):
+            return operation(input)
+
+        return input
+
+    return modifier
