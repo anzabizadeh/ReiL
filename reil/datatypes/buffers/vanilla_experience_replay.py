@@ -17,8 +17,6 @@ class VanillaExperienceReplay(CircularBuffer[T]):
 
     Extends `CircularBuffer` class.
     '''
-    _batch_size = None
-    _clear_buffer = False
 
     def __init__(self,
                  buffer_size: Optional[int] = None,
@@ -42,6 +40,10 @@ class VanillaExperienceReplay(CircularBuffer[T]):
         clear_buffer:
             Whether to clear the buffer when `reset` is called.
         '''
+
+        self._batch_size = None
+        self._clear_buffer = False
+
         self.setup(buffer_size=buffer_size,
                    batch_size=batch_size,
                    buffer_names=buffer_names,

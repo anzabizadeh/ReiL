@@ -6,7 +6,7 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 import numpy as np
 from reil import reilbase
@@ -20,13 +20,6 @@ class Buffer(reilbase.ReilBase, Generic[T]):
     '''
     The base class for all buffers in `reil`.
     '''
-
-    _buffer_size = None
-    _buffer_names = None
-    _pick_mode = None
-    _buffer_index = -1
-    _count = 0
-
     def __init__(self,
                  buffer_size: Optional[int] = None,
                  buffer_names: Optional[List[str]] = None,
@@ -43,6 +36,13 @@ class Buffer(reilbase.ReilBase, Generic[T]):
         pick_mode:
             The default mode to pick items from the list.
         '''
+        self._buffer_size = None
+        self._buffer_names = None
+        self._pick_mode = None
+        self._buffer_index = -1
+        self._count = 0
+        self._buffer: Union[None, Dict[str, List[T]]]
+
         self.setup(buffer_size, buffer_names, pick_mode)
 
     def setup(self,
@@ -92,7 +92,7 @@ class Buffer(reilbase.ReilBase, Generic[T]):
                 self._buffer_names = buffer_names
 
         if self._buffer_size is not None and self._buffer_names is not None:
-            self._buffer = {name: [0.0]*self._buffer_size
+            self._buffer = {name: [None]*self._buffer_size  # type: ignore
                             for name in self._buffer_names}
         else:
             self._buffer = None
@@ -251,3 +251,6 @@ class Buffer(reilbase.ReilBase, Generic[T]):
         s = slice(self._buffer_index + 1)
         return {name: tuple(buffer[s])
                 for name, buffer in self._buffer.items()}
+
+    def dump(self):
+        pass

@@ -6,7 +6,8 @@ CircularBuffer class
 A `Buffer` that overflows!
 '''
 
-from typing import Dict, Tuple
+from reil.datatypes.buffers.buffer import PickModes
+from typing import Dict, List, Optional, Tuple
 
 from reil.datatypes.buffers import Buffer, T
 
@@ -17,7 +18,14 @@ class CircularBuffer(Buffer[T]):
 
     Extends `Buffer` class.
     '''
-    _buffer_full = False
+
+    def __init__(
+            self, buffer_size: Optional[int],
+            buffer_names: Optional[List[str]],
+            pick_mode: Optional[PickModes]) -> None:
+        super().__init__(buffer_size=buffer_size, buffer_names=buffer_names,
+                         pick_mode=pick_mode)
+        self._buffer_full = False
 
     def add(self, data: Dict[str, T]) -> None:
         '''
