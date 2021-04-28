@@ -94,37 +94,33 @@ class EnvironmentStaticMap(Environment):
 
         self._interaction_sequence = seq
 
-    def simulate_one_pass(self) -> None:
+    def simulate_pass(self, n: int = 1) -> None:
         '''
-        Go through the interaction sequence for one pass and
+        Go through the interaction sequence for a number of passes and
         simulate interactions accordingly.
+
+        Arguments
+        ---------
+        n:
+            The number of passes that simulation should go.
         '''
-        for protocol in self._interaction_sequence:
-            subject_name = protocol.subject.name
+        for _ in range(n):
+            for protocol in self._interaction_sequence:
+                subject_name = protocol.subject.name
 
-            if self._subjects[subject_name].is_terminated(None):
-                continue
+                if self._subjects[subject_name].is_terminated(None):
+                    continue
 
-            agent_name = protocol.agent.name
-            a_s_name = (agent_name, subject_name)
-            unit = protocol.unit
-            state_name = protocol.state_name
-            action_name = protocol.action_name
-            reward_function_name = protocol.reward_function_name
-            agent_id, _ = self._assignment_list[a_s_name]
+                agent_name = protocol.agent.name
+                a_s_name = (agent_name, subject_name)
+                unit = protocol.unit
+                state_name = protocol.state_name
+                action_name = protocol.action_name
+                reward_function_name = protocol.reward_function_name
+                agent_id, _ = self._assignment_list[a_s_name]
 
-            if unit == 'interaction':
-                if protocol.n == 1:
-                    self.interact_once(
-                        agent_id=agent_id,  # type: ignore
-                        agent_observer=self._agent_observers[a_s_name],
-                        subject_instance=self._subjects[subject_name],
-                        state_name=state_name,
-                        action_name=action_name,
-                        reward_function_name=reward_function_name,
-                        epoch=self._epochs[subject_name])
-                else:
-                    self.interact_n_times(
+                if unit == 'interaction':
+                    self.interact(
                         agent_id=agent_id,  # type: ignore
                         agent_observer=self._agent_observers[a_s_name],
                         subject_instance=self._subjects[subject_name],
@@ -134,38 +130,39 @@ class EnvironmentStaticMap(Environment):
                         epoch=self._epochs[subject_name],
                         times=protocol.n)
 
-                if self._subjects[subject_name].is_terminated(None):
-                    self.check_subject(subject_name)
+                    if self._subjects[subject_name].is_terminated(None):
+                        self.check_subject(subject_name)
 
-            elif unit in ['instance', 'epoch']:
-                # For epoch, simulate the current instance, then in the next if
-                # statement, simulate the rest of the generated instances.
-                self.interact_while(
-                    agent_id=agent_id,  # type: ignore
-                    agent_observer=self._agent_observers[a_s_name],
-                    subject_instance=self._subjects[subject_name],
-                    state_name=state_name,
-                    action_name=action_name,
-                    reward_function_name=reward_function_name,
-                    epoch=self._epochs[subject_name])
+                elif unit in ('instance', 'epoch'):
+                    # For epoch, simulate the current instance, then in
+                    # the next if statement, simulate the rest of the
+                    # generated instances.
+                    self.interact_while(
+                        agent_id=agent_id,  # type: ignore
+                        agent_observer=self._agent_observers[a_s_name],
+                        subject_instance=self._subjects[subject_name],
+                        state_name=state_name,
+                        action_name=action_name,
+                        reward_function_name=reward_function_name,
+                        epoch=self._epochs[subject_name])
 
-                if (unit == 'epoch'
-                        and subject_name in self._instance_generators):
-                    while self.check_subject(subject_name):
-                        self.interact_while(
-                            agent_id=agent_id,  # type: ignore
-                            agent_observer=self._agent_observers[a_s_name],
-                            subject_instance=self._subjects[subject_name],
-                            state_name=state_name,
-                            action_name=action_name,
-                            reward_function_name=reward_function_name,
-                            epoch=self._epochs[subject_name])
+                    if (unit == 'epoch'
+                            and subject_name in self._instance_generators):
+                        while self.check_subject(subject_name):
+                            self.interact_while(
+                                agent_id=agent_id,  # type: ignore
+                                agent_observer=self._agent_observers[a_s_name],
+                                subject_instance=self._subjects[subject_name],
+                                state_name=state_name,
+                                action_name=action_name,
+                                reward_function_name=reward_function_name,
+                                epoch=self._epochs[subject_name])
+
+                    else:
+                        self.check_subject(subject_name)
 
                 else:
-                    self.check_subject(subject_name)
-
-            else:
-                raise ValueError(f'Unknown protocol unit: {unit}.')
+                    raise ValueError(f'Unknown protocol unit: {unit}.')
 
     def simulate_to_termination(self) -> None:
         '''
@@ -201,7 +198,7 @@ class EnvironmentStaticMap(Environment):
 
         while not all(self._instance_generators[s].is_terminated()
                       for s in subjects_in_use):
-            self.simulate_one_pass()
+            self.simulate_pass()
 
         self.report_statistics(True)
 
@@ -252,13 +249,16 @@ class EnvironmentStaticMap(Environment):
 
         Parameters
         ----------
+        unstack:
+            Whether to unstack the resulting pivottable or not.
+
         reset_history:
             Whether to clear up the history after computing stats.
 
         Returns
         -------
         :
-            A dictionary with state, subject pairs as keys and dataframes as
+            A dictionary with state-subject pairs as keys and dataframes as
             values.
         '''
         StatInfo = namedtuple(

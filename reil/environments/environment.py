@@ -158,25 +158,17 @@ class Environment(stateful.Stateful):
             if name in self._instance_generators:
                 del self._instance_generators[name]
 
-    def simulate_one_pass(self) -> None:
-        '''
-        Go through the interaction sequence for one pass and
-        simulate interactions accordingly.
-        '''
-        raise NotImplementedError
-
-    def simulate_passes(self, passes: int) -> None:
+    def simulate_pass(self, n: int = 1) -> None:
         '''
         Go through the interaction sequence for a number of passes and
         simulate interactions accordingly.
 
         Arguments
         ---------
-        passes:
+        n:
             The number of passes that simulation should go.
         '''
-        for _ in range(passes):
-            self.simulate_one_pass()
+        raise NotImplementedError
 
     def simulate_to_termination(self) -> None:
         '''
@@ -197,73 +189,8 @@ class Environment(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    @staticmethod
-    def interact_once(
-            agent_id: int,
-            agent_observer: Generator[Union[FeatureArray, None], Any, None],
-            subject_instance: Subject,
-            state_name: str,
-            action_name: str,
-            reward_function_name: str,
-            epoch: int) -> None:
-        '''
-        Allow `agent` and `subject` to interact once.
-
-        Attributes
-        ----------
-        agent_id:
-            Agent's ID by which it is registered at the `subject`.
-
-        subject_id:
-            Subject's ID by which it is registered at the `agent`.
-
-        agent_instance:
-            An instance of an `agent` that takes the action.
-
-        subject_instance:
-            An instance of a `subject` that computes reward, determines
-            possible actions, and takes the action.
-
-        state_name:
-            A string that specifies the state definition.
-
-        action_name:
-            A string that specifies the action definition.
-
-        reward_function_name:
-            A string that specifies the reward function definition.
-
-        epoch:
-            The epoch of of the current run. This value is used by the `agent`
-            to determine the action.
-
-        Returns
-        -------
-        :
-            Reward received by `subject`  and state before taking an action and
-            the action that `agent` took.
-
-        Notes
-        -----
-        This method does not check whether the `subject` is terminated.
-
-        If no possible actions are available, `None` will be returned for
-        action.
-        '''
-        agent_observer.send(subject_instance.reward(
-            name=reward_function_name, _id=agent_id))
-
-        state = subject_instance.state(name=state_name, _id=agent_id)
-        possible_actions = subject_instance.possible_actions(
-            name=action_name, _id=agent_id)
-        if possible_actions:
-            action = agent_observer.send({'state': state,
-                                          'actions': possible_actions,
-                                          'epoch': epoch})
-            subject_instance.take_effect(action, agent_id)  # type: ignore
-
     @classmethod
-    def interact_n_times(
+    def interact(
             cls,
             agent_id: int,
             agent_observer: Generator[Union[FeatureArray, None], Any, None],
@@ -320,9 +247,18 @@ class Environment(stateful.Stateful):
         necessarily have a lenght of "times".
         '''
         for _ in range(times):
-            cls.interact_once(agent_id, agent_observer, subject_instance,
-                              state_name, action_name, reward_function_name,
-                              epoch)
+            reward = subject_instance.reward(
+                name=reward_function_name, _id=agent_id)
+            agent_observer.send(reward)
+
+            state = subject_instance.state(name=state_name, _id=agent_id)
+            possible_actions = subject_instance.possible_actions(
+                name=action_name, _id=agent_id)
+            if possible_actions:
+                action = agent_observer.send({'state': state,
+                                              'actions': possible_actions,
+                                              'epoch': epoch})
+                subject_instance.take_effect(action, agent_id)  # type: ignore
 
     @classmethod
     def interact_while(
@@ -374,9 +310,9 @@ class Environment(stateful.Stateful):
         instance is run to termination, not the whole generator.
         '''
         while not subject_instance.is_terminated(agent_id):
-            cls.interact_once(agent_id, agent_observer, subject_instance,
-                              state_name, action_name, reward_function_name,
-                              epoch)
+            cls.interact(agent_id, agent_observer, subject_instance,
+                         state_name, action_name, reward_function_name,
+                         epoch)
 
     def assert_protocol(self, protocol: InteractionProtocol) -> None:
         '''
@@ -524,17 +460,17 @@ class Environment(stateful.Stateful):
             # for the current subject, so that agent_observer does not raise
             # exception.
             try:
-                _, self._subjects[subject_name] = next(
-                    self._instance_generators[subject_name])  # type: ignore
+                _, self._subjects[subject_name] = next(  # type: ignore
+                    self._instance_generators[subject_name])
 
             except StopIteration:
                 self._epochs[subject_name] += 1
                 if self._instance_generators[subject_name].is_terminated():
                     self._subjects[subject_name].reward.disable()
                 else:
-                    _, self._subjects[subject_name] = next(
+                    _, self._subjects[subject_name] = next(  # type: ignore
                         self._instance_generators[subject_name]
-                        )  # type: ignore
+                        )
                 return False
         else:
             self._epochs[subject_name] += 1
