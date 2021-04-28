@@ -12,7 +12,7 @@ import dataclasses
 import functools
 from collections import defaultdict
 from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Tuple,
-                    Union, cast)
+                    Union)
 
 import pandas as pd
 from reil.datatypes import FeatureArray
@@ -602,7 +602,7 @@ class Statistic(SecondayComponent):
             raise ValueError(f'Definition {name} not found.')
 
         d = self._definitions[_name]
-        agg, comp_name = cast(Tuple[str, str], d.args)
+        agg, comp_name = d.args
 
         return (self._primary_component(name=agg, _id=_id),
                 d.fn(self._primary_component(name=comp_name, _id=_id)))

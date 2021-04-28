@@ -7,7 +7,7 @@ The base class of all `agent` classes.
 '''
 
 import random
-from typing import Any, Generator, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Generator, Optional, Tuple, TypeVar, Union
 
 from reil import stateful
 from reil.datatypes import FeatureArray
@@ -142,13 +142,14 @@ class NoLearnAgent(stateful.Stateful):
             try:
                 new_observation = stateful.Observation()
                 temp = yield
-                new_observation.state = cast(FeatureArray, temp['state'])
+                new_observation.state = temp['state']
                 actions: Tuple[FeatureArray, ...] = temp['actions']
                 epoch: int = temp['epoch']
 
                 if actions is not None:
                     new_observation.action = self.act(
-                        state=new_observation.state, subject_id=subject_id,
+                        state=new_observation.state,  # type: ignore
+                        subject_id=subject_id,
                         actions=actions, epoch=epoch)
 
                     new_observation.reward = (yield new_observation.action)
