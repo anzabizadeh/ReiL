@@ -138,3 +138,9 @@ class SubjectDemon(reilbase.ReilBase):
                     data_to_save: Optional[Tuple[str, ...]] = None
                     ) -> Tuple[pathlib.PurePath, str]:
         return super().save(filename, path, data_to_save)
+
+    def register(self, entity_name: str, _id: Optional[int] = None) -> int:
+        return self._subject.register(entity_name, _id)
+
+    def deregister(self, entity_id: int) -> None:
+        return self._subject.deregister(entity_id)
