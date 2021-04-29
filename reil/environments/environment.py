@@ -11,11 +11,11 @@ import pathlib
 from collections import defaultdict
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
-from reil.agents import Agent, NoLearnAgent
 from reil import stateful
+from reil.agents import Agent, NoLearnAgent
+from reil.datatypes import FeatureArray, InteractionProtocol
 from reil.subjects import Subject
-from reil.datatypes import InteractionProtocol, FeatureArray
-from reil.utils import InstanceGenerator
+from reil.utils import InstanceGenerator, SubjectDemon
 
 AgentSubjectTuple = Tuple[str, str]
 EntityType = Union[Agent, Subject]
@@ -128,7 +128,7 @@ class Environment(stateful.Stateful):
             _, obj = next(generator)  # type: ignore
             if isinstance(obj, Agent):
                 self._agents.update({name: obj})
-            elif isinstance(obj, Subject):
+            elif isinstance(obj, (Subject, SubjectDemon)):
                 self._subjects.update({name: obj})
             else:
                 raise TypeError(
