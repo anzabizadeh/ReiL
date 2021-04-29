@@ -43,12 +43,10 @@ class Buffer(reilbase.ReilBase, Generic[T]):
         self._count = 0
         self._buffer: Union[None, Dict[str, List[T]]]
 
-        self.setup(buffer_size, buffer_names, pick_mode)
+        self.setup(buffer_size=buffer_size,
+                   buffer_names=buffer_names, pick_mode=pick_mode)
 
-    def setup(self,
-              buffer_size: Optional[int] = None,
-              buffer_names: Optional[List[str]] = None,
-              pick_mode: Optional[PickModes] = None) -> None:
+    def setup(self, **kwargs) -> None:
         '''
         Set up the buffer.
 
@@ -77,15 +75,19 @@ class Buffer(reilbase.ReilBase, Generic[T]):
         not defined. Attempt to use `setup` to modify size, names or mode will
         result in an exception.
         '''
+        buffer_size = kwargs.get('buffer_size')
+        buffer_names = kwargs.get('buffer_names')
+        pick_mode = kwargs.get('pick_mode')
+
         if buffer_size is not None:
-            if self._buffer_size is not None:
+            if self._buffer_size not in (None, buffer_size):
                 raise ValueError(
                     'Cannot modify buffer_size. The value is already set.')
             else:
                 self._buffer_size = buffer_size
 
         if buffer_names is not None:
-            if self._buffer_names is not None:
+            if self._buffer_names not in (None, buffer_names):
                 raise ValueError(
                     'Cannot modify buffer_names. The value is already set.')
             else:

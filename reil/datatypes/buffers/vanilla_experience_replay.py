@@ -40,22 +40,18 @@ class VanillaExperienceReplay(CircularBuffer[T]):
         clear_buffer:
             Whether to clear the buffer when `reset` is called.
         '''
-
         self._batch_size = None
         self._clear_buffer = False
+
+        super().__init__(buffer_size=buffer_size,
+                         buffer_names=buffer_names, pick_mode='random')
 
         self.setup(buffer_size=buffer_size,
                    batch_size=batch_size,
                    buffer_names=buffer_names,
                    clear_buffer=clear_buffer)
 
-        super().setup(pick_mode='random')
-
-    def setup(self,
-              buffer_size: Optional[int] = None,
-              batch_size: Optional[int] = None,
-              buffer_names: Optional[List[str]] = None,
-              clear_buffer: bool = False) -> None:
+    def setup(self, **kwargs) -> None:
         '''
         Set up the buffer.
 
@@ -79,25 +75,32 @@ class VanillaExperienceReplay(CircularBuffer[T]):
         not defined. Attempt to use `setup` to modify size, names or mode will
         result in an exception.
         '''
+        buffer_size = kwargs.get('buffer_size')
+        batch_size = kwargs.get('batch_size')
+        buffer_names = kwargs.get('buffer_names')
+        clear_buffer = kwargs.get('clear_buffer')
+
+        super().setup(buffer_size=buffer_size,
+                      buffer_names=buffer_names)
+
         if buffer_size is not None and buffer_size < 1:
             raise ValueError('buffer_size should be at least 1.')
-
-        super().setup(buffer_size=buffer_size, buffer_names=buffer_names)
 
         if self._buffer_size is not None:
             if batch_size is not None and self._buffer_size < batch_size:
                 raise ValueError('buffer_size should be >= batch_size.')
 
         if batch_size is not None:
-            if self._batch_size is not None:
+            if (self._buffer_size is not None and
+                    self._buffer_size < batch_size):
+                raise ValueError('buffer_size should be >= batch_size.')
+            if self._batch_size not in (None, batch_size):
                 raise ValueError(
                     'Cannot modify batch_size. The value is already set.')
             else:
                 self._batch_size = batch_size
 
         self._clear_buffer = clear_buffer
-
-        self.reset()
 
     def pick(self) -> Dict[str, Tuple[T, ...]]:
         '''

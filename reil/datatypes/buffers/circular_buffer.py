@@ -23,9 +23,9 @@ class CircularBuffer(Buffer[T]):
             self, buffer_size: Optional[int],
             buffer_names: Optional[List[str]],
             pick_mode: Optional[PickModes]) -> None:
+        self._buffer_full = False
         super().__init__(buffer_size=buffer_size, buffer_names=buffer_names,
                          pick_mode=pick_mode)
-        self._buffer_full = False
 
     def add(self, data: Dict[str, T]) -> None:
         '''
