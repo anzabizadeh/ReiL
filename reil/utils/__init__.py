@@ -40,4 +40,5 @@ from .action_generator import (ActionGenerator,  # noqa: W0611
 from .instance_generator import InstanceGenerator  # noqa: W0611
 from .output_writer import OutputWriter  #noqa: W0611
 from .subject_demon import SubjectDemon, Modifier  #noqa: W0611
+from .agent_demon import AgentDemon  #noqa: W0611
 from .mnkboard import MNKBoard  # noqa: W0611

@@ -9,6 +9,7 @@ on one or more `subjects`.
 import inspect
 import pathlib
 from collections import defaultdict
+from reil.utils.agent_demon import AgentDemon
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 from reil import stateful
@@ -116,9 +117,9 @@ class Environment(stateful.Stateful):
                 _obj = obj
             if isinstance(_obj, InstanceGenerator):
                 self._instance_generators.update({name: _obj})
-            elif isinstance(_obj, NoLearnAgent):
+            elif isinstance(_obj, (NoLearnAgent, AgentDemon)):
                 self._agents.update({name: _obj})
-            elif isinstance(_obj, Subject):
+            elif isinstance(_obj, (Subject, SubjectDemon)):
                 self._subjects.update({name: _obj})
             else:
                 raise TypeError(
@@ -126,7 +127,7 @@ class Environment(stateful.Stateful):
 
         for name, generator in self._instance_generators.items():
             _, obj = next(generator)  # type: ignore
-            if isinstance(obj, Agent):
+            if isinstance(obj, (Agent, AgentDemon)):
                 self._agents.update({name: obj})
             elif isinstance(obj, (Subject, SubjectDemon)):
                 self._subjects.update({name: obj})
