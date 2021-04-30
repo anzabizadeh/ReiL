@@ -60,6 +60,10 @@ class SubjectDemon(reilbase.ReilBase):
         self._action_modifier = action_modifier
         self._state_modifier = state_modifier
 
+    @classmethod
+    def _empty_instance(cls):
+        return cls(None)  # type: ignore
+
     def state(self,
               name: str,
               _id: Optional[int] = None) -> datatypes.FeatureArray:
