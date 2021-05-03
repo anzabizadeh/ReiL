@@ -19,6 +19,7 @@ class Entity:
     Used in `InteractionProtocol`.
     '''
     name: str
+    demon_name: Optional[str] = None
     statistic_name: Optional[str] = None
     groupby: Optional[Tuple[str, ...]] = None
     aggregators: Optional[Tuple[str, ...]] = None

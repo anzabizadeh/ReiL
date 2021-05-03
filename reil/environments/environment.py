@@ -45,6 +45,8 @@ class Environment(stateful.Stateful):
     def __init__(self,
                  entity_dict: Optional[
                      Dict[str, Union[EntityType, EntityGenType, str]]] = None,
+                 demon_dict: Optional[
+                     Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
                  **kwargs: Any):
         '''
         Arguments
@@ -57,6 +59,8 @@ class Environment(stateful.Stateful):
 
         self._agents: Dict[str, Agent] = {}
         self._subjects: Dict[str, Subject] = {}
+        self._agent_demons: Dict[str, AgentDemon] = {}
+        self._subject_demons: Dict[str, SubjectDemon] = {}
         self._instance_generators: Dict[str, EntityGenType] = {}
         self._assignment_list: Dict[
             AgentSubjectTuple,
@@ -68,11 +72,15 @@ class Environment(stateful.Stateful):
             Generator[Union[FeatureArray, None], Any, None]] = {}
 
         if entity_dict is not None:
-            self.add(entity_dict)
+            self.add_entities(entity_dict)
 
-    def add(self,
-            entity_dict: Dict[str, Union[EntityType, EntityGenType, str]]
-            ) -> None:
+        if demon_dict is not None:
+            self.add_demons(demon_dict)
+
+    def add_entities(self,
+                     entity_dict: Dict[str,
+                                       Union[EntityType, EntityGenType, str]]
+                     ) -> None:
         '''
         Add `agents` and `subjects` to the environment.
 
@@ -84,7 +92,7 @@ class Environment(stateful.Stateful):
             To assign one entity to multiple names, use the name in the
             first assignment as the value of the dict for other assignments.
             For example:
-            >>> env.add({'agent_1': Agent(), 'agent_2': 'agent_1'})
+            >>> env.add_entities({'agent_1': Agent(), 'agent_2': 'agent_1'})
 
             When using name as value, the name is being looked up first in
             instance generators, then agents, and finally subjects. Whichever
@@ -135,7 +143,7 @@ class Environment(stateful.Stateful):
                 raise TypeError(
                     f'entity {name} is niether an agent nor a subject.')
 
-    def remove(self, entity_names: Tuple[str, ...]) -> None:
+    def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
         '''
         Remove `agents`, `subjects`, or `instance_generators` from
         the environment.
@@ -158,6 +166,79 @@ class Environment(stateful.Stateful):
                 del self._subjects[name]
             if name in self._instance_generators:
                 del self._instance_generators[name]
+
+    def add_demons(self,
+                   demon_dict: Optional[
+                       Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
+                   ) -> None:
+        '''
+        Add `AgentDemon`s and `SubjectDemon`s to the environment.
+
+        Arguments
+        ---------
+        demon_dict:
+            a dictionary consist of `AgentDemon`/ `SubjectDemon` name and the
+            respective entity. Names should be unique, otherwise overwritten.
+            To assign one entity to multiple names, use the name in the
+            first assignment as the value of the dict for other assignments.
+            For example:
+            >>> env.add_demons({'agent_demon_1': AgentDemon(),
+                                'agent_demon_2': 'agent_demon_1'})
+
+            When using name as value, the name is being looked up first in
+            agent demons, and then subject demons. Whichever
+            contains the name first, the demon corresponding to that instance
+            is being used.
+
+        Raises
+        ------
+        ValueError
+            A demon is being reused without being defined first.
+
+        TypeError
+            The demon is niether an `AgentDemon` nor a `SubjectDemon`.
+        '''
+        for name, obj in demon_dict.items():
+            if isinstance(obj, str):
+                _obj = self._agent_demons.get(
+                        obj, self._subject_demons.get(obj))
+                if _obj is None:
+                    raise ValueError(f'entity {obj} defined for {name} is '
+                                     'not in the list of agent demons, '
+                                     'and subject demons.')
+            else:
+                _obj = obj
+            if isinstance(_obj, AgentDemon):
+                self._agent_demons.update({name: _obj})
+            elif isinstance(_obj, SubjectDemon):
+                self._subject_demons.update({name: _obj})
+            else:
+                raise TypeError(
+                    f'entity {name} is niether an agent demon nor '
+                    'a subject demon.')
+
+    def remove_demon(self, demon_names: Tuple[str, ...]) -> None:
+        '''
+        Remove `agent demons` or `subject demons` from
+        the environment.
+
+        Arguments
+        ---------
+        demon_names:
+            A list of demon names to be deleted.
+
+        Notes
+        -----
+        This method removes the item from both `agent_demons` and
+        `subject_demons` lists.
+        Hence, it is not recommended to use the same name for both
+        an `agent demon` and a `subject demon`.
+        '''
+        for name in demon_names:
+            if name in self._agent_demons:
+                del self._agent_demons[name]
+            if name in self._subject_demons:
+                del self._subject_demons[name]
 
     def simulate_pass(self, n: int = 1) -> None:
         '''
@@ -195,7 +276,7 @@ class Environment(stateful.Stateful):
             cls,
             agent_id: int,
             agent_observer: Generator[Union[FeatureArray, None], Any, None],
-            subject_instance: Subject,
+            subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,
             reward_function_name: str,
@@ -266,7 +347,7 @@ class Environment(stateful.Stateful):
             cls,
             agent_id: int,
             agent_observer: Generator[Union[FeatureArray, None], Any, None],
-            subject_instance: Subject,
+            subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,
             reward_function_name: str,
@@ -331,23 +412,36 @@ class Environment(stateful.Stateful):
         Raises
         ------
         ValueError
-            `agent` or `subject` is not defined.
+            `agent`, `agent demon`, `subject`, or `subject demon` is not
+            defined.
 
         ValueError
             `unit` is not one of `interaction`, `instance`, or `epoch`.
         '''
-        if protocol.agent.name not in self._agents:
-            raise ValueError(f'Unknown agent name: {protocol.agent.name}.')
-        if protocol.subject.name not in self._subjects:
-            raise ValueError(f'Unknown subject name: {protocol.subject.name}.')
-        if protocol.unit not in ('interaction', 'instance', 'epoch'):
+        agent_name = protocol.agent.name
+        agent_demon_name = protocol.agent.demon_name
+        subject_name = protocol.subject.name
+        subject_demon_name = protocol.subject.demon_name
+        unit = protocol.unit
+
+        if agent_name not in self._agents:
+            raise ValueError(f'Unknown agent name: {agent_name}.')
+        if (agent_demon_name is not None
+                and agent_demon_name not in self._agent_demons):
             raise ValueError(
-                f'Unknown unit: {protocol.unit}. '
+                f'Unknown agent demon name: {agent_demon_name}.')
+        if subject_name not in self._subjects:
+            raise ValueError(f'Unknown subject name: {subject_name}.')
+        if (subject_demon_name is not None
+                and subject_demon_name not in self._subject_demons):
+            raise ValueError(
+                f'Unknown subject demon name: {subject_demon_name}.')
+        if unit not in ('interaction', 'instance', 'epoch'):
+            raise ValueError(
+                f'Unknown unit: {unit}. '
                 'It should be one of interaction, instance, or epoch. '
                 'For subjects of non-instance generator, epoch and '
                 'instance are equivalent.')
-        # if (protocol.agent_name in self._instance_generators or
-        #     protocol.subject_name in self._instance_generators) and
 
     def register(self,
                  interaction_protocol: InteractionProtocol,
@@ -373,19 +467,35 @@ class Environment(stateful.Stateful):
         have access to the same information.
         '''
         a_name = interaction_protocol.agent.name
+        a_demon_name = interaction_protocol.agent.demon_name
         a_stat = interaction_protocol.agent.statistic_name
         s_name = interaction_protocol.subject.name
+        s_demon_name = interaction_protocol.subject.demon_name
         a_s_name = (a_name, s_name)
 
+        if s_demon_name is None:
+            subject_instance = self._subjects[s_name]
+        else:
+            subject_instance = \
+                self._subject_demons[s_demon_name](
+                    self._subjects[s_name])
+
+        if a_demon_name is None:
+            agent_instance = self._agents[a_name]
+        else:
+            agent_instance = \
+                self._agent_demons[a_demon_name](
+                    self._agents[a_name])
+
         a_id, s_id = self._assignment_list[a_s_name]
-        a_id = self._subjects[s_name].register(entity_name=a_name, _id=a_id)
-        s_id = self._agents[a_name].register(entity_name=s_name, _id=s_id)
+        a_id = subject_instance.register(entity_name=a_name, _id=a_id)
+        s_id = agent_instance.register(entity_name=s_name, _id=s_id)
 
         self._assignment_list[a_s_name] = (a_id, s_id)
 
         if get_agent_observer:
             self._agent_observers[a_s_name] = \
-                self._agents[a_name].observe(s_id, a_stat)
+                agent_instance.observe(s_id, a_stat)
 
     def close_agent_observer(self, protocol: InteractionProtocol) -> None:
         '''
@@ -410,15 +520,23 @@ class Environment(stateful.Stateful):
         r_func_name = protocol.reward_function_name
         state_name = protocol.state_name
         a_s_names = (agent_name, subject_name)
+        s_demon_name = protocol.subject.demon_name
+
+        if s_demon_name is None:
+            subject_instance = self._subjects[subject_name]
+        else:
+            subject_instance = \
+                self._subject_demons[s_demon_name](
+                    self._subjects[subject_name])
 
         if inspect.getgeneratorstate(
                 self._agent_observers[a_s_names]) != inspect.GEN_SUSPENDED:
             return
 
         a_id, _ = self._assignment_list[a_s_names]
-        reward = self._subjects[subject_name].reward(
+        reward = subject_instance.reward(
             name=r_func_name, _id=a_id)
-        state = self._subjects[subject_name].state(
+        state = subject_instance.state(
             name=state_name, _id=a_id)
 
         self._agent_observers[a_s_names].send(reward)
@@ -508,6 +626,8 @@ class Environment(stateful.Stateful):
             self._instance_generators: Dict[str, EntityGenType] = {}
             self._agents: Dict[str, Agent] = {}
             self._subjects: Dict[str, Subject] = {}
+            self._agent_demons: Dict[str, AgentDemon] = {}
+            self._subject_demons: Dict[str, SubjectDemon] = {}
 
             for name, obj_type in self._env_data['instance_generators']:
                 self._instance_generators[name] = obj_type.from_pickle(
@@ -530,6 +650,15 @@ class Environment(stateful.Stateful):
                     self._subjects[name] = obj_type.from_pickle(
                         path=(_path / f'{_filename}.subjects'), filename=name)
 
+            for name, obj_type in self._env_data['agent_demons']:
+                self._agent_demons[name] = obj_type.from_pickle(
+                    path=(_path / f'{_filename}.agent_demons'), filename=name)
+
+            for name, obj_type in self._env_data['subject_demons']:
+                self._agent_demons[name] = obj_type.from_pickle(
+                    path=(_path / f'{_filename}.subject_demons'),
+                    filename=name)
+
             del self._env_data
 
         else:
@@ -548,6 +677,16 @@ class Environment(stateful.Stateful):
                     self._subjects[obj].load(
                         path=(_path / f'{_filename}.subjects'), filename=obj)
                     self._subjects[obj].reset()
+                elif obj in self._agent_demons:
+                    self._agent_demons[obj].load(
+                        path=(_path / f'{_filename}.agent_demons'),
+                        filename=obj)
+                    self._agent_demons[obj].reset()
+                elif obj in self._subject_demons:
+                    self._subject_demons[obj].load(
+                        path=(_path / f'{_filename}.subject_demons'),
+                        filename=obj)
+                    self._subject_demons[obj].reset()
 
     def save(self,  # noqa: C901
              filename: Optional[str] = None,
@@ -623,12 +762,28 @@ class Environment(stateful.Stateful):
                         self._env_data['subjects'].append(
                             (filename, type(subject)))
 
+                for name, agent_demon in self._agent_demons.items():
+                    _, filename = agent_demon.save(
+                        path=_path / f'{_filename}.agent_demons',
+                        filename=name)
+                    self._env_data['agent_demons'].append(
+                        (filename, type(agent_demon)))
+
+                for name, subject_demon in self._subject_demons.items():
+                    _, filename = subject_demon.save(
+                        path=_path / f'{_filename}.subject_demons',
+                        filename=name)
+                    self._env_data['subject_demons'].append(
+                        (filename, type(subject_demon)))
+
                 super().save(
                     filename=_filename, path=_path,
                     data_to_save=tuple(v for v in self.__dict__
                                        if v not in ('_agents',
                                                     '_subjects',
-                                                    '_instance_generators')))
+                                                    '_instance_generators',
+                                                    '_agent_demons',
+                                                    '_subject_demons')))
 
                 del self._env_data
 
@@ -647,6 +802,14 @@ class Environment(stateful.Stateful):
                 elif obj in self._subjects:
                     self._subjects[obj].save(
                         path=_path / f'{_filename}.subjects', filename=obj)
+                elif obj in self._subjects:
+                    self._agent_demons[obj].save(
+                        path=_path / f'{_filename}.agent_demons',
+                        filename=obj)
+                elif obj in self._subjects:
+                    self._subject_demons[obj].save(
+                        path=_path / f'{_filename}.subject_demons',
+                        filename=obj)
                 else:
                     self._logger.warning(f'Cannot save {obj} individually. '
                                          'Try saving the whole environment.')
@@ -658,9 +821,19 @@ class Environment(stateful.Stateful):
 
     def __repr__(self) -> str:
         try:
-            return super().__repr__() + '\n Agents:\n' + \
-                '\n\t'.join((a.__repr__() for a in self._agents.values())) + \
-                '\nSubjects:\n' + \
-                '\n\t'.join((s.__repr__() for s in self._subjects.values()))
+            return (
+                super().__repr__() + '\n Agents:\n'
+                '\n\t'.join((a.__repr__()
+                             for a in self._agents.values())) +
+                '\nSubjects:\n'
+                '\n\t'.join((s.__repr__()
+                             for s in self._subjects.values())) +
+                '\n AgentDemons:\n'
+                '\n\t'.join((a.__repr__()
+                             for a in self._agent_demons.values())) +
+                '\nSubjectDemons:\n'
+                '\n\t'.join((s.__repr__()
+                             for s in self._subject_demons.values()))
+            )
         except AttributeError:
             return super().__repr__()

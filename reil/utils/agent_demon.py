@@ -5,15 +5,18 @@ AgentDemon class
 
 `AgentDemon` class changes the behavior of a given agent.
 '''
+from __future__ import annotations
 
 import pathlib
+from typing import Any, Callable, Optional, Tuple, Union
+
+from reil import agents, reilbase, stateful
+from reil.datatypes.components import PrimaryComponent, Statistic
 from reil.datatypes.feature import FeatureArray
-from typing import Any, Callable, Generator, Optional, Tuple, Union
-
-from reil import reilbase, agents, stateful
+from reil.subjects.subject import Subject
 
 
-class AgentDemon(reilbase.ReilBase):
+class AgentDemon(agents.Agent):
     '''
     This class accepts a regular `agent`, and intervenes in its interaction
     with the subjects. A substitute `agent` acts whenever a condition is
@@ -22,16 +25,13 @@ class AgentDemon(reilbase.ReilBase):
 
     def __init__(
             self,
-            main_agent: agents.Agent,
             sub_agent: agents.NoLearnAgent,
             condition_fn: Callable[[FeatureArray, int], bool],
+            main_agent: Optional[agents.Agent] = None,
             **kwargs: Any):
         '''
         Arguments
         ---------
-        main_agent:
-            The `agent` that needs to be intervened with.
-
         sub_agent:
             An `agent` that acts instead of the `main_agent`.
 
@@ -39,32 +39,89 @@ class AgentDemon(reilbase.ReilBase):
             A function that accepts the current state and ID of the subject
             and decides whether the `main_agent` should act or the `sub_agent`.
 
+        main_agent:
+            The `agent` that needs to be intervened with.
         '''
-        super().__init__(**kwargs)
+        reilbase.ReilBase.__init__(self, **kwargs)
+
+        self.state: PrimaryComponent
+        self.statistic: Statistic
+        self._entity_list: stateful.EntityRegister
+        self._training_trigger: str
 
         self._main_agent = main_agent
-        self._sub_agent = sub_agent
+        self._sub_agent: agents.NoLearnAgent = sub_agent
         self._condition_fn = condition_fn
 
-        self.state = main_agent.state
-        self.statistic = main_agent.statistic
-        self.load = main_agent.load
-        self.save = main_agent.save
+        if main_agent is not None:
+            self.__call__(main_agent)
 
     @classmethod
     def _empty_instance(cls):
-        return cls(None, None, None)  # type: ignore
+        return cls(Subject(), None, None)  # type: ignore
 
-    def load_daemon(self, filename: str,
-                    path: Optional[Union[str, pathlib.PurePath]]) -> None:
-        super().load(filename, path)
+    def __call__(self, main_agent: agents.Agent) -> AgentDemon:
+        self._main_agent = main_agent
+        self.state = main_agent.state
+        self.statistic = main_agent.statistic
+        self._entity_list = main_agent._entity_list
+        self._training_trigger = main_agent._training_trigger
 
-    def save_daemon(self,
-                    filename: Optional[str] = None,
-                    path: Optional[Union[str, pathlib.PurePath]] = None,
-                    data_to_save: Optional[Tuple[str, ...]] = None
-                    ) -> Tuple[pathlib.PurePath, str]:
-        return super().save(filename, path, data_to_save)
+        return self
+
+    def load(self, filename: str,
+             path: Optional[Union[str, pathlib.PurePath]]) -> None:
+        _path = pathlib.Path(path or self._path)
+        super().load(filename, _path)
+
+        self._main_agent = self._main_agent.from_pickle(  # type: ignore
+            filename, _path / 'main_agent')
+        self._sub_agent = self._sub_agent.from_pickle(  # type: ignore
+            filename, _path / 'sub_agent')
+
+        self.__call__(self._main_agent)
+
+    def save(self,
+             filename: Optional[str] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
+             data_to_save: Optional[Tuple[str, ...]] = None
+             ) -> Tuple[pathlib.PurePath, str]:
+
+        data = list(data_to_save or self.__dict__)
+        save_main = '_main_agent' in data
+        save_sub = '_sub_agent' in data
+        if save_main:
+            temp_main, self._main_agent = (  # type: ignore
+                self._main_agent, type(self._main_agent))
+
+        if save_sub:
+            temp_sub, self._sub_agent = (  # type: ignore
+                self._sub_agent, type(self._sub_agent))
+
+        if 'state' in data:
+            data.remove('state')
+
+        if 'statistic' in data:
+            data.remove('statistic')
+
+        _path = pathlib.Path(path or self._path)
+        _filename = filename or self._name
+
+        try:
+            super().save(
+                _filename, _path, data_to_save=tuple(data))
+            if save_main:
+                self._main_agent = temp_main  # type: ignore
+                self._main_agent.save(_filename, _path / 'main_agent')
+            if save_sub:
+                self._sub_agent = temp_sub  # type: ignore
+                self._sub_agent.save(_filename, _path / 'sub_agent')
+        finally:
+            if save_main:
+                self._main_agent = temp_main  # type: ignore
+                self._sub_agent = temp_sub  # type: ignore
+
+        return _path, _filename
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         from_main = self._main_agent.register(entity_name, _id)
@@ -73,7 +130,7 @@ class AgentDemon(reilbase.ReilBase):
             raise RuntimeError(f'ID from the main agent {from_main} does not '
                                f'match the ID from the sub agent {from_sub}.')
 
-        return self._main_agent.register(entity_name, _id)
+        return from_main
 
     def deregister(self, entity_id: int) -> None:
         self._sub_agent.deregister(entity_id)
@@ -134,80 +191,3 @@ class AgentDemon(reilbase.ReilBase):
             Some methods
         '''
         self._main_agent.learn(history)
-
-    def observe(self, subject_id: int, stat_name: Optional[str],  # noqa: C901
-                ) -> Generator[Union[FeatureArray, None], Any, None]:
-        '''
-        Create a generator to interact with the subject (`subject_id`).
-        Extends `NoLearnAgent.observe`.
-
-        This method creates a generator for `subject_id` that
-        receives `state`, yields `action` and receives `reward`
-        until it is closed. When `.close()` is called on the generator,
-        `statistics` are calculated.
-
-        Arguments
-        ---------
-        subject_id:
-            the ID of the `subject` on which action happened.
-
-        stat_name:
-            The name of the `statistic` that should be computed at the end of
-            each trajectory.
-
-        Raises
-        ------
-        ValueError
-            Subject with `subject_id` not found.
-        '''
-        if subject_id not in self._main_agent._entity_list:
-            raise ValueError(f'Subject with ID={subject_id} not found.')
-
-        trigger = self._main_agent._training_trigger
-        trigger_on_state = trigger == 'state'
-        trigger_on_action = trigger == 'action'
-        trigger_on_reward = trigger == 'reward'
-        trigger_on_termination = trigger == 'termination'
-
-        history: stateful.History = []
-        new_observation = stateful.Observation()
-        while True:
-            try:
-                new_observation = stateful.Observation()
-                temp = yield
-                new_observation.state = temp['state']
-                actions: Tuple[FeatureArray, ...] = temp['actions']
-                epoch: int = temp['epoch']
-
-                if trigger_on_state:
-                    self._main_agent.learn([history[-1], new_observation])
-
-                if actions is not None:
-                    new_observation.action = self.act(
-                        state=new_observation.state,  # type: ignore
-                        subject_id=subject_id,
-                        actions=actions, epoch=epoch)
-
-                    if trigger_on_action:
-                        self._main_agent.learn([history[-1], new_observation])
-
-                    new_observation.reward = (yield new_observation.action)
-
-                    history.append(new_observation)
-
-                    if trigger_on_reward:
-                        self._main_agent.learn(history[-2:])
-                else:
-                    yield
-
-            except GeneratorExit:
-                if new_observation.reward is None:  # terminated early!
-                    history.append(new_observation)
-
-                if trigger_on_termination:
-                    self._main_agent.learn(history)
-
-                if stat_name is not None:
-                    self.statistic.append(stat_name, subject_id)
-
-                return

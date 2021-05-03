@@ -111,7 +111,7 @@ class ReilBase:
     @classmethod
     def from_pickle(
             cls, filename: str,
-            path: Optional[Union[pathlib.PurePath, str]] = None) -> ReilBase:
+            path: Optional[Union[pathlib.PurePath, str]] = None):
         '''
         Load a pickled instance.
 

@@ -5,12 +5,15 @@ SubjectDemon class
 
 `SubjectDemon` class changes the behavior of a given subject.
 '''
+from __future__ import annotations
 
 import dataclasses
 import pathlib
 from typing import Any, Callable, Optional, Tuple, Union
 
 from reil import datatypes, reilbase, subjects
+from reil.datatypes.components import SecondayComponent, Statistic
+from reil.subjects.subject import Subject
 
 
 @dataclasses.dataclass
@@ -29,7 +32,7 @@ class SubjectDemon(reilbase.ReilBase):
 
     def __init__(
             self,
-            subject: subjects.Subject,
+            subject: Optional[subjects.Subject] = None,
             action_modifier: Optional[Modifier] = None,
             state_modifier: Optional[Modifier] = None,
             **kwargs: Any):
@@ -48,6 +51,21 @@ class SubjectDemon(reilbase.ReilBase):
         '''
         super().__init__(**kwargs)
 
+        self._subject: Subject
+        self.reward: SecondayComponent
+        self.statistic: Statistic
+
+        if subject:
+            self.__call__(subject)
+
+        self._action_modifier = action_modifier
+        self._state_modifier = state_modifier
+
+    # @classmethod
+    # def _empty_instance(cls):
+    #     return cls(Subject())
+
+    def __call__(self, subject: Subject) -> SubjectDemon:
         self._subject = subject
         self.reward = subject.reward
         self.statistic = subject.statistic
@@ -57,12 +75,7 @@ class SubjectDemon(reilbase.ReilBase):
         self.load = subject.load
         self.save = subject.save
 
-        self._action_modifier = action_modifier
-        self._state_modifier = state_modifier
-
-    @classmethod
-    def _empty_instance(cls):
-        return cls(None)  # type: ignore
+        return self
 
     def state(self,
               name: str,
@@ -132,15 +145,15 @@ class SubjectDemon(reilbase.ReilBase):
 
         return original_set
 
-    def load_daemon(self, filename: str,
-                    path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    def load(self, filename: str,
+                   path: Optional[Union[str, pathlib.PurePath]]) -> None:
         super().load(filename, path)
 
-    def save_daemon(self,
-                    filename: Optional[str] = None,
-                    path: Optional[Union[str, pathlib.PurePath]] = None,
-                    data_to_save: Optional[Tuple[str, ...]] = None
-                    ) -> Tuple[pathlib.PurePath, str]:
+    def save(self,
+                   filename: Optional[str] = None,
+                   path: Optional[Union[str, pathlib.PurePath]] = None,
+                   data_to_save: Optional[Tuple[str, ...]] = None
+                   ) -> Tuple[pathlib.PurePath, str]:
         return super().save(filename, path, data_to_save)
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:

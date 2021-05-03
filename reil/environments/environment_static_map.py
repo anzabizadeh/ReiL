@@ -9,6 +9,8 @@ are determined by a fixed `interaction_sequence`.
 '''
 from collections import namedtuple
 import pathlib
+from reil.utils.subject_demon import SubjectDemon
+from reil.utils.agent_demon import AgentDemon
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
@@ -25,6 +27,8 @@ class EnvironmentStaticMap(Environment):
     def __init__(self,
                  entity_dict: Optional[
                      Dict[str, Union[EntityType, EntityGenType, str]]] = None,
+                 demon_dict: Optional[
+                     Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
                  interaction_sequence: Optional[
                      Tuple[InteractionProtocol, ...]] = None,
                  **kwargs: Any):
@@ -39,16 +43,17 @@ class EnvironmentStaticMap(Environment):
             a tuple of `InteractionProtocols` that specify
             how entities interact in the simulation.
         '''
-        super().__init__(entity_dict=entity_dict, **kwargs)
+        super().__init__(
+            entity_dict=entity_dict, demon_dict=demon_dict, **kwargs)
 
         self._interaction_sequence: Tuple[InteractionProtocol, ...] = ()
 
         if interaction_sequence is not None:
             self.interaction_sequence = interaction_sequence
 
-    def remove(self, entity_names: Tuple[str, ...]) -> None:
+    def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
         '''
-        Extends `Environment.remove`.
+        Extends `Environment.remove_entity`.
 
         Remove `agents`, `subjects`, or `instance_generators` from
         the environment.
@@ -78,7 +83,42 @@ class EnvironmentStaticMap(Environment):
         if temp:
             raise RuntimeError(f'Some entities are in use: {temp}')
 
-        super().remove(entity_names)
+        super().remove_entity(entity_names)
+
+    def remove_demon(self, demon_names: Tuple[str, ...]) -> None:
+        '''
+        Extends `Environment.remove_demon`.
+
+        Remove `agent demons`, or `subject demons` from
+        the environment.
+
+        Arguments
+        ---------
+        demon_names:
+            A list of `agent demon`/ `subject demon` names to be deleted.
+
+        Raises
+        ------
+        RuntimeError
+            The entity listed for deletion is used in the
+            `interaction_sequence`.
+
+        Notes
+        -----
+        This method removes the item from both `agent_demons` and
+        `subject_demons` lists.
+        Hence, it is not recommended to use the same name for both
+        an `agent demon` and a `subject demon`.
+        '''
+        names_in_use = [p.agent.demon_name
+                        for p in self._interaction_sequence] + \
+                       [p.subject.demon_name
+                        for p in self._interaction_sequence]
+        temp = set(demon_names).difference(names_in_use)
+        if temp:
+            raise RuntimeError(f'Some demons are in use: {temp}')
+
+        super().remove_demon(demon_names)
 
     @property
     def interaction_sequence(self) -> Tuple[InteractionProtocol, ...]:
@@ -119,11 +159,18 @@ class EnvironmentStaticMap(Environment):
                 reward_function_name = protocol.reward_function_name
                 agent_id, _ = self._assignment_list[a_s_name]
 
+                if protocol.subject.demon_name is None:
+                    subject_instance = self._subjects[subject_name]
+                else:
+                    subject_instance = \
+                        self._subject_demons[protocol.subject.demon_name](
+                            self._subjects[subject_name])
+
                 if unit == 'interaction':
                     self.interact(
                         agent_id=agent_id,  # type: ignore
                         agent_observer=self._agent_observers[a_s_name],
-                        subject_instance=self._subjects[subject_name],
+                        subject_instance=subject_instance,
                         state_name=state_name,
                         action_name=action_name,
                         reward_function_name=reward_function_name,
@@ -140,7 +187,7 @@ class EnvironmentStaticMap(Environment):
                     self.interact_while(
                         agent_id=agent_id,  # type: ignore
                         agent_observer=self._agent_observers[a_s_name],
-                        subject_instance=self._subjects[subject_name],
+                        subject_instance=subject_instance,
                         state_name=state_name,
                         action_name=action_name,
                         reward_function_name=reward_function_name,
@@ -152,7 +199,7 @@ class EnvironmentStaticMap(Environment):
                             self.interact_while(
                                 agent_id=agent_id,  # type: ignore
                                 agent_observer=self._agent_observers[a_s_name],
-                                subject_instance=self._subjects[subject_name],
+                                subject_instance=subject_instance,
                                 state_name=state_name,
                                 action_name=action_name,
                                 reward_function_name=reward_function_name,

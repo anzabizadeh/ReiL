@@ -8,8 +8,7 @@ This `agent` class is the base class of all agent classes that can learn from
 '''
 
 import pathlib
-from collections import defaultdict
-from typing import Any, Dict, Generator, Generic, Optional, Tuple, Union
+from typing import Any, Generator, Generic, Optional, Tuple, Union
 
 from reil import agents, stateful
 from reil.datatypes import FeatureArray
@@ -74,7 +73,6 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
         self._discount_factor = min(discount_factor, 1.0)
         self._exploration_strategy = exploration_strategy
         self._training_trigger = training_trigger
-        self._history: Dict[int, stateful.History] = defaultdict(list)
 
     @classmethod
     def _empty_instance(cls):
@@ -275,10 +273,10 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         trigger = self._training_trigger
-        trigger_on_state = trigger == 'state'
-        trigger_on_action = trigger == 'action'
-        trigger_on_reward = trigger == 'reward'
-        trigger_on_termination = trigger == 'termination'
+        learn_on_state = trigger == 'state'
+        learn_on_action = trigger == 'action'
+        learn_on_reward = trigger == 'reward'
+        learn_on_termination = trigger == 'termination'
 
         history: stateful.History = []
         new_observation = stateful.Observation()
@@ -290,7 +288,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                 actions: Tuple[FeatureArray, ...] = temp['actions']
                 epoch: int = temp['epoch']
 
-                if trigger_on_state:
+                if learn_on_state:
                     self.learn([history[-1], new_observation])
 
                 if actions is not None:
@@ -299,14 +297,14 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                         subject_id=subject_id,
                         actions=actions, epoch=epoch)
 
-                    if trigger_on_action:
+                    if learn_on_action:
                         self.learn([history[-1], new_observation])
 
                     new_observation.reward = (yield new_observation.action)
 
                     history.append(new_observation)
 
-                    if trigger_on_reward:
+                    if learn_on_reward:
                         self.learn(history[-2:])
                 else:
                     yield
@@ -315,7 +313,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                 if new_observation.reward is None:  # terminated early!
                     history.append(new_observation)
 
-                if trigger_on_termination:
+                if learn_on_termination:
                     self.learn(history)
 
                 if stat_name is not None:
