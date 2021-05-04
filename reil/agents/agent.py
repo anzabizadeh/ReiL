@@ -12,7 +12,7 @@ from typing import Any, Generator, Generic, Optional, Tuple, Union
 
 from reil import agents, stateful
 from reil.datatypes import FeatureArray
-from reil.learners.learner import Learner, LabelType
+from reil.learners.learner import LabelType, Learner
 from reil.utils.exploration_strategies import ExplorationStrategy
 from typing_extensions import Literal
 

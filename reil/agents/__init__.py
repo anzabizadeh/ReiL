@@ -13,6 +13,9 @@ NoLearnAgent
 Agent
     the base class of all agent classes that learn from history
 
+AgentDemon:
+    A class that allows an `agent` to be manipulated.
+
 QLearning
     the Q-learning agent that can accept any learner
 
@@ -36,6 +39,7 @@ TrainingData
 '''
 from .no_learn_agent import NoLearnAgent, TrainingData  # noqa: W0611
 from .agent import Agent  # noqa: W0611
+from .agent_demon import AgentDemon  # noqa: W0611
 from .q_learning import QLearning  # noqa: W0611
 from .deep_q_learning import DeepQLearning  # noqa: W0611
 from .random_agent import RandomAgent  # noqa: W0611

@@ -72,8 +72,6 @@ class SubjectDemon(reilbase.ReilBase):
         self.is_terminated = subject.is_terminated
         self.take_effect = subject.take_effect
         self.reset = subject.reset
-        self.load = subject.load
-        self.save = subject.save
 
         return self
 
@@ -146,14 +144,14 @@ class SubjectDemon(reilbase.ReilBase):
         return original_set
 
     def load(self, filename: str,
-                   path: Optional[Union[str, pathlib.PurePath]]) -> None:
+             path: Optional[Union[str, pathlib.PurePath]]) -> None:
         super().load(filename, path)
 
     def save(self,
-                   filename: Optional[str] = None,
-                   path: Optional[Union[str, pathlib.PurePath]] = None,
-                   data_to_save: Optional[Tuple[str, ...]] = None
-                   ) -> Tuple[pathlib.PurePath, str]:
+             filename: Optional[str] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
+             data_to_save: Optional[Tuple[str, ...]] = None
+             ) -> Tuple[pathlib.PurePath, str]:
         return super().save(filename, path, data_to_save)
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:

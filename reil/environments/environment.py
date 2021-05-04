@@ -9,14 +9,13 @@ on one or more `subjects`.
 import inspect
 import pathlib
 from collections import defaultdict
-from reil.utils.agent_demon import AgentDemon
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 from reil import stateful
-from reil.agents import Agent, NoLearnAgent
+from reil.agents import Agent, NoLearnAgent, AgentDemon
 from reil.datatypes import FeatureArray, InteractionProtocol
-from reil.subjects import Subject
-from reil.utils import InstanceGenerator, SubjectDemon
+from reil.subjects import Subject, SubjectDemon
+from reil.utils import InstanceGenerator
 
 AgentSubjectTuple = Tuple[str, str]
 EntityType = Union[Agent, Subject]

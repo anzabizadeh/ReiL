@@ -11,6 +11,9 @@ Classes
 Subject:
     The base class of all `subject` classes.
 
+SubjectDemon:
+    A class that allows a `subject` to be manipulated.
+
 MNKGame:
     A simple game consisting of an m-by-n board.
     Each player should make a horizontal, vertical, or
@@ -31,6 +34,7 @@ WindyGridworld:
 '''
 
 from .subject import Subject  # noqa: W0611
+from .subject_demon import SubjectDemon, Modifier  # noqa: W0611
 from .mnkgame import MNKGame  # noqa: W0611
 from .tic_tac_toe import TicTacToe  # noqa: W0611
 # from .windy_gridworld import WindyGridworld  # noqa: W0611

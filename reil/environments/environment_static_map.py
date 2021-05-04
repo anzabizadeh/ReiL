@@ -9,8 +9,8 @@ are determined by a fixed `interaction_sequence`.
 '''
 from collections import namedtuple
 import pathlib
-from reil.utils.subject_demon import SubjectDemon
-from reil.utils.agent_demon import AgentDemon
+from reil.subjects import SubjectDemon
+from reil.agents import AgentDemon
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd

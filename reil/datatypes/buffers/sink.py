@@ -6,13 +6,12 @@ Sink class
 A dummy buffer that does nothing!
 '''
 
-from reil.datatypes.buffers.buffer import PickModes
 from typing import Any, Dict, List, Optional
 
-from reil.datatypes import buffers
+from reil.datatypes.buffers import Buffer, PickModes
 
 
-class Sink(buffers.Buffer):
+class Sink(Buffer):
     '''
     A sink class.
     '''

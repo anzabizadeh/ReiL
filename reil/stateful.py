@@ -36,11 +36,11 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
-from reil.datatypes import Feature
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from reil import reilbase
-from reil.datatypes import PrimaryComponent, FeatureArray, SubComponentInfo
+from reil.datatypes import (Feature, FeatureArray, PrimaryComponent,
+                            SubComponentInfo)
 from reil.datatypes.components import Statistic
 
 

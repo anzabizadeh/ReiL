@@ -17,7 +17,6 @@ from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Tuple,
 import pandas as pd
 from reil.datatypes import FeatureArray
 
-
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
 
 

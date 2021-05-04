@@ -10,13 +10,15 @@ from __future__ import annotations
 import pathlib
 from typing import Any, Callable, Optional, Tuple, Union
 
-from reil import agents, reilbase, stateful
+from reil import reilbase, stateful
+from reil.agents.agent import Agent
+from reil.agents.no_learn_agent import NoLearnAgent
 from reil.datatypes.components import PrimaryComponent, Statistic
 from reil.datatypes.feature import FeatureArray
 from reil.subjects.subject import Subject
 
 
-class AgentDemon(agents.Agent):
+class AgentDemon(Agent):
     '''
     This class accepts a regular `agent`, and intervenes in its interaction
     with the subjects. A substitute `agent` acts whenever a condition is
@@ -25,9 +27,9 @@ class AgentDemon(agents.Agent):
 
     def __init__(
             self,
-            sub_agent: agents.NoLearnAgent,
+            sub_agent: NoLearnAgent,
             condition_fn: Callable[[FeatureArray, int], bool],
-            main_agent: Optional[agents.Agent] = None,
+            main_agent: Optional[Agent] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -50,7 +52,7 @@ class AgentDemon(agents.Agent):
         self._training_trigger: str
 
         self._main_agent = main_agent
-        self._sub_agent: agents.NoLearnAgent = sub_agent
+        self._sub_agent: NoLearnAgent = sub_agent
         self._condition_fn = condition_fn
 
         if main_agent is not None:
@@ -60,7 +62,7 @@ class AgentDemon(agents.Agent):
     def _empty_instance(cls):
         return cls(Subject(), None, None)  # type: ignore
 
-    def __call__(self, main_agent: agents.Agent) -> AgentDemon:
+    def __call__(self, main_agent: Agent) -> AgentDemon:
         self._main_agent = main_agent
         self.state = main_agent.state
         self.statistic = main_agent.statistic
