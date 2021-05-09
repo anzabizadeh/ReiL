@@ -654,7 +654,7 @@ class Environment(stateful.Stateful):
                     path=(_path / f'{_filename}.agent_demons'), filename=name)
 
             for name, obj_type in self._env_data['subject_demons']:
-                self._agent_demons[name] = obj_type.from_pickle(
+                self._subject_demons[name] = obj_type.from_pickle(
                     path=(_path / f'{_filename}.subject_demons'),
                     filename=name)
 
@@ -801,11 +801,11 @@ class Environment(stateful.Stateful):
                 elif obj in self._subjects:
                     self._subjects[obj].save(
                         path=_path / f'{_filename}.subjects', filename=obj)
-                elif obj in self._subjects:
+                elif obj in self._agent_demons:
                     self._agent_demons[obj].save(
                         path=_path / f'{_filename}.agent_demons',
                         filename=obj)
-                elif obj in self._subjects:
+                elif obj in self._subject_demons:
                     self._subject_demons[obj].save(
                         path=_path / f'{_filename}.subject_demons',
                         filename=obj)
