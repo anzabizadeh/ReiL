@@ -7,9 +7,7 @@ A datatype that accepts initial value and feature generator, and generates
 new values. This datatype uses `Entity` to specify an `agent` or a `subject`.
 '''
 import dataclasses
-from typing import Optional, Tuple
-
-from typing_extensions import Literal
+from typing import Literal, Optional, Tuple
 
 
 @dataclasses.dataclass(frozen=True)

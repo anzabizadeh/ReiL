@@ -13,10 +13,8 @@ import dataclasses
 import itertools
 from dataclasses import field
 from typing import (Any, Callable, Dict, Generic, Iterable, Iterator, List,
-                    Mapping, Optional, Sequence, Tuple, TypeVar, Union, cast,
-                    overload)
-
-from typing_extensions import Literal
+                    Literal, Mapping, Optional, Sequence, Tuple, TypeVar,
+                    Union, cast, overload)
 
 T = TypeVar('T')
 

@@ -7,11 +7,10 @@ The base class of all `agent` classes.
 '''
 
 import random
-from typing import Any, Generator, Optional, Tuple, TypeVar, Union
+from typing import Any, Generator, Literal, Optional, Tuple, TypeVar, Union
 
 from reil import stateful
 from reil.datatypes import FeatureArray
-from typing_extensions import Literal
 
 TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[float, ...]]
 T = TypeVar('T')

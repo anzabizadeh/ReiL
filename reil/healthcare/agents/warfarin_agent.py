@@ -7,14 +7,13 @@ An agent for warfarin modeling based on the protocols defined
 in Ravvaz et al (2017).
 '''
 
-from typing import Any, Optional, Tuple
+from typing import Any, Literal, Optional, Tuple
 
 from reil import agents
 from reil.datatypes import FeatureArray
 from reil.datatypes.feature import FeatureGenerator
 from reil.healthcare.dosing_protocols.warfarin import (AAA, CAA, PGAA, PGPGA,
                                                        PGPGI)
-from typing_extensions import Literal
 
 
 class WarfarinAgent(agents.NoLearnAgent):

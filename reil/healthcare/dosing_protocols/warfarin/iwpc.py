@@ -7,10 +7,9 @@ IWPC dosing protocol ('pharmacogenetic', 'clinical', 'modified').
 '''
 
 from math import exp
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Literal, Tuple
 
 from reil.healthcare.dosing_protocols.dosing_protocol import DosingProtocol
-from typing_extensions import Literal
 
 
 class IWPC(DosingProtocol):

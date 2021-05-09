@@ -8,13 +8,12 @@ This `agent` class is the base class of all agent classes that can learn from
 '''
 
 import pathlib
-from typing import Any, Generator, Generic, Optional, Tuple, Union
+from typing import Any, Generator, Generic, Literal, Optional, Tuple, Union
 
 from reil import agents, stateful
 from reil.datatypes import FeatureArray
 from reil.learners.learner import LabelType, Learner
 from reil.utils.exploration_strategies import ExplorationStrategy
-from typing_extensions import Literal
 
 
 class Agent(agents.NoLearnAgent, Generic[LabelType]):

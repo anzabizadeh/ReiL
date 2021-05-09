@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "c:\\Users\\Sadjad\\.rlenv\\Scripts\\python.exe",
+    "python.pythonPath": "c:\\Users\\Sadjad\\.reil38\\Scripts\\python.exe",
     "python.linting.pylintEnabled": false,
     "python.linting.enabled": true,
     "python.testing.unittestArgs": [

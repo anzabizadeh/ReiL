@@ -6,11 +6,11 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import (Any, Dict, Generic, List, Literal, Optional, Tuple,
+                    TypeVar, Union)
 
 import numpy as np
 from reil import reilbase
-from typing_extensions import Literal
 
 T = TypeVar('T')
 PickModes = Literal['all', 'random', 'recent', 'old']
