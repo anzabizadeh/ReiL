@@ -97,7 +97,8 @@ class VariableEpsilonGreedy(ExplorationStrategy):
         Arguments
         ---------
         epsilon:
-            A uni-variate function that computes `epsilon` based on `iteration`.
+            A uni-variate function that computes `epsilon`
+            based on `iteration`.
 
         Raises
         ------
