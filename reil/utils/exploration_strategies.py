@@ -32,14 +32,14 @@ class ExplorationStrategy(reilbase.ReilBase):
     def __init__(self) -> None:
         pass
 
-    def explore(self, epoch: int = 0) -> bool:
+    def explore(self, iteration: int = 0) -> bool:
         '''
         Return `True` if the `agent` needs to explore.
 
         Arguments
         ---------
-        epoch:
-            The current epoch number.
+        iteration:
+            The current iteration number.
 
         Returns
         -------
@@ -70,14 +70,14 @@ class ConstantEpsilonGreedy(ExplorationStrategy):
             warnings.warn('epsilon is not in the range of [0, 1].')
         self._epsilon = epsilon
 
-    def explore(self, epoch: int = 0) -> bool:
+    def explore(self, iteration: int = 0) -> bool:
         '''
         Return `True` if a randomly generated number is less than `epsilon`.
 
         Arguments
         ---------
-        epoch:
-            The current epoch number.
+        iteration:
+            The current iteration number.
 
         Returns
         -------
@@ -97,7 +97,7 @@ class VariableEpsilonGreedy(ExplorationStrategy):
         Arguments
         ---------
         epsilon:
-            A uni-variate function that computes `epsilon` based on `epoch`.
+            A uni-variate function that computes `epsilon` based on `iteration`.
 
         Raises
         ------
@@ -114,18 +114,18 @@ class VariableEpsilonGreedy(ExplorationStrategy):
     def _empty_instance(cls):
         return cls(lambda e: 0.0)
 
-    def explore(self, epoch: int) -> bool:
+    def explore(self, iteration: int) -> bool:
         '''
         Return `True` if a randomly generated number is less than `epsilon`.
 
         Arguments
         ---------
-        epoch:
-            The current epoch number.
+        iteration:
+            The current iteration number.
 
         Returns
         -------
         :
             `True` if the caller should explore, otherwise `False`.
         '''
-        return random.random() < self._epsilon(epoch)
+        return random.random() < self._epsilon(iteration)

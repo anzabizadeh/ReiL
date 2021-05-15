@@ -25,9 +25,9 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
         ---------
         learning_rate:
             A `LearningRateScheduler` object that determines the learning rate
-            based on epoch. If any scheduler other than constant is provided,
+            based on iteration. If any scheduler other than constant is provided,
             the model uses the `new_rate` method of the scheduler to determine
-            the learning rate at each epoch.
+            the learning rate at each iteration.
         '''
         super().__init__(**kwargs)
         self._learning_rate = learning_rate

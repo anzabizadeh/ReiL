@@ -24,7 +24,7 @@ class UserAgent(agents.NoLearnAgent):
     def act(self,
             state: FeatureArray,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            epoch: int = 0) -> FeatureArray:
+            iteration: int = 0) -> FeatureArray:
         '''
         Return a random action.
 
@@ -36,8 +36,8 @@ class UserAgent(agents.NoLearnAgent):
         actions:
             The set of possible actions to choose from.
 
-        epoch:
-            The epoch in which the agent is acting.
+        iteration:
+            The iteration in which the agent is acting.
 
         Returns
         -------

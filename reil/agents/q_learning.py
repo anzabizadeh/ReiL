@@ -41,7 +41,7 @@ class QLearning(agents.Agent):
         exploration_strategy:
             an `ExplorationStrategy` object that determines
             whether the `action` should be exploratory or not for a given
-            `state` at a given `epoch`.
+            `state` at a given `iteration`.
 
         discount_factor:
             by what factor should future rewards be discounted?
@@ -227,6 +227,6 @@ class QLearning(agents.Agent):
         return result
 
     def reset(self) -> None:
-        '''Resets the agent at the end of a learning epoch.'''
+        '''Resets the agent at the end of a learning iteration.'''
         super().reset()
         self._buffer.reset()

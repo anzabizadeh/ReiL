@@ -146,7 +146,7 @@ class AgentDemon(Agent):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            epoch: int = 0) -> FeatureArray:
+            iteration: int = 0) -> FeatureArray:
         '''
         Return an action based on the given state.
 
@@ -161,8 +161,8 @@ class AgentDemon(Agent):
         actions:
             the set of possible actions to choose from.
 
-        epoch:
-            the epoch in which the agent is acting.
+        iteration:
+            the iteration in which the agent is acting.
 
         Raises
         ------
@@ -175,9 +175,9 @@ class AgentDemon(Agent):
             the action
         '''
         if self._condition_fn(state, subject_id):
-            return self._sub_agent.act(state, subject_id, actions, epoch)
+            return self._sub_agent.act(state, subject_id, actions, iteration)
 
-        return self._main_agent.act(state, subject_id, actions, epoch)
+        return self._main_agent.act(state, subject_id, actions, iteration)
 
     def learn(self, history: stateful.History) -> None:
         '''

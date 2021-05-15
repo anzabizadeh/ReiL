@@ -20,7 +20,7 @@ from reil import reilbase
 class LearningRateScheduler(reilbase.ReilBase):
     '''
     A class that gets an initial learning rate and a function to determine the
-    rate based on epoch and previous rate.
+    rate based on iteration and previous rate.
     '''
     def __init__(self, initial_lr: float,
                  new_rate_function: Callable[[int, float], float]) -> None:
@@ -31,7 +31,7 @@ class LearningRateScheduler(reilbase.ReilBase):
             The initial learning rate.
 
         new_rate_function:
-            A function that accepts epoch and current learning
+            A function that accepts iteration and current learning
             rate and returns a new learning rate.
         '''
         self.initial_lr = initial_lr
@@ -41,14 +41,14 @@ class LearningRateScheduler(reilbase.ReilBase):
     def _empty_instance(cls):
         return cls(0.0, lambda e, lr: lr)
 
-    def new_rate(self, epoch: int, current_lr: float) -> float:
+    def new_rate(self, iteration: int, current_lr: float) -> float:
         '''
-        Determine the new rate based on `epoch` and current learning rate.
+        Determine the new rate based on `iteration` and current learning rate.
 
         Arguments
         ---------
-        epoch:
-            The current training epoch.
+        iteration:
+            The current training iteration.
 
         current_lr:
             The current learning rate.
@@ -59,7 +59,7 @@ class LearningRateScheduler(reilbase.ReilBase):
             The new learning rate.
 
         '''
-        return self._lambda_func(epoch, current_lr)
+        return self._lambda_func(iteration, current_lr)
 
 
 class ConstantLearningRate(LearningRateScheduler):

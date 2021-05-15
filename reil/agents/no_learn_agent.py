@@ -55,7 +55,7 @@ class NoLearnAgent(stateful.Stateful):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            epoch: int = 0) -> FeatureArray:
+            iteration: int = 0) -> FeatureArray:
         '''
         Return an action based on the given state.
 
@@ -67,8 +67,8 @@ class NoLearnAgent(stateful.Stateful):
         actions:
             The set of possible actions to choose from.
 
-        epoch:
-            The epoch in which the agent is acting.
+        iteration:
+            The iteration in which the agent is acting.
 
         Returns
         -------
@@ -143,13 +143,13 @@ class NoLearnAgent(stateful.Stateful):
                 temp = yield
                 new_observation.state = temp['state']
                 actions: Tuple[FeatureArray, ...] = temp['actions']
-                epoch: int = temp['epoch']
+                iteration: int = temp['iteration']
 
                 if actions is not None:
                     new_observation.action = self.act(
                         state=new_observation.state,  # type: ignore
                         subject_id=subject_id,
-                        actions=actions, epoch=epoch)
+                        actions=actions, iteration=iteration)
 
                     new_observation.reward = (yield new_observation.action)
 

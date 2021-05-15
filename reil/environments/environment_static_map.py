@@ -156,7 +156,7 @@ class EnvironmentStaticMap(Environment):
                 unit = protocol.unit
                 state_name = protocol.state_name
                 action_name = protocol.action_name
-                reward_function_name = protocol.reward_function_name
+                reward_name = protocol.reward_name
                 agent_id, _ = self._assignment_list[a_s_name]
 
                 if protocol.subject.demon_name is None:
@@ -173,15 +173,15 @@ class EnvironmentStaticMap(Environment):
                         subject_instance=subject_instance,
                         state_name=state_name,
                         action_name=action_name,
-                        reward_function_name=reward_function_name,
-                        epoch=self._epochs[subject_name],
+                        reward_name=reward_name,
+                        iteration=self._iterations[subject_name],
                         times=protocol.n)
 
                     if self._subjects[subject_name].is_terminated(None):
                         self.check_subject(subject_name)
 
-                elif unit in ('instance', 'epoch'):
-                    # For epoch, simulate the current instance, then in
+                elif unit in ('instance', 'iteration'):
+                    # For iteration, simulate the current instance, then in
                     # the next if statement, simulate the rest of the
                     # generated instances.
                     self.interact_while(
@@ -190,10 +190,10 @@ class EnvironmentStaticMap(Environment):
                         subject_instance=subject_instance,
                         state_name=state_name,
                         action_name=action_name,
-                        reward_function_name=reward_function_name,
-                        epoch=self._epochs[subject_name])
+                        reward_name=reward_name,
+                        iteration=self._iterations[subject_name])
 
-                    if (unit == 'epoch'
+                    if (unit == 'iteration'
                             and subject_name in self._instance_generators):
                         while self.check_subject(subject_name):
                             self.interact_while(
@@ -202,8 +202,8 @@ class EnvironmentStaticMap(Environment):
                                 subject_instance=subject_instance,
                                 state_name=state_name,
                                 action_name=action_name,
-                                reward_function_name=reward_function_name,
-                                epoch=self._epochs[subject_name])
+                                reward_name=reward_name,
+                                iteration=self._iterations[subject_name])
 
                     else:
                         self.check_subject(subject_name)
@@ -344,7 +344,7 @@ class EnvironmentStaticMap(Environment):
                   ).assign(
                       entity=e.entity_name,
                       assigned_to=e.assigned_to,
-                      epoch=self._epochs[e.a_s_name[1]])
+                      iteration=self._iterations[e.a_s_name[1]])
                   for e in entities}
 
         return result

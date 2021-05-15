@@ -38,7 +38,7 @@ class DeepQLearning(QLearning):
         exploration_strategy:
             An `ExplorationStrategy` object that determines
             whether the `action` should be exploratory or not for a given
-            `state` at a given `epoch`.
+            `state` at a given `iteration`.
 
         method:
             Either 'forward' or 'backward' Q-learning.

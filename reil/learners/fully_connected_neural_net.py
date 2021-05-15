@@ -36,9 +36,9 @@ class Dense_tf_1(learners.Learner[float]):
         ---------
         learning_rate:
             A `LearningRateScheduler` object that determines the learning rate
-            based on epoch. If any scheduler other than constant is provided,
+            based on iteration. If any scheduler other than constant is provided,
             the model uses the `new_rate` method of the scheduler to determine
-            the learning rate at each epoch.
+            the learning rate at each iteration.
 
         validation_split:
             How much of the training set should be used for validation?
@@ -63,7 +63,7 @@ class Dense_tf_1(learners.Learner[float]):
 
         super().__init__(learning_rate=learning_rate, **kwargs)
 
-        self._epoch = 0
+        self._iteration = 0
 
         self._hidden_layer_sizes = hidden_layer_sizes
         self._input_length = input_length
@@ -169,7 +169,7 @@ class Dense_tf_1(learners.Learner[float]):
             with self._graph.as_default():
                 self._model.fit(
                     np.array(_X), np.array(Y),
-                    initial_epoch=self._epoch, epochs=self._epoch+1,
+                    initial_epoch=self._iteration, epochs=self._iteration+1,
                     callbacks=self._callbacks,
                     validation_split=self._validation_split,
                     verbose=0)
@@ -178,7 +178,7 @@ class Dense_tf_1(learners.Learner[float]):
         '''
         reset the learner.
         '''
-        self._epoch += 1
+        self._iteration += 1
 
     def save(self,
              filename: str,
@@ -271,9 +271,9 @@ class Dense_tf_2(learners.Learner[float]):
         ---------
         learning_rate:
             A `LearningRateScheduler` object that determines the learning rate
-            based on epoch. If any scheduler other than constant is provided,
+            based on iteration. If any scheduler other than constant is provided,
             the model uses the `new_rate` method of the scheduler to determine
-            the learning rate at each epoch.
+            the learning rate at each iteration.
 
         validation_split:
             How much of the training set should be used for validation?
@@ -298,7 +298,7 @@ class Dense_tf_2(learners.Learner[float]):
 
         super().__init__(learning_rate=learning_rate, **kwargs)
 
-        self._epoch = 0
+        self._iteration = 0
 
         self._hidden_layer_sizes = hidden_layer_sizes
         self._input_length = input_length
@@ -394,7 +394,7 @@ class Dense_tf_2(learners.Learner[float]):
 
         self._model.fit(
             np.array(_X), np.array(Y),
-            initial_epoch=self._epoch, epochs=self._epoch+1,
+            initial_epoch=self._iteration, epochs=self._iteration+1,
             callbacks=self._callbacks,
             validation_split=self._validation_split,
             verbose=0)
@@ -403,7 +403,7 @@ class Dense_tf_2(learners.Learner[float]):
         '''
         reset the learner.
         '''
-        self._epoch += 1
+        self._iteration += 1
 
     def save(self,
              filename: str,

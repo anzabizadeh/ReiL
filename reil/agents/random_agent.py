@@ -27,7 +27,7 @@ class RandomAgent(agents.NoLearnAgent):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            epoch: int = 0) -> FeatureArray:
+            iteration: int = 0) -> FeatureArray:
         '''
         Return a random action.
 
@@ -39,8 +39,8 @@ class RandomAgent(agents.NoLearnAgent):
         actions:
             The set of possible actions to choose from.
 
-        epoch:
-            The epoch in which the agent is acting.
+        iteration:
+            The iteration in which the agent is acting.
 
         Returns
         -------

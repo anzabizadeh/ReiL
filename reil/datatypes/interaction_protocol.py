@@ -33,6 +33,6 @@ class InteractionProtocol:
     subject: Entity
     state_name: str
     action_name: str
-    reward_function_name: str
+    reward_name: str
     n: int
-    unit: Literal['interaction', 'instance', 'epoch']
+    unit: Literal['interaction', 'instance', 'iteration']

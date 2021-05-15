@@ -11,6 +11,8 @@ import pathlib
 from collections import defaultdict
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
+import pandas as pd
+
 from reil import stateful
 from reil.agents import Agent, NoLearnAgent, AgentDemon
 from reil.datatypes import FeatureArray, InteractionProtocol
@@ -36,9 +38,10 @@ class Environment(stateful.Stateful):
 
     `Pass`: visiting all protocols in the interaction sequence, once.
 
-    `Epoch`: For each subject, an epoch is one time reaching its terminal
-    state. If the subject is an instance generator, then the generator should
-    reach to terminal state, not just its current instance.
+    `iteration`: For each subject, an iteration is one time reaching its
+    terminal state. If the subject is an instance generator, then
+    the generator should reach to terminal state, not just its
+    current instance.
     '''
 
     def __init__(self,
@@ -65,7 +68,7 @@ class Environment(stateful.Stateful):
             AgentSubjectTuple,
             Tuple[Union[int, None], Union[int, None]]] = \
             defaultdict(lambda: (None, None))
-        self._epochs: Dict[str, int] = defaultdict(int)
+        self._iterations: Dict[str, int] = defaultdict(int)
         self._agent_observers: Dict[
             Tuple[str, str],
             Generator[Union[FeatureArray, None], Any, None]] = {}
@@ -278,8 +281,8 @@ class Environment(stateful.Stateful):
             subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,
-            reward_function_name: str,
-            epoch: int,
+            reward_name: str,
+            iteration: int,
             times: int = 1) -> None:
         '''
         Allow `agent` and `subject` to interact at most `times` times.
@@ -305,12 +308,12 @@ class Environment(stateful.Stateful):
         action_name:
             A string that specifies the action definition.
 
-        reward_function_name:
+        reward_name:
             A string that specifies the reward function definition.
 
-        epoch:
-            The epoch of of the current run. This value is used by the `agent`
-            to determine the action.
+        iteration:
+            The iteration of of the current run. This value is used by the
+            `agent` to determine the action.
 
         times:
             The number of times the `agent` and the `subject` should interact.
@@ -329,7 +332,7 @@ class Environment(stateful.Stateful):
         '''
         for _ in range(times):
             reward = subject_instance.reward(
-                name=reward_function_name, _id=agent_id)
+                name=reward_name, _id=agent_id)
             agent_observer.send(reward)
 
             state = subject_instance.state(name=state_name, _id=agent_id)
@@ -338,7 +341,7 @@ class Environment(stateful.Stateful):
             if possible_actions:
                 action = agent_observer.send({'state': state,
                                               'actions': possible_actions,
-                                              'epoch': epoch})
+                                              'iteration': iteration})
                 subject_instance.take_effect(action, agent_id)  # type: ignore
 
     @classmethod
@@ -349,8 +352,8 @@ class Environment(stateful.Stateful):
             subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,
-            reward_function_name: str,
-            epoch: int) -> None:
+            reward_name: str,
+            iteration: int) -> None:
         '''
         Allow `agent` and `subject` to interact until `subject` is terminated.
 
@@ -372,12 +375,12 @@ class Environment(stateful.Stateful):
         action_name:
             A string that specifies the action definition.
 
-        reward_function_name:
+        reward_name:
             A string that specifies the reward function definition.
 
-        epoch:
-            The epoch of of the current run. This value is used by the agent
-            to determine the action.
+        iteration:
+            The iteration of of the current run. This value is used by the
+            agent to determine the action.
 
         Returns
         -------
@@ -392,8 +395,8 @@ class Environment(stateful.Stateful):
         '''
         while not subject_instance.is_terminated(agent_id):
             cls.interact(agent_id, agent_observer, subject_instance,
-                         state_name, action_name, reward_function_name,
-                         epoch)
+                         state_name, action_name, reward_name,
+                         iteration)
 
     def assert_protocol(self, protocol: InteractionProtocol) -> None:
         '''
@@ -415,7 +418,7 @@ class Environment(stateful.Stateful):
             defined.
 
         ValueError
-            `unit` is not one of `interaction`, `instance`, or `epoch`.
+            `unit` is not one of `interaction`, `instance`, or `iteration`.
         '''
         agent_name = protocol.agent.name
         agent_demon_name = protocol.agent.demon_name
@@ -435,11 +438,11 @@ class Environment(stateful.Stateful):
                 and subject_demon_name not in self._subject_demons):
             raise ValueError(
                 f'Unknown subject demon name: {subject_demon_name}.')
-        if unit not in ('interaction', 'instance', 'epoch'):
+        if unit not in ('interaction', 'instance', 'iteration'):
             raise ValueError(
                 f'Unknown unit: {unit}. '
-                'It should be one of interaction, instance, or epoch. '
-                'For subjects of non-instance generator, epoch and '
+                'It should be one of interaction, instance, or iteration. '
+                'For subjects of non-instance generator, iteration and '
                 'instance are equivalent.')
 
     def register(self,
@@ -516,7 +519,7 @@ class Environment(stateful.Stateful):
         '''
         agent_name = protocol.agent.name
         subject_name = protocol.subject.name
-        r_func_name = protocol.reward_function_name
+        r_func_name = protocol.reward_name
         state_name = protocol.state_name
         a_s_names = (agent_name, subject_name)
         s_demon_name = protocol.subject.demon_name
@@ -541,7 +544,7 @@ class Environment(stateful.Stateful):
         self._agent_observers[a_s_names].send(reward)
         self._agent_observers[a_s_names].send({'state': state,
                                                'actions': None,
-                                               'epoch': None})
+                                               'iteration': None})
         self._agent_observers[a_s_names].close()
 
     def reset_subject(self, subject_name: str) -> bool:
@@ -550,7 +553,7 @@ class Environment(stateful.Stateful):
         function is called to reset the `subject`.
 
         If the `subject` is an `InstanceGenerator`, a new instance is created.
-        If reset is successful, `epoch` is incremented by one.
+        If reset is successful, `iteration` is incremented by one.
 
         Attributes
         ----------
@@ -571,7 +574,7 @@ class Environment(stateful.Stateful):
         if subject_name in self._instance_generators:
             # get a new instance if possible,
             # if not instance generator returns StopIteration.
-            # So, increment epoch by 1, then if the generator is not
+            # So, increment iteration by 1, then if the generator is not
             # terminated, get a new instance.
             # If the generator is terminated, check if it is finite. If
             # infinite, call it again to get a subject. If not, disable reward
@@ -582,7 +585,7 @@ class Environment(stateful.Stateful):
                     self._instance_generators[subject_name])
 
             except StopIteration:
-                self._epochs[subject_name] += 1
+                self._iterations[subject_name] += 1
                 if self._instance_generators[subject_name].is_terminated():
                     self._subjects[subject_name].reward.disable()
                 else:
@@ -591,7 +594,7 @@ class Environment(stateful.Stateful):
                         )
                 return False
         else:
-            self._epochs[subject_name] += 1
+            self._iterations[subject_name] += 1
             self._subjects[subject_name].reset()
 
         return True
@@ -815,7 +818,26 @@ class Environment(stateful.Stateful):
 
         return _path, _filename
 
-    def report_statistics(self):
+    def report_statistics(self,
+                          unstack: bool = True,
+                          reset_history: bool = True
+                          ) -> Dict[Tuple[str, str], pd.DataFrame]:
+        '''Generate statistics for agents and subjects.
+
+        Parameters
+        ----------
+        unstack:
+            Whether to unstack the resulting pivottable or not.
+
+        reset_history:
+            Whether to clear up the history after computing stats.
+
+        Returns
+        -------
+        :
+            A dictionary with state-subject pairs as keys and dataframes as
+            values.
+        '''
         raise NotImplementedError
 
     def __repr__(self) -> str:

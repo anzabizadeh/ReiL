@@ -40,7 +40,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
         exploration_strategy:
             an `ExplorationStrategy` object that determines
             whether the `action` should be exploratory or not for a given
-            `state` at a given `epoch`.
+            `state` at a given `iteration`.
 
         discount_factor:
             by what factor should future rewards be discounted?
@@ -75,13 +75,13 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(None)  # type: ignore
+        return cls(None, None)  # type: ignore
 
     def act(self,
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            epoch: int = 0) -> FeatureArray:
+            iteration: int = 0) -> FeatureArray:
         '''
         Return an action based on the given state.
 
@@ -96,8 +96,8 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
         actions:
             the set of possible actions to choose from.
 
-        epoch:
-            the epoch in which the agent is acting.
+        iteration:
+            the iteration in which the agent is acting.
 
         Raises
         ------
@@ -113,18 +113,18 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         if (self._training_trigger != 'none' and
-                self._exploration_strategy.explore(epoch)):
+                self._exploration_strategy.explore(iteration)):
             possible_actions = actions or self._default_actions
             action = self._break_tie(
                 possible_actions, self._tie_breaker)
         else:
             action = super().act(state=state, subject_id=subject_id,
-                                 actions=actions, epoch=epoch)
+                                 actions=actions, iteration=iteration)
 
         return action
 
     def reset(self):
-        '''Reset the agent at the end of a learning epoch.'''
+        '''Reset the agent at the end of a learning iteration.'''
         super().reset()
         if self._training_trigger != 'none':
             self._learner.reset()
@@ -285,7 +285,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                 temp = yield
                 new_observation.state = temp['state']
                 actions: Tuple[FeatureArray, ...] = temp['actions']
-                epoch: int = temp['epoch']
+                iteration: int = temp['iteration']
 
                 if learn_on_state:
                     self.learn([history[-1], new_observation])
@@ -294,7 +294,7 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
                     new_observation.action = self.act(
                         state=new_observation.state,  # type: ignore
                         subject_id=subject_id,
-                        actions=actions, epoch=epoch)
+                        actions=actions, iteration=iteration)
 
                     if learn_on_action:
                         self.learn([history[-1], new_observation])

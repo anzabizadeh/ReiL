@@ -56,7 +56,7 @@ class WarfarinAgent(agents.NoLearnAgent):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            epoch: Optional[int] = 0) -> FeatureArray:
+            iteration: Optional[int] = 0) -> FeatureArray:
         '''
         Generate the dosing `action` based on the `state` and current dosing
         protocol.
@@ -69,8 +69,8 @@ class WarfarinAgent(agents.NoLearnAgent):
         actions:
             The set of possible actions to choose from.
 
-        epoch:
-            The epoch in which the agent is acting.
+        iteration:
+            The iteration in which the agent is acting.
 
         Returns
         -------
@@ -89,7 +89,7 @@ class WarfarinAgent(agents.NoLearnAgent):
         ])
 
     def reset(self):
-        '''Resets the agent at the end of a learning epoch.'''
+        '''Resets the agent at the end of a learning iteration.'''
         self._protocol.reset()
 
     def __repr__(self) -> str:
