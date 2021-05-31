@@ -22,8 +22,13 @@ class Aurora(DosingProtocol):
         today = patient['day']
         INRs = patient['INR_history']
         previous_INR = INRs[-1]
-        previous_dose = patient['dose_history'][-1]
-        previous_interval = patient['interval_history'][-1]
+
+        previous_dose = 0.0  # to suppress Pylance's unbound variable error.
+        previous_interval = 1  # to suppress Pylance's unbound variable error.
+
+        if today > 1:
+            previous_dose = patient['dose_history'][-1]
+            previous_interval = patient['interval_history'][-1]
 
         red_flag = additional_info.get('red_flag', False)
         skip_dose = additional_info.get('skip_dose', 0)
@@ -43,26 +48,46 @@ class Aurora(DosingProtocol):
             next_dose = new_dose
             next_interval = 7
         elif today <= 2:  # initial dosing
+            # Note: in the actual described protocol, INR>1.1 and some other
+            # conditions should get 5.0, but in their simulation, Ravvaz et al,
+            # assumed all <65 get 10.0. (Footnote on page 10 of paper's
+            # appendix)
             next_dose = 10.0 if patient['age'] < 65.0 else 5.0
             next_interval = 3 - today
         elif today == 3:  # adjustment dosing
+            # Note: the paper is a bit vague on interval, since it has provided
+            # the whole dosing table for days 3 and 4 (which says retest in 7
+            # and 28 days), but at the same time says dose for days 3 and 4 are
+            # based on the table. Here I assume that the interval is not
+            # determined by the table, and only the dose is adjusted.
+            next_interval = 2
+
             if previous_INR >= 2.0:
                 next_dose = 5.0
-                next_interval = 2
                 if previous_INR <= 3.0:
-                    number_of_stable_days = self._stable_days(
-                        INRs[-2], previous_INR, previous_interval)
+                    if 2.0 <= INRs[-2] <= 3.0:
+                        number_of_stable_days = previous_interval
+                    else:
+                        number_of_stable_days = 1
+                    # number_of_stable_days = self._stable_days(
+                    #     INRs[-2], previous_INR, previous_interval)
             else:
-                next_dose, next_interval, _, _ = self.aurora_dosing_table(
+                next_dose, _, _, _ = self.aurora_dosing_table(
                     previous_INR, previous_dose)
         elif today == 4:
             raise ValueError(
                 'Cannot use Aurora on day 4. '
                 'Dose on day 4 equals dose on day 3.')
         else:  # maintenance dosing
-            if 2 <= previous_INR <= 3:
-                number_of_stable_days += self._stable_days(
-                    INRs[-2], previous_INR, previous_interval)
+            if 2.0 <= previous_INR <= 3.0:
+                if (previous_dose == patient['dose_history'][-2]) and (
+                        2.0 <= INRs[-2] <= 3.0):
+                    # stable dose and therapeutic INR
+                    number_of_stable_days += previous_interval
+                    # number_of_stable_days += self._stable_days(
+                    #     INRs[-2], previous_INR, previous_interval)
+                else:
+                    number_of_stable_days = 1
 
                 next_dose = previous_dose
                 next_interval = self.aurora_retesting_table(
@@ -92,8 +117,7 @@ class Aurora(DosingProtocol):
     @staticmethod
     def _stable_days(INR_start: float, INR_end: float, interval: int) -> int:
         '''
-        Interpolate the INR values in the range and compute the number of days
-        in therapeutic range of [2, 3].
+        Compute the number of stable days.
 
         Arguments
         ---------
@@ -113,12 +137,22 @@ class Aurora(DosingProtocol):
 
         Notes
         -----
-        This method excludes `INR_start` and includes `INR_end` in
-        computing TTR.
+        The paper is a bit vague! Initially I assumed we interpolate INRs to
+        get the number of stable days, but it does not seem to be the case.
+        So, in the updated implementation, if INR_end is not in the range,
+        it returns 0, if it is in the range, but INR_start is not in the range,
+        it returns 1, otherwise, it returns `interval`.
 
         '''
-        return sum(2 <= INR_end + (INR_start - INR_end) * i / interval <= 3
-                   for i in range(1, interval+1))
+        # return sum(2 <= INR_end + (INR_start - INR_end) * i / interval <= 3
+        #            for i in range(1, interval+1))
+        if 2.0 <= INR_end <= 3.0:
+            if 2.0 <= INR_start <= 3.0:
+                return interval
+            else:
+                return 1
+
+        return 0
 
     @staticmethod
     def aurora_dosing_table(
@@ -144,24 +178,26 @@ class Aurora(DosingProtocol):
         '''
         skip_dose = 0
         red_flag = False
-        if current_INR < 1.50:
+        _current_INR = round(current_INR, 2)
+
+        if _current_INR < 1.50:
             dose = dose * 1.15
             next_test = 7
-        elif current_INR < 1.80:
+        elif _current_INR < 1.80:
             dose = dose * 1.10
             next_test = 7
-        elif current_INR < 2.00:
+        elif _current_INR < 2.00:
             dose = dose * 1.075
             next_test = 7
-        elif current_INR <= 3.00:
+        elif _current_INR <= 3.00:
             next_test = 28
-        elif current_INR < 3.40:
+        elif _current_INR < 3.40:
             dose = dose * 0.925
             next_test = 7
-        elif current_INR < 4.00:
+        elif _current_INR < 4.00:
             dose = dose * 0.9
             next_test = 7
-        elif current_INR <= 5.00:
+        elif _current_INR <= 5.00:
             skip_dose = 2
             dose = dose * 0.875
             next_test = 7
