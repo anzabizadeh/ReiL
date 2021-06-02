@@ -36,9 +36,9 @@ class Dense_tf_1(learners.Learner[float]):
         ---------
         learning_rate:
             A `LearningRateScheduler` object that determines the learning rate
-            based on iteration. If any scheduler other than constant is provided,
-            the model uses the `new_rate` method of the scheduler to determine
-            the learning rate at each iteration.
+            based on iteration. If any scheduler other than constant is
+            provided, the model uses the `new_rate` method of the scheduler
+            to determine the learning rate at each iteration.
 
         validation_split:
             How much of the training set should be used for validation?
@@ -146,7 +146,7 @@ class Dense_tf_1(learners.Learner[float]):
             with self._graph.as_default():
                 result = self._model.predict(np.array(_X))
 
-        return result
+        return result  # type: ignore
 
     def learn(self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...]) -> None:
         '''
@@ -271,9 +271,9 @@ class Dense_tf_2(learners.Learner[float]):
         ---------
         learning_rate:
             A `LearningRateScheduler` object that determines the learning rate
-            based on iteration. If any scheduler other than constant is provided,
-            the model uses the `new_rate` method of the scheduler to determine
-            the learning rate at each iteration.
+            based on iteration. If any scheduler other than constant is
+            provided, the model uses the `new_rate` method of the scheduler
+            to determine the learning rate at each iteration.
 
         validation_split:
             How much of the training set should be used for validation?
@@ -430,7 +430,11 @@ class Dense_tf_2(learners.Learner[float]):
             tuple(attr for attr in self.__dict__.keys()
                   if attr not in ('_session', '_graph', '_model')))
 
-        self._model.save(p / f'{f}.tf')
+        try:
+            self._model.save(p / f'{f}.tf')
+        except ValueError:
+            self._logger.warning(
+                'Model is not compiled. Skipped saving the model.')
 
         return p, f
 
@@ -456,8 +460,11 @@ class Dense_tf_2(learners.Learner[float]):
         super().load(filename, path)
 
         _path = path or '.'
-        self._model = keras.models.load_model(
-            pathlib.Path(_path, f'{filename}.tf'))
+        if self._ann_ready:
+            self._model = keras.models.load_model(
+                pathlib.Path(_path, f'{filename}.tf'))
+        else:
+            self._model = keras.models.Sequential()
 
         self._tensorboard = keras.callbacks.TensorBoard(
             log_dir=self._tensorboard_path)
