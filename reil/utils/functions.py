@@ -9,11 +9,19 @@ Contains some useful functions.
 import math
 import random
 from reil.datatypes.feature import FeatureArray
-from typing import Callable, Iterable, Optional, Tuple, TypeVar
+from typing import Any, Callable, Iterable, Optional, Tuple, TypeVar
 
 import numpy as np
 from reil.datatypes import FeatureGenerator
 from scipy import stats
+
+
+def random_choice(f: Any):
+    '''
+    This function allows `yaml` config files to use `random.choice`
+    as part of `reil` module.
+    '''
+    return random.choice(f)
 
 
 def random_truncated_normal(f: FeatureGenerator) -> float:

@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional, OrderedDict, Tuple, Union
 import dill
 from ruamel.yaml import YAML
 
+import reil
+
 
 class ReilBase:
     '''
@@ -180,7 +182,7 @@ class ReilBase:
         return cls.parse_yaml(temp_yaml)
 
     @staticmethod
-    def parse_yaml(data: OrderedDict):
+    def parse_yaml(data: OrderedDict):  # noqa: C901
         '''
         Parse a yaml tree.
 
@@ -205,6 +207,14 @@ class ReilBase:
         if isinstance(data, (int, float, str)):
             return data
 
+        if 'eval' in data:
+            args = {'reil': reil}
+            if 'args' in data:
+                args.update(ReilBase.parse_yaml(data['args']))
+            # else:
+            #     args = {}
+            return eval(data['eval'], args)
+
         if len(data) == 1:
             k, v = next(iter(data.items()))
             result = ReilBase._create_component_from_yaml(k, v)
@@ -218,8 +228,13 @@ class ReilBase:
             elif isinstance(v, list):
                 v_obj = [ReilBase.parse_yaml(v_i)
                          for v_i in v]
-            elif isinstance(v, str) and 'lambda' in v:
-                v_obj = eval(v)
+            elif isinstance(v, str):
+                if v.startswith('lambda'):
+                    v_obj = eval(v, {})
+                elif v.startswith('eval'):
+                    v_obj = eval(v[4:], {})
+                else:
+                    v_obj = v
             else:
                 v_obj = v
 
@@ -277,7 +292,7 @@ class ReilBase:
         for key, value in params.items():
             self.__dict__[f'_{key}'] = value
 
-    def load(self, filename: str,
+    def load(self, filename: str,  # noqa: C901
              path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Load an object from a file.
@@ -405,3 +420,31 @@ class ReilBase:
 
     def __repr__(self) -> str:
         return self.__class__.__qualname__
+
+
+if __name__ == '__main__':
+    config = '''
+        test:
+            eval: change_array_to_missing(1)
+            args:
+                change_array_to_missing:
+                    eval: reil.datatypes.feature.change_array_to_missing
+    '''
+    # '''
+    #     training_config: &training_config
+    #     reil.utils.InstanceGenerator:
+    #         object:
+    #         reil.healthcare.subjects.Warfarin:
+    #             patient:
+    #             reil.healthcare.PatientWarfarinRavvaz:
+    #                 model:
+    #                 reil.healthcare.mathematical_models.HambergPKPD:
+    #                     randomized: True
+    #                 allow_missing_genotypes: True
+    #         instance_counter_stops:
+    #         eval: "[i*size for i in range(1, iterations + 1)]"
+    #         args:
+    #             size: 1000
+    #             iterations: 100
+    # '''
+    x = ReilBase.parse_yaml(YAML().load(config))
