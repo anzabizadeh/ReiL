@@ -7,9 +7,9 @@ A dosing protocol class that can contain three dosing protocols for
 `initial`, `adjustment` and `maintenance` phases of dosing.
 '''
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Union
 
-from reil.healthcare.dosing_protocols import DosingProtocol
+from reil.healthcare.dosing_protocols import DosingDecision, DosingProtocol
 
 
 class ThreePhaseDosingProtocol:
@@ -39,7 +39,8 @@ class ThreePhaseDosingProtocol:
         self._maintenance_protocol = maintenance_protocol
         self._additional_info = {}
 
-    def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
+    def prescribe(
+            self, patient: Dict[str, Any]) -> DosingDecision:
         '''
         Prescribe a dose and next test (in days) for the given `patient`.
 

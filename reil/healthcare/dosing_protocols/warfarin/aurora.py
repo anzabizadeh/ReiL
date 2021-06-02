@@ -3,22 +3,48 @@
 Aurora class
 ============
 
-Aurora Dosing Protocol, based on Ravvaz et al. (2017).
+Aurora Dosing Protocol, based on `Ravvaz et al. (2017)
+<https://doi.org/10.1161/circgenetics.117.001804>`_
 '''
 
 from typing import Any, Dict, Tuple
-from reil.healthcare.dosing_protocols import DosingProtocol
+
+import reil.healthcare.dosing_protocols.dosing_protocol as dp
 
 
-class Aurora(DosingProtocol):
+class Aurora(dp.DosingProtocol):
     '''
-    Aurora Dosing Protocol, based on Ravvaz et al. (2017)
+    Aurora Dosing Protocol, based on `Ravvaz et al. (2017)
+    <https://doi.org/10.1161/circgenetics.117.001804>`_
     '''
 
     def prescribe(self,  # noqa: C901
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]
-                  ) -> Tuple[float, int, Dict[str, Any]]:
+                  additional_info: dp.AdditionalInfo
+                  ) -> Tuple[dp.DosingDecision, dp.AdditionalInfo]:
+        '''
+        Prescribe a dose for the given `patient` and `additional_info`.
+
+        Arguments
+        ---------
+        patient:
+            A dictionary of patient characteristics including:
+            - age
+            - day
+            - INR_history
+            - dose_history
+            - interval_history
+
+        additional_info:
+            A dictionary of information being communicated between protocols at
+            each call to `prescribe`. These additional information are
+            protocol-dependent.
+
+        Returns
+        -------
+        :
+            A `DosingDecision` along with updated `additional_info`.
+        '''
         today = patient['day']
         INRs = patient['INR_history']
         previous_INR = INRs[-1]
@@ -105,14 +131,13 @@ class Aurora(DosingProtocol):
                 else:
                     next_dose = new_dose
 
-        new_info = {
+        additional_info.update({
             'red_flag': red_flag,
             'skip_dose': skip_dose,
             'new_dose': new_dose,
-            'number_of_stable_days': number_of_stable_days
-        }
+            'number_of_stable_days': number_of_stable_days})
 
-        return next_dose, next_interval, new_info
+        return dp.DosingDecision(next_dose, next_interval), additional_info
 
     @staticmethod
     def _stable_days(INR_start: float, INR_end: float, interval: int) -> int:

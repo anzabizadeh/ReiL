@@ -6,10 +6,17 @@ DosingProtocol class
 The base class for all basic dosing protocols.
 '''
 
-import collections
-from typing import Any, Dict, Tuple
+import dataclasses
+from typing import Any, Dict, Optional, Tuple
 
-DoseInterval = collections.namedtuple('DoseInterval', 'dose, interval')
+
+@dataclasses.dataclass
+class DosingDecision:
+    dose: float
+    duration: Optional[int] = None
+
+
+AdditionalInfo = Dict[str, Any]
 
 
 class DosingProtocol:
@@ -22,8 +29,8 @@ class DosingProtocol:
 
     def prescribe(self,
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]
-                  ) -> Tuple[float, int, Dict[str, Any]]:
+                  additional_info: AdditionalInfo
+                  ) -> Tuple[DosingDecision, AdditionalInfo]:
         '''
         Prescribe a dose for the given `patient` and `additional_info`.
 
@@ -41,7 +48,7 @@ class DosingProtocol:
         Returns
         -------
         :
-            The prescribed dose along with updated `additional_info`.
+            A `DosingDecision` along with updated `additional_info`.
         '''
         raise NotImplementedError
 

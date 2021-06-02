@@ -9,12 +9,21 @@ supplements Appendix B
 '''
 
 import functools
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
-from reil.healthcare.dosing_protocols import DosingProtocol, DoseInterval
+import reil.healthcare.dosing_protocols.dosing_protocol as dp
 
 
-class Intermountain(DosingProtocol):
+Zone = Literal['action point low',
+               'red zone low',
+               'yellow zone low',
+               'green zone',
+               'yellow zone high',
+               'red zone high',
+               'action point high']
+
+
+class Intermountain(dp.DosingProtocol):
     '''
     Intermountain warfarin dosing protocol based on `Anderson et al. (2007)
     supplements Appendix B
@@ -27,55 +36,77 @@ class Intermountain(DosingProtocol):
 
     def prescribe(self,
                   patient: Dict[str, Any],
-                  additional_info: Dict[str, Any]
-                  ) -> Tuple[float, int, Dict[str, Any]]:
-        dose_interval_list = additional_info.get('dose_interval_list', [])
-        last_zone = additional_info.get('last_zone', '')
+                  additional_info: dp.AdditionalInfo
+                  ) -> Tuple[dp.DosingDecision, dp.AdditionalInfo]:
+        '''
+        Prescribe a dose for the given `patient` and `additional_info`.
+
+        Arguments
+        ---------
+        patient:
+            A dictionary of patient characteristics including:
+            - day
+            - dose_history
+            - interval_history (only for day 8)
+
+        additional_info:
+            A dictionary of information being communicated between protocols,
+            including:
+            - dosing_decisions_list
+            - last_zone
+
+        Returns
+        -------
+        :
+            A `DosingDecision` along with updated `additional_info`.
+        '''
+        dosing_decisions_list: List[dp.DosingDecision] = additional_info.get(
+            'dosing_decisions_list', [])
+        last_zone: Zone = additional_info.get('last_zone', '')
         previous_INR = patient['INR_history'][-1]
 
-        if not dose_interval_list:
+        if not dosing_decisions_list:
             today = patient['day']
 
             if self._enforce_day_ge_8 and today < 8:
                 raise ValueError('Intermountain is only valid for day>=8.')
 
             if self._enforce_day_ge_8 and today == 8:
-                dose_list = patient['dose_history']
-                interval_list = patient['interval_history']
-                dose_list = functools.reduce(
+                dose_history = patient['dose_history']
+                interval_history = patient['interval_history']
+                all_doses = functools.reduce(
                     lambda x, y: x+y,
-                    ([dose_list[-i]]*interval_list[-i]
-                     for i in range(len(interval_list), 0, -1)))
+                    ([dose_history[-i]]*interval_history[-i]
+                     for i in range(len(interval_history), 0, -1)))
 
-                if len(dose_list) < 3:
+                if len(all_doses) < 3:
                     raise ValueError(
                         'Intermountain requires doses for days 5 to 7 '
                         'for dosing on day 8.')
 
-                previous_dose = sum(dose_list[-3:])/3
+                previous_dose = sum(all_doses[-3:])/3
             else:
                 previous_dose = patient['dose_history'][-1]
 
-            dose_interval_list, last_zone = self.intermountain_dosing_table(
+            dosing_decisions_list, last_zone = self.intermountain_dosing_table(
                 previous_INR, last_zone, previous_dose)
 
         else:
-            if dose_interval_list[0].interval == -1:
-                dose_interval_list, last_zone = \
+            if dosing_decisions_list[0].duration is None:
+                dosing_decisions_list, last_zone = \
                     self.intermountain_dosing_table(
-                        previous_INR, last_zone, dose_interval_list[0].dose)
+                        previous_INR, last_zone, dosing_decisions_list[0].dose)
 
         additional_info['last_zone'] = last_zone
-        additional_info['dose_interval_list'] = dose_interval_list[1:]
+        additional_info['dosing_decisions_list'] = dosing_decisions_list[1:]
 
-        return (dose_interval_list[0].dose,
-                dose_interval_list[0].interval, additional_info)
+        return dosing_decisions_list[0], additional_info
 
-    @staticmethod  # noqa: C901
-    def intermountain_dosing_table(
+    @staticmethod
+    def intermountain_dosing_table(  # noqa: C901
             INR: float,
-            last_zone: str,
-            daily_dose: float) -> Tuple[List[DoseInterval], str]:
+            last_zone: Zone,
+            daily_dose: float) -> Tuple[List[dp.DosingDecision], Zone]:
         '''
         Determine the dosing information, based on Intermountain dosing table.
 
@@ -111,65 +142,66 @@ class Intermountain(DosingProtocol):
         weekly_dose = daily_dose * 7
 
         immediate_dose: float = -1.0
-        immediate_interval: int = -1
+        immediate_duration: Optional[int] = None
+        same_zone = zone == last_zone
 
-        next_interval: int = {
-            # -1 because immediate_interval = 1
+        # -1s below are added to compensate for immediate_duration = 1
+        next_duration: Optional[int] = {
             'action point low': (5-1, 14-1),
-            'red zone low': (7-1, 14-1),  # -1 because immediate_interval = 1
+            'red zone low': (7-1, 14-1),
             'yellow zone low': (14, 14),
             'green zone': (14, 28),
             'yellow zone high': (14, 14),
-            'red zone high': (7-1, 14-1),  # -1 because immediate_interval = 1
+            'red zone high': (7-1, 14-1),
             'action point high': (7, 14)
-        }[zone][zone == last_zone]
+        }[zone][same_zone]
 
         if last_zone == 'action point high':
-            if zone in ['yellow zone low', 'green zone', 'yellow zone high']:
+            if zone.startswith(('yellow', 'green')):
                 weekly_dose *= 0.85
-                next_interval = 7
+                next_duration = 7
             else:
                 immediate_dose = 0.0
-                immediate_interval = 2
-                next_interval = -1
+                immediate_duration = 2
+                next_duration = None
 
+        elif zone == 'green zone':
+            pass
         elif zone == 'action point low':
             # (immediate extra dose) average 5-7 for day 8
             immediate_dose = daily_dose * 2
-            immediate_interval = 1
+            immediate_duration = 1
             weekly_dose *= 1.10
         elif zone == 'red zone low':
             # (extra half dose) average 5-7 for day 8
             immediate_dose = daily_dose * 1.5
-            immediate_interval = 1
+            immediate_duration = 1
             weekly_dose *= 1.05
         elif zone == 'yellow zone low':
-            if zone == last_zone:
+            if same_zone:
                 weekly_dose *= 1.05
-        # elif zone == 'green zone':
-        #     pass
         elif zone == 'yellow zone high':
-            if zone == last_zone:
+            if same_zone:
                 weekly_dose *= 0.95
         elif zone == 'red zone high':
-            immediate_dose = daily_dose * 0.5 if INR < 4 else 0.0
-            immediate_interval = 1
+            immediate_dose = daily_dose * 0.5 if INR < 4.0 else 0.0
+            immediate_duration = 1
             weekly_dose *= 0.90
         elif zone == 'action point high':
             immediate_dose = 0.0
-            immediate_interval = 2
-            next_interval = -1
+            immediate_duration = 2
+            next_duration = None
 
-        dose_intervals = list(
-            (DoseInterval(immediate_dose, immediate_interval),)
-            if (immediate_dose >= 0.0 and immediate_interval > 0)
+        dosing_decisions = list(
+            (dp.DosingDecision(immediate_dose, immediate_duration),)
+            if (immediate_dose >= 0.0 and immediate_duration is not None)
             else []
-        ) + [DoseInterval(weekly_dose / 7, next_interval)]
+        ) + [dp.DosingDecision(weekly_dose / 7, next_duration)]
 
-        return dose_intervals, zone
+        return dosing_decisions, zone
 
     @staticmethod
-    def zone(INR: float) -> str:
+    def zone(INR: float) -> Zone:
         '''
         Determine the zone based on patient's INR.
 

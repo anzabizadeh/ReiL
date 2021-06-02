@@ -3,12 +3,14 @@
 AAA, CAA, PGAA, PGPGA, PGPGI classes
 ====================================
 
-Study arms in Ravvaz et al. (2017).
+Study arms in `Ravvaz et al. (2017)
+<https://doi.org/10.1161/circgenetics.117.001804>`_
 '''
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
-from reil.healthcare.dosing_protocols import ThreePhaseDosingProtocol
+from reil.healthcare.dosing_protocols import (DosingDecision,
+                                              ThreePhaseDosingProtocol)
 from reil.healthcare.dosing_protocols.warfarin import (IWPC, Aurora,
                                                        Intermountain, Lenzini)
 
@@ -22,17 +24,21 @@ class AAA(ThreePhaseDosingProtocol):
         aurora_instance = Aurora()
         super().__init__(aurora_instance, aurora_instance, aurora_instance)
 
-    def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
-        dose, interval, self._additional_info = \
+    def prescribe(
+            self, patient: Dict[str, Any]) -> DosingDecision:
+        dosing_decision, self._additional_info = \
             self._initial_protocol.prescribe(patient, self._additional_info)
 
-        return dose, interval
+        return dosing_decision
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '[AAA]'
 
 
 class CAA(ThreePhaseDosingProtocol):
     '''
-    A composite dosing protocol with clinical `IWPC` in initial phase, and
-    `Aurora` in adjustment and maintenance phases.
+    A composite dosing protocol with clinical `IWPC` in the initial phase
+    (days 1 and 2), and `Aurora` in the adjustment and maintenance phases.
     '''
 
     def __init__(self) -> None:
@@ -40,19 +46,24 @@ class CAA(ThreePhaseDosingProtocol):
         aurora_instance = Aurora()
         super().__init__(iwpc_instance, aurora_instance, aurora_instance)
 
-    def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
+    def prescribe(
+            self, patient: Dict[str, Any]) -> DosingDecision:
         fn = (self._initial_protocol if patient['day'] <= 2
               else self._adjustment_protocol)
-        dose, interval, self._additional_info = fn.prescribe(
+        dosing_decision, self._additional_info = fn.prescribe(
             patient, self._additional_info)
 
-        return dose, interval
+        return dosing_decision
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '[CAA]'
 
 
 class PGAA(ThreePhaseDosingProtocol):
     '''
-    A composite dosing protocol with pharmacogenetic `IWPC` in initial phase,
-    and `Aurora` in adjustment and maintenance phases.
+    A composite dosing protocol with pharmacogenetic `IWPC` in the initial
+    phase (days 1 and 2), and `Aurora` in the adjustment and maintenance
+    phases.
     '''
 
     def __init__(self) -> None:
@@ -60,19 +71,24 @@ class PGAA(ThreePhaseDosingProtocol):
         aurora_instance = Aurora()
         super().__init__(iwpc_instance, aurora_instance, aurora_instance)
 
-    def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
+    def prescribe(
+            self, patient: Dict[str, Any]) -> DosingDecision:
         fn = (self._initial_protocol if patient['day'] <= 2
               else self._adjustment_protocol)
-        dose, interval, self._additional_info = fn.prescribe(
+        dosing_decision, self._additional_info = fn.prescribe(
             patient, self._additional_info)
 
-        return dose, interval
+        return dosing_decision
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '[PGAA]'
 
 
 class PGPGA(ThreePhaseDosingProtocol):
     '''
-    A composite dosing protocol with modified `IWPC` in initial phase,
-    `Lenzini` in adjustment phase, and `Aurora` in maintenance phase.
+    A composite dosing protocol with modified `IWPC` in the initial phase
+    (days 1, 2, and 3), `Lenzini` in the adjustment phase (days 4 and 5),
+    and `Aurora` in the maintenance phase.
     '''
 
     def __init__(self) -> None:
@@ -81,7 +97,8 @@ class PGPGA(ThreePhaseDosingProtocol):
         aurora_instance = Aurora()
         super().__init__(iwpc_instance, lenzini_instance, aurora_instance)
 
-    def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
+    def prescribe(
+            self, patient: Dict[str, Any]) -> DosingDecision:
         if patient['day'] <= 3:
             fn = self._initial_protocol
         elif patient['day'] <= 5:
@@ -89,16 +106,20 @@ class PGPGA(ThreePhaseDosingProtocol):
         else:
             fn = self._maintenance_protocol
 
-        dose, interval, self._additional_info = fn.prescribe(
+        dosing_decision, self._additional_info = fn.prescribe(
             patient, self._additional_info)
 
-        return dose, interval
+        return dosing_decision
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '[PGPGA]'
 
 
 class PGPGI(ThreePhaseDosingProtocol):
     '''
-    A composite dosing protocol with modified `IWPC` in initial phase,
-    `Lenzini` in adjustment phase, and `Intermountain` in maintenance phase.
+    A composite dosing protocol with modified `IWPC` in the initial phase
+    (days 1, 2, and 3), `Lenzini` in the adjustment phase (days 4 and 5),
+    and `Intermountain` in the maintenance phase.
     '''
 
     def __init__(self) -> None:
@@ -108,7 +129,8 @@ class PGPGI(ThreePhaseDosingProtocol):
         super().__init__(
             iwpc_instance, lenzini_instance, intermountain_instance)
 
-    def prescribe(self, patient: Dict[str, Any]) -> Tuple[float, int]:
+    def prescribe(
+            self, patient: Dict[str, Any]) -> DosingDecision:
         if patient['day'] <= 3:
             fn = self._initial_protocol
         elif patient['day'] <= 5:
@@ -116,7 +138,10 @@ class PGPGI(ThreePhaseDosingProtocol):
         else:
             fn = self._maintenance_protocol
 
-        dose, interval, self._additional_info = fn.prescribe(
+        dosing_decision, self._additional_info = fn.prescribe(
             patient, self._additional_info)
 
-        return dose, interval
+        return dosing_decision
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '[PGPGI]'
