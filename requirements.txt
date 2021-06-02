@@ -19,6 +19,7 @@ matplotlib
 mccabe
 numpy
 opt-einsum
+openpyxl
 pandas
 Pillow
 protobuf
