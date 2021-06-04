@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterator, Union
 
 import pandas as pd
 from openpyxl import load_workbook
-from reil.healthcare.dosing_protocols.warfarin import Aurora
+from reil.healthcare.dosing_protocols.warfarin import Intermountain
 
 
 class DummyPatients:
@@ -51,11 +51,12 @@ class DummyPatients:
                 yield patient, data.dose.iat[-1], data.interval.iat[-1]
 
 
-class testAurora(unittest.TestCase):
-    def test_aurora(self) -> None:
-        aurora = Aurora()
+class testIntermountain(unittest.TestCase):
+    def test_intermountain(self) -> None:
+        intermountain = Intermountain()
 
-        patients = DummyPatients('./tests/data/aurora_sample_dosing.xlsx')
+        patients = DummyPatients(
+            './tests/data/intermountain_sample_dosing.xlsx')
 
         additional_info = {}
         dose, interval = -1, -1
@@ -66,17 +67,16 @@ class testAurora(unittest.TestCase):
                 _id = p['ID']
                 additional_info = {}
 
-            dosing_decision, additional_info = aurora.prescribe(
-                patient=p, additional_info=additional_info)
-            if additional_info['skip_dose']:
-                dosing_decision, additional_info = aurora.prescribe(
+            if p['day'] >= 8:
+                dosing_decision, additional_info = intermountain.prescribe(
                     patient=p, additional_info=additional_info)
-            try:
-                self.assertAlmostEqual(d, dosing_decision.dose)
-                self.assertEqual(i, dosing_decision.duration)
-            except AssertionError:
-                print(d, dose, i, interval, '\n', p, '\n', additional_info)
-                raise
+                try:
+                    self.assertAlmostEqual(d, dosing_decision.dose)
+                    self.assertEqual(i, dosing_decision.duration)
+                except AssertionError:
+                    print(d, dosing_decision.dose, i, dosing_decision.duration,
+                          '\n', p, '\n', additional_info)
+                    raise
 
 
 if __name__ == "__main__":

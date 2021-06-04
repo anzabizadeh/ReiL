@@ -7,7 +7,9 @@ Intermountain warfarin dosing protocol based on `Anderson et al. (2007)
 supplements Appendix B
 <https://www.ahajournals.org/doi/10.1161/circulationaha.107.737312>`_
 '''
-
+# TODO: The current implementation assumes the same patient is being treated
+# on future days. The correct implementation should be fully "functional", with
+# no memory keeping! (no `additional_info`)
 import functools
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
@@ -161,6 +163,7 @@ class Intermountain(dp.DosingProtocol):
                 weekly_dose *= 0.85
                 next_duration = 7
             else:
+                zone = 'action point high'
                 immediate_dose = 0.0
                 immediate_duration = 2
                 next_duration = None
