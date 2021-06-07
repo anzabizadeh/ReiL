@@ -22,6 +22,12 @@ class Entity:
     groupby: Optional[Tuple[str, ...]] = None
     aggregators: Optional[Tuple[str, ...]] = None
 
+    def __post_init__(self):
+        if self.groupby is not None:
+            self.__dict__['groupby'] = tuple(self.groupby)
+        if self.aggregators is not None:
+            self.__dict__['aggregators'] = tuple(self.aggregators)
+
 
 @dataclasses.dataclass
 class InteractionProtocol:
