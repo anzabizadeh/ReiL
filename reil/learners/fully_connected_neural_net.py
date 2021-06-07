@@ -431,7 +431,7 @@ class Dense_tf_2(learners.Learner[float]):
                   if attr not in ('_session', '_graph', '_model')))
 
         try:
-            self._model.save(p / f'{f}.tf')
+            self._model.save(pathlib.Path(p, f'{f}.tf').resolve())
         except ValueError:
             self._logger.warning(
                 'Model is not compiled. Skipped saving the model.')
