@@ -1,87 +1,67 @@
 import logging
 from math import ceil, log10
-from typing import Dict, Literal, Optional, Union
+import pathlib
+from typing import Dict, Literal, Optional, Tuple, Union
 
-from reil.agents import Agent, AgentDemon
 from reil.datatypes import InteractionProtocol
-from reil.environments import Environment, EnvironmentStaticMap
-from reil.subjects import Subject, SubjectDemon
-from reil.utils import InstanceGenerator, OutputWriter
+from reil.environments import EnvironmentStaticMap
+from reil.utils import OutputWriter
+
+# TODO: Documentation
+# TODO: what should we do with `save` and `iterations`?!
 
 
 class Task:
     def __init__(
-            self, name: str, path: str, task_type: Literal['training', 'test'],
-            interaction_protocol: InteractionProtocol,
-            agent: Agent, subject: Union[Subject, InstanceGenerator],
-            auto_rewind: bool,  # ??
-            agent_demon: Optional[AgentDemon] = None,
-            subject_demon: Optional[SubjectDemon] = None,
-            start_iteration: int = 0, iterations: int = 1,
+            self, name: str, path: Union[pathlib.PurePath, str],
+            agent_training_triggers: Dict[str, Literal[
+                'none', 'termination',
+                'state', 'action', 'reward']],
+            interaction_sequence: Tuple[InteractionProtocol, ...],
+            start_iteration: int = 0, max_iterations: int = 1,
             writer: Optional[OutputWriter] = None,
-            save_instances: bool = True, save_iterations: bool = True):
-        # TODO: auto_rewind, save_instances, save_iterations are
-        # not fully implemented!
+            save_iterations: bool = True):
         self._name = name
         self._path = path
-        self.iterations = iterations
+        self.max_iterations = max_iterations
         self._start_iteration = start_iteration
-        self._type = task_type
-        self._save_instances = save_instances
-        self._save_iterations = save_iterations
-        self._auto_rewind = auto_rewind
+        self._agent_training_triggers = agent_training_triggers
         self._writer = writer
 
-        filename_format = f'{{}}_{{:0{ceil(log10(iterations))}}}'
-        self._filename = (
-            lambda i: filename_format.format(name, i)
-        ) if save_iterations else (lambda _: name)
+        # self._subjects = subjects
 
-        if task_type != 'training':
-            agent._training_trigger = 'none'
+        self._save_iterations = save_iterations
+        if save_iterations:
+            self._filename_format = f'{{}}_{{:0{ceil(log10(max_iterations))}}}'
+        else:
+            self._filename_format = f'{{}}'
 
-        self._interaction_protocol = interaction_protocol
-        if interaction_protocol.unit != 'iteration':
-            logging.warning('Interaction protocol unit should be "iteration". '
-                            'Current unit might have unintended consequences.')
+        for protocol in interaction_sequence:
+            if protocol.unit != 'iteration':
+                logging.warning(
+                    'Interaction protocol unit should be "iteration". '
+                    'Current unit might have unintended consequences.')
 
-        a_demon_name = interaction_protocol.agent.demon_name
-        s_demon_name = interaction_protocol.subject.demon_name
-        demon_dict: Dict[str, Union[AgentDemon, SubjectDemon]] = {}
-        if a_demon_name:
-            if agent_demon is None:
-                raise ValueError(
-                    'AgentDemon not provided. Expected one for '
-                    f'{a_demon_name}.')
-            demon_dict = {a_demon_name: agent_demon}
-        if s_demon_name:
-            if subject_demon is None:
-                raise ValueError(
-                    'SubjectDemon not provided. Expected one for '
-                    f'{s_demon_name}.')
-            demon_dict.update({s_demon_name: subject_demon})
+        self._interaction_sequence = interaction_sequence
 
-        env = EnvironmentStaticMap(
-            name=name,
-            path=path,
-            entity_dict={interaction_protocol.agent.name: agent,
-                         interaction_protocol.subject.name: subject},
-            demon_dict=demon_dict or None,  # type: ignore
-            interaction_sequence=(interaction_protocol,))
+    def run(self, environment_filename: str,
+            path: pathlib.PurePath, iteration: int):
+        env = EnvironmentStaticMap.from_pickle(environment_filename, path)
 
-        env._iterations[interaction_protocol.subject.name] = start_iteration
-        env.save(filename=self._filename(start_iteration))
+        env.interaction_sequence = self._interaction_sequence
 
-    @staticmethod
-    def simulate(env: Environment, writer: Optional[OutputWriter]):
+        for agent, trigger in self._agent_training_triggers.items():
+            env._agents[agent]._training_trigger = trigger
+
+        for protocol in self._interaction_sequence:
+            env._iterations[protocol.subject.name] = iteration
+
         env.simulate_pass()
-        if writer:
+        if self._writer:
             rep = env.report_statistics(unstack=True, reset_history=True)
-            writer.write_stats_output(rep)
+            self._writer.write_stats_output(rep)
 
-    def run(self, iteration: int):
-        env = EnvironmentStaticMap.from_pickle(
-            self._filename(iteration), self._path)
-
-        self.simulate(env, self._writer)
-        env.save(filename=self._filename(iteration + 1), path=self._path)
+        # self.simulate(env, self._writer)
+        # env.save(
+        #     filename=self._filename_format.format(self._name, iteration + 1),
+        #     path=self._path)
