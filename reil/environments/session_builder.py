@@ -1,8 +1,8 @@
 import pathlib
 from typing import Union
+
 from reil.environments import Session, Task
 from reil.utils import ConfigParser, OutputWriter
-
 
 # TODO: documentation
 
@@ -81,9 +81,9 @@ class SessionBuilder:
                     if self._parser.contains('tasks', t):
                         temp = self.create_task(t, pathlib.PurePath(
                             session_info['path'], session_name))
-                    elif self._parser.contains('sessions', t):
-                        temp = self.create_session(t, pathlib.PurePath(
-                            session_info['path'], session_name))
+                    # elif self._parser.contains('sessions', t):
+                    #     temp = self.create_session(t, pathlib.PurePath(
+                    #         session_info['path'], session_name))
                     else:
                         raise ValueError(f'Unknown name "{t}" in {component}.')
 
@@ -117,4 +117,4 @@ class SessionBuilder:
             agents=agents, subjects=subjects, demons=demons,
             separate_process=session_info.get('separate_process'),
             process_type=session_info.get('process_type'),
-            **components)
+            **components)  # type: ignore

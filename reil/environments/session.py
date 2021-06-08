@@ -1,23 +1,23 @@
 # from __future__ import annotations
 
 import multiprocessing
-from multiprocessing.context import BaseContext
 import pathlib
-from reil.subjects.subject import Subject
-from reil.environments.environment_static_map import EnvironmentStaticMap
+from multiprocessing.context import BaseContext
 from typing import Dict, List, Literal, Optional, Union
 
 from reil.agents import Agent, AgentDemon
 from reil.environments import Task
+from reil.environments.environment_static_map import EnvironmentStaticMap
 from reil.subjects import SubjectDemon
-
+from reil.subjects.subject import Subject
 
 # TODO: Documentation
 
 
 class Session:
     def __init__(
-            self, name: str, path: str, main_task: Task,
+            self, name: str, path: Union[pathlib.PurePath, str],
+            main_task: Task,
             agents: Dict[str, Union[Agent, str]],
             subjects: Dict[str, Union[Subject, str]],
             demons: Optional[Dict[
