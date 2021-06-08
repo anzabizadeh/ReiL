@@ -48,10 +48,15 @@ class CAA(ThreePhaseDosingProtocol):
 
     def prescribe(
             self, patient: Dict[str, Any]) -> DosingDecision:
-        fn = (self._initial_protocol if patient['day'] <= 2
-              else self._adjustment_protocol)
-        dosing_decision, self._additional_info = fn.prescribe(
-            patient, self._additional_info)
+        day: int = patient['day']
+        if day <= 2:
+            temp, self._additional_info = self._initial_protocol.prescribe(
+                patient, self._additional_info)
+            dosing_decision = DosingDecision(temp.dose, 3 - day)
+        else:
+            dosing_decision, self._additional_info = \
+                self._adjustment_protocol.prescribe(
+                    patient, self._additional_info)
 
         return dosing_decision
 
@@ -73,10 +78,15 @@ class PGAA(ThreePhaseDosingProtocol):
 
     def prescribe(
             self, patient: Dict[str, Any]) -> DosingDecision:
-        fn = (self._initial_protocol if patient['day'] <= 2
-              else self._adjustment_protocol)
-        dosing_decision, self._additional_info = fn.prescribe(
-            patient, self._additional_info)
+        day: int = patient['day']
+        if day <= 2:
+            temp, self._additional_info = self._initial_protocol.prescribe(
+                patient, self._additional_info)
+            dosing_decision = DosingDecision(temp.dose, 3 - day)
+        else:
+            dosing_decision, self._additional_info = \
+                self._adjustment_protocol.prescribe(
+                    patient, self._additional_info)
 
         return dosing_decision
 
@@ -100,14 +110,19 @@ class PGPGA(ThreePhaseDosingProtocol):
     def prescribe(
             self, patient: Dict[str, Any]) -> DosingDecision:
         if patient['day'] <= 3:
-            fn = self._initial_protocol
+            temp, self._additional_info = \
+                self._initial_protocol.prescribe(
+                    patient, self._additional_info)
+            dosing_decision = DosingDecision(temp.dose, 4 - patient['day'])
         elif patient['day'] <= 5:
-            fn = self._adjustment_protocol
+            temp, self._additional_info = \
+                self._adjustment_protocol.prescribe(
+                    patient, self._additional_info)
+            dosing_decision = DosingDecision(temp.dose, 6 - patient['day'])
         else:
-            fn = self._maintenance_protocol
-
-        dosing_decision, self._additional_info = fn.prescribe(
-            patient, self._additional_info)
+            dosing_decision, self._additional_info = \
+                self._maintenance_protocol.prescribe(
+                    patient, self._additional_info)
 
         return dosing_decision
 
@@ -132,14 +147,19 @@ class PGPGI(ThreePhaseDosingProtocol):
     def prescribe(
             self, patient: Dict[str, Any]) -> DosingDecision:
         if patient['day'] <= 3:
-            fn = self._initial_protocol
+            temp, self._additional_info = \
+                self._initial_protocol.prescribe(
+                    patient, self._additional_info)
+            dosing_decision = DosingDecision(temp.dose, 4 - patient['day'])
         elif patient['day'] <= 5:
-            fn = self._adjustment_protocol
+            temp, self._additional_info = \
+                self._adjustment_protocol.prescribe(
+                    patient, self._additional_info)
+            dosing_decision = DosingDecision(temp.dose, 6 - patient['day'])
         else:
-            fn = self._maintenance_protocol
-
-        dosing_decision, self._additional_info = fn.prescribe(
-            patient, self._additional_info)
+            dosing_decision, self._additional_info = \
+                self._maintenance_protocol.prescribe(
+                    patient, self._additional_info)
 
         return dosing_decision
 

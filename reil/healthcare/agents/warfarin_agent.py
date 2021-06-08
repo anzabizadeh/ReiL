@@ -80,7 +80,12 @@ class WarfarinAgent(agents.NoLearnAgent):
         patient = state.value
         patient['day'] += 1
 
-        dose, interval = self._protocol.prescribe(patient)
+        decision = self._protocol.prescribe(patient)
+        dose = decision.dose
+        interval = decision.duration
+
+        if interval is None:
+            raise ValueError(f'None duration received from {self._protocol}.')
 
         return FeatureArray([
             self._dose_gen(min(dose, self._dose_gen.upper or dose)),

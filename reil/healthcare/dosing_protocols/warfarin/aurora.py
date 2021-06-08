@@ -7,7 +7,7 @@ Aurora Dosing Protocol, based on `Ravvaz et al. (2017)
 <https://doi.org/10.1161/circgenetics.117.001804>`_
 '''
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import reil.healthcare.dosing_protocols.dosing_protocol as dp
 
@@ -45,21 +45,24 @@ class Aurora(dp.DosingProtocol):
         :
             A `DosingDecision` along with updated `additional_info`.
         '''
-        today = patient['day']
-        INRs = patient['INR_history']
+        today: int = patient['day']
+        INRs: List[float] = patient['INR_history']
         previous_INR = INRs[-1]
 
-        previous_dose = 0.0  # to suppress Pylance's unbound variable error.
-        previous_interval = 1  # to suppress Pylance's unbound variable error.
+        # to suppress Pylance's unbound variable error.
+        previous_dose = 0.0
+        previous_interval: int = 1
+        next_interval: int
 
         if today > 1:
-            previous_dose = patient['dose_history'][-1]
-            previous_interval = patient['interval_history'][-1]
+            previous_dose: float = patient['dose_history'][-1]
+            previous_interval: int = patient['interval_history'][-1]
 
-        red_flag = additional_info.get('red_flag', False)
-        skip_dose = additional_info.get('skip_dose', 0)
-        new_dose = additional_info.get('new_dose', 0)
-        number_of_stable_days = additional_info.get('number_of_stable_days', 0)
+        red_flag: bool = additional_info.get('red_flag', False)
+        skip_dose: int = additional_info.get('skip_dose', 0)
+        new_dose: float = additional_info.get('new_dose', 0.0)
+        number_of_stable_days: int = additional_info.get(
+            'number_of_stable_days', 0)
 
         if red_flag:
             if previous_INR > 3.0:
@@ -201,31 +204,26 @@ class Aurora(dp.DosingProtocol):
             * The number of doses to skip.
             * Red flag for too high INR values.
         '''
-        skip_dose = 0
+        skip_dose: int = 0
         red_flag = False
         _current_INR = round(current_INR, 2)
+        next_test: int = 7
 
         if _current_INR < 1.50:
             dose = dose * 1.15
-            next_test = 7
         elif _current_INR < 1.80:
             dose = dose * 1.10
-            next_test = 7
         elif _current_INR < 2.00:
             dose = dose * 1.075
-            next_test = 7
         elif _current_INR <= 3.00:
             next_test = 28
         elif _current_INR < 3.40:
             dose = dose * 0.925
-            next_test = 7
         elif _current_INR < 4.00:
             dose = dose * 0.9
-            next_test = 7
         elif _current_INR <= 5.00:
             skip_dose = 2
             dose = dose * 0.875
-            next_test = 7
         else:
             red_flag = True
             next_test = 2
