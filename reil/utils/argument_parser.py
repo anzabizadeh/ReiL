@@ -80,7 +80,7 @@ class ConfigParser:
 
     def extract(
             self, root_name: str, branch_name: str, as_object: bool = False
-    ) -> Dict[str, Any]:
+    ) -> Any:
         conf = self.config[root_name][branch_name]
         if as_object:
             return ReilBase.parse_yaml(conf)
