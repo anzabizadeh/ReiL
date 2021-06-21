@@ -34,7 +34,7 @@ class ReilBase:
                  logger_level: Optional[int] = None,
                  logger_filename: Optional[str] = None,
                  persistent_attributes: Optional[List[str]] = None,
-                 save_zipped: bool = True,
+                 save_zipped: bool = False,
                  **kwargs: Any):
         '''
         Arguments
