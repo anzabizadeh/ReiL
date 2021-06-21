@@ -3,16 +3,20 @@
 HambergPKPD class
 =================
 
-A PK/PD model proposed by Hamberg et al. (2007).
+A warfarin PK/PD model proposed by Hamberg et al. (2007).
 DOI: 10.1038/sj.clpt.6100084
 '''
 import math
 from collections import namedtuple
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, Final, Iterator, List, NewType, Union
 
 import numpy as np
 from reil.datatypes import Feature
 from reil.healthcare.mathematical_models import HealthMathModel
+
+Day = NewType('Day', float)
+Hour = NewType('Hour', int)
+dT = NewType('dT', int)
 
 DoseEffect = namedtuple('DoseEffect', ['dose', 'Cs'])
 
@@ -21,7 +25,52 @@ class HambergPKPD(HealthMathModel):
     '''
     Hamberg PK/PD model for warfarin.
     '''
-    def __init__(self, randomized: bool = True, cache_size: int = 30) -> None:
+    _per_hour: int = 1
+
+    # Hamberg et al. (2007) - Table 2
+    # CL_s: Apparent oral clearance
+    _CL_s_1_1: Final = 0.314  # (l/h) CL_s for *1/*1 of a typical 71-yr patient
+    _CL_s_genotypes: Final = {  # Effect of genotypes diff. from *1/*1 on CL_s
+        '*1/*1': 0.0,
+        '*1/*2': 0.315,
+        '*1/*3': 0.453,
+        '*2/*2': 0.722,
+        '*2/*3': 0.690,
+        '*3/*3': 0.852}
+    _CL_s_age: Final = 0.0091  # Effect of age on CL_s centered around 71 years
+    _V1: Final = 13.8  # (l) Apparent central volume of distribution
+    _k_aS: Final = 2.0  # (1/hr) Absorption rate constant
+    _Q: Final = 0.131    # (l/h) Apparent intercompartmental clearance
+    _V2: Final = 6.59  # (l) Apparent peripheral volume of distribution
+
+    _omega_CL_s: Final = 0.310  # Interindividual variability for CL_s
+    _omega_V1: Final = 0.262  # Interindividual variability for V1
+    _omega_V2: Final = 0.991  # Interindividual variability for V2
+
+    _sigma_s: Final = 0.0908  # Residual error after single dose
+    _sigma_ss: Final = 0.301  # Residual error after steady-state dose
+
+    # Hamberg et al. (2007) - Table 4
+    _E_max: Final = 1.0
+    _gamma: Final = 0.424
+    _EC_50_GG: Final = 4.61  # (mg/l) EC_50 for VKORC1 genotype G/G
+    _EC_50_GA: Final = 3.02  # (mg/l) EC_50 for VKORC1 genotype G/A
+    _EC_50_AA: Final = 2.20  # (mg/l) EC_50 for VKORC1 genotype A/A
+    _MTT_1: Final = 11.6  # (h) Mean Transit Time
+    _MTT_2: Final = 120  # (h) Mean Transit Time
+    _lambda: Final = 3.61
+
+    _omega_MTT_1: Final = 0.141  # Interindividual variability for MTT_1
+    _omega_MTT_2: Final = 1.020  # Interindividual variability for MTT_2
+    _omega_EC_50: Final = 0.409  # Interindividual variability for EC_50
+    _sigma_INR: Final = 0.0325  # Residual error for INR
+
+    # Hamberg et al. (2007) - Misc.
+    _INR_max: Final = 20.0  # page 538
+
+    def __init__(
+            self, randomized: bool = True,
+            cache_size: Day = Day(30)) -> None:
         """
         Arguments
         ---------
@@ -33,15 +82,9 @@ class HambergPKPD(HealthMathModel):
             INR computation.
         """
         self._randomized = randomized
-        self._d2h = 24
-
-        self._gamma = 0.424  # no units
-        self._Q = 0.131    # (L/h)
-        self._lambda = 3.61
-        self._E_max = 1	 # no units
-
-        self._cache_size = cache_size
-        self._cached_cs = []
+        self._cache_size = math.ceil(cache_size)
+        self._last_computed_day: Day = Day(0)
+        self._cached_cs: Dict[float, List[float]] = {}
 
     def setup(self, **arguments: Feature) -> None:
         '''
@@ -57,7 +100,7 @@ class HambergPKPD(HealthMathModel):
         This model requires `age`, `CYP2C9`, `MTT_1`, `MTT_2`, `EC_50`,
         `cyp_1_1`, `V1`, and `V2`. The genotype of `VKORC1` is not directly
         used in this implementation. Instead, one should use it to generate
-        `EC_50`.
+        `EC_50`. See `WarfarinPatient` class.
 
         Raises
         ------
@@ -65,86 +108,106 @@ class HambergPKPD(HealthMathModel):
             `CYP2C9` is not one of the acceptable values:
             *1/*1, *1/*2, *1/*3, *2/*2, *2/*3, *3/*3
         '''
+        # Note: In Hamberg et al. (2007), BASE_i is the measured baseline INR
+        # for patients, but Ravvaz fixed it to 1.
+        self._baseINR = 1.0    # Ravvaz source code
+
         age = float(arguments['age'].value)  # type: ignore
         CYP2C9 = str(arguments['CYP2C9'].value)
-
-        # VKORC1 is not used inside this implementation of Hamberg. It
-        # specifies the distribution of EC_50 which is being determined
-        # in WarfarinPatient class.
-
         MTT_1 = float(arguments['MTT_1'].value)  # type: ignore
         MTT_2 = float(arguments['MTT_2'].value)  # type: ignore
-
-        self._EC_50_gamma = float(
-            arguments['EC_50'].value) ** self._gamma  # type: ignore
-
-        cyp_1_1 = float(arguments['cyp_1_1'].value)  # type: ignore
         V1 = float(arguments['V1'].value)  # type: ignore
         V2 = float(arguments['V2'].value)  # type: ignore
+        EC_50 = float(arguments['EC_50'].value)  # type: ignore
+        CL_S_cyp_1_1 = float(arguments['CL_S_cyp_1_1'].value)  # type: ignore
 
-        ktr1 = 6/MTT_1  # 1/hours; changed from 1/MTT_1
-        ktr2 = 1/MTT_2  # 1/hours
-        self._ktr = np.array([0.0] + [ktr1] * 6 + [0.0, ktr2])
+        if CYP2C9 not in self._CL_s_genotypes:
+            raise ValueError('The CYP2C9 genotype not recognized!')
 
-        Q = 0.131    # (L/h)
+        # Note:
+        # Hamberg et al. (2007) says "CLS was reduced with increasing age,
+        # decreasing by approximately 9% per decade". However, it does not say
+        # whether it applies to younger than 71 or not. Ravvaz assumed that it
+        # does not, but Figure 3 in Hamberg et al. (2007) shows a 50-year-old
+        # patient has a lower INR than a 70-year-old. So, it applies!
+        CL_s = CL_S_cyp_1_1 * (
+            1.0 - (self._CL_s_age * (age - 71.0))
+        ) * (1 - self._CL_s_genotypes[CYP2C9])
+
+        # -------- Implementation of the two compartment model ------------
+        # Adapted from Ravvaz source code in R
+        # Similar to "Equations to use for time points when absorption can
+        # occur and compartment A is unsaturated" available at
+        # http://www.rsc.org/suppdata/c7/md/c7md00586e/c7md00586e1.pdf
+        # There, compartments B and C are equivalent of compartments 1 and 2
+        # here. Also, k_1...k_4 are K_aS, k12, k21, k10, respectively.
+        # Note that $x_B^0$ and $x_C^0$ terms are zero as described in that
+        # document.
 
         # bioavilability fraction 0-1 (from: "Applied Pharmacokinetics &
         # Pharmacodynamics 4th edition, p.717", some other references)
         F = 0.9
 
-        self._ka = 2  # absorption rate (1/hr)
-
-        temp = {'*1/*1': 0.0,
-                '*1/*2': 0.315,
-                '*1/*3': 0.453,
-                '*2/*2': 0.722,
-                '*2/*3': 0.69,
-                '*3/*3': 0.852}
-
-        if CYP2C9 not in temp:
-            raise ValueError('The CYP2C9 genotype not recognized fool!')
-
-        CL_s = 1.0 - (0.0091 * (age - 71) if age > 71 else 0)
-        CL_s *= cyp_1_1 * (1 - temp[CYP2C9])
-
-        k12 = Q / V1
-        k21 = Q / V2
-        k10 = CL_s / V1
+        k12 = self._Q / V1  # Central to peripheral distribution constant
+        k21 = self._Q / V2  # Peripheral to central distribution constant
+        k10 = CL_s / V1  # Elimination rate constant
 
         b = k10 + k21 + k12
         c = k10 * k21
+
+        # Alpha: distribution phase slope (-alpha)
+        # Beta: elimination phase slope (-beta)
         self._alpha = (b + math.sqrt(b ** 2 - 4*c)) / 2
         self._beta = (b - math.sqrt(b ** 2 - 4*c)) / 2
 
-        kaF_2V1 = (self._ka * F / 2) / V1
-        self._coef_alpha = max(
-            0.0, ((k21 - self._alpha)
-                  / ((self._ka - self._alpha)*(self._beta - self._alpha)))
+        # Note: Here we halved the value for KaF_2V1, because half of the
+        # warfarin is S, and only S affects the INR.
+        kaF_2V1 = (self._k_aS * F / 2) / V1
+
+        # $C_s$ = c_{\k_1}\exp{-k_1 t}
+        #       + c_{\alpha}\exp{-\alpha t}
+        #       + c_{\beta}\exp{-\beta t}
+        self._coef_alpha = (
+            (k21 - self._alpha)
+            / ((self._k_aS - self._alpha)*(self._beta - self._alpha))
         ) * kaF_2V1
-        self._coef_beta = max(
-            0.0, ((k21 - self._beta)
-                  / ((self._ka - self._beta)*(self._alpha - self._beta)))
+        self._coef_beta = (
+            (k21 - self._beta)
+            / ((self._k_aS - self._beta)*(self._alpha - self._beta))
         ) * kaF_2V1
-        self._coef_k_a = max(
-            0.0, ((k21 - self._ka)
-                  / ((self._ka - self._alpha)*(self._ka - self._beta)))
+        self._coef_k_a = (
+            (k21 - self._k_aS)
+            / ((self._k_aS - self._alpha)*(self._k_aS - self._beta))
         ) * kaF_2V1
 
-        self._dose_records: Dict[int, DoseEffect] = {}
-        self._total_cs = np.array(
-            [0.0] * self._cache_size * self._d2h)  # hourly
-        self._list_of_INRs = [0.0] * (self._cache_size + 1)  # daily
-        self._err_list = []  # daily
-        self._err_ss_list = []  # daily
-        self._exp_e_INR_list = []  # daily
-        self._last_computed_day: int = 0
+        # ---- End of the implementation of the two compartment model -------
 
-        temp_cs_generator = self._CS_function_generator(0, 1.0)
-        self._cached_cs = [temp_cs_generator(t)
-                           for t in range(self._cache_size * self._d2h)]
+        # Note: According to Hamberg et al. (2007) pp. 538, $ktr_1=1/MTT_1$
+        # However, Ravvaz set it to $6/MTT_1$. It must be because we have
+        # 6 compartment amounts, and total $MTT_1$ for the whole chain is
+        # 11.6 h (Figure 2), so each should take $\frac{1}{6} MTT_1$
+        ktr1 = 6.0/MTT_1  # (1/hours)
+        ktr2 = 1.0/MTT_2  # (1/hours)
+        self._ktr = np.array([0.0] + [ktr1] * 6 + [0.0, ktr2])
+        self._EC_50_gamma = EC_50 ** self._gamma
+
+        self._dose_records: Dict[Day, DoseEffect] = {}
+        cs_size = self._cache_size * 24 * self._per_hour
+        self._total_cs = np.array([0.0] * cs_size)  # hourly
+        # self._computed_INRs = [0.0] * (self._cache_size + 1)  # daily
+        self._computed_INRs: Dict[Day, float] = {}  # daily
+        self._err_list: List[List[float]] = []  # hourly
+        self._err_ss_list: List[List[float]] = []  # hourly
+        self._exp_e_INR_list: List[List[float]] = []  # daily
+        self._last_computed_day = Day(0)
+
+        temp_cs_generator = self._CS_function_generator(dT(0), 1.0)
+        self._cached_cs = {
+            1.0: temp_cs_generator(range(cs_size))}  # type: ignore
 
         self._A = np.array([0.0] + [1.0] * 8)
-        self._list_of_INRs[0] = self._INR(self._A, 0)
+        # self._computed_INRs[0] = self._INR(self._A, Day(0))
+        self._computed_INRs[Day(0)] = self._INR(self._A, Day(0))
 
     def run(self, **inputs: Any) -> Dict[str, Any]:
         '''
@@ -166,10 +229,13 @@ class HambergPKPD(HealthMathModel):
         '''
         self.dose = inputs.get('dose', {})
 
-        return {'INR': self.INR(inputs.get('measurement_days', []))}
+        if days := inputs.get('measurement_days'):
+            return {'INR': self.INR(days)}
+
+        return {'INR': {}}
 
     @property
-    def dose(self) -> Dict[int, float]:
+    def dose(self) -> Dict[Day, float]:
         '''
         Return doses for each day.
 
@@ -182,7 +248,7 @@ class HambergPKPD(HealthMathModel):
                 for t, info in self._dose_records.items()}
 
     @dose.setter
-    def dose(self, dose: Dict[int, float]) -> None:
+    def dose(self, dose: Dict[Day, float]) -> None:
         '''
         Add warfarin doses at the specified days.
 
@@ -195,29 +261,25 @@ class HambergPKPD(HealthMathModel):
         # together because the history of "A" array is not kept.
         try:
             if self._last_computed_day > min(dose.keys()):
-                self._last_computed_day = 0
+                self._last_computed_day = Day(0)
         except ValueError:  # no doses
             pass
 
-        for t, d in dose.items():
-            if d != 0.0:
-                h = t * self._d2h
-                if t in self._dose_records:
-                    self._total_cs -= (np.array([0.0]*h + self._cached_cs[:-h])
-                                       * self._dose_records[t])
+        for day, _dose in dose.items():
+            if _dose != 0.0:
+                dt = dT(math.ceil(day * 24 * self._per_hour))
+                if day in self._dose_records:
+                    # TODO: Implement!
+                    raise NotImplementedError
 
-                self._dose_records[t] = DoseEffect(
-                    d, self._CS_function_generator(h, d))
+                self._dose_records[day] = DoseEffect(
+                    _dose, self._CS_function_generator(dt, _dose))
 
-                try:
-                    self._total_cs += np.array(
-                        [0.0]*h +
-                        self._cached_cs[:-h]
-                    )[:self._cache_size * self._d2h] * d
-                except ValueError:  # _t == 0
-                    self._total_cs += np.array(self._cached_cs) * d
+                self._total_cs += np.array(
+                    self._dose_records[day].Cs(
+                        range(self._cache_size * 24 * self._per_hour)))
 
-    def INR(self, measurement_days: Union[int, List[int]]) -> List[float]:
+    def INR(self, measurement_days: Union[Day, List[Day]]) -> List[float]:
         '''
         Compute INR values for the specified days.
 
@@ -231,35 +293,44 @@ class HambergPKPD(HealthMathModel):
         :
             A list of INRs for the specified days.
         '''
+        days: List[Day]
+
         days = (measurement_days if hasattr(measurement_days, '__iter__')
-                else [measurement_days])
+                else [measurement_days])  # type: ignore
+
+        not_computed_days = set(days).difference(self._computed_INRs)
+        if min(not_computed_days) < self._last_computed_day:
+            self._last_computed_day = Day(0)
+            self._computed_INRs = {}
+            not_computed_days = days
 
         if self._last_computed_day == 0:
             self._A = np.array([0.0] + [1.0] * 8)
 
-        max_days = max(days)  # type: ignore
-        self._list_of_INRs.extend(
-            [0.0] * (max_days - len(self._list_of_INRs) + 1))
+        stop_points = [self._last_computed_day] + list(not_computed_days)
+        for d1, d2 in zip(stop_points[:-1], stop_points[1:]):
+            delta_Ts = 24 * self._per_hour
+            for dt in range(int(d1 * delta_Ts), int(d2 * delta_Ts)):
+                self._A[0] = self._A[7] = self._inflow(dt)  # type: ignore
+                self._A[1:] += self._ktr[1:] * \
+                    (self._A[0:-1] - self._A[1:]) / self._per_hour
 
-        for d in range(self._last_computed_day, max_days):
-            for i in range(d * 24, (d + 1) * 24):
-                self._A[0] = self._A[7] = self._inflow(i)
-                self._A[1:] += self._ktr[1:] * (self._A[0:-1] - self._A[1:])
-            self._list_of_INRs[d + 1] = self._INR(self._A, d + 1)
+            self._computed_INRs[d2] = self._INR(self._A, Day(int(d2)))
 
-        self._last_computed_day = max_days
+        self._last_computed_day = stop_points[-1]
 
-        return [self._list_of_INRs[i] for i in days]  # type: ignore
+        return [self._computed_INRs[i] for i in days]
 
     def _CS_function_generator(
-            self, t_dose: int, dose: float) -> Callable[[int], float]:
+            self, dt_dose: dT, dose: float
+    ) -> Callable[[Iterator[dT]], List[float]]:
         '''
         Generate a Cs function.
 
         Arguments
         ---------
-        t_dose:
-            The day in which the dose is administered.
+        dt_dose:
+            The time in which the dose is administered.
 
         dose:
             The value of the dose administered.
@@ -267,7 +338,7 @@ class HambergPKPD(HealthMathModel):
         Returns
         -------
         :
-            A function that gets the day and return that day's
+            A function that gets the time and returns that time's
             warfarin concentration.
 
         Notes
@@ -276,48 +347,67 @@ class HambergPKPD(HealthMathModel):
         cache of concentrations and only computes the concentration
         if the requested day is beyond the cached range.
         '''
-        cached_cs_temp = [dose * cs for cs in self._cached_cs]
+        if dose == 1.0:
+            cached_cs_temp = []
+        else:
+            if dose not in self._cached_cs:
+                self._cached_cs[dose] = [dose * cs
+                                         for cs in self._cached_cs[1.0]]
+            cached_cs_temp = self._cached_cs[dose]
 
-        def Cs(t: int) -> float:
+        def Cs(dts: Iterator[dT]) -> List[float]:
             '''
-            Get a day and return its warfarin concentration.
+            Get delta_t list and return the warfarin concentration of
+            those times.
 
             Arguments
             ---------
-            t:
-                The day for which concentration value is needed.
+            dts:
+                The times for which concentration value is needed.
 
             Returns
             -------
             :
                 Warfarin concentration
             '''
-            if t <= t_dose:
-                return 0.0
+            max_diff = len(cached_cs_temp)
+            coef_alpha = self._coef_alpha
+            coef_beta = self._coef_beta
+            coef_k_a = self._coef_k_a
+            alpha = self._alpha
+            beta = self._beta
+            k_aS = self._k_aS
 
-            try:
-                return cached_cs_temp[t - t_dose]
-            except IndexError:
-                return (self._coef_alpha * math.exp(
-                    -self._alpha * (t - t_dose)) +
-                    self._coef_beta * math.exp(
-                    -self._beta * (t - t_dose)) +
-                    self._coef_k_a * math.exp(
-                    -self._ka * (t - t_dose))) * dose
+            # For hour_diff == 0, the Cs equation itself is zero, so included
+            # it in the main if to avoid unnecessary computation.
+            return [
+                0.0 if (dt_diff := dt - dt_dose) <= 0
+                else (
+                    cached_cs_temp[dt_diff] if dt_diff < max_diff
+                    else (
+                        coef_alpha *
+                        math.exp(-alpha * dt_diff / self._per_hour) +
+                        coef_beta *
+                        math.exp(-beta * dt_diff / self._per_hour) +
+                        coef_k_a *
+                        math.exp(-k_aS * dt_diff / self._per_hour)
+                    ) * dose
+                ) for dt in dts]
 
         return Cs
 
-    def _err(self, t: int, ss: bool = False) -> float:
+    def _err(self, dt: dT, ss: bool = False) -> float:
         '''
         Generate error term for the requested day.
 
         Arguments
         ---------
-        t:
-            The day for which the error is requested.
+        dt:
+            The time for which the error is requested.
 
         ss:
-            Whether the dosing has reached the steady-state.
+            Whether the error is for the steady-state case. For single dose
+            it should be `False`, and for multiple doses, it should be `True`.
 
         Returns
         -------
@@ -329,33 +419,37 @@ class HambergPKPD(HealthMathModel):
         To speed up the process and generate reproducible results in each run,
         the errors are cached in batches.
         For each call of the function, the cached error is returned. If
-        the `day` is beyond the cached range, a new range of error values
+        the `hour` is beyond the cached range, a new range of error values
         are generated and added to the cache.
+        Also, error is per hour. So, for any fraction of hour, the same
+        value will be returned.
         '''
         if self._randomized:
-            index_0 = t // self._cache_size
-            index_1 = t % self._cache_size
+            h = dt // self._per_hour
+            hourly_cache_size = self._cache_size * 24
+            index_0 = h // hourly_cache_size
+            index_1 = h % hourly_cache_size
             e_list = self._err_ss_list if ss else self._err_list
             try:
                 return e_list[index_0][index_1]
             except IndexError:
                 missing_rows = index_0 - len(e_list) + 1
-                stdev = 0.30 if ss else 0.09
+                stdev = self._sigma_ss if ss else self._sigma_s
                 for _ in range(missing_rows):
                     e_list.append(np.exp(np.random.normal(  # type:ignore
-                        0, stdev, self._cache_size)))
+                        0, stdev, hourly_cache_size)))
 
             return e_list[index_0][index_1]
         else:
             return 1.0
 
-    def _exp_e_INR(self, t: int) -> float:
+    def _exp_e_INR(self, d: Day) -> float:
         '''
         Generate exp(error) term of INR for the requested day.
 
         Arguments
         ---------
-        t:
+        d:
             The day for which the error is requested.
 
         Returns
@@ -365,15 +459,19 @@ class HambergPKPD(HealthMathModel):
 
         Notes
         -----
-        To speed up the process and generate reproducible results in each run,
-        the errors are cached in batches.
-        For each call of the function, the cached error is returned. If
-        the `day` is beyond the cached range, a new range of error values
-        are generated and added to the cache.
+            error is generated per day. So, if the given `d` is fractional,
+            it will be truncated and the respective error is returned.
+
+            To speed up the process and generate reproducible results in each
+            run, the errors are cached in batches.
+            For each call of the function, the cached error is returned. If
+            the `day` is beyond the cached range, a new range of error values
+            are generated and added to the cache.
         '''
+        _d = int(d)
         if self._randomized:
-            index_0 = t // self._cache_size
-            index_1 = t % self._cache_size
+            index_0 = _d // self._cache_size
+            index_1 = _d % self._cache_size
             try:
                 return self._exp_e_INR_list[index_0][index_1]
             except IndexError:
@@ -381,22 +479,24 @@ class HambergPKPD(HealthMathModel):
                 for _ in range(missing_rows):
                     self._exp_e_INR_list.append(
                         np.exp(np.random.normal(  # type:ignore
-                            0, 0.0325, self._cache_size)))
+                            0, self._sigma_INR,
+                            self._cache_size)))
 
             return self._exp_e_INR_list[index_0][index_1]
 
         else:
             return 1.0
 
-    def _inflow(self, t: int) -> float:
+    def _inflow(self, t: dT) -> float:
         '''
         Compute the warfarin concentration that enters the two compartments
-        is the PK/PD model.
+        in the PK/PD model.
 
         Arguments
         ---------
         t:
-            The day for which the input is requested.
+            The time for which the input is requested.
+            t = Hours * _per_hour + delta_t
 
         Returns
         -------
@@ -412,29 +512,29 @@ class HambergPKPD(HealthMathModel):
         try:
             Cs = self._total_cs[t]
         except IndexError:
-            Cs = sum(v.Cs(t)
+            Cs = sum(v.Cs([t])[0]
                      for v in self._dose_records.values())
 
         Cs_gamma = (Cs * self._err(t, t > 0)) ** self._gamma
-        inflow = 1 - self._E_max * \
-            Cs_gamma / (self._EC_50_gamma + Cs_gamma)
+        inflow = 1 - (
+            (self._E_max * Cs_gamma) / (self._EC_50_gamma + Cs_gamma))
 
         return inflow
 
-    def _INR(self, A: List[float], t: int) -> float:
+    def _INR(self, A: List[float], d: Day) -> float:
         '''
-        Compute the warfarin concentration that enters the two compartments
-        is the PK/PD model.
+        Compute the INR on day `d`.
 
         Arguments
         ---------
-        t:
+
+        d:
             The day for which the input is requested.
 
         Returns
         -------
         :
-            The input value.
+            The INR value.
 
         Notes
         -----
@@ -442,9 +542,9 @@ class HambergPKPD(HealthMathModel):
         number of days. For days beyond this range, concentration values are
         computed and used on each call.
         '''
-        INR_max = 20
-        baseINR = 1
 
-        return (baseINR +
-                (INR_max*(1-A[6]*A[8]) ** self._lambda)
-                ) * self._exp_e_INR(t)
+        # Note: we defined `A` in such a way to compute changes in `A`s
+        # easier. In our implementation, `A8` is the `A7` in Hamberg et al.
+        return (self._baseINR +
+                (self._INR_max * ((1 - A[6]*A[8]) ** self._lambda))
+                ) * self._exp_e_INR(d)

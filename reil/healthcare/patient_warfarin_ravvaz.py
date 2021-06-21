@@ -29,15 +29,16 @@ from typing import Any
 from reil.datatypes import FeatureGenerator
 from reil.healthcare import Patient
 from reil.healthcare.mathematical_models import HealthMathModel
-from reil.utils.functions import (random_categorical, random_truncated_lnorm,
-                                  random_truncated_normal)
-
+from reil.healthcare.mathematical_models.hamberg_pkpd import HambergPKPD
+from reil.utils.functions import (random_categorical,
+                                  random_lognormal_truncated,
+                                  random_normal_truncated)
 
 # pre-computing to gain some speed boost!
-log_4_61 = math.log(4.61)
-log_3_02 = math.log(3.02)
-log_2_20 = math.log(2.20)
-sqrt_0_409 = math.sqrt(0.409)
+log_EC_50_GG = math.log(HambergPKPD._EC_50_GG)
+log_EC_50_GA = math.log(HambergPKPD._EC_50_GA)
+log_EC_50_AA = math.log(HambergPKPD._EC_50_AA)
+sqrt_omega_EC_50 = math.sqrt(HambergPKPD._omega_EC_50)
 
 
 class PatientWarfarinRavvaz(Patient):
@@ -63,19 +64,19 @@ class PatientWarfarinRavvaz(Patient):
         '''
         self.feature_gen_set = {
             'age': FeatureGenerator.numerical(
-                name='age',  # Aurora population
-                lower=18.0, upper=100.0, mean=67.30, stdev=13.43,
-                generator=random_truncated_normal,
+                name='age',  # (years) Aurora population
+                lower=18.0, upper=150.0, mean=67.30, stdev=13.43,
+                generator=random_normal_truncated,
                 randomized=randomized),
             'weight': FeatureGenerator.numerical(
-                name='weight',  # lb  - Aurora population
+                name='weight',  # (lb) Aurora population
                 lower=70.0, upper=500.0, mean=199.24, stdev=54.71,
-                generator=random_truncated_normal,
+                generator=random_normal_truncated,
                 randomized=randomized),
             'height': FeatureGenerator.numerical(
-                name='height',  # in - Aurora population
+                name='height',  # (in) Aurora population
                 lower=45.0, upper=85.0, mean=66.78, stdev=4.31,
-                generator=random_truncated_normal,
+                generator=random_normal_truncated,
                 randomized=randomized),
             'gender': FeatureGenerator.categorical(
                 name='gender',  # Aurora population
@@ -125,35 +126,41 @@ class PatientWarfarinRavvaz(Patient):
                 allow_missing=allow_missing_genotypes),
 
             'MTT_1': FeatureGenerator.numerical(
-                name='MTT_1',  # Hamberg PK/PD
-                mean=math.log(11.6), stdev=math.sqrt(0.141),
-                generator=random_truncated_lnorm,
+                name='MTT_1',  # (hours) Hamberg PK/PD
+                mean=math.log(HambergPKPD._MTT_1),
+                stdev=math.sqrt(HambergPKPD._omega_MTT_1),
+                generator=random_lognormal_truncated,
                 randomized=randomized),
             'MTT_2': FeatureGenerator.numerical(
-                name='MTT_2',  # Hamberg PK/PD
-                mean=math.log(120.0), stdev=math.sqrt(1.02),
-                generator=random_truncated_lnorm,
+                name='MTT_2',  # (hours) Hamberg PK/PD
+                # Hamberg et al. (2007) - Table 4
+                mean=math.log(HambergPKPD._MTT_2),
+                stdev=math.sqrt(HambergPKPD._omega_MTT_2),
+                generator=random_lognormal_truncated,
                 randomized=randomized),
-            'cyp_1_1': FeatureGenerator.numerical(
-                name='cyp_1_1',  # Hamberg PK/PD
-                mean=math.log(0.314), stdev=math.sqrt(0.31),
-                generator=random_truncated_lnorm,
+            'CL_S_cyp_1_1': FeatureGenerator.numerical(
+                name='CL_S_cyp_1_1',  # (l/h) Hamberg PK/PD
+                mean=math.log(HambergPKPD._CL_s_1_1),
+                stdev=math.sqrt(HambergPKPD._omega_CL_s),
+                generator=random_lognormal_truncated,
                 randomized=randomized),
             'V1': FeatureGenerator.numerical(
-                name='V1',  # Hamberg PK/PD
-                mean=math.log(13.8), stdev=math.sqrt(0.262),
-                generator=random_truncated_lnorm,
+                name='V1',  # (L) Volume in central compartment
+                mean=math.log(HambergPKPD._V1),
+                stdev=math.sqrt(HambergPKPD._omega_V1),
+                generator=random_lognormal_truncated,
                 randomized=randomized),
             'V2': FeatureGenerator.numerical(
-                name='V2',  # Hamberg PK/PD
-                mean=math.log(6.59), stdev=math.sqrt(0.991),
-                generator=random_truncated_lnorm,
+                name='V2',  # (L) volume in peripheral compartment
+                mean=math.log(HambergPKPD._V2),
+                stdev=math.sqrt(HambergPKPD._omega_V2),
+                generator=random_lognormal_truncated,
                 randomized=randomized),
 
             # 'EC_50': FeatureGenerator.numerical(
-            #     name='EC_50',  # Hamberg PK/PD
+            #     name='EC_50',  # (mg/L) Hamberg PK/PD
             #     stdev=math.sqrt(0.409),
-            #     generator=random_truncated_lnorm,
+            #     generator=random_lognormal_truncated,
             #     randomized=randomized),
 
             # 'sensitivity': FeatureGenerator.categorical(
@@ -187,18 +194,19 @@ class PatientWarfarinRavvaz(Patient):
         self._model.setup(**self.feature_set)
 
     def _generate_EC_50(self) -> None:
-        if self.feature_set['VKORC1'].value == 'G/G':
-            mean = log_4_61
-        elif self.feature_set['VKORC1'].value in ('G/A', 'A/G'):
-            mean = log_3_02
-        else:  # if self.feature_set['VKORC1'].value == 'A/A':
-            mean = log_2_20
+        vkorc1 = self.feature_set['VKORC1'].value
+        if vkorc1 == 'G/G':
+            mean = log_EC_50_GG
+        elif vkorc1 in ('G/A', 'A/G'):
+            mean = log_EC_50_GA
+        else:  # 'A/A'
+            mean = log_EC_50_AA
 
         self.feature_gen_set['EC_50'] = FeatureGenerator.numerical(
-            name='EC_50',  # Hamberg PK/PD
+            name='EC_50',  # (mg/L) Hamberg PK/PD
             mean=mean,
-            stdev=sqrt_0_409,
-            generator=random_truncated_lnorm,
+            stdev=sqrt_omega_EC_50,
+            generator=random_lognormal_truncated,
             randomized=self._randomized)
 
         self.feature_set['EC_50'] = self.feature_gen_set['EC_50']()
