@@ -299,7 +299,8 @@ class HambergPKPD(HealthMathModel):
                 else [measurement_days])  # type: ignore
 
         not_computed_days = set(days).difference(self._computed_INRs)
-        if min(not_computed_days) < self._last_computed_day:
+        if (not_computed_days and
+                min(not_computed_days) < self._last_computed_day):
             self._last_computed_day = Day(0)
             self._computed_INRs = {}
             not_computed_days = days
