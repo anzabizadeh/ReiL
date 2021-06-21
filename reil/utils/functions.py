@@ -8,12 +8,12 @@ Contains some useful functions.
 
 import math
 import random
-from reil.datatypes.feature import FeatureArray
 from typing import Any, Callable, Iterable, Optional, Tuple, TypeVar
 
 import numpy as np
 from reil.datatypes import FeatureGenerator
-from scipy import stats
+from reil.datatypes.feature import FeatureArray
+from scipy.stats import lognorm  # type: ignore
 
 
 def random_choice(f: Any):
@@ -24,37 +24,62 @@ def random_choice(f: Any):
     return random.choice(f)
 
 
-def random_truncated_normal(f: FeatureGenerator) -> float:
-    return min(max(
-        np.random.normal(f.mean, f.stdev), f.lower),
-        f.upper)
+def random_uniform(f: FeatureGenerator) -> float:
+    if f.randomized:
+        return np.random.uniform(f.lower, f.upper)
+
+    return f.mean or (f.upper - f.lower) / 2.0  # type: ignore
 
 
-def random_uniform(f: FeatureGenerator):
-    return np.random.uniform(f.lower, f.upper)
+def random_normal(f: FeatureGenerator) -> float:
+    if f.randomized:
+        return np.random.normal(f.mean, f.stdev)
+
+    return f.mean  # type: ignore
 
 
-def random_categorical(f: FeatureGenerator):
-    if f.probabilities is None:
-        return random.choice(f.categories)  # type:ignore
-    else:
-        return np.random.choice(
-            f.categories, 1, p=f.probabilities)[0]
+def random_normal_truncated(f: FeatureGenerator) -> float:
+    if f.randomized:
+        return min(max(
+            np.random.normal(f.mean, f.stdev), f.lower),
+            f.upper)
+
+    return f.mean  # type: ignore
 
 
-def random_truncated_lnorm(f: FeatureGenerator) -> float:
+def random_lognormal(f: FeatureGenerator) -> float:
+    exp_mu = math.exp(f.mean)  # type:ignore
+    if f.randomized:
+        return lognorm.rvs(s=f.stdev, scale=exp_mu)
+
+    return exp_mu
+
+
+def random_lognormal_truncated(f: FeatureGenerator) -> float:
     # capture 50% of the data.
     # This restricts the log values to a "reasonable" range
+    exp_mu = math.exp(f.mean)  # type:ignore
     if f.randomized:
         quartileRange = (0.25, 0.75)
-        lnorm = stats.lognorm(f.stdev, scale=math.exp(f.mean))  # type:ignore
+        lnorm = lognorm(f.stdev, scale=exp_mu)
         qValues = lnorm.ppf(quartileRange)
         values = list(v for v in lnorm.rvs(size=1000)
                       if (v > qValues[0]) & (v < qValues[1]))
 
         return random.sample(values, 1)[0]
 
-    return math.exp(f.mean + (f.stdev ** 2)/2)
+    return exp_mu
+
+
+def random_categorical(f: FeatureGenerator):
+    if f.randomized:
+        if f.probabilities is None:
+            return random.choice(f.categories)  # type:ignore
+        else:
+            return np.random.choice(
+                f.categories, 1, p=f.probabilities)[0]
+
+    return f.categories[0]
 
 
 def square_dist(x: float, y: Iterable[float]) -> float:
