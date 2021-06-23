@@ -8,9 +8,10 @@ from reil.utils import ConfigParser, OutputWriter
 
 
 class SessionBuilder:
-    def __init__(self, config_filenames, config_path) -> None:
+    def __init__(self, config_filenames, config_path, vars_dict) -> None:
         self._parser = ConfigParser(
-            config_filenames=config_filenames, config_path=config_path)
+            config_filenames=config_filenames, config_path=config_path,
+            vars_dict=vars_dict)
 
     def create_task(
             self,

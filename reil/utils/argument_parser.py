@@ -54,11 +54,12 @@ class ConfigParser:
     def __init__(
             self,
             config_filenames: Dict[str, str],
-            config_path: Optional[Union[pathlib.Path, str]] = None) -> None:
+            config_path: Optional[Union[pathlib.Path, str]] = None,
+            vars_dict: Optional[Dict[str, str]] = None) -> None:
 
         if config_filenames:
             self.config = {
-                key: self._load_config_file(value, config_path)
+                key: self._load_config_file(value, config_path, vars_dict)
                 for key, value in config_filenames.items()
             }
         else:
@@ -67,16 +68,22 @@ class ConfigParser:
     @staticmethod
     def _load_config_file(
             filename: str,
-            path: Optional[Union[pathlib.Path, str]] = None) -> Any:
+            path: Optional[Union[pathlib.Path, str]] = None,
+            vars_dict: Optional[Dict[str, str]] = None) -> Any:
 
         _path = pathlib.Path(path or '.')
         _filename = filename if filename.endswith((
             '.yaml', '.yml')) else f'{filename}.yaml'
 
         with open(_path / _filename, 'r') as f:
-            temp = YAML().load(f)
+            temp = f.read()
+            # temp = YAML().load(f)
 
-        return temp
+        if vars_dict:
+            for name, value in vars_dict.items():
+                temp = temp.replace(f'${name}$', str(value))
+
+        return YAML().load(temp)
 
     def extract(
             self, root_name: str, branch_name: str, as_object: bool = False
