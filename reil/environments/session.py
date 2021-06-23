@@ -3,7 +3,7 @@
 import multiprocessing
 import pathlib
 from multiprocessing.context import BaseContext
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from reil.agents import Agent, AgentDemon
 from reil.environments import Task
@@ -18,7 +18,7 @@ class Session:
     def __init__(
             self, name: str, path: Union[pathlib.PurePath, str],
             main_task: Task,
-            agents: Dict[str, Union[Agent, str]],
+            agents: Dict[str, Union[Agent[Any], str]],
             subjects: Dict[str, Union[Subject, str]],
             demons: Optional[Dict[
                 str, Union[AgentDemon, SubjectDemon, str]]] = None,
@@ -65,7 +65,7 @@ class Session:
                 environment.interaction_sequence = ()
                 environment.save(
                     filename=filename, path=path)
-                if separate_process:
+                if separate_process and context:
                     p = context.Process(
                         target=t.run, args=(filename, path, iteration))
                     p.start()
