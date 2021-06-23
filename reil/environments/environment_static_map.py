@@ -7,15 +7,23 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-from collections import namedtuple
 import pathlib
 from reil.subjects import SubjectDemon
 from reil.agents import AgentDemon
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import pandas as pd
 from reil.datatypes import InteractionProtocol
 from reil.environments import EntityType, EntityGenType, Environment
+
+
+class StatInfo(NamedTuple):
+    obj: str
+    entity_name: str
+    assigned_to: str
+    a_s_name: Tuple[str, str]
+    aggregators: Optional[Tuple[str, ...]]
+    groupby: Optional[Tuple[str, ...]]
 
 
 class EnvironmentStaticMap(Environment):
@@ -308,10 +316,6 @@ class EnvironmentStaticMap(Environment):
             A dictionary with state-subject pairs as keys and dataframes as
             values.
         '''
-        StatInfo = namedtuple(
-            'StatInfo', ('obj', 'entity_name', 'assigned_to', 'a_s_name',
-                         'aggregators', 'groupby'))
-
         entities = set(
             StatInfo('_agents', p.agent.name, p.subject.name,
                      (p.agent.name, p.subject.name),
@@ -326,10 +330,13 @@ class EnvironmentStaticMap(Environment):
             for p in self.interaction_sequence
             if p.subject.statistic_name is not None))
 
-        transform = (
-            lambda x: x.unstack().reset_index().rename(
-                columns={'level_0': 'aggregator', 0: 'value'})
-            if unstack else lambda x: x)
+        if unstack:
+            def transform(x: pd.DataFrame) -> pd.DataFrame:
+                return x.unstack().reset_index().rename(
+                    columns={'level_0': 'aggregator', 0: 'value'})
+        else:
+            def transform(x: pd.DataFrame) -> pd.DataFrame:
+                return x
 
         result = {e.a_s_name:
                   transform(

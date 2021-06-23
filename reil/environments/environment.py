@@ -20,8 +20,8 @@ from reil.subjects import Subject, SubjectDemon
 from reil.utils import InstanceGenerator
 
 AgentSubjectTuple = Tuple[str, str]
-EntityType = Union[Agent, Subject]
-EntityGenType = Union[InstanceGenerator[Agent],
+EntityType = Union[Agent[Any], Subject]
+EntityGenType = Union[InstanceGenerator[Agent[Any]],
                       InstanceGenerator[Subject]]
 
 
@@ -59,7 +59,7 @@ class Environment(stateful.Stateful):
         '''
         super().__init__(**kwargs)
 
-        self._agents: Dict[str, Agent] = {}
+        self._agents: Dict[str, Agent[Any]] = {}
         self._subjects: Dict[str, Subject] = {}
         self._agent_demons: Dict[str, AgentDemon] = {}
         self._subject_demons: Dict[str, SubjectDemon] = {}
@@ -170,8 +170,7 @@ class Environment(stateful.Stateful):
                 del self._instance_generators[name]
 
     def add_demons(self,
-                   demon_dict: Optional[
-                       Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
+                   demon_dict: Dict[str, Union[AgentDemon, SubjectDemon, str]],
                    ) -> None:
         '''
         Add `AgentDemon`s and `SubjectDemon`s to the environment.
@@ -626,7 +625,7 @@ class Environment(stateful.Stateful):
         if entity_name == 'all':
             super().load(filename=_filename, path=_path)
             self._instance_generators: Dict[str, EntityGenType] = {}
-            self._agents: Dict[str, Agent] = {}
+            self._agents: Dict[str, Agent[Any]] = {}
             self._subjects: Dict[str, Subject] = {}
             self._agent_demons: Dict[str, AgentDemon] = {}
             self._subject_demons: Dict[str, SubjectDemon] = {}
