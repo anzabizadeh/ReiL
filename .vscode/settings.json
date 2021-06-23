@@ -13,7 +13,7 @@
     "python.testing.nosetestsEnabled": false,
     "python.testing.unittestEnabled": true,
     "gitlab.instanceUrl": "research-git.uiowa.edu/",
-    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.typeCheckingMode": "strict",
     "restructuredtext.confPath": "${workspaceFolder}\\docs",
     "python.analysis.logLevel": "Warning",
     "python.autoComplete.addBrackets": true,
