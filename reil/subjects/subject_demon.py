@@ -19,8 +19,9 @@ from reil.subjects.subject import Subject
 @dataclasses.dataclass
 class Modifier:
     name: str
-    condition_state_definition: str
-    function: Callable[[datatypes.FeatureArray, datatypes.FeatureArray], Any]
+    cond_state_def: Optional[str]
+    condition_fn: Optional[Callable[[datatypes.FeatureArray], bool]]
+    modifier_fn: Callable[[datatypes.FeatureArray], datatypes.FeatureArray]
 
 
 class SubjectDemon(reilbase.ReilBase):
@@ -101,11 +102,11 @@ class SubjectDemon(reilbase.ReilBase):
             Definition not found.
         '''
         original_state = self._subject.state(name, _id)
-        if self._state_modifier is not None:
-            condition_state = self._subject.state(
-                self._state_modifier.condition_state_definition, _id)
-            return self._state_modifier.function(
-                condition_state, original_state)
+        if (self._state_modifier is not None and
+            (self._state_modifier.condition_fn is None
+                or self._state_modifier.condition_fn(self._subject.state(
+                    self._state_modifier.cond_state_def, _id)))):
+            return self._state_modifier.modifier_fn(original_state)
 
         return original_state
 
@@ -135,11 +136,11 @@ class SubjectDemon(reilbase.ReilBase):
             Definition not found.
         '''
         original_set = self._subject.possible_actions(name, _id)
-        if self._action_modifier is not None:
-            condition_state = self._subject.state(
-                self._action_modifier.condition_state_definition, _id)
-            return self._action_modifier.function(
-                condition_state, original_set)
+        if (self._action_modifier is not None and
+            (self._action_modifier.condition_fn is None
+                or self._action_modifier.condition_fn(self._subject.state(
+                    self._action_modifier.cond_state_def, _id)))):
+            return self._action_modifier.modifier_fn(original_set)
 
         return original_set
 
