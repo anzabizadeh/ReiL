@@ -63,16 +63,14 @@ class Session:
             for t in task_list:
                 filename = f'{t._name}_{str(iteration)}'
                 environment.interaction_sequence = ()
-                environment.save(
-                    filename=filename, path=path)
                 if separate_process and context:
+                    environment.save(
+                        filename=filename, path=path)
                     p = context.Process(
-                        target=t.run, args=(filename, path, iteration))
+                        target=t.run_file, args=(filename, path, iteration))
                     p.start()
                 else:
-                    t.run(
-                        environment_filename=filename,
-                        path=path, iteration=iteration)
+                    t.run_env(environment, iteration)
 
     def run(self):
         '''Run the session'''
@@ -96,14 +94,12 @@ class Session:
                     'tasks_before_iteration' in self._separate_process),
                 context=context)
 
-            path = self._environment._path / self._environment._name
-            filename = f'{self._environment._name}_{str(itr)}'
-
-            self._environment.save(
-                filename=filename, path=path)
-            self._main_task.run(
-                environment_filename=filename,
-                path=path, iteration=itr)
+            # path = self._environment._path / self._environment._name
+            # filename = f'{self._environment._name}_{str(itr)}'
+            # self._environment.save(
+            #     filename=filename, path=path)
+            self._environment = self._main_task.run_env(
+                self._environment, itr)
 
             self._run_tasks(
                 task_list=self._tasks_after_iteration,
@@ -121,4 +117,7 @@ class Session:
             context=context)
 
         path = self._environment._path / self._environment._name
-        filename = f'{self._environment._name}_{str(itr)}'
+        filename = (f'{self._environment._name}_'
+                    + str(self._main_task.max_iterations))
+        self._environment.save(
+            filename=filename, path=path)

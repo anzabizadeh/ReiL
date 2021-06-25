@@ -1,6 +1,6 @@
 import logging
-from math import ceil, log10
 import pathlib
+from math import ceil, log10
 from typing import Dict, Literal, Optional, Tuple, Union
 
 from reil.datatypes import InteractionProtocol
@@ -44,10 +44,16 @@ class Task:
 
         self._interaction_sequence = interaction_sequence
 
-    def run(self, environment_filename: str,
-            path: pathlib.PurePath, iteration: int):
-        env = EnvironmentStaticMap.from_pickle(environment_filename, path)
+    def run_file(
+        self, environment_filename: str,
+        path: pathlib.PurePath, iteration: int
+    ) -> EnvironmentStaticMap:
+        return self.run_env(EnvironmentStaticMap.from_pickle(
+            environment_filename, path), iteration)
 
+    def run_env(
+            self, env: EnvironmentStaticMap,
+            iteration: int) -> EnvironmentStaticMap:
         env.interaction_sequence = self._interaction_sequence
 
         for agent, trigger in self._agent_training_triggers.items():
@@ -61,7 +67,8 @@ class Task:
             rep = env.report_statistics(unstack=True, reset_history=True)
             self._writer.write_stats_output(rep)
 
+        return env
+
         # self.simulate(env, self._writer)
-        # env.save(
+        # f, p = env.save(
         #     filename=self._filename_format.format(self._name, iteration + 1),
-        #     path=self._path)
