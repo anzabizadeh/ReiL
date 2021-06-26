@@ -6,12 +6,12 @@ Sink class
 A dummy buffer that does nothing!
 '''
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Union
 
-from reil.datatypes.buffers import Buffer, PickModes
+from reil.datatypes.buffers.buffer import Buffer, T_1, T_2, PickModes
 
 
-class Sink(Buffer):
+class Sink(Buffer[T_1, T_2]):
     '''
     A sink class.
     '''
@@ -23,19 +23,40 @@ class Sink(Buffer):
             A list containing the names of buffer queues.
         '''
         self._buffer_names = None
-        self.setup(buffer_names)
+        self.setup(buffer_names=buffer_names)
 
-    def setup(self, buffer_names: Optional[List[str]] = None) -> None:
+    def setup(
+            self, buffer_size: Optional[int] = None,
+            buffer_names: Optional[List[str]] = None,
+            pick_mode: Optional[PickModes] = None,
+            clear_buffer: Optional[bool] = None) -> None:
         '''
         Set up the buffer.
 
         Arguments
         ---------
+        buffer_size:
+            The size of the buffer. This argument is only available for
+            signature consistency. Assigning it has no effect.
+
         buffer_names:
             A list containing the names of buffer elements.
 
+        pick_mode:
+            The default mode to pick items from the list. This argument is
+            only available for signature consistency. Assigning it has
+            no effect.
+
+        clear_buffer:
+            Whether to clear the buffer when `reset` is called. This argument
+            is only available for signature consistency. Assigning it has no
+            effect.
+
         Raises
         ------
+        ValueError:
+            Cannot modify `buffer_size`. The value is already set.
+
         ValueError:
             Cannot modify `buffer_names`. The value is already set.
 
@@ -45,14 +66,9 @@ class Sink(Buffer):
         not defined. Attempt to use `setup` to modify size, names or mode will
         result in an exception.
         '''
-        if buffer_names is not None:
-            if self._buffer_names is not None:
-                raise ValueError(
-                    'Cannot modify buffer_names. The value is already set.')
-            else:
-                self._buffer_names = buffer_names
+        super().setup(buffer_names=buffer_names)
 
-    def add(self, data: Dict[str, Any]) -> None:
+    def add(self, data: Dict[str, Union[T_1, T_2]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -69,9 +85,11 @@ class Sink(Buffer):
         '''
         return
 
-    def pick(self,
-             count: Optional[int] = None,
-             mode: Optional[PickModes] = None) -> None:
+    def pick(
+            self,
+            count: Optional[int] = None,
+            mode: Optional[PickModes] = None
+    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
         '''
         Raises an exception.
 

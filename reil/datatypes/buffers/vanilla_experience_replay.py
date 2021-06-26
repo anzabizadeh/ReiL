@@ -6,12 +6,13 @@ VanillaExperienceReplay class
 A `Buffer` with random pick that picks only if it is full.
 '''
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
-from reil.datatypes.buffers import CircularBuffer, T
+from reil.datatypes.buffers.circular_buffer import CircularBuffer
+from reil.datatypes.buffers.buffer import T_1, T_2, PickModes
 
 
-class VanillaExperienceReplay(CircularBuffer[T]):
+class VanillaExperienceReplay(CircularBuffer[T_1, T_2]):
     '''
     A `Buffer` with random pick that picks only if it is full.
 
@@ -51,7 +52,12 @@ class VanillaExperienceReplay(CircularBuffer[T]):
                    buffer_names=buffer_names,
                    clear_buffer=clear_buffer)
 
-    def setup(self, **kwargs) -> None:
+    def setup(
+            self, buffer_size: Optional[int] = None,
+            buffer_names: Optional[List[str]] = None,
+            pick_mode: Optional[PickModes] = None,
+            clear_buffer: Optional[bool] = None,
+            batch_size: Optional[int] = None) -> None:
         '''
         Set up the buffer.
 
@@ -69,17 +75,17 @@ class VanillaExperienceReplay(CircularBuffer[T]):
         clear_buffer:
             Whether to clear the buffer when `reset` is called.
 
+        pick_mode:
+            The default mode to pick items from the list. This argument is
+            only available for signature consistency. Assigning it has
+            no effect.
+
         Notes
         -----
         `setup` should be used only for attributes of the buffer that are
         not defined. Attempt to use `setup` to modify size, names or mode will
         result in an exception.
         '''
-        buffer_size = kwargs.get('buffer_size')
-        batch_size = kwargs.get('batch_size')
-        buffer_names = kwargs.get('buffer_names')
-        clear_buffer = kwargs.get('clear_buffer')
-
         super().setup(buffer_size=buffer_size,
                       buffer_names=buffer_names)
 
@@ -102,15 +108,35 @@ class VanillaExperienceReplay(CircularBuffer[T]):
 
         self._clear_buffer = clear_buffer
 
-    def pick(self) -> Dict[str, Tuple[T, ...]]:
+    def pick(
+        self,
+        count: Optional[int] = None,
+        mode: Optional[PickModes] = None
+    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
         '''
-        Return `batch_size` number of items from the buffer randomly.
-        If the buffer is not full, return empty tuples.
+        Return items from the buffer.
+
+        Arguments
+        ---------
+        count:
+            This argument is only available for signature consistency.
+            Assigning it has no effect.
+
+        mode:
+            This argument is only available for signature consistency.
+            Assigning it has no effect.
+
+        Returns
+        -------
+        :
+            `batch_size` number of items from the buffer randomly.
+            If the buffer is not full, return empty tuples.
+
         '''
         if self._buffer_full:
             return super().pick(self._batch_size, 'random')
         else:
-            return {name: () for name in self._buffer}
+            return {name: () for name in self._buffer}  # type: ignore
 
     def reset(self) -> None:
         '''
