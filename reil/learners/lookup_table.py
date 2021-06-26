@@ -9,7 +9,7 @@ type of inputs to be `TableEntry`.
 `QLookupTable` is a lookup table for `Q-learning`.
 '''
 import dataclasses
-from typing import Any, Dict, Generic, Tuple, TypeVar
+from typing import Any, Dict, Generic, Hashable, Tuple, TypeVar
 
 from reil import learners
 from reil.datatypes import FeatureArray
@@ -30,7 +30,7 @@ class LookupTable(Dict[Any, TableEntry[T]]):
     A simple lookup table based on `dict` that checks for the type of inputs
     to be `TableEntry`.
     '''
-    def __setitem__(self, key, item):
+    def __setitem__(self, key: Hashable, item: Any):
         if isinstance(item, TableEntry):
             super().__setitem__(key, item)
         else:
@@ -43,10 +43,11 @@ class QLookupTable(learners.Learner[float]):
 
     This class stores input data and the corresponding output as a dictionay.
     '''
-    def __init__(self,
-                 learning_rate: learners.LearningRateScheduler,
-                 initial_estimate: float = 0.0,
-                 minimum_visits: int = 0) -> None:
+    def __init__(
+            self,
+            learning_rate: learners.LearningRateScheduler,
+            initial_estimate: float = 0.0,
+            minimum_visits: int = 0) -> None:
         '''
         Arguments
         ---------
@@ -69,10 +70,6 @@ class QLookupTable(learners.Learner[float]):
         # defaultdict is not efficient.
         # It creates entries as soon as they are looked up.
         self._table: LookupTable[float] = LookupTable()
-
-    @classmethod
-    def _empty_instance(cls):
-        return cls(None)  # type: ignore
 
     def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[float, ...]:
         '''

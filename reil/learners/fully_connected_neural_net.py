@@ -6,13 +6,13 @@ Dense class
 The Dense learner.
 '''
 import pathlib
-from typing import Any, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
 from reil import learners
 from reil.datatypes import FeatureArray
-from tensorflow import keras  # type: ignore
+from tensorflow import keras
 
 
 class Dense_tf_1(learners.Learner[float]):
@@ -27,7 +27,7 @@ class Dense_tf_1(learners.Learner[float]):
             self,
             learning_rate: learners.LearningRateScheduler,
             validation_split: float = 0.3,
-            hidden_layer_sizes: Tuple[int, ] = (1,),
+            hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
             tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
             **kwargs: Any) -> None:
@@ -63,7 +63,7 @@ class Dense_tf_1(learners.Learner[float]):
 
         super().__init__(learning_rate=learning_rate, **kwargs)
 
-        self._iteration = 0
+        self._iteration: int = 0
 
         self._hidden_layer_sizes = hidden_layer_sizes
         self._input_length = input_length
@@ -73,9 +73,11 @@ class Dense_tf_1(learners.Learner[float]):
 
         self._validation_split = validation_split
 
-        self._callbacks = []
-        self._tensorboard_path = None
-        self._graph = tf.Graph()  # type: ignore
+        self._callbacks: List[Any] = []
+        self._tensorboard_path: Optional[pathlib.PurePath] = None
+        self._model: keras.models.Sequential
+
+        self._graph = tf.Graph()
         with self._graph.as_default():
             self._session = tf.Session()  # type: ignore
 
@@ -96,7 +98,7 @@ class Dense_tf_1(learners.Learner[float]):
                         self._learning_rate.new_rate, verbose=0)
                 self._callbacks.append(learning_rate_scheduler)
 
-        self._ann_ready = False
+        self._ann_ready: bool = False
         if self._input_length is not None:
             self._generate_network()
 
@@ -137,14 +139,14 @@ class Dense_tf_1(learners.Learner[float]):
         :
             The predicted `y`.
         '''
-        _X = [x.normalized.flatten() for x in X]
+        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
 
         with self._session.as_default():
             with self._graph.as_default():
-                result = self._model.predict(np.array(_X))
+                result = self._model.predict(np.array(_X))  # type: ignore
 
         return result  # type: ignore
 
@@ -160,7 +162,7 @@ class Dense_tf_1(learners.Learner[float]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X = [x.normalized.flatten() for x in X]
+        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -181,8 +183,9 @@ class Dense_tf_1(learners.Learner[float]):
         self._iteration += 1
 
     def save(self,
-             filename: str,
-             path: Optional[Union[str, pathlib.PurePath]]
+             filename: Optional[str] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
+             data_to_save: Optional[Tuple[str, ...]] = None
              ) -> Tuple[pathlib.PurePath, str]:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
@@ -190,15 +193,20 @@ class Dense_tf_1(learners.Learner[float]):
         Arguments
         ---------
         filename:
-            The name of the file to be saved.
+            the name of the file to be saved.
 
         path:
-            The path of the file to be saved.
+            the path in which the file should be saved.
 
-        Raises
-        ------
-        ValueError:
-            The filename is not specified.
+        data_to_save:
+            This argument is only present for signature consistency. It has
+            no effect on save.
+
+        Returns
+        -------
+        :
+            a `Path` object to the location of the saved file and its name
+            as `str`
         '''
         p, f = super().save(
             filename, path,
@@ -262,7 +270,7 @@ class Dense_tf_2(learners.Learner[float]):
             self,
             learning_rate: learners.LearningRateScheduler,
             validation_split: float = 0.3,
-            hidden_layer_sizes: Tuple[int, ] = (1,),
+            hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
             tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
             **kwargs: Any) -> None:
@@ -298,7 +306,7 @@ class Dense_tf_2(learners.Learner[float]):
 
         super().__init__(learning_rate=learning_rate, **kwargs)
 
-        self._iteration = 0
+        self._iteration: int = 0
 
         self._hidden_layer_sizes = hidden_layer_sizes
         self._input_length = input_length
@@ -308,8 +316,8 @@ class Dense_tf_2(learners.Learner[float]):
 
         self._validation_split = validation_split
 
-        self._callbacks = []
-        self._tensorboard_path = None
+        self._callbacks: List[Any] = []
+        self._tensorboard_path: Optional[pathlib.PurePath] = None
         self._model = keras.models.Sequential()
 
         if tensorboard_path is not None:
@@ -327,7 +335,7 @@ class Dense_tf_2(learners.Learner[float]):
                     self._learning_rate.new_rate, verbose=0)
             self._callbacks.append(learning_rate_scheduler)
 
-        self._ann_ready = False
+        self._ann_ready: bool = False
         if self._input_length is not None:
             self._generate_network()
 
@@ -366,14 +374,14 @@ class Dense_tf_2(learners.Learner[float]):
         :
             The predicted `y`.
         '''
-        _X = [x.normalized.flatten() for x in X]
+        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
 
         result = self._model.predict(np.array(_X))
 
-        return result
+        return result  # type: ignore
 
     def learn(self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...]) -> None:
         '''
@@ -387,7 +395,7 @@ class Dense_tf_2(learners.Learner[float]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X = [x.normalized.flatten() for x in X]
+        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -406,8 +414,9 @@ class Dense_tf_2(learners.Learner[float]):
         self._iteration += 1
 
     def save(self,
-             filename: str,
-             path: Optional[Union[str, pathlib.PurePath]]
+             filename: Optional[str] = None,
+             path: Optional[Union[str, pathlib.PurePath]] = None,
+             data_to_save: Optional[Tuple[str, ...]] = None
              ) -> Tuple[pathlib.PurePath, str]:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
@@ -415,15 +424,20 @@ class Dense_tf_2(learners.Learner[float]):
         Arguments
         ---------
         filename:
-            The name of the file to be saved.
+            the name of the file to be saved.
 
         path:
-            The path of the file to be saved.
+            the path in which the file should be saved.
 
-        Raises
-        ------
-        ValueError:
-            The filename is not specified.
+        data_to_save:
+            This argument is only present for signature consistency. It has
+            no effect on save.
+
+        Returns
+        -------
+        :
+            a `Path` object to the location of the saved file and its name
+            as `str`
         '''
         p, f = super().save(
             filename, path,
