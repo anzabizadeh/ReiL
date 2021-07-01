@@ -11,8 +11,8 @@ import dataclasses
 import pathlib
 from typing import Any, Callable, Optional, Tuple, Union
 
-from reil import datatypes, reilbase, subjects
 from reil.datatypes.components import SecondayComponent, Statistic
+from reil.datatypes.feature import FeatureArray
 from reil.subjects.subject import Subject
 
 
@@ -20,11 +20,18 @@ from reil.subjects.subject import Subject
 class Modifier:
     name: str
     cond_state_def: Optional[str]
-    condition_fn: Optional[Callable[[datatypes.FeatureArray], bool]]
-    modifier_fn: Callable[[datatypes.FeatureArray], datatypes.FeatureArray]
+    condition_fn: Optional[Callable[[FeatureArray], bool]]
+    modifier_fn: Callable[[FeatureArray], FeatureArray]
+
+    def __post_init__(self):
+        if self.condition_fn is not None:
+            if self.cond_state_def is None:
+                raise ValueError(
+                    '`condition_fn` cannot be declared with '
+                    '`cond_state_def=None`.')
 
 
-class SubjectDemon(reilbase.ReilBase):
+class SubjectDemon(Subject):
     '''
     This class accepts a regular subject, and intervenes in its interaction
     with the agents. It can modify `state` representation or change
@@ -33,7 +40,7 @@ class SubjectDemon(reilbase.ReilBase):
 
     def __init__(
             self,
-            subject: Optional[subjects.Subject] = None,
+            subject: Optional[Subject] = None,
             action_modifier: Optional[Modifier] = None,
             state_modifier: Optional[Modifier] = None,
             **kwargs: Any):
@@ -76,9 +83,9 @@ class SubjectDemon(reilbase.ReilBase):
 
         return self
 
-    def state(self,
-              name: str,
-              _id: Optional[int] = None) -> datatypes.FeatureArray:
+    def state(
+            self, name: str,
+            _id: Optional[int] = None) -> FeatureArray:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -102,17 +109,18 @@ class SubjectDemon(reilbase.ReilBase):
             Definition not found.
         '''
         original_state = self._subject.state(name, _id)
-        if (self._state_modifier is not None and
-            (self._state_modifier.condition_fn is None
-                or self._state_modifier.condition_fn(self._subject.state(
-                    self._state_modifier.cond_state_def, _id)))):
-            return self._state_modifier.modifier_fn(original_state)
+        modifier = self._state_modifier
+        if (modifier is not None and
+            (modifier.condition_fn is None
+                or modifier.condition_fn(self._subject.state(
+                    modifier.cond_state_def, _id)))):  # type: ignore
+            return modifier.modifier_fn(original_state)
 
         return original_state
 
-    def possible_actions(self,
-                         name: str,
-                         _id: Optional[int] = None) -> Any:
+    def possible_actions(
+            self, name: str,
+            _id: Optional[int] = None) -> Any:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -136,23 +144,26 @@ class SubjectDemon(reilbase.ReilBase):
             Definition not found.
         '''
         original_set = self._subject.possible_actions(name, _id)
-        if (self._action_modifier is not None and
-            (self._action_modifier.condition_fn is None
-                or self._action_modifier.condition_fn(self._subject.state(
-                    self._action_modifier.cond_state_def, _id)))):
-            return self._action_modifier.modifier_fn(original_set)
+        modifier = self._action_modifier
+        if (modifier is not None and
+            (modifier.condition_fn is None
+                or modifier.condition_fn(self._subject.state(
+                    modifier.cond_state_def, _id)))):  # type: ignore
+            return modifier.modifier_fn(original_set)
 
         return original_set
 
-    def load(self, filename: str,
-             path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    def load(
+            self, filename: str,
+            path: Optional[Union[str, pathlib.PurePath]]) -> None:
         super().load(filename, path)
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(
+            self,
+            filename: Optional[str] = None,
+            path: Optional[Union[str, pathlib.PurePath]] = None,
+            data_to_save: Optional[Tuple[str, ...]] = None
+    ) -> Tuple[pathlib.PurePath, str]:
         return super().save(filename, path, data_to_save)
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:

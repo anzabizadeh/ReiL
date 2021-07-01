@@ -8,12 +8,15 @@ healthcare.
 '''
 from typing import Any, Dict
 
+from reil.datatypes.feature import Feature
+
 
 class HealthMathModel:
     '''
     The base class of all mathematical models in healthcare.
     '''
-    def setup(self, **arguments: Any) -> None:
+
+    def setup(self, **arguments: Feature[Any]) -> None:
         '''
         Set up the model.
 

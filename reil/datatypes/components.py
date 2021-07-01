@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 PrimaryComponent and SecondayComponent classes
-=============================================
+==============================================
 
 A datatype used to specify entity components, such as `state`, `reward`,
 and `statistic`.
@@ -9,28 +9,28 @@ and `statistic`.
 from __future__ import annotations
 
 import dataclasses
-import functools
 from collections import defaultdict
-from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Tuple,
-                    Union)
+from typing import (Any, Callable, DefaultDict, Dict, Generic, List, Optional,
+                    Tuple, TypeVar, Union)
 
 import pandas as pd
-from reil.datatypes import FeatureArray
+from reil.datatypes.feature import FeatureArray
 
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
 
+ArgsType = TypeVar('ArgsType', str, Tuple[str, ...], Dict[str, Any])
+
 
 @dataclasses.dataclass
-class SubComponentInstance:
+class SubComponentInstance(Generic[ArgsType]):
     '''
     A `dataclass` to store an instance of a sub component.
 
     :meta private:
     '''
     name: str
-    fn: Optional[Callable[..., Any]] = None
-    args: Union[str, Tuple[str, ...], Dict[str, Any]
-                ] = dataclasses.field(default_factory=dict)
+    args: ArgsType
+    fn: Callable[..., Any]
 
 
 class PrimaryComponent:
@@ -53,8 +53,8 @@ class PrimaryComponent:
             function and its argument list as values.
         '''
         self._available_sub_components: Dict[str, SubComponentInfo] = {}
-        self._definitions: Dict[str,
-                                List[SubComponentInstance]] = defaultdict(list)
+        self._definitions: Dict[str, List[
+            SubComponentInstance[Dict[str, Any]]]] = defaultdict(list)
 
         if available_sub_components is not None:
             self.sub_components = available_sub_components
@@ -97,9 +97,10 @@ class PrimaryComponent:
         '''
         self._default = default_definition
 
-    def add_definition(self,
-                       name: str,
-                       *sub_components: Tuple[str, Dict[str, Any]]) -> None:
+    def add_definition(
+            self,
+            name: str,
+            *sub_components: Tuple[str, Dict[str, Any]]) -> None:
         '''Add a new component definition.
 
         Parameters
@@ -149,13 +150,11 @@ class PrimaryComponent:
                 raise ValueError(
                     f'Unknown keyword argument(s): {unknown_keywords}.')
 
-            self._definitions[_name].append(
-                SubComponentInstance(name=sub_comp_name,
-                                     fn=fn,
-                                     args=kwargs))
+            self._definitions[_name].append(SubComponentInstance(
+                name=sub_comp_name, fn=fn, args=kwargs))
 
     @property
-    def definitions(self) -> Dict[str, List[SubComponentInstance]]:
+    def definitions(self):
         '''Return the dictionary of component definitions.
 
         Returns
@@ -227,13 +226,13 @@ class SecondayComponent:
     `reward`.
     '''
 
-    def __init__(self,
-                 name: str,
-                 primary_component: Optional[PrimaryComponent] = None,
-                 default_definition: Optional[Callable[[
-                     Optional[int]], Any]] = None,
-                 enabled: bool = True
-                 ) -> None:
+    def __init__(
+            self,
+            name: str,
+            primary_component: Optional[PrimaryComponent] = None,
+            default_definition: Optional[Callable[[
+                Optional[int]], Any]] = None,
+            enabled: bool = True):
         '''
 
         Parameters
@@ -256,7 +255,8 @@ class SecondayComponent:
         self._default = default_definition
         self._enabled = enabled
 
-        self._definitions: Dict[str, SubComponentInstance] = defaultdict(None)
+        self._definitions: Dict[
+            str, SubComponentInstance[str]] = defaultdict(None)
 
     def enable(self) -> None:
         self._enabled = True
@@ -298,10 +298,9 @@ class SecondayComponent:
         '''
         self._default = default_definition
 
-    def add_definition(self,
-                       name: str,
-                       fn: Callable[..., Any],
-                       primary_component_name: str = 'default') -> None:
+    def add_definition(
+            self, name: str, fn: Callable[..., Any],
+            primary_component_name: str = 'default') -> None:
         '''
         Add a new component definition.
 
@@ -334,6 +333,11 @@ class SecondayComponent:
 
         if _name in self._definitions:
             raise ValueError(f'Definition {name} already exists.')
+
+        if self._primary_component is None:
+            raise ValueError(
+                'Primary component is not defined. '
+                'Use `set_primary_component` to specify it.')
 
         if _primary_component_name not in self._primary_component.definitions:
             raise ValueError(f'Undefined {_primary_component_name}.')
@@ -398,28 +402,34 @@ class SecondayComponent:
             except AttributeError:
                 pass
 
-        if _name not in self._definitions:
+        if self._primary_component is None:
+            raise ValueError(
+                'Primary component is not defined. '
+                'Use `set_primary_component` to specify it.')
+
+        try:
+            d = self._definitions[_name]
+        except KeyError:
             raise ValueError(f'Definition {name} not found.')
 
-        d = self._definitions[_name]
-        p = self._primary_component(name=d.args, _id=_id)  # type: ignore
+        p = self._primary_component(name=d.args, _id=_id)
 
         return d.fn(p)
 
 
-class Statistic(SecondayComponent):
+class Statistic:
     '''
     A component similar to `SecondaryComponent`, but with history and
     aggregator.
     '''
 
-    def __init__(self,
-                 name: str,
-                 primary_component: Optional[PrimaryComponent] = None,
-                 default_definition: Optional[Callable[[
-                     Optional[int]], Tuple[FeatureArray, float]]] = None,
-                 enabled: bool = True
-                 ) -> None:
+    def __init__(
+            self,
+            name: str,
+            primary_component: Optional[PrimaryComponent] = None,
+            default_definition: Optional[Callable[[
+                Optional[int]], Tuple[FeatureArray, float]]] = None,
+            enabled: bool = True):
         '''
 
         Parameters
@@ -437,10 +447,14 @@ class Statistic(SecondayComponent):
         enabled:
             Whether to return the computed value or `None`.
         '''
-        super().__init__(name=name,
-                         primary_component=primary_component,
-                         enabled=enabled)
+        self._name = name
+        self._primary_component = primary_component
         self._default = default_definition
+        self._enabled = enabled
+
+        self._definitions: Dict[
+            str, SubComponentInstance[Tuple[str, str]]] = defaultdict(None)
+
         self._history: Dict[
             int,
             List[Tuple[FeatureArray, float]]] = DefaultDict(list)
@@ -475,9 +489,9 @@ class Statistic(SecondayComponent):
         self._primary_component = primary_component
 
     def set_default_definition(
-            self, default_definition: Callable[[Optional[int]],
-                                               Tuple[FeatureArray, float]]
-    ) -> None:
+            self,
+            default_definition: Callable[
+                [Optional[int]], Tuple[FeatureArray, float]]) -> None:
         '''Add a new component definition.
 
         Parameters
@@ -488,11 +502,9 @@ class Statistic(SecondayComponent):
         '''
         self._default = default_definition
 
-    def add_definition(self,
-                       name: str,
-                       fn: Callable[..., Any],
-                       stat_component: str,
-                       aggregation_component: str) -> None:
+    def add_definition(
+            self, name: str, fn: Callable[..., Any],
+            stat_component: str, aggregation_component: str) -> None:
         '''
         Add a new component definition.
 
@@ -529,13 +541,18 @@ class Statistic(SecondayComponent):
         if _name in self._definitions:
             raise ValueError(f'Definition {name} already exists.')
 
+        if self._primary_component is None:
+            raise ValueError(
+                'Primary component is not defined. '
+                'Use `set_primary_component` to specify it.')
+
         if _stat_component not in self._primary_component.definitions:
             raise ValueError(f'Undefined {_stat_component}.')
 
         if _aggregation_component not in self._primary_component.definitions:
             raise ValueError(f'Undefined {_aggregation_component}.')
 
-        self._definitions[_name] = SubComponentInstance(
+        self._definitions[_name] = SubComponentInstance[Tuple[str, str]](
             name=_name,
             fn=fn,
             args=(_aggregation_component, _stat_component))
@@ -597,10 +614,16 @@ class Statistic(SecondayComponent):
             except AttributeError:
                 pass
 
-        if _name not in self._definitions:
+        if self._primary_component is None:
+            raise ValueError(
+                'Primary component is not defined. '
+                'Use `set_primary_component` to specify it.')
+
+        try:
+            d = self._definitions[_name]
+        except KeyError:
             raise ValueError(f'Definition {name} not found.')
 
-        d = self._definitions[_name]
         agg, comp_name = d.args
 
         return (self._primary_component(name=agg, _id=_id),
@@ -647,7 +670,12 @@ class Statistic(SecondayComponent):
                           for i, x in enumerate(temp))
         temp_group_by = ['instance_id'] if groupby is None else list(groupby)
         grouped_df = df.groupby(temp_group_by)
-        result = grouped_df['value'].agg(aggregators or (lambda x: x))
+
+        def no_change(x: Any) -> Any:
+            return x
+
+        result: pd.DataFrame = grouped_df['value'].agg(  # type: ignore
+            aggregators or no_change)
 
         if reset_history:
             self._history: Dict[
@@ -655,182 +683,3 @@ class Statistic(SecondayComponent):
             self._history_none: List[Tuple[FeatureArray, float]] = []
 
         return result
-
-
-class MockStatistic:
-    '''
-    A component that mocks `Statistic` class, and uses another object's
-    `Statistic` methods, except for `append` and `aggregate`.
-    '''
-
-    def __init__(self, obj) -> None:
-        '''
-
-        Parameters
-        ----------
-        obj:
-            The object that provides actual `Statistic` capabilities.
-        '''
-        self._obj = obj
-        self._history: Dict[
-            int,
-            List[Tuple[FeatureArray, float]]] = DefaultDict(list)
-        self._history_none: List[Tuple[FeatureArray, float]] = []
-
-    def set_object(self, obj) -> None:
-        self._obj = obj
-
-    def enable(self) -> None:
-        return self._obj.statistic.enable()
-
-    def disable(self) -> None:
-        return self._obj.statistic.disable()
-
-    def set_primary_component(
-            self,
-            primary_component: PrimaryComponent) -> None:
-        return self._obj.statistic.set_primary_component(primary_component)
-
-    def add_definition(self,
-                       name: str,
-                       fn: Callable[..., Any],
-                       stat_component: str,
-                       aggregation_component: str) -> None:
-        return self._obj.statistic.add_definition(
-            name, fn, stat_component, aggregation_component)
-
-    def default(self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
-        return self._obj.statistic.default(_id)
-
-    def __call__(
-            self,
-            name: str,
-            _id: Optional[int] = None
-    ) -> Union[Tuple[FeatureArray, float], None]:
-        return self._obj.statistic.__call__(name, _id)
-
-    def append(self,
-               name: str,
-               _id: Optional[int] = None) -> None:
-        '''
-        Generate the stat and append it to the history.
-
-        Arguments
-        ---------
-        name:
-            The name of the component definition.
-
-        _id:
-            ID of the caller.
-
-        Raises
-        ------
-        ValueError
-            Definition not found.
-        '''
-        s = self._obj.statistic.__call__(name, _id)
-        # print(s[0].value, s[1])
-        if s is not None:
-            if _id is None:
-                self._history_none.append(s)
-            else:
-                self._history[_id].append(s)
-
-    def aggregate(self,
-                  aggregators: Optional[Tuple[str, ...]] = None,
-                  groupby: Optional[Tuple[str, ...]] = None,
-                  _id: Optional[int] = None,
-                  reset_history: bool = False):
-        temp = self._history_none if _id is None else self._history[_id]
-        if not temp:
-            return None
-
-        df = pd.DataFrame({'instance_id': i,  # type: ignore
-                           **x[0].value,
-                           'value': x[1]}
-                          for i, x in enumerate(temp))
-        temp_group_by = ['instance_id'] if groupby is None else list(groupby)
-        grouped_df = df.groupby(temp_group_by)
-        result = grouped_df['value'].agg(aggregators or (lambda x: x))
-
-        if reset_history:
-            self._history: Dict[
-                int, List[Tuple[FeatureArray, float]]] = DefaultDict(list)
-            self._history_none: List[Tuple[FeatureArray, float]] = []
-
-        return result
-
-
-if __name__ == '__main__':  # noqa: C901
-    from reil.utils.reil_functions import Arguments, NormalizedSquareDistance
-
-    def aggregation_function(x):
-        v = {
-            'name': 't1',
-            'value': sum(xi['value'] for xi in x)}
-        return v
-        # return x
-
-    class test:
-        def __init__(self) -> None:
-            self._INR = 2.5
-            sub_comp_dict = self._extract_sub_components()
-            state = PrimaryComponent(sub_comp_dict)
-            reward = SecondayComponent(name='reward', primary_component=state)
-            state.add_definition('normal_state',
-                                 ('age', {}),
-                                 ('INR', {'length': 5})
-                                 )
-            reward.add_definition('normal_reward',
-                                  NormalizedSquareDistance(
-                                      name='TTR',
-                                      arguments=Arguments('INR',),
-                                      length=2,
-                                      multiplier=-1.0,
-                                      retrospective=True,
-                                      interpolate=False,
-                                      center=2.5,
-                                      band_width=0.5,
-                                      exclude_first=True),
-                                  'normal_state')
-            print(state('normal_state', _id=1).value)
-            print(reward('normal_reward', _id=1))
-            self._INR = 1000
-            print(state('normal_state', _id=1).value)
-            print(reward('normal_reward', _id=1))
-
-        def _sub_comp_age(self, _id, **kwargs):
-            return {'name': 'age', 'value': 10}
-
-        def _sub_comp_INR(self, _id, length, **kwargs):
-            return {'name': 'INR', 'value': [self._INR] * length}
-
-        def _extract_sub_components(self):
-            sub_comp_dict = {}
-            for k, v in self.__class__.__dict__.items():
-                if callable(v) and k[:10] == '_sub_comp_':
-                    keywords = list(v.__code__.co_varnames)
-                    if 'self' in keywords:
-                        keywords.remove('self')
-                        f = functools.partial(v, self)
-                    else:
-                        f = v
-
-                    if 'kwargs' in keywords:
-                        keywords.remove('kwargs')
-
-                    if len(keywords) == 0 or keywords[0] != '_id':
-                        raise ValueError(
-                            f'Error in {k} signature: '
-                            'The first argument, except for "self", '
-                            'should be "_id".')
-
-                    if '_id' in keywords:
-                        keywords.remove('_id')
-
-                    sub_comp_dict[k[10:]] = (f, tuple(keywords))
-
-            return sub_comp_dict
-
-    test()
-    print('hi')

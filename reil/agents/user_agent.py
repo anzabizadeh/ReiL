@@ -7,22 +7,24 @@ An agent that prints the state and asks the user for action.
 '''
 from typing import Any, Optional, Tuple
 
-from reil import agents
-from reil.datatypes import FeatureArray
+from reil.agents.no_learn_agent import NoLearnAgent
+from reil.datatypes.feature import FeatureArray
 
 
-class UserAgent(agents.NoLearnAgent):
+class UserAgent(NoLearnAgent):
     '''
     An agent that acts based on user input.
     '''
 
-    def __init__(self,
-                 default_actions: Tuple[FeatureArray, ...] = (),
-                 **kwargs: Any):
+    def __init__(
+            self,
+            default_actions: Tuple[FeatureArray, ...] = (),
+            **kwargs: Any):
         super().__init__(default_actions=default_actions, **kwargs)
 
     def act(self,
             state: FeatureArray,
+            subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
             iteration: int = 0) -> FeatureArray:
         '''
@@ -49,8 +51,10 @@ class UserAgent(agents.NoLearnAgent):
         action = None
         while action is None:
             for i, a in enumerate(possible_actions):
-                print(f'{i}. {a.value}')
+                print(f'{i}. {a.value}')  # type: ignore
             action = int(input(
-                f'Choose action number for this state: {state.value}'))
+                'Choose action number for this state:'
+                f'{state.value}')  # type: ignore
+                )
 
         return possible_actions[action]

@@ -5,10 +5,11 @@ import pathlib
 from multiprocessing.context import BaseContext
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from reil.agents import Agent, AgentDemon
-from reil.environments import Task
+from reil.agents.agent import Agent
+from reil.agents.agent_demon import AgentDemon
+from reil.environments.task import Task
 from reil.environments.environment_static_map import EnvironmentStaticMap
-from reil.subjects import SubjectDemon
+from reil.subjects.subject_demon import SubjectDemon
 from reil.subjects.subject import Subject
 
 # TODO: Documentation
@@ -21,7 +22,7 @@ class Session:
             agents: Dict[str, Union[Agent[Any], str]],
             subjects: Dict[str, Union[Subject, str]],
             demons: Optional[Dict[
-                str, Union[AgentDemon, SubjectDemon, str]]] = None,
+                str, Union[AgentDemon[Any], SubjectDemon, str]]] = None,
             tasks_before: Optional[List[Task]] = None,
             tasks_after: Optional[List[Task]] = None,
             tasks_before_iteration: Optional[List[Task]] = None,

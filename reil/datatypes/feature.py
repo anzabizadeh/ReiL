@@ -14,13 +14,17 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import (Any, Callable, Dict, Generic, Iterable, Literal, Optional,
+                    Tuple, TypeVar, Union)
 
 MISSING = '__missing_feature__'
 
+T = TypeVar('T')
+MissingType = Literal['__missing_feature__']
+
 
 @dataclasses.dataclass(frozen=True)
-class Feature:
+class Feature(Generic[T]):
     '''
     Attributes
     ----------
@@ -47,17 +51,18 @@ class Feature:
         The upper limit for numerical values.
     '''
     name: str
-    value: Optional[Any] = None
+    value: Optional[Union[T, Tuple[T, ...], MissingType]] = None
     is_numerical: Optional[bool] = dataclasses.field(
         default=None, repr=False, compare=False)
-    categories: Optional[Tuple[Any, ...]] = dataclasses.field(
+    categories: Optional[Tuple[T, ...]] = dataclasses.field(
         default=None, repr=False, compare=False)
-    lower: Optional[Union[int, float]] = dataclasses.field(
+    lower: Optional[T] = dataclasses.field(
         default=None, repr=False, compare=False)
-    upper: Optional[Union[int, float]] = dataclasses.field(
+    upper: Optional[T] = dataclasses.field(
         default=None, repr=False, compare=False)
-    normalized: Optional[Tuple[float, ...]] = dataclasses.field(
-        default=None, repr=False, compare=False)
+    normalized: Optional[
+        Union[Tuple[float, ...], Tuple[int, ...]]] = dataclasses.field(
+            default=None, repr=False, compare=False)
     dict_fields: Tuple[str, ...] = dataclasses.field(
         default=('name', 'value'), init=False, repr=False, compare=False)
 
@@ -79,14 +84,19 @@ class Feature:
 
     @classmethod
     def numerical(
-            cls, name, value=None, lower=None, upper=None, normalized=None):
+            cls, name: str, value: Optional[Union[T, Tuple[T, ...]]] = None,
+            lower: Optional[T] = None, upper: Optional[T] = None,
+            normalized: Optional[Tuple[float, ...]] = None):
         '''Create a numerical instance of `Feature`.'''
         return cls(name=name, value=value, is_numerical=True,
                    lower=lower, upper=upper, normalized=normalized)
 
     @classmethod
     def categorical(
-            cls, name, value=None, categories=None, normalized=None):
+            cls, name: str,
+            value: Optional[Union[T, Tuple[T, ...], MissingType]] = None,
+            categories: Optional[Tuple[T, ...]] = None,
+            normalized: Optional[Tuple[float, ...]] = None):
         '''Create a categorical instance of `Feature`.'''
         return cls(name=name, value=value, is_numerical=False,
                    categories=categories, normalized=normalized)
@@ -102,7 +112,7 @@ class Feature:
         '''
         return {field: self.__dict__[field] for field in self.dict_fields}
 
-    def __add__(self, other):
+    def __add__(self, other: Any):
         my_type = type(self)
         if type(other) != my_type:
             raise TypeError("unsupported operand type(s) for +: "
@@ -127,7 +137,7 @@ class Feature:
 
 
 @dataclasses.dataclass(frozen=True)
-class FeatureGenerator:
+class FeatureGenerator(Generic[T]):
     '''
     A class to generate `Feature`s.
 
@@ -182,22 +192,27 @@ class FeatureGenerator:
     name: str
     is_numerical: bool = dataclasses.field(
         default=False, repr=False, compare=False)
-    categories: Optional[Tuple[str, ...]] = None
+    categories: Optional[Tuple[T, ...]] = None
     probabilities: Optional[Tuple[float, ...]] = None
-    mean: Optional[float] = None
-    stdev: Optional[float] = None
-    lower: Optional[float] = None
-    upper: Optional[float] = None
+    mean: Optional[T] = None
+    stdev: Optional[T] = None
+    lower: Optional[T] = None
+    upper: Optional[T] = None
     normalizer: Optional[Any] = dataclasses.field(
         default=None, init=False, repr=False, compare=False)
     randomized: Optional[bool] = True
-    generator: Optional[Callable[[FeatureGenerator], Any]] = None
+    generator: Optional[
+        Callable[[FeatureGenerator[T]], Union[T, Tuple[T, ...]]]] = None
     allow_missing: bool = False
 
     @classmethod
     def numerical(
-            cls, name, lower=None, upper=None,
-            mean=None, stdev=None, generator=None, randomized=None):
+            cls, name: str,
+            mean: Optional[float] = None, stdev: Optional[float] = None,
+            lower: Optional[float] = None, upper: Optional[float] = None,
+            generator: Optional[Callable[
+                [FeatureGenerator[T]], Union[T, Tuple[T, ...]]]] = None,
+            randomized: Optional[bool] = None):
         return cls(
             name=name, is_numerical=True, lower=lower, upper=upper, mean=mean,
             stdev=stdev, generator=generator, randomized=randomized,
@@ -205,8 +220,12 @@ class FeatureGenerator:
 
     @classmethod
     def categorical(
-                cls, name, categories=None, probabilities=None,
-            generator=None, randomized=None, allow_missing=False):
+            cls, name: str,
+            categories: Optional[Tuple[T, ...]] = None,
+            probabilities: Optional[Tuple[float, ...]] = None,
+            generator: Optional[Callable[
+                [FeatureGenerator[T]], Union[T, Tuple[T, ...]]]] = None,
+            randomized: Optional[bool] = None, allow_missing: bool = False):
         return cls(
             name=name, is_numerical=False,
             categories=categories, probabilities=probabilities,
@@ -227,30 +246,36 @@ class FeatureGenerator:
                 raise ValueError(
                     'Categorical type cannot have lower and upper.')
 
-            if self.probabilities is not None:
-                if abs(sum(self.probabilities) - 1.0) > 1e-6:
+            probabilities = self.probabilities
+            categories = self.categories
+            if probabilities is not None:
+                if abs(sum(probabilities) - 1.0) > 1e-6:
                     raise ValueError('probabilities should add up to 1.0.'
-                                     f'Got {sum(self.probabilities)}')
-                if self.categories is None:
+                                     f'Got {sum(probabilities)}')
+                if categories is None:
                     raise ValueError(
                         'probabilities cannot be set for None categories.')
-                if len(self.probabilities) != len(self.categories):
+                if len(probabilities) != len(categories):
                     raise ValueError('Size mismatch. '
-                                     f'{len(self.categories)} categories vs. '
-                                     f'{len(self.categories)} probabilities')
+                                     f'{len(categories)} categories vs. '
+                                     f'{len(probabilities)} probabilities')
 
             self._process_categorical()
 
-    def __call__(self, value=None):
+    def __call__(
+        self, value: Optional[Union[T, Tuple[T, ...], MissingType]] = None
+    ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
         if value is None:
-            try:
-                _value = self.generator(self)
-            except TypeError:
-                _value = self.generator
+            if self.generator is None:
+                raise RuntimeError('generator not found.')
+            _value = self.generator(self)
         else:
             _value = value
 
         if self.is_numerical:
+            if _value == MISSING:
+                raise ValueError('Numerical feature cannot accept MISSING.')
+
             return self._call_numerical(_value)
         else:
             return self._call_categorical(_value)
@@ -277,11 +302,11 @@ class FeatureGenerator:
         self.__dict__['normalizer'] = normalizer
 
     def _process_numerical(self):
-        lower = self.lower
-        upper = self.upper
+        lower: Optional[float] = self.lower  # type: ignore
+        upper: Optional[float] = self.upper  # type: ignore
 
         if lower is None or upper is None or upper == lower:
-            self.__dict__['normalizer'] = lambda _: None
+            self.__dict__['normalizer'] = lambda _: None  # type: ignore
         else:
             if lower > upper:
                 raise ValueError(f'lower ({lower}) cannot be '
@@ -289,14 +314,16 @@ class FeatureGenerator:
 
             denominator = upper - lower
 
-            def normalizer(x):
-                return (x - lower)/denominator
+            def normalizer(x: float) -> float:
+                return (x - lower)/denominator  # type: ignore
 
             self.__dict__['normalizer'] = normalizer
 
-    def _call_categorical(self, value):
+    def _call_categorical(
+            self, value: Union[T, Tuple[T, ...], MissingType]
+    ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
         normalizer = self.normalizer
-        categories = self.categories
+        categories = self.categories or ()
 
         if normalizer is None:
             normalized = None
@@ -309,7 +336,7 @@ class FeatureGenerator:
                 normalized = tuple(
                     itertools.chain(
                         *(normalizer[d]
-                          for d in value)))
+                          for d in value)))  # type: ignore
             except KeyError:
                 raise ValueError(
                     f'{value} is not '
@@ -321,7 +348,9 @@ class FeatureGenerator:
 
         return instance
 
-    def _call_numerical(self, value):
+    def _call_numerical(
+            self, value: Union[T, Tuple[T, ...]]
+    ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
         normalizer = self.normalizer
         lower = self.lower
         upper = self.upper
@@ -329,33 +358,32 @@ class FeatureGenerator:
         if value is None:
             normalized = None
 
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, tuple):
             if (lower is not None
-                    and min(value) < lower):
+                    and min(value) < lower):  # type: ignore
                 raise ValueError(f'Lower bound ({lower}) violated:\n {value}')
 
             if (upper is not None
-                    and max(value) > upper):
+                    and max(value) > upper):  # type: ignore
                 raise ValueError(f'Upper bound ({upper}) violated:\n {value}')
 
-            normalized = tuple(
-                normalizer(d)
-                for d in value)
+            normalized = tuple(normalizer(d) for d in value)  # type: ignore
 
         else:
             if (lower is not None
-                    and value < lower):
+                    and value < lower):  # type: ignore
                 raise ValueError(f'Lower bound ({lower}) violated:\n {value}')
 
             if (upper is not None
-                    and value > upper):
+                    and value > upper):  # type: ignore
                 raise ValueError(f'Upper bound ({upper}) violated:\n {value}')
 
-            normalized = normalizer(value)
+            normalized = normalizer(value)  # type: ignore
 
-        instance = Feature.numerical(
-            name=self.name, value=value, lower=lower, upper=upper,
-            normalized=normalized)
+        instance: Union[Feature[T], Feature[Tuple[T, ...]]] = \
+            Feature.numerical(name=self.name, value=value,   # type: ignore
+                              lower=lower, upper=upper,
+                              normalized=normalized)
 
         return instance
 
@@ -366,16 +394,17 @@ class FeatureArray:
     between objects in `reil`.
     '''
 
-    def __init__(self,
-                 data):
+    def __init__(self, data: Union[Feature[Any], Iterable[Feature[Any]]]):
         '''
         Arguments
         ---------
         data:
             One or a sequence of `Feature`s.
         '''
-        temp = {}
-        _data = data if hasattr(data, '__iter__') else [data]
+        temp: Dict[str, Feature[Any]] = {}
+        _data: Iterable[Any] = (  # type: ignore
+            data if hasattr(data, '__iter__') else [data])
+
         for d in _data:
             if isinstance(d, Feature):
                 name = d.name
@@ -390,11 +419,11 @@ class FeatureArray:
         self._clear_temps()
 
     def _clear_temps(self):
-        self._value = None
-        self._lower = None
-        self._upper = None
-        self._categories = None
-        self._is_numerical = None
+        self._value: Union[Dict[str, Any], None] = None
+        self._lower: Union[Dict[str, Any], None] = None
+        self._upper: Union[Dict[str, Any], None] = None
+        self._categories: Union[Dict[str, Any], None] = None
+        self._is_numerical: Union[Dict[str, Any], None] = None
 
     @property
     def value(self):
@@ -489,7 +518,7 @@ class FeatureArray:
         :
             A list that contains all the values of all the items.
         """
-        def make_iterable(x):
+        def make_iterable(x: Any) -> Iterable[Any]:
             return x if hasattr(x, '__iter__') else [x]
 
         return list(itertools.chain(*[make_iterable(sublist)
@@ -538,10 +567,10 @@ class FeatureArray:
     def __hash__(self):
         return hash(tuple(self._data.items()))
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any):
         return isinstance(other, type(self)) and (self._data == other._data)
 
-    def __add__(self, other):
+    def __add__(self, other: Any):
         if not isinstance(other, FeatureArray):
             new_data = FeatureArray(other)
         else:
@@ -565,8 +594,8 @@ class FeatureArray:
         for item in temp:
             if hasattr(item.value, '__neg__'):
                 neg_value = -item.value  # type: ignore
-                lower = item.__dict__.get('lower') or neg_value
-                upper = item.__dict__.get('upper') or neg_value
+                lower: Any = item.__dict__.get('lower') or neg_value
+                upper: Any = item.__dict__.get('upper') or neg_value
                 if lower <= neg_value <= upper:
                     object.__setattr__(item, 'value', neg_value)
                 else:
@@ -574,7 +603,7 @@ class FeatureArray:
                                      f'upper: {upper}, '
                                      f'negative value: {neg_value}')
 
-        return FeatureArray(temp)
+        return FeatureArray(temp)  # type: ignore
 
     def __repr__(self):
         return f'[{super().__repr__()} -> {self._data}]'
@@ -583,7 +612,7 @@ class FeatureArray:
         return f"[{', '.join((d.__str__() for d in self._data.items()))}]"
 
 
-def change_to_missing(feature: Feature) -> Feature:
+def change_to_missing(feature: Feature[T]) -> Feature[T]:
     if feature.is_numerical:
         raise TypeError('Only categorical features can have missing.')
     categories = feature.categories
@@ -597,13 +626,13 @@ def change_to_missing(feature: Feature) -> Feature:
     if len(categories) != len(normalized):
         raise TypeError('Feature is not allowed to have MISSING')
 
-    return FeatureGenerator.categorical(
+    return FeatureGenerator.categorical(  # type: ignore
         name=feature.name, categories=categories, allow_missing=True)(MISSING)
 
 
 def change_array_to_missing(
         features: FeatureArray, suppress_error: bool = True) -> FeatureArray:
-    def try_to_change(feature: Feature) -> Feature:
+    def try_to_change(feature: Feature[T]) -> Feature[T]:
         try:
             return change_to_missing(feature)
         except (TypeError, ValueError):

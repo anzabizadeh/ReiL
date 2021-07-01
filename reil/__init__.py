@@ -44,9 +44,6 @@ legacy
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
 
-from .reilbase import ReilBase  # noqa: W0611
-from .stateful import Stateful  # noqa: W0611
-
 from ._version import get_versions
-__version__ = get_versions()['version']
+__version__ = get_versions()['version']  # type: ignore
 del get_versions

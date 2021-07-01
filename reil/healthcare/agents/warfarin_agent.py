@@ -10,8 +10,7 @@ in Ravvaz et al (2017).
 from typing import Any, Literal, Optional, Tuple
 
 from reil import agents
-from reil.datatypes import FeatureArray
-from reil.datatypes.feature import FeatureGenerator
+from reil.datatypes.feature import FeatureArray, FeatureGenerator
 from reil.healthcare.dosing_protocols.warfarin import (AAA, CAA, PGAA, PGPGA,
                                                        PGPGI)
 
@@ -47,9 +46,9 @@ class WarfarinAgent(agents.NoLearnAgent):
         elif study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
             self._protocol = PGPGA()
 
-        self._dose_gen = FeatureGenerator.numerical(
+        self._dose_gen = FeatureGenerator[float].numerical(
             name='dose', lower=dose_range[0], upper=dose_range[1])
-        self._interval_gen = FeatureGenerator.numerical(
+        self._interval_gen = FeatureGenerator[float].numerical(
             name='interval', lower=interval_range[0], upper=interval_range[1])
 
     def act(self,

@@ -9,11 +9,11 @@ An agent that randomly chooses an action
 import random
 from typing import Any, Optional, Tuple
 
-from reil import agents
-from reil.datatypes import FeatureArray
+from reil.agents.no_learn_agent import NoLearnAgent
+from reil.datatypes.feature import FeatureArray
 
 
-class RandomAgent(agents.NoLearnAgent):
+class RandomAgent(NoLearnAgent):
     '''
     An agent that acts randomly.
     '''

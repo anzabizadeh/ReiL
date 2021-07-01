@@ -1,14 +1,18 @@
 import pathlib
-from typing import Union
+from typing import Dict, List, Optional, Union
 
-from reil.environments import Session, Task
+from reil.environments.session import Session
+from reil.environments.task import Task
 from reil.utils import ConfigParser, OutputWriter
 
 # TODO: documentation
 
 
 class SessionBuilder:
-    def __init__(self, config_filenames, config_path, vars_dict) -> None:
+    def __init__(
+            self, config_filenames: Dict[str, str],
+            config_path: Optional[Union[pathlib.Path, str]],
+            vars_dict: Optional[Dict[str, str]]) -> None:
         self._parser = ConfigParser(
             config_filenames=config_filenames, config_path=config_path,
             vars_dict=vars_dict)
@@ -66,7 +70,7 @@ class SessionBuilder:
         except KeyError:
             raise ValueError(f'Session {session_name} not found.')
 
-        components = {
+        components: Dict[str, List[Task]] = {
             'main_task': [],
             'tasks_before': [],
             'tasks_after': [],

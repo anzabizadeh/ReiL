@@ -7,10 +7,9 @@ This class creates a board for players to play the mnk game.
 '''
 
 import math
-from reil.datatypes.feature import FeatureGenerator
 from typing import Any, Iterator, List, Optional, Tuple, Union, overload
 
-from reil.datatypes import FeatureArray
+from reil.datatypes.feature import FeatureArray, FeatureGenerator
 
 
 class MNKBoard:

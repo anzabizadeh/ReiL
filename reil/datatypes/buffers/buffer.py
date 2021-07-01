@@ -12,13 +12,13 @@ from typing import (Dict, Generic, List, Literal, Optional, Tuple, TypeVar,
 import numpy as np
 from reil import reilbase
 
-T_1 = TypeVar('T_1')
-T_2 = TypeVar('T_2')
+T1 = TypeVar('T1')
+T2 = TypeVar('T2')
 
 PickModes = Literal['all', 'random', 'recent', 'old']
 
 
-class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
+class Buffer(reilbase.ReilBase, Generic[T1, T2]):
     '''
     The base class for all buffers in `reil`.
     '''
@@ -44,7 +44,7 @@ class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
         clear_buffer:
             Whether to clear the buffer when `reset` is called.
         '''
-        self._buffer: Union[None, Dict[str, Union[List[T_1], List[T_2]]]]
+        self._buffer: Union[None, Dict[str, Union[List[T1], List[T2]]]]
         self._buffer_size: Optional[int] = None
         self._buffer_names: Optional[List[str]] = None
         self._pick_mode: Optional[PickModes] = None
@@ -120,7 +120,7 @@ class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
 
         self.reset()
 
-    def add(self, data: Dict[str, Union[T_1, T_2]]) -> None:
+    def add(self, data: Dict[str, Union[T1, T2]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -148,7 +148,7 @@ class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
             self,
             count: Optional[int] = None,
             mode: Optional[PickModes] = None
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return items from the buffer.
 
@@ -204,7 +204,7 @@ class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
 
     def _pick_old(
         self, count: int
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return the oldest items in the buffer.
 
@@ -228,7 +228,7 @@ class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
 
     def _pick_recent(
         self, count: int
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return the most recent items in the buffer.
 
@@ -252,7 +252,7 @@ class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
 
     def _pick_random(
         self, count: int
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return a random sample of items in the buffer.
 
@@ -275,7 +275,7 @@ class Buffer(reilbase.ReilBase, Generic[T_1, T_2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def _pick_all(self) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    def _pick_all(self) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return all items in the buffer.
 

@@ -9,10 +9,10 @@ A `Buffer` with random pick that picks only if it is full.
 from typing import Dict, List, Optional, Tuple, Union
 
 from reil.datatypes.buffers.circular_buffer import CircularBuffer
-from reil.datatypes.buffers.buffer import T_1, T_2, PickModes
+from reil.datatypes.buffers.buffer import T1, T2, PickModes
 
 
-class VanillaExperienceReplay(CircularBuffer[T_1, T_2]):
+class VanillaExperienceReplay(CircularBuffer[T1, T2]):
     '''
     A `Buffer` with random pick that picks only if it is full.
 
@@ -112,7 +112,7 @@ class VanillaExperienceReplay(CircularBuffer[T_1, T_2]):
         self,
         count: Optional[int] = None,
         mode: Optional[PickModes] = None
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return items from the buffer.
 

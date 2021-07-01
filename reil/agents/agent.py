@@ -10,13 +10,16 @@ This `agent` class is the base class of all agent classes that can learn from
 import pathlib
 from typing import Any, Generator, Generic, Literal, Optional, Tuple, Union
 
-from reil import agents, stateful
-from reil.datatypes import FeatureArray
-from reil.learners.learner import LabelType, Learner
+from reil import stateful
+from reil.agents.no_learn_agent import NoLearnAgent
+from reil.datatypes.feature import FeatureArray
+from reil.learners.learner import Learner, LabelType
 from reil.utils.exploration_strategies import ExplorationStrategy
 
+TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[LabelType, ...]]
 
-class Agent(agents.NoLearnAgent, Generic[LabelType]):
+
+class Agent(NoLearnAgent, Generic[LabelType]):
     '''
     The base class of all agent classes that learn from history.
     '''
@@ -201,8 +204,8 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
 
         return _path, _filename
 
-    def _prepare_training(self,
-                          history: stateful.History) -> agents.TrainingData:
+    def _prepare_training(
+            self, history: stateful.History) -> TrainingData[LabelType]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -235,13 +238,13 @@ class Agent(agents.NoLearnAgent, Generic[LabelType]):
             The new `state` of the `subject` after taking `agent`'s action.
             Some methods
         '''
+        training_data: TrainingData[Any] = (), ()
         if history is not None:
-            X, Y = self._prepare_training(history)
-        else:
-            X, Y = [], []
+            training_data = self._prepare_training(history)
 
+        X, Y = training_data
         if X:
-            self._learner.learn(X, Y)  # type: ignore
+            self._learner.learn(X, Y)
 
     def observe(self, subject_id: int, stat_name: Optional[str],  # noqa: C901
                 ) -> Generator[Union[FeatureArray, None], Any, None]:

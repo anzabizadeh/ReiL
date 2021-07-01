@@ -9,7 +9,8 @@ A dosing protocol class that can contain three dosing protocols for
 
 from typing import Any, Dict
 
-from reil.healthcare.dosing_protocols import DosingDecision, DosingProtocol
+from reil.healthcare.dosing_protocols.dosing_protocol import (
+    AdditionalInfo, DosingDecision, DosingProtocol)
 
 
 class ThreePhaseDosingProtocol:
@@ -18,10 +19,11 @@ class ThreePhaseDosingProtocol:
     `initial`, `adjustment` and `maintenance` phases of dosing.
     '''
 
-    def __init__(self,
-                 initial_protocol: DosingProtocol,
-                 adjustment_protocol: DosingProtocol,
-                 maintenance_protocol: DosingProtocol) -> None:
+    def __init__(
+            self,
+            initial_protocol: DosingProtocol,
+            adjustment_protocol: DosingProtocol,
+            maintenance_protocol: DosingProtocol) -> None:
         '''
         Arguments
         ---------
@@ -37,7 +39,7 @@ class ThreePhaseDosingProtocol:
         self._initial_protocol = initial_protocol
         self._adjustment_protocol = adjustment_protocol
         self._maintenance_protocol = maintenance_protocol
-        self._additional_info = {}
+        self._additional_info: AdditionalInfo = {}
 
     def prescribe(
             self, patient: Dict[str, Any]) -> DosingDecision:

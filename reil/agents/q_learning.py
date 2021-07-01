@@ -11,24 +11,24 @@ A Q-learning `agent`.
 from typing import Any, Optional, Tuple, Union
 
 import numpy as np
-from reil import agents, stateful
-from reil.datatypes import FeatureArray
+from reil import stateful
+from reil.agents.agent import Agent, TrainingData
 from reil.datatypes.buffers import Buffer
+from reil.datatypes.feature import FeatureArray
 from reil.learners import Learner
 from reil.utils.exploration_strategies import ExplorationStrategy
-
 
 Feature_or_Tuple_of_Feature = Union[Tuple[FeatureArray, ...], FeatureArray]
 
 
-class QLearning(agents.Agent):
+class QLearning(Agent[float]):
     '''
     A Q-learning `agent`.
     '''
 
     def __init__(self,
                  learner: Learner[float],
-                 buffer: Buffer,
+                 buffer: Buffer[FeatureArray, float],
                  exploration_strategy: ExplorationStrategy,
                  method: str = 'backward',
                  **kwargs: Any):
@@ -71,9 +71,9 @@ class QLearning(agents.Agent):
         self._buffer.setup(buffer_names=['X', 'Y'])
 
     @classmethod
-    def _empty_instance(cls):
+    def _empty_instance(cls):  # type: ignore
         class MockBuffer:
-            def setup(self, **kwargs):
+            def setup(self, **kwargs: Any):
                 pass
 
         return cls(None, MockBuffer(), None)  # type: ignore
@@ -115,20 +115,20 @@ class QLearning(agents.Agent):
         len_action = len(action_list)
 
         if len_state == len_action:
-            X = tuple(state_list[i] + action_list[i]
+            x = tuple(state_list[i] + action_list[i]
                       for i in range(len_state))
         elif len_action == 1:
-            X = tuple(state_list[i] + action_list[0]
+            x = tuple(state_list[i] + action_list[0]
                       for i in range(len_state))
         elif len_state == 1:
-            X = tuple(state_list[0] + action_list[i]
+            x = tuple(state_list[0] + action_list[i]
                       for i in range(len_action))
         else:
             raise ValueError(
                 'State and action should be of the same size'
                 ' or at least one should be of size one.')
 
-        return self._learner.predict(X)
+        return self._learner.predict(x)
 
     def _max_q(self, state: Feature_or_Tuple_of_Feature) -> float:
         '''
@@ -144,14 +144,14 @@ class QLearning(agents.Agent):
         '''
         try:
             q_values = self._q(state)
-            max_q = np.max(q_values)
+            max_q: float = np.max(q_values)
         except ValueError:
-            max_q = 0
+            max_q = 0.0
 
         return max_q
 
-    def _prepare_training(self,
-                          history: stateful.History) -> agents.TrainingData:
+    def _prepare_training(
+            self, history: stateful.History) -> TrainingData[float]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -166,17 +166,38 @@ class QLearning(agents.Agent):
         :
             a `TrainingData` object that contains `X` and 'y` vectors
 
-
         :meta public:
         '''
+        state: FeatureArray
+        action: FeatureArray
+        next_state: FeatureArray
+        reward: float
+
+        discount_factor = self._discount_factor
+
+        for h in history[:-1]:
+            if h.state is None or h.action is None:
+                raise ValueError(f'state and action cannot be None.\n{h}')
+
+        # When history is one complete trajectory, the last observation
+        # contains only the terminal state. In this case, we don't have an
+        # action and a reward for the last observation, so we do not compute
+        # its new Q value.
+        if history[-1].action is None:
+            active_history = history[:-1]
+        else:
+            active_history = history
+
         if self._method == 'forward':
-            for i in range(len(history)-1):
-                state = history[i].state
-                action = history[i].action
-                reward = history[i].reward
+            for i, h in enumerate(active_history):
+                state: FeatureArray = h.state  # type: ignore
+                action: FeatureArray = h.action  # type: ignore
+                reward = h.reward or 0.0
+
                 try:
-                    max_q = self._max_q(history[i+1].state)  # type: ignore
-                    new_q = reward + self._discount_factor*max_q
+                    next_state = history[i+1].state  # type: ignore
+                    new_q = reward + discount_factor * \
+                        self._max_q(next_state)
                 except IndexError:
                     new_q = reward
 
@@ -184,23 +205,23 @@ class QLearning(agents.Agent):
                     {'X': state + action, 'Y': new_q})
 
         else:  # backward
-            q_list = [0.0] * len(history)
-            for i in range(len(history)-2, -1, -1):
-                state = history[i].state
-                action = history[i].action
-                reward = history[i].reward
-                q_list[i] = reward + self._discount_factor*q_list[i+1]
+            q_list = [0.0] * len(active_history)
+            for i in range(len(active_history)-2, -1, -1):
+                state = active_history[i].state  # type: ignore
+                action = active_history[i].action  # type: ignore
+                reward = active_history[i].reward or 0.0
+                q_list[i] = reward + discount_factor * q_list[i+1]
 
                 self._buffer.add(
                     {'X': state + action, 'Y': q_list[i]})
 
         temp = self._buffer.pick()
 
-        return temp['X'], temp['Y']
+        return temp['X'], temp['Y']  # type: ignore
 
     def best_actions(self,
                      state: FeatureArray,
-                     actions: Optional[Tuple[FeatureArray, ...]] = None
+                     actions: Tuple[FeatureArray, ...]
                      ) -> Tuple[FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
@@ -222,7 +243,9 @@ class QLearning(agents.Agent):
         q_values = self._q(state, None if actions ==
                            self._default_actions else actions)
         max_q = np.max(q_values)
-        result = tuple(actions[i] for i in np.nonzero(q_values == max_q)[0])
+        result = tuple(
+            actions[i]  # type: ignore
+            for i in np.nonzero(q_values == max_q)[0])
 
         return result
 

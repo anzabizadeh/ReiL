@@ -39,16 +39,16 @@ import pathlib
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from reil import reilbase
-from reil.datatypes import (Feature, FeatureArray, PrimaryComponent,
-                            SubComponentInfo)
-from reil.datatypes.components import Statistic
+from reil.datatypes.components import (PrimaryComponent, Statistic,
+                                       SubComponentInfo)
+from reil.datatypes.feature import Feature, FeatureArray
 
 
 @dataclasses.dataclass
 class Observation:
     state: Optional[FeatureArray] = None
     action: Optional[FeatureArray] = None
-    reward: Optional[Any] = None
+    reward: Optional[float] = None
 
 
 History = List[Observation]
@@ -216,7 +216,7 @@ class Stateful(reilbase.ReilBase):
 
     def _default_state_definition(
             self, _id: Optional[int] = None) -> FeatureArray:
-        return FeatureArray(Feature(name='default_state'))
+        return FeatureArray(Feature[Any](name='default_state'))
 
     def _default_statistic_definition(
             self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
@@ -267,7 +267,7 @@ class Stateful(reilbase.ReilBase):
         {'sub_comp_01': 'something', 'sub_comp_02':
         'new valuenew valuenew value'}
         '''
-        sub_comp_list = {}
+        sub_comp_list: Dict[str, SubComponentInfo] = {}
         for func_name, func in ((f, getattr(self, f).__func__)
                                 for f in dir(self)
                                 if f.startswith('_sub_comp_')):

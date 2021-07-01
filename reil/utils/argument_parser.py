@@ -4,14 +4,14 @@ import dataclasses
 import pathlib
 from typing import Any, Dict, List, Optional, Type, Union
 
-from reil import ReilBase
+from reil.reilbase import ReilBase
 from ruamel.yaml import YAML
 
 
 @dataclasses.dataclass
 class CommandlineArgument:
     name: str
-    type: Type
+    type: Type[Any]
     default: Any
 
 
@@ -57,6 +57,7 @@ class ConfigParser:
             config_path: Optional[Union[pathlib.Path, str]] = None,
             vars_dict: Optional[Dict[str, str]] = None) -> None:
 
+        self.config: Dict[str, Any]
         if config_filenames:
             self.config = {
                 key: self._load_config_file(value, config_path, vars_dict)
@@ -83,7 +84,7 @@ class ConfigParser:
             for name, value in vars_dict.items():
                 temp = temp.replace(f'${name}$', str(value))
 
-        return YAML().load(temp)
+        return YAML().load(temp)  # type: ignore
 
     def extract(
             self, root_name: str, branch_name: str, as_object: bool = False

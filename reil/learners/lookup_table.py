@@ -11,8 +11,9 @@ type of inputs to be `TableEntry`.
 import dataclasses
 from typing import Any, Dict, Generic, Hashable, Tuple, TypeVar
 
-from reil import learners
-from reil.datatypes import FeatureArray
+from reil.learners.learner import Learner
+from reil.datatypes.feature import FeatureArray
+from reil.learners.learning_rate_schedulers import LearningRateScheduler
 
 T = TypeVar('T')
 
@@ -37,7 +38,7 @@ class LookupTable(Dict[Any, TableEntry[T]]):
             raise TypeError('item should be of type TableEntry.')
 
 
-class QLookupTable(learners.Learner[float]):
+class QLookupTable(Learner[float]):
     '''
     A Q-learning lookup table class.
 
@@ -45,7 +46,7 @@ class QLookupTable(learners.Learner[float]):
     '''
     def __init__(
             self,
-            learning_rate: learners.LearningRateScheduler,
+            learning_rate: LearningRateScheduler,
             initial_estimate: float = 0.0,
             minimum_visits: int = 0) -> None:
         '''

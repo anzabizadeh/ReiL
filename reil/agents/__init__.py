@@ -37,10 +37,9 @@ TrainingData
     `FeatureArray` for X matrix and a tuple of floats for Y vector.
 
 '''
-from .no_learn_agent import NoLearnAgent, TrainingData  # noqa: W0611
-from .agent import Agent  # noqa: W0611
-from .agent_demon import AgentDemon  # noqa: W0611
-from .q_learning import QLearning  # noqa: W0611
-from .deep_q_learning import DeepQLearning  # noqa: W0611
-from .random_agent import RandomAgent  # noqa: W0611
-from .user_agent import UserAgent  # noqa: W0611
+from .no_learn_agent import NoLearnAgent  # noqa: W601
+from .agent import Agent, TrainingData  # noqa: W601
+from .q_learning import QLearning  # noqa: W601
+from .deep_q_learning import DeepQLearning  # noqa: W601
+from .random_agent import RandomAgent  # noqa: W601
+from .user_agent import UserAgent  # noqa: W601

@@ -9,20 +9,26 @@ on one or more `subjects`.
 import inspect
 import pathlib
 from collections import defaultdict
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, TypeVar, Union
 
 import pandas as pd
-
 from reil import stateful
-from reil.agents import Agent, NoLearnAgent, AgentDemon
-from reil.datatypes import FeatureArray, InteractionProtocol
-from reil.subjects import Subject, SubjectDemon
-from reil.utils import InstanceGenerator
+from reil.agents.agent import Agent
+from reil.agents.agent_demon import AgentDemon
+from reil.datatypes.feature import FeatureArray
+from reil.datatypes.interaction_protocol import InteractionProtocol
+from reil.subjects.subject import Subject
+from reil.subjects.subject_demon import SubjectDemon
+from reil.utils.instance_generator import InstanceGenerator
+
+T = TypeVar('T')
 
 AgentSubjectTuple = Tuple[str, str]
-EntityType = Union[Agent[Any], Subject]
-EntityGenType = Union[InstanceGenerator[Agent[Any]],
-                      InstanceGenerator[Subject]]
+EntityType = Union[Agent[T], Subject]
+EntityGenType = Union[InstanceGenerator[Agent[T]],
+                      InstanceGenerator[AgentDemon[T]],
+                      InstanceGenerator[Subject],
+                      InstanceGenerator[SubjectDemon]]
 
 
 class Environment(stateful.Stateful):
@@ -44,12 +50,13 @@ class Environment(stateful.Stateful):
     current instance.
     '''
 
-    def __init__(self,
-                 entity_dict: Optional[
-                     Dict[str, Union[EntityType, EntityGenType, str]]] = None,
-                 demon_dict: Optional[
-                     Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            entity_dict: Optional[Dict[str, Union[
+                EntityType[Any], EntityGenType[Any], str]]] = None,
+            demon_dict: Optional[Dict[str, Union[
+                AgentDemon[Any], SubjectDemon, str]]] = None,
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -61,9 +68,9 @@ class Environment(stateful.Stateful):
 
         self._agents: Dict[str, Agent[Any]] = {}
         self._subjects: Dict[str, Subject] = {}
-        self._agent_demons: Dict[str, AgentDemon] = {}
+        self._agent_demons: Dict[str, AgentDemon[Any]] = {}
         self._subject_demons: Dict[str, SubjectDemon] = {}
-        self._instance_generators: Dict[str, EntityGenType] = {}
+        self._instance_generators: Dict[str, EntityGenType[Any]] = {}
         self._assignment_list: Dict[
             AgentSubjectTuple,
             Tuple[Union[int, None], Union[int, None]]] = \
@@ -79,10 +86,10 @@ class Environment(stateful.Stateful):
         if demon_dict is not None:
             self.add_demons(demon_dict)
 
-    def add_entities(self,
-                     entity_dict: Dict[str,
-                                       Union[EntityType, EntityGenType, str]]
-                     ) -> None:
+    def add_entities(
+            self,
+            entity_dict: Dict[str, Union[
+                EntityType[Any], EntityGenType[Any], str]]) -> None:
         '''
         Add `agents` and `subjects` to the environment.
 
@@ -127,20 +134,21 @@ class Environment(stateful.Stateful):
                 _obj = obj
             if isinstance(_obj, InstanceGenerator):
                 self._instance_generators.update({name: _obj})
-            elif isinstance(_obj, (NoLearnAgent, AgentDemon)):
-                self._agents.update({name: _obj})
-            elif isinstance(_obj, (Subject, SubjectDemon)):
-                self._subjects.update({name: _obj})
-            else:
-                raise TypeError(
-                    f'entity {name} is niether an agent nor a subject.')
 
-        for name, generator in self._instance_generators.items():
-            _, obj = next(generator)  # type: ignore
-            if isinstance(obj, (Agent, AgentDemon)):
-                self._agents.update({name: obj})
-            elif isinstance(obj, (Subject, SubjectDemon)):
-                self._subjects.update({name: obj})
+                _, instance = next(_obj)
+                if isinstance(instance, Agent):
+                    self._agents.update({name: instance})
+                elif isinstance(instance, Subject):
+                    self._subjects.update({name: instance})
+                else:
+                    raise TypeError(
+                        f'entity {name} is niether an agent generator nor a '
+                        'subject generator.')
+
+            elif isinstance(_obj, Agent):
+                self._agents.update({name: _obj})
+            elif isinstance(_obj, Subject):
+                self._subjects.update({name: _obj})
             else:
                 raise TypeError(
                     f'entity {name} is niether an agent nor a subject.')
@@ -169,9 +177,10 @@ class Environment(stateful.Stateful):
             if name in self._instance_generators:
                 del self._instance_generators[name]
 
-    def add_demons(self,
-                   demon_dict: Dict[str, Union[AgentDemon, SubjectDemon, str]],
-                   ) -> None:
+    def add_demons(
+            self,
+            demon_dict: Dict[str, Union[
+                AgentDemon[Any], SubjectDemon, str]]) -> None:
         '''
         Add `AgentDemon`s and `SubjectDemon`s to the environment.
 
@@ -624,10 +633,10 @@ class Environment(stateful.Stateful):
 
         if entity_name == 'all':
             super().load(filename=_filename, path=_path)
-            self._instance_generators: Dict[str, EntityGenType] = {}
+            self._instance_generators: Dict[str, EntityGenType[Any]] = {}
             self._agents: Dict[str, Agent[Any]] = {}
             self._subjects: Dict[str, Subject] = {}
-            self._agent_demons: Dict[str, AgentDemon] = {}
+            self._agent_demons: Dict[str, AgentDemon[Any]] = {}
             self._subject_demons: Dict[str, SubjectDemon] = {}
 
             for name, obj_type in self._env_data['instance_generators']:

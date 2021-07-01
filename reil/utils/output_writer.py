@@ -16,15 +16,10 @@ class OutputWriter:
         self._csv_filename = filename if filename.endswith((
             '.yaml', '.yml')) else f'{filename}.csv'
         pathlib.Path(self._path).mkdir(parents=True, exist_ok=True)
-        # self._filehandler = open(
-        #     self._path / self._csv_filename, 'a+', newline='')
         if columns:
             with open(self._path / self._csv_filename, 'a+', newline='') as f:
                 pd.DataFrame([], columns=columns).to_csv(
                     f, header=True)
-
-    # def __del__(self) -> None:
-    #     self._filehandler.close()
 
     def write_stats_output(
             self, stats_output: Dict[Tuple[str, str], pd.DataFrame]) -> None:

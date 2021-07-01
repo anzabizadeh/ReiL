@@ -8,10 +8,10 @@ A `Buffer` that overflows!
 
 from typing import Dict, List, Optional, Tuple, Union
 
-from reil.datatypes.buffers.buffer import Buffer, PickModes, T_1, T_2
+from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2
 
 
-class CircularBuffer(Buffer[T_1, T_2]):
+class CircularBuffer(Buffer[T1, T2]):
     '''
     A `Buffer` that overflows.
 
@@ -26,7 +26,7 @@ class CircularBuffer(Buffer[T_1, T_2]):
         super().__init__(buffer_size=buffer_size, buffer_names=buffer_names,
                          pick_mode=pick_mode)
 
-    def add(self, data: Dict[str, Union[T_1, T_2]]) -> None:
+    def add(self, data: Dict[str, Union[T1, T2]]) -> None:
         '''
         Add a new item to the buffer.
 
@@ -51,7 +51,7 @@ class CircularBuffer(Buffer[T_1, T_2]):
 
     def _pick_old(
         self, count: int
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return the oldest items in the buffer.
 
@@ -75,7 +75,7 @@ class CircularBuffer(Buffer[T_1, T_2]):
 
     def _pick_recent(
         self, count: int
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return the most recent items in the buffer.
 
@@ -95,12 +95,12 @@ class CircularBuffer(Buffer[T_1, T_2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def _pick_all(self) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    def _pick_all(self) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Return all items in the buffer.
         '''
         if self._buffer_full:
-            self._buffer: Dict[str, Union[List[T_1], List[T_2]]]
+            self._buffer: Dict[str, Union[List[T1], List[T2]]]
             slice_pre = slice(self._buffer_index + 1, None)
             slice_post = slice(self._buffer_index + 1)
             return {name: tuple(

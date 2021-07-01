@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-from collections import namedtuple
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, NamedTuple, Optional, Tuple
 
-from reil.datatypes import FeatureArray
-from reil.utils import functions
+from reil.datatypes.feature import FeatureArray
+from reil.utils.functions import in_range, interpolate, square_dist
 
 # SOME THOUGHTS!
 # Lookahead is not something a subject can/should do!
@@ -16,7 +15,9 @@ from reil.utils import functions
 # and finally add that to the reward from the subject!
 
 
-Arguments = namedtuple('Arguments', ('y', 'x'), defaults=(None,))
+class Arguments(NamedTuple):
+    y: str
+    x: Optional[str] = None
 
 
 @dataclasses.dataclass
@@ -29,7 +30,7 @@ class ReilFunction:
     interpolate: bool = True
 
     def __post_init__(self):
-        if not isinstance(self.arguments, Arguments):
+        if not isinstance(self.arguments, Arguments):  # type: ignore
             self.arguments = Arguments(*self.arguments)  # type: ignore
 
     def __call__(self, args: FeatureArray) -> float:
@@ -87,8 +88,8 @@ class NormalizedSquareDistance(ReilFunction):
         else:
             _y = y
 
-        result = sum(functions.square_dist(
-            self.center, functions.interpolate(_y[i], _y[i+1], _x[i]))
+        result = sum(square_dist(
+            self.center, interpolate(_y[i], _y[i+1], _x[i]))
             for i in range(len(_x)))
 
         # normalize
@@ -116,9 +117,9 @@ class PercentInRange(ReilFunction):
             _y = y
 
         result = sum(
-            functions.in_range(
+            in_range(
                 self.acceptable_range,
-                functions.interpolate(_y[i], _y[i+1], _x[i]))
+                interpolate(_y[i], _y[i+1], _x[i]))
             for i in range(len(_x)))
 
         total_intervals = sum(_x)
@@ -251,9 +252,9 @@ class Functions:
             _INRs = INRs
 
         result = sum(
-            functions.square_dist(
+            square_dist(
                 INR_mid,
-                functions.interpolate(_INRs[i], _INRs[i+1], _intervals[i]))
+                interpolate(_INRs[i], _INRs[i+1], _intervals[i]))
             for i in range(len(_intervals)))
 
         # normalize

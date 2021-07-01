@@ -22,6 +22,9 @@ from ruamel.yaml import YAML
 import reil
 
 
+Parsable = Union[OrderedDict[str, Any], Any]
+
+
 class ReilBase:
     '''
     The base class of all classes in the `ReiL` package.
@@ -173,7 +176,7 @@ class ReilBase:
 
         yaml = YAML()
         with open(_path / _filename, 'r') as f:
-            yaml_output = yaml.load(f)
+            yaml_output: OrderedDict[str, Any] = yaml.load(f)  # type: ignore
 
         temp_yaml = yaml_output
         for key in node_reference:
@@ -182,7 +185,7 @@ class ReilBase:
         return cls.parse_yaml(temp_yaml)
 
     @staticmethod
-    def parse_yaml(data: OrderedDict):  # noqa: C901
+    def parse_yaml(data: Parsable) -> Parsable:  # noqa: C901
         '''
         Parse a yaml tree.
 
@@ -226,8 +229,8 @@ class ReilBase:
             if isinstance(v, dict):
                 v_obj = ReilBase.parse_yaml(data[k])
             elif isinstance(v, list):
-                v_obj = [ReilBase.parse_yaml(v_i)
-                         for v_i in v]
+                v_obj = [
+                    ReilBase.parse_yaml(v_i) for v_i in v]  # type: ignore
             elif isinstance(v, str):
                 if v.startswith('lambda'):
                     v_obj = eval(v, {})
@@ -243,7 +246,7 @@ class ReilBase:
         return args
 
     @staticmethod
-    def _create_component_from_yaml(name: str, args: OrderedDict):
+    def _create_component_from_yaml(name: str, args: OrderedDict[str, Any]):
         '''
         Create a component from yaml data.
 
@@ -318,15 +321,15 @@ class ReilBase:
                      f'{filename}{".pbz2" if self._save_zipped else ".pkl"}')
         full_path = pathlib.Path(path or self._path) / _filename
 
-        data = None
+        data: Optional[Dict[str, Any]] = None
         for i in range(1, 6):
             try:
                 if self._save_zipped:
                     with bz2.BZ2File(full_path, 'r') as f:
-                        data = dill.load(f)
+                        data = dill.load(f)  # type: ignore
                 else:
                     with open(full_path, 'rb') as f:
-                        data = dill.load(f)
+                        data = dill.load(f)  # type: ignore
             except FileNotFoundError:
                 raise
             except (EOFError, OSError):
@@ -379,7 +382,7 @@ class ReilBase:
 
         data_to_save:
             a list of variables that should be pickled. If omitted,
-            the `agent` is saved completely.
+            the object is saved completely.
 
         Returns
         -------
@@ -404,10 +407,10 @@ class ReilBase:
 
         if self._save_zipped:
             with bz2.BZ2File(_path / f'{_filename}.pbz2', 'w') as f:
-                dill.dump(data, f, dill.HIGHEST_PROTOCOL)
+                dill.dump(data, f, dill.HIGHEST_PROTOCOL)  # type: ignore
         else:
             with open(_path / f'{_filename}.pkl', 'wb+') as f:
-                dill.dump(data, f, dill.HIGHEST_PROTOCOL)
+                dill.dump(data, f, dill.HIGHEST_PROTOCOL)  # type: ignore
 
         if temp:
             self._logger = temp
@@ -420,31 +423,3 @@ class ReilBase:
 
     def __repr__(self) -> str:
         return self.__class__.__qualname__
-
-
-if __name__ == '__main__':
-    config = '''
-        test:
-            eval: change_array_to_missing(1)
-            args:
-                change_array_to_missing:
-                    eval: reil.datatypes.feature.change_array_to_missing
-    '''
-    # '''
-    #     training_config: &training_config
-    #     reil.utils.InstanceGenerator:
-    #         object:
-    #         reil.healthcare.subjects.Warfarin:
-    #             patient:
-    #             reil.healthcare.PatientWarfarinRavvaz:
-    #                 model:
-    #                 reil.healthcare.mathematical_models.HambergPKPD:
-    #                     randomized: True
-    #                 allow_missing_genotypes: True
-    #         instance_counter_stops:
-    #         eval: "[i*size for i in range(1, iterations + 1)]"
-    #         args:
-    #             size: 1000
-    #             iterations: 100
-    # '''
-    x = ReilBase.parse_yaml(YAML().load(config))

@@ -3,9 +3,9 @@ import pathlib
 from math import ceil, log10
 from typing import Dict, Literal, Optional, Tuple, Union
 
-from reil.datatypes import InteractionProtocol
-from reil.environments import EnvironmentStaticMap
-from reil.utils import OutputWriter
+from reil.datatypes.interaction_protocol import InteractionProtocol
+from reil.environments.environment_static_map import EnvironmentStaticMap
+from reil.utils.output_writer import OutputWriter
 
 # TODO: Documentation
 # TODO: what should we do with `save` and `iterations`?!

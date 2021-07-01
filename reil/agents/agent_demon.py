@@ -15,10 +15,10 @@ from reil.agents.agent import Agent
 from reil.agents.no_learn_agent import NoLearnAgent
 from reil.datatypes.components import PrimaryComponent, Statistic
 from reil.datatypes.feature import FeatureArray
-from reil.subjects.subject import Subject
+from reil.learners.learner import LabelType
 
 
-class AgentDemon(Agent):
+class AgentDemon(Agent[LabelType]):
     '''
     This class accepts a regular `agent`, and intervenes in its interaction
     with the subjects. A substitute `agent` acts whenever a condition is
@@ -29,7 +29,7 @@ class AgentDemon(Agent):
             self,
             sub_agent: NoLearnAgent,
             condition_fn: Callable[[FeatureArray, int], bool],
-            main_agent: Optional[Agent] = None,
+            main_agent: Optional[Agent[LabelType]] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -51,7 +51,7 @@ class AgentDemon(Agent):
         self._entity_list: stateful.EntityRegister
         self._training_trigger: str
 
-        self._main_agent = main_agent
+        self._main_agent: Union[Agent[LabelType], None] = main_agent
         self._sub_agent: NoLearnAgent = sub_agent
         self._condition_fn = condition_fn
 
@@ -60,9 +60,9 @@ class AgentDemon(Agent):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(Subject(), None, None)  # type: ignore
+        return cls(NoLearnAgent(), lambda f, i: True, None)
 
-    def __call__(self, main_agent: Agent) -> AgentDemon:
+    def __call__(self, main_agent: Agent[LabelType]) -> AgentDemon[LabelType]:
         self._main_agent = main_agent
         self.state = main_agent.state
         self.statistic = main_agent.statistic
@@ -76,9 +76,9 @@ class AgentDemon(Agent):
         _path = pathlib.Path(path or self._path)
         super().load(filename, _path)
 
-        self._main_agent = self._main_agent.from_pickle(  # type: ignore
+        self._main_agent = (self._main_agent or Agent).from_pickle(
             filename, _path / 'main_agent')
-        self._sub_agent = self._sub_agent.from_pickle(  # type: ignore
+        self._sub_agent = self._sub_agent.from_pickle(
             filename, _path / 'sub_agent')
 
         self.__call__(self._main_agent)
@@ -89,16 +89,17 @@ class AgentDemon(Agent):
              data_to_save: Optional[Tuple[str, ...]] = None
              ) -> Tuple[pathlib.PurePath, str]:
 
+        temp_main = self._main_agent
+        temp_sub = self._sub_agent
+
         data = list(data_to_save or self.__dict__)
         save_main = '_main_agent' in data
         save_sub = '_sub_agent' in data
         if save_main:
-            temp_main, self._main_agent = (  # type: ignore
-                self._main_agent, type(self._main_agent))
+            self._main_agent = type(self._main_agent)
 
         if save_sub:
-            temp_sub, self._sub_agent = (  # type: ignore
-                self._sub_agent, type(self._sub_agent))
+            self._sub_agent = type(self._sub_agent)  # type: ignore
 
         if 'state' in data:
             data.remove('state')
@@ -113,19 +114,23 @@ class AgentDemon(Agent):
             super().save(
                 _filename, _path, data_to_save=tuple(data))
             if save_main:
-                self._main_agent = temp_main  # type: ignore
-                self._main_agent.save(_filename, _path / 'main_agent')
+                self._main_agent = temp_main
+                if self._main_agent:
+                    self._main_agent.save(_filename, _path / 'main_agent')
             if save_sub:
-                self._sub_agent = temp_sub  # type: ignore
+                self._sub_agent = temp_sub
                 self._sub_agent.save(_filename, _path / 'sub_agent')
         finally:
             if save_main:
-                self._main_agent = temp_main  # type: ignore
-                self._sub_agent = temp_sub  # type: ignore
+                self._main_agent = temp_main
+                self._sub_agent = temp_sub
 
         return _path, _filename
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
+        if self._main_agent is None:
+            raise ValueError('main_agent is not set.')
+
         from_main = self._main_agent.register(entity_name, _id)
         from_sub = self._sub_agent.register(entity_name, _id)
         if from_main != from_sub:
@@ -136,10 +141,14 @@ class AgentDemon(Agent):
 
     def deregister(self, entity_id: int) -> None:
         self._sub_agent.deregister(entity_id)
+
+        if self._main_agent is None:
+            raise ValueError('main_agent is not set.')
         self._main_agent.deregister(entity_id)
 
     def reset(self):
-        self._main_agent.reset()
+        if self._main_agent:
+            self._main_agent.reset()
         self._sub_agent.reset()
 
     def act(self,
@@ -177,6 +186,9 @@ class AgentDemon(Agent):
         if self._condition_fn(state, subject_id):
             return self._sub_agent.act(state, subject_id, actions, iteration)
 
+        if self._main_agent is None:
+            raise ValueError('main_agent is not set.')
+
         return self._main_agent.act(state, subject_id, actions, iteration)
 
     def learn(self, history: stateful.History) -> None:
@@ -192,4 +204,7 @@ class AgentDemon(Agent):
             The new `state` of the `subject` after taking `agent`'s action.
             Some methods
         '''
+        if self._main_agent is None:
+            raise ValueError('main_agent is not set.')
+
         self._main_agent.learn(history)

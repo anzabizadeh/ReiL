@@ -26,7 +26,7 @@ VanilaExperienceReplay:
 
 '''
 
-from .buffer import Buffer, PickModes, T  # noqa: W0611
+from .buffer import Buffer, PickModes  # noqa: W0611
 from .circular_buffer import CircularBuffer  # noqa: W0611
 from .endless_buffer import EndlessBuffer  # noqa: W0611
 from .sink import Sink  # noqa: W0611

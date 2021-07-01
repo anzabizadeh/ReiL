@@ -8,10 +8,10 @@ A dummy buffer that does nothing!
 
 from typing import Dict, List, Optional, Tuple, Union
 
-from reil.datatypes.buffers.buffer import Buffer, T_1, T_2, PickModes
+from reil.datatypes.buffers.buffer import Buffer, T1, T2, PickModes
 
 
-class Sink(Buffer[T_1, T_2]):
+class Sink(Buffer[T1, T2]):
     '''
     A sink class.
     '''
@@ -68,7 +68,7 @@ class Sink(Buffer[T_1, T_2]):
         '''
         super().setup(buffer_names=buffer_names)
 
-    def add(self, data: Dict[str, Union[T_1, T_2]]) -> None:
+    def add(self, data: Dict[str, Union[T1, T2]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -89,7 +89,7 @@ class Sink(Buffer[T_1, T_2]):
             self,
             count: Optional[int] = None,
             mode: Optional[PickModes] = None
-    ) -> Dict[str, Union[Tuple[T_1, ...], Tuple[T_2, ...]]]:
+    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
         '''
         Raises an exception.
 
