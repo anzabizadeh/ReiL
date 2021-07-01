@@ -10,7 +10,8 @@ import pathlib
 from typing import Any, Optional, Tuple, Union
 
 from reil import stateful
-from reil.datatypes import Feature, FeatureArray, SecondayComponent
+from reil.datatypes.components import SecondayComponent
+from reil.datatypes.feature import Feature, FeatureArray
 
 
 class Subject(stateful.Stateful):
@@ -53,7 +54,7 @@ class Subject(stateful.Stateful):
 
     def _default_action_definition(
             self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
-        return (FeatureArray(Feature(name='default_action')),)
+        return (FeatureArray(Feature[Any](name='default_action')),)
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''

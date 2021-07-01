@@ -9,10 +9,14 @@ Study arms in `Ravvaz et al. (2017)
 
 from typing import Any, Dict
 
-from reil.healthcare.dosing_protocols import (DosingDecision,
-                                              ThreePhaseDosingProtocol)
-from reil.healthcare.dosing_protocols.warfarin import (IWPC, Aurora,
-                                                       Intermountain, Lenzini)
+from reil.healthcare.dosing_protocols.dosing_protocol import DosingDecision
+from reil.healthcare.dosing_protocols.three_phase_dosing_protocol import \
+    ThreePhaseDosingProtocol
+from reil.healthcare.dosing_protocols.warfarin.aurora import Aurora
+from reil.healthcare.dosing_protocols.warfarin.intermountain import \
+    Intermountain
+from reil.healthcare.dosing_protocols.warfarin.iwpc import IWPC
+from reil.healthcare.dosing_protocols.warfarin.lenzini import Lenzini
 
 
 class AAA(ThreePhaseDosingProtocol):

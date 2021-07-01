@@ -8,10 +8,10 @@ A `Buffer` without size limit.
 
 from typing import Dict, List, Optional, Union
 
-from reil.datatypes.buffers.buffer import Buffer, PickModes, T_1, T_2
+from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2
 
 
-class EndlessBuffer(Buffer[T_1, T_2]):
+class EndlessBuffer(Buffer[T1, T2]):
     '''
     A `Buffer` without size limit.
 
@@ -74,7 +74,7 @@ class EndlessBuffer(Buffer[T_1, T_2]):
             buffer_names=buffer_names, pick_mode=pick_mode,
             clear_buffer=clear_buffer)
 
-    def add(self, data: Dict[str, Union[T_1, T_2]]) -> None:
+    def add(self, data: Dict[str, Union[T1, T2]]) -> None:
         '''
         Add a new item to the buffer.
 

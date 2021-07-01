@@ -8,9 +8,9 @@ This class emulates mnk game.
 
 
 import random
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
-from reil.datatypes import FeatureArray, FeatureGenerator
+from reil.datatypes.feature import FeatureArray, FeatureGenerator
 from reil.subjects.subject import Subject
 from reil.utils.mnkboard import MNKBoard
 
@@ -54,7 +54,8 @@ class MNKGame(MNKBoard, Subject):
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         return self._board_status is not None
 
-    def possible_actions(self, _id: int = None) -> Tuple[FeatureArray, ...]:
+    def possible_actions(
+            self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
         return tuple(FeatureArray(self._action_gen(v))
                      for v in self.get_action_set())
 
@@ -240,7 +241,7 @@ class MNKGame(MNKBoard, Subject):
 
 if __name__ == '__main__':
     board = MNKGame(m=3, n=3, k=3, players=2)
-    player = {}
+    player: Dict[str, int] = {}
     p = 0
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')

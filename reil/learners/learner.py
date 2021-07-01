@@ -7,8 +7,10 @@ The base class for all `learner` classes.
 '''
 from typing import Any, Generic, Tuple, TypeVar
 
-from reil import learners, reilbase
-from reil.datatypes import FeatureArray
+from reil import reilbase
+from reil.datatypes.feature import FeatureArray
+from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
+                                                    LearningRateScheduler)
 
 LabelType = TypeVar('LabelType')
 
@@ -18,7 +20,7 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
     The base class for all `learner` classes.
     '''
     def __init__(self,
-                 learning_rate: learners.LearningRateScheduler,
+                 learning_rate: LearningRateScheduler,
                  **kwargs: Any) -> None:
         '''
         Arguments
@@ -34,7 +36,7 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(learning_rate=learners.ConstantLearningRate(0.0))
+        return cls(learning_rate=ConstantLearningRate(0.0))
 
     def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[LabelType, ...]:
         '''

@@ -51,13 +51,9 @@ SecondayComponent:
     different definitions for the component, and call the instance to calculate
     them.
 '''
-
-from .feature import (Feature, FeatureGenerator,  # noqa: W0611
-                       FeatureArray)
-
-from .interaction_protocol import Entity, InteractionProtocol  # noqa: W0611
-
-from .components import (PrimaryComponent, SecondayComponent,  # noqa: W0611
-                         Statistic, MockStatistic, SubComponentInfo)
-
-import reil.datatypes.buffers  # noqa: W0611
+from . import buffers  # noqa: W601
+from .feature import Feature, FeatureArray, FeatureGenerator  # noqa: W601
+from .components import (PrimaryComponent, SecondayComponent,  # noqa: W601
+                         Statistic)
+from .interaction_protocol import Entity, InteractionProtocol  # noqa: W601
+from .mock_statistic import MockStatistic  # noqa: W601

@@ -8,12 +8,11 @@ Contains some useful functions.
 
 import math
 import random
-from typing import Any, Callable, Iterable, Optional, Tuple, TypeVar
+from typing import Any, Callable, Iterable, List, Optional, Tuple, TypeVar
 
 import numpy as np
-from reil.datatypes import FeatureGenerator
-from reil.datatypes.feature import FeatureArray
-from scipy.stats import lognorm  # type: ignore
+from reil.datatypes.feature import FeatureArray, FeatureGenerator
+from scipy.stats import lognorm
 
 
 def random_choice(f: Any):
@@ -24,62 +23,88 @@ def random_choice(f: Any):
     return random.choice(f)
 
 
-def random_uniform(f: FeatureGenerator) -> float:
+def random_uniform(f: FeatureGenerator[float]) -> float:
     if f.randomized:
         return np.random.uniform(f.lower, f.upper)
 
-    return f.mean or (f.upper - f.lower) / 2.0  # type: ignore
+    if f.mean is not None:
+        return f.mean
+
+    if f.upper is None or f.lower is None:
+        raise ValueError('mean, or upper and lower should be numbers.')
+
+    return (f.upper - f.lower) / 2.0
 
 
-def random_normal(f: FeatureGenerator) -> float:
+def random_normal(f: FeatureGenerator[float]) -> float:
     if f.randomized:
         return np.random.normal(f.mean, f.stdev)
 
-    return f.mean  # type: ignore
+    if f.mean is None:
+        raise ValueError('mean should be a number.')
+
+    return f.mean
 
 
-def random_normal_truncated(f: FeatureGenerator) -> float:
+def random_normal_truncated(f: FeatureGenerator[float]) -> float:
     if f.randomized:
         return min(max(
             np.random.normal(f.mean, f.stdev), f.lower),
             f.upper)
 
-    return f.mean  # type: ignore
+    if f.mean is None:
+        raise ValueError('mean should be a number.')
+
+    return f.mean
 
 
-def random_lognormal(f: FeatureGenerator) -> float:
-    exp_mu = math.exp(f.mean)  # type:ignore
+def random_lognormal(f: FeatureGenerator[float]) -> float:
+    try:
+        exp_mu = math.exp(f.mean)  # type: ignore
+    except TypeError:
+        raise ValueError('mean should be a number.')
+
     if f.randomized:
         return lognorm.rvs(s=f.stdev, scale=exp_mu)
 
     return exp_mu
 
 
-def random_lognormal_truncated(f: FeatureGenerator) -> float:
+def random_lognormal_truncated(f: FeatureGenerator[float]) -> float:
     # capture 50% of the data.
     # This restricts the log values to a "reasonable" range
-    exp_mu = math.exp(f.mean)  # type:ignore
+    try:
+        exp_mu = math.exp(f.mean)  # type: ignore
+    except TypeError:
+        raise ValueError('mean should be a number.')
+
     if f.randomized:
         quartileRange = (0.25, 0.75)
         lnorm = lognorm(f.stdev, scale=exp_mu)
-        qValues = lnorm.ppf(quartileRange)
-        values = list(v for v in lnorm.rvs(size=1000)
-                      if (v > qValues[0]) & (v < qValues[1]))
+        qValues: Tuple[float, float] = lnorm.ppf(quartileRange)
+        values: List[float] = list(
+            v for v in lnorm.rvs(size=1000)
+            if (v > qValues[0]) & (v < qValues[1]))
 
         return random.sample(values, 1)[0]
 
     return exp_mu
 
 
-def random_categorical(f: FeatureGenerator):
-    if f.randomized:
-        if f.probabilities is None:
-            return random.choice(f.categories)  # type:ignore
-        else:
-            return np.random.choice(
-                f.categories, 1, p=f.probabilities)[0]
+Categorical = TypeVar('Categorical')
 
-    return f.categories[0]
+
+def random_categorical(f: FeatureGenerator[Categorical]) -> Categorical:
+    if (categories := f.categories) is None:
+        raise TypeError('No categories found!')
+
+    if f.randomized:
+        if (probs := f.probabilities) is None:
+            return random.choice(categories)
+        else:
+            return np.random.choice(categories, 1, p=probs)[0]
+
+    return categories[0]
 
 
 def square_dist(x: float, y: Iterable[float]) -> float:
@@ -122,17 +147,17 @@ def generate_modifier(
         modified `input`.
     '''
     if condition is None:
-        def no_condition_modifier(condition_state: FeatureArray,
-                                  input: T) -> T:
+        def no_condition_modifier(
+                condition_state: FeatureArray, input: T) -> T:
             return operation(input)
 
         return no_condition_modifier
+    else:
+        def modifier(
+                condition_state: FeatureArray, input: T) -> T:
+            if condition(condition_state):  # type: ignore
+                return operation(input)
 
-    def modifier(condition_state: FeatureArray,
-                 input: T) -> T:
-        if condition(condition_state):
-            return operation(input)
-
-        return input
+            return input
 
     return modifier

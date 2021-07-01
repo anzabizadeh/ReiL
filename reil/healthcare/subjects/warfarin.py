@@ -8,12 +8,11 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 
 import functools
 import itertools
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from reil.datatypes import FeatureArray
-from reil.datatypes.feature import Feature
-from reil.healthcare import Patient
-from reil.healthcare.subjects import HealthSubject
+from reil.datatypes.feature import Feature, FeatureArray
+from reil.healthcare.patient import Patient
+from reil.healthcare.subjects.health_subject import HealthSubject
 from reil.utils import reil_functions
 
 
@@ -22,13 +21,14 @@ class Warfarin(HealthSubject):
     A warfarin subject based on Hamberg's two compartment PK/PD model.
     '''
 
-    def __init__(self,
-                 patient: Patient,
-                 INR_range: Tuple[float, float] = (0.0, 15.0),
-                 dose_range: Tuple[float, float] = (0.0, 15.0),
-                 interval_range: Tuple[int, int] = (1, 28),
-                 max_day: int = 90,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            patient: Patient,
+            INR_range: Tuple[float, float] = (0.0, 15.0),
+            dose_range: Tuple[float, float] = (0.0, 15.0),
+            interval_range: Tuple[int, int] = (1, 28),
+            max_day: int = 90,
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -64,63 +64,70 @@ class Warfarin(HealthSubject):
     def _generate_state_defs(self):
         super()._generate_state_defs()
 
-        patient_basic = (('age', {}), ('CYP2C9', {}),
-                         ('VKORC1', {}), ('sensitivity', {}))
-        patient_extra = (('weight', {}), ('height', {}),
-                         ('gender', {}), ('race', {}), ('tobaco', {}),
-                         ('amiodarone', {}), ('fluvastatin', {}))
+        patient_basic: Tuple[Tuple[str, Dict[str, Any]], ...] = (
+            ('age', {}), ('CYP2C9', {}),
+            ('VKORC1', {}), ('sensitivity', {})
+        )
+        patient_extra: Tuple[Tuple[str, Dict[str, Any]], ...] = (
+            ('weight', {}), ('height', {}),
+            ('gender', {}), ('race', {}), ('tobaco', {}),
+            ('amiodarone', {}), ('fluvastatin', {})
+        )
 
-        self.state.add_definition('age',
-                                  ('age', {}))
+        self.state.add_definition(
+            'age', ('age', {}))
 
-        self.state.add_definition('patient_basic',
-                                  *patient_basic)
+        self.state.add_definition(
+            'patient_basic', *patient_basic)
 
-        self.state.add_definition('patient',
-                                  *patient_basic,
-                                  *patient_extra)
+        self.state.add_definition(
+            'patient', *patient_basic, *patient_extra)
 
-        self.state.add_definition('patient_w_dosing',
-                                  *patient_basic,
-                                  *patient_extra,
-                                  ('day', {}),
-                                  ('dose_history', {'length': -1}),
-                                  ('INR_history', {'length': -1}),
-                                  ('interval_history', {'length': -1}))
+        self.state.add_definition(
+            'patient_w_dosing',
+            *patient_basic, *patient_extra,
+            ('day', {}),
+            ('dose_history', {'length': -1}),
+            ('INR_history', {'length': -1}),
+            ('interval_history', {'length': -1}))
 
-        self.state.add_definition('patient_for_baseline',
-                                  *patient_basic,
-                                  *patient_extra,
-                                  ('day', {}),
-                                  ('dose_history', {'length': 4}),
-                                  ('INR_history', {'length': 4}),
-                                  ('interval_history', {'length': 4}))
+        self.state.add_definition(
+            'patient_for_baseline',
+            *patient_basic, *patient_extra,
+            ('day', {}),
+            ('dose_history', {'length': 4}),
+            ('INR_history', {'length': 4}),
+            ('interval_history', {'length': 4}))
 
         for i in (1, 3, 5, 7, 9):
-            self.state.add_definition(f'patient_w_dosing_{i:02}',
-                                      *patient_basic,
-                                      ('day', {}),
-                                      ('dose_history', {'length': i}),
-                                      ('INR_history', {'length': i}),
-                                      ('interval_history', {'length': i}))
+            self.state.add_definition(
+                f'patient_w_dosing_{i:02}',
+                *patient_basic,
+                ('day', {}),
+                ('dose_history', {'length': i}),
+                ('INR_history', {'length': i}),
+                ('interval_history', {'length': i}))
 
-        self.state.add_definition('patient_w_full_dosing',
-                                  *patient_basic,
-                                  *patient_extra,
-                                  ('day', {}),
-                                  ('daily_dose_history', {'length': -1}),
-                                  ('daily_INR_history', {'length': -1}),
-                                  ('interval_history', {'length': -1}))
+        self.state.add_definition(
+            'patient_w_full_dosing',
+            *patient_basic, *patient_extra,
+            ('day', {}),
+            ('daily_dose_history', {'length': -1}),
+            ('daily_INR_history', {'length': -1}),
+            ('interval_history', {'length': -1}))
 
-        self.state.add_definition('daily_INR',
-                                  ('daily_INR_history', {'length': -1}))
+        self.state.add_definition(
+            'daily_INR',
+            ('daily_INR_history', {'length': -1}))
 
-        self.state.add_definition('Measured_INR_2',
-                                  ('INR_history', {'length': 2}),
-                                  ('interval_history', {'length': 1}))
+        self.state.add_definition(
+            'Measured_INR_2',
+            ('INR_history', {'length': 2}),
+            ('interval_history', {'length': 1}))
 
-        self.state.add_definition('INR_within_2',
-                                  ('daily_INR_history', {'length': -1}))
+        self.state.add_definition(
+            'INR_within_2',
+            ('daily_INR_history', {'length': -1}))
 
     def _generate_reward_defs(self):
         super()._generate_reward_defs()
@@ -180,7 +187,8 @@ class Warfarin(HealthSubject):
         dose_gen = self.feature_gen_set['dose']
         interval_gen = self.feature_gen_set['interval']
 
-        def _actions(dose_values, interval_values):
+        def _actions(
+                dose_values: Iterable[float], interval_values: Iterable[int]):
             actions = itertools.product(
                 (dose_gen(vi)
                  for vi in dose_values),
@@ -217,8 +225,8 @@ class Warfarin(HealthSubject):
 
         max_cap = min(caps[-1], self._dose_range[1])
 
-        def _237(f: FeatureArray, cap):
-            day = f['day'].value
+        def _237(f: FeatureArray, cap: float):
+            day: int = f['day'].value  # type: ignore
             if day == 0:
                 return dose_int_fixed[cap, 2]
             elif day == 2:
@@ -250,58 +258,61 @@ class Warfarin(HealthSubject):
             patient_features['CYP2C9'],
             patient_features['VKORC1']])
 
-    def _sub_comp_age(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_age(self, _id: int, **kwargs: Any) -> Feature[float]:
         return super()._numerical_sub_comp('age')
 
-    def _sub_comp_weight(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_weight(self, _id: int, **kwargs: Any) -> Feature[float]:
         return self._numerical_sub_comp('weight')
 
-    def _sub_comp_height(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_height(self, _id: int, **kwargs: Any) -> Feature[float]:
         return self._numerical_sub_comp('height')
 
-    def _sub_comp_gender(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_gender(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('gender')
 
-    def _sub_comp_race(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_race(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('race')
 
-    def _sub_comp_tobaco(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_tobaco(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('tobaco')
 
-    def _sub_comp_amiodarone(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_amiodarone(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('amiodarone')
 
-    def _sub_comp_fluvastatin(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_fluvastatin(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('fluvastatin')
 
-    def _sub_comp_CYP2C9(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_CYP2C9(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('CYP2C9')
 
-    def _sub_comp_CYP2C9_masked(self, _id: int, days: int,
-                                **kwargs: Any) -> Feature:
+    def _sub_comp_CYP2C9_masked(
+            self, _id: int, days: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('CYP2C9', self._day < days)
 
-    def _sub_comp_VKORC1(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_VKORC1(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('VKORC1')
 
-    def _sub_comp_VKORC1_masked(self, _id: int, days: int,
-                                **kwargs: Any) -> Feature:
+    def _sub_comp_VKORC1_masked(
+            self, _id: int, days: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('VKORC1', self._day < days)
 
-    def _sub_comp_sensitivity(self, _id: int, **kwargs: Any) -> Feature:
+    def _sub_comp_sensitivity(self, _id: int, **kwargs: Any) -> Feature[str]:
         return self._categorical_sub_comp('sensitivity')
 
     def _sub_comp_INR_history(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[float]]:
         return self._sub_comp_measurement_history(
             _id, length, **kwargs)
 
     def _sub_comp_daily_INR_history(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[float]]:
         return self._sub_comp_daily_measurement_history(
             _id, length, **kwargs)
 
     def _sub_comp_INR_within(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[float]]:
         intervals = self._get_history('interval_history', length).value
         return self._get_history('daily_INR', sum(intervals))  # type: ignore

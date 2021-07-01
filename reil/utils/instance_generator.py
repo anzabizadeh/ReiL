@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import os
 import pathlib
-from typing import Any, Callable, Generic, Tuple, TypeVar, Union
+from typing import Any, Generic, Tuple, TypeVar, Union
 
-from reil import reilbase
-from reil.datatypes.components import MockStatistic
+from reil import reilbase, stateful
+from reil.datatypes.mock_statistic import MockStatistic
 
-T = TypeVar('T', bound=reilbase.ReilBase)
+T = TypeVar('T', bound=stateful.Stateful)
 
 
 class InstanceGenerator(Generic[T], reilbase.ReilBase):
@@ -28,17 +28,18 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     numbers where the instance generator should stop.
     '''
 
-    def __init__(self,
-                 object: T,
-                 instance_counter_stops: Tuple[int] = (-1,),  # -1: infinite
-                 first_instance_number: int = 0,
-                 auto_rewind: bool = False,
-                 save_instances: bool = False,
-                 overwrite_instances: bool = False,
-                 use_existing_instances: bool = True,
-                 save_path: Union[pathlib.PurePath, str] = '',
-                 filename_pattern: str = '{n:04}',
-                 **kwargs: Any):
+    def __init__(
+            self,
+            object: T,
+            instance_counter_stops: Tuple[int] = (-1,),  # -1: infinite
+            first_instance_number: int = 0,
+            auto_rewind: bool = False,
+            save_instances: bool = False,
+            overwrite_instances: bool = False,
+            use_existing_instances: bool = True,
+            save_path: Union[pathlib.PurePath, str] = '',
+            filename_pattern: str = '{n:04}',
+            **kwargs: Any):
         '''
         Attributes
         ----------
@@ -136,13 +137,19 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
                 raise StopIteration
         return end
 
+    @staticmethod
+    def _do_not_stop(current: int, end: int) -> bool:
+        return False
+
+    @staticmethod
+    def _do_stop(current: int, end: int) -> bool:
+        return current >= end
+
     def _determine_stop_check(self):
         if self._instance_counter_stops[self._stops_index] == -1:
-            self._stop_check: Callable[
-                [int, int], bool] = lambda current, end: False
+            self._stop_check = self._do_not_stop
         else:
-            self._stop_check: Callable[
-                [int, int], bool] = lambda current, end: current >= end
+            self._stop_check = self._do_stop
 
     def _generate_new_instance(self):
         current_instance = self._filename_pattern.format(

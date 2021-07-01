@@ -10,12 +10,14 @@ from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-from reil import learners
-from reil.datatypes import FeatureArray
+from reil.datatypes.feature import FeatureArray
+from reil.learners.learner import Learner
+from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
+                                                    LearningRateScheduler)
 from tensorflow import keras
 
 
-class Dense_tf_1(learners.Learner[float]):
+class Dense_tf_1(Learner[float]):
     '''
     The Dense learner.
 
@@ -25,7 +27,7 @@ class Dense_tf_1(learners.Learner[float]):
 
     def __init__(
             self,
-            learning_rate: learners.LearningRateScheduler,
+            learning_rate: LearningRateScheduler,
             validation_split: float = 0.3,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
@@ -92,7 +94,7 @@ class Dense_tf_1(learners.Learner[float]):
                 self._callbacks.append(self._tensorboard)
 
             if not isinstance(self._learning_rate,
-                              learners.ConstantLearningRate):
+                              ConstantLearningRate):
                 learning_rate_scheduler = \
                     keras.callbacks.LearningRateScheduler(
                         self._learning_rate.new_rate, verbose=0)
@@ -251,14 +253,14 @@ class Dense_tf_1(learners.Learner[float]):
                 log_dir=self._tensorboard_path)
 
             if not isinstance(self._learning_rate,
-                              learners.ConstantLearningRate):
+                              ConstantLearningRate):
                 learning_rate_scheduler = \
                     keras.callbacks.LearningRateScheduler(
                         self._learning_rate.new_rate, verbose=0)
                 self._callbacks.append(learning_rate_scheduler)
 
 
-class Dense_tf_2(learners.Learner[float]):
+class Dense_tf_2(Learner[float]):
     '''
     The Dense learner.
 
@@ -268,7 +270,7 @@ class Dense_tf_2(learners.Learner[float]):
 
     def __init__(
             self,
-            learning_rate: learners.LearningRateScheduler,
+            learning_rate: LearningRateScheduler,
             validation_split: float = 0.3,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
@@ -329,7 +331,7 @@ class Dense_tf_2(learners.Learner[float]):
             self._callbacks.append(self._tensorboard)
 
         if not isinstance(self._learning_rate,
-                          learners.ConstantLearningRate):
+                          ConstantLearningRate):
             learning_rate_scheduler = \
                 keras.callbacks.LearningRateScheduler(
                     self._learning_rate.new_rate, verbose=0)
@@ -484,7 +486,7 @@ class Dense_tf_2(learners.Learner[float]):
             log_dir=self._tensorboard_path)
 
         if not isinstance(self._learning_rate,
-                          learners.ConstantLearningRate):
+                          ConstantLearningRate):
             learning_rate_scheduler = \
                 keras.callbacks.LearningRateScheduler(
                     self._learning_rate.new_rate, verbose=0)

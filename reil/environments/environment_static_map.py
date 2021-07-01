@@ -8,13 +8,14 @@ This class provides a learning environment for any reinforcement learning
 are determined by a fixed `interaction_sequence`.
 '''
 import pathlib
-from reil.subjects import SubjectDemon
-from reil.agents import AgentDemon
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import pandas as pd
-from reil.datatypes import InteractionProtocol
-from reil.environments import EntityType, EntityGenType, Environment
+from reil.agents.agent_demon import AgentDemon
+from reil.datatypes.interaction_protocol import InteractionProtocol
+from reil.environments.environment import (EntityGenType, EntityType,
+                                           Environment)
+from reil.subjects.subject_demon import SubjectDemon
 
 
 class StatInfo(NamedTuple):
@@ -32,14 +33,15 @@ class EnvironmentStaticMap(Environment):
     `subjects`, based on a static interaction sequence.
     '''
 
-    def __init__(self,
-                 entity_dict: Optional[
-                     Dict[str, Union[EntityType, EntityGenType, str]]] = None,
-                 demon_dict: Optional[
-                     Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
-                 interaction_sequence: Optional[
-                     Tuple[InteractionProtocol, ...]] = None,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            entity_dict: Optional[Dict[str, Union[
+                EntityType[Any], EntityGenType[Any], str]]] = None,
+            demon_dict: Optional[Dict[str, Union[
+                AgentDemon[Any], SubjectDemon, str]]] = None,
+            interaction_sequence: Optional[
+                Tuple[InteractionProtocol, ...]] = None,
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -330,20 +332,24 @@ class EnvironmentStaticMap(Environment):
             for p in self.interaction_sequence
             if p.subject.statistic_name is not None))
 
+        def do_transform(x: pd.DataFrame) -> pd.DataFrame:
+            return x.unstack().reset_index().rename(  # type: ignore
+                columns={'level_0': 'aggregator', 0: 'value'})
+
+        def no_transform(x: pd.DataFrame) -> pd.DataFrame:
+            return x
+
         if unstack:
-            def transform(x: pd.DataFrame) -> pd.DataFrame:
-                return x.unstack().reset_index().rename(
-                    columns={'level_0': 'aggregator', 0: 'value'})
+            transform = do_transform
         else:
-            def transform(x: pd.DataFrame) -> pd.DataFrame:
-                return x
+            transform = no_transform
 
         result = {e.a_s_name:
-                  transform(
+                  transform(  # type: ignore
                       self._instance_generators.get(
                           e.entity_name,
                           self.__dict__[e.obj][e.entity_name]
-                      ).statistic.aggregate(
+                      ).statistic.aggregate(  # type: ignore
                           e.aggregators, e.groupby,
                           self._assignment_list[e.a_s_name][e.a_s_name.index(
                               e.entity_name)],

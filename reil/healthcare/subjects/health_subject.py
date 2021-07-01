@@ -6,13 +6,12 @@ HealthSubject class
 This `HealthSubject` class implements interaction with patients.
 '''
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
-from reil.datatypes import FeatureArray
-from reil.datatypes import feature
-from reil.datatypes.feature import Feature, FeatureGenerator
-from reil.subjects import Subject
-from reil.healthcare import Patient
+from reil.datatypes.feature import (MISSING, Feature, FeatureArray,
+                                    FeatureGenerator)
+from reil.healthcare.patient import Patient
+from reil.subjects.subject import Subject
 
 
 class HealthSubject(Subject):
@@ -20,14 +19,15 @@ class HealthSubject(Subject):
     A HealthSubject subject class with a patient.
     '''
 
-    def __init__(self,
-                 patient: Patient,
-                 measurement_name: str,
-                 measurement_range: Tuple[float, float],
-                 dose_range: Tuple[float, float],
-                 interval_range: Tuple[int, int],
-                 max_day,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            patient: Patient,
+            measurement_name: str,
+            measurement_range: Tuple[float, float],
+            dose_range: Tuple[float, float],
+            interval_range: Tuple[int, int],
+            max_day: int,
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -111,27 +111,28 @@ class HealthSubject(Subject):
         return cls(None, None)  # type: ignore
 
     @staticmethod
-    def generate_dose_values(min_dose: float = 0.0,
-                             max_dose: float = 15.0,
-                             dose_increment: float = 0.5) -> List[float]:
+    def generate_dose_values(
+            min_dose: float = 0.0,
+            max_dose: float = 15.0,
+            dose_increment: float = 0.5) -> List[float]:
 
         return list(min_dose + x * dose_increment
                     for x in range(
                         int((max_dose - min_dose)/dose_increment) + 1))
 
     @staticmethod
-    def generate_interval_values(min_interval: int = 1,
-                                 max_interval: int = 28,
-                                 interval_increment: int = 1) -> List[int]:
+    def generate_interval_values(
+            min_interval: int = 1,
+            max_interval: int = 28,
+            interval_increment: int = 1) -> List[int]:
 
         return list(range(min_interval, max_interval, interval_increment))
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         return self._day >= self._max_day
 
-    def take_effect(self,
-                    action: FeatureArray,
-                    _id: int = 0) -> None:
+    def take_effect(
+            self, action: FeatureArray, _id: int = 0) -> None:
         Subject.take_effect(self, action, _id)
         action_temp = action.value
         current_dose = float(action_temp['dose'])
@@ -183,21 +184,25 @@ class HealthSubject(Subject):
         self._decision_points_measurement_history[0] = \
             self._full_measurement_history[0]
 
-    def _numerical_sub_comp(self, name):
+    def _numerical_sub_comp(self, name: str):
         return self._patient.feature_set[name]
 
-    def _categorical_sub_comp(self, name, missing=False):
+    def _categorical_sub_comp(self, name: str, missing: bool = False):
         if missing:
-            self._patient.feature_gen_set[name](feature.MISSING)
+            self._patient.feature_gen_set[name](MISSING)
 
         return self._patient.feature_set[name]
 
     def _get_history(
-            self, list_name: str, length: int) -> Feature:
+            self, list_name: str, length: int
+    ) -> Union[Feature[List[float]], Feature[List[int]]]:
         if length == 0:
-            raise ValueError('length should be a positive integer, or '
-                             '-1 for full length output.')
+            raise ValueError(
+                'length should be a positive integer, or '
+                '-1 for full length output.')
 
+        filler: Union[float, int]
+        _list: Union[List[float], List[int]]
         if list_name == f'{self._measurement_name}_history':
             _list = self._decision_points_measurement_history
             index = self._decision_points_index + 1
@@ -217,7 +222,7 @@ class HealthSubject(Subject):
         elif list_name == 'interval_history':
             _list = self._decision_points_interval_history
             index = self._decision_points_index
-            filler = 1
+            filler = int(1)
         else:
             raise ValueError(f'Unknown list_name: {list_name}.')
 
@@ -230,31 +235,37 @@ class HealthSubject(Subject):
                 i1, i2 = 0, index-length
             result = [filler] * i1 + _list[i2:index]  # type: ignore
 
-        return self.feature_gen_set[list_name](result)
+        return self.feature_gen_set[list_name](result)  # type: ignore
 
     def _sub_comp_dose_history(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
-        return self._get_history('dose_history', length)
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[float]]:
+        return self._get_history('dose_history', length)  # type: ignore
 
     def _sub_comp_measurement_history(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
-        return self._get_history(f'{self._measurement_name}_history', length)
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[float]]:
+        return self._get_history(  # type: ignore
+            f'{self._measurement_name}_history', length)
 
     def _sub_comp_interval_history(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
-        return self._get_history('interval_history', length)
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[int]]:
+        return self._get_history('interval_history', length)  # type: ignore
 
-    def _sub_comp_day(self, _id: int, **kwargs: Any) -> Feature:
-        return self.feature_gen_set['day'](
+    def _sub_comp_day(self, _id: int, **kwargs: Any) -> Feature[int]:
+        return self.feature_gen_set['day'](  # type: ignore
             value=self._day if 0 <= self._day < self._max_day else None)
 
     def _sub_comp_daily_dose_history(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
-        return self._get_history('daily_dose_history', length)
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[float]]:
+        return self._get_history('daily_dose_history', length)  # type: ignore
 
     def _sub_comp_daily_measurement_history(
-            self, _id: int, length: int = 1, **kwargs: Any) -> Feature:
-        return self._get_history(
+            self, _id: int, length: int = 1, **kwargs: Any
+    ) -> Feature[List[float]]:
+        return self._get_history(  # type: ignore
             f'daily_{self._measurement_name}_history', length)
 
     def __repr__(self) -> str:

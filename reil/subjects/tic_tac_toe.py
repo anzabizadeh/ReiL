@@ -6,14 +6,13 @@ TicTacToe class
 The standard Tic-Tac-Toe game.
 '''
 import random
-from reil.datatypes.feature import FeatureGenerator
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
-from reil import subjects
-from reil.datatypes import FeatureArray
+from reil.subjects.mnkgame import MNKGame
+from reil.datatypes.feature import FeatureArray, FeatureGenerator
 
 
-class TicTacToe(subjects.MNKGame):
+class TicTacToe(MNKGame):
     '''
     Build a 3-by-3 board in which 2 players can play.
     Winner is the player who can put 3 pieces in one row, column, or diagonal.
@@ -30,7 +29,7 @@ class TicTacToe(subjects.MNKGame):
             name='state', lower=-1, upper=1)
 
     def default_state(self, _id: Optional[int] = None) -> FeatureArray:
-        def modify(i, _id) -> float:
+        def modify(i: int, _id: Optional[int]) -> float:
             if i == _id:
                 return 1
             if i == 0:
@@ -46,7 +45,7 @@ class TicTacToe(subjects.MNKGame):
 
 if __name__ == '__main__':
     board = TicTacToe()
-    player = {}
+    player: Dict[str, int] = {}
     p = 0
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')

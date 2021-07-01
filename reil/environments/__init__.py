@@ -20,7 +20,7 @@ Task:
 
 Session:
     A class that accepts `Agent`s, `Subject`s, and `Demon`s, and
-    runs a set of `Task`s. 
+    runs a set of `Task`s.
 
 SessionBuilder:
     A tool to create a `Session` from one or a list of `YAML` config files.

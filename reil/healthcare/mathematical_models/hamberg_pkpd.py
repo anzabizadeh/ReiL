@@ -7,18 +7,22 @@ A warfarin PK/PD model proposed by Hamberg et al. (2007).
 DOI: 10.1038/sj.clpt.6100084
 '''
 import math
-from collections import namedtuple
-from typing import Any, Callable, Dict, Final, Iterator, List, NewType, Union
+from typing import (Any, Callable, Dict, Final, Iterable, List, NamedTuple,
+                    NewType, Union)
 
 import numpy as np
-from reil.datatypes import Feature
-from reil.healthcare.mathematical_models import HealthMathModel
+from reil.datatypes.feature import Feature
+from reil.healthcare.mathematical_models.health_math_model import \
+    HealthMathModel
 
 Day = NewType('Day', float)
 Hour = NewType('Hour', int)
 dT = NewType('dT', int)
 
-DoseEffect = namedtuple('DoseEffect', ['dose', 'Cs'])
+
+class DoseEffect(NamedTuple):
+    dose: float
+    Cs: Callable[[Iterable[dT]], List[float]]
 
 
 class HambergPKPD(HealthMathModel):
@@ -86,7 +90,7 @@ class HambergPKPD(HealthMathModel):
         self._last_computed_day: Day = Day(0)
         self._cached_cs: Dict[float, List[float]] = {}
 
-    def setup(self, **arguments: Feature) -> None:
+    def setup(self, **arguments: Feature[Any]) -> None:
         '''
         Set up the model.
 
@@ -275,9 +279,8 @@ class HambergPKPD(HealthMathModel):
                 self._dose_records[day] = DoseEffect(
                     _dose, self._CS_function_generator(dt, _dose))
 
-                self._total_cs += np.array(
-                    self._dose_records[day].Cs(
-                        range(self._cache_size * 24 * self._per_hour)))
+                self._total_cs += np.array(self._dose_records[day].Cs(range(
+                    self._cache_size * 24 * self._per_hour)))  # type: ignore
 
     def INR(self, measurement_days: Union[Day, List[Day]]) -> List[float]:
         '''
@@ -306,7 +309,7 @@ class HambergPKPD(HealthMathModel):
             not_computed_days = days
 
         if self._last_computed_day == 0:
-            self._A = np.array([0.0] + [1.0] * 8)
+            self._A = np.array([0.0] + [1.0] * 8)  # type: ignore
 
         stop_points = [self._last_computed_day] + list(not_computed_days)
         for d1, d2 in zip(stop_points[:-1], stop_points[1:]):
@@ -324,7 +327,7 @@ class HambergPKPD(HealthMathModel):
 
     def _CS_function_generator(
             self, dt_dose: dT, dose: float
-    ) -> Callable[[Iterator[dT]], List[float]]:
+    ) -> Callable[[Iterable[dT]], List[float]]:
         '''
         Generate a Cs function.
 
@@ -356,7 +359,7 @@ class HambergPKPD(HealthMathModel):
                                          for cs in self._cached_cs[1.0]]
             cached_cs_temp = self._cached_cs[dose]
 
-        def Cs(dts: Iterator[dT]) -> List[float]:
+        def Cs(dts: Iterable[dT]) -> List[float]:
             '''
             Get delta_t list and return the warfarin concentration of
             those times.

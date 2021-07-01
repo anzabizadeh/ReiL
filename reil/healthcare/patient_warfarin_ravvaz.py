@@ -24,10 +24,10 @@ Features included in this model are:
 * EC_50
 '''
 import math
-from typing import Any
+from typing import Any, Literal
 
-from reil.datatypes import FeatureGenerator
-from reil.healthcare import Patient
+from reil.datatypes.feature import FeatureGenerator
+from reil.healthcare.patient import Patient
 from reil.healthcare.mathematical_models import HealthMathModel
 from reil.healthcare.mathematical_models.hamberg_pkpd import HambergPKPD
 from reil.utils.functions import (random_categorical,
@@ -63,53 +63,58 @@ class PatientWarfarinRavvaz(Patient):
             age=40.0 will set the initial age to 40.0.
         '''
         self.feature_gen_set = {
-            'age': FeatureGenerator.numerical(
+            'age': FeatureGenerator[float].numerical(
                 name='age',  # (years) Aurora population
                 lower=18.0, upper=150.0, mean=67.30, stdev=13.43,
                 generator=random_normal_truncated,
                 randomized=randomized),
-            'weight': FeatureGenerator.numerical(
+            'weight': FeatureGenerator[float].numerical(
                 name='weight',  # (lb) Aurora population
                 lower=70.0, upper=500.0, mean=199.24, stdev=54.71,
                 generator=random_normal_truncated,
                 randomized=randomized),
-            'height': FeatureGenerator.numerical(
+            'height': FeatureGenerator[float].numerical(
                 name='height',  # (in) Aurora population
                 lower=45.0, upper=85.0, mean=66.78, stdev=4.31,
                 generator=random_normal_truncated,
                 randomized=randomized),
-            'gender': FeatureGenerator.categorical(
+            'gender': FeatureGenerator[Literal['Female', 'Male']].categorical(
                 name='gender',  # Aurora population
                 categories=('Female', 'Male'),
                 probabilities=(0.5314, 0.4686),
                 generator=random_categorical,
                 randomized=randomized),
-            'race': FeatureGenerator.categorical(
+            'race': FeatureGenerator[Literal[
+                'White', 'Black', 'Asian',
+                'American Indian', 'Pacific Islander'
+            ]].categorical(
                 name='race',  # Aurora Avatar Population
                 categories=('White', 'Black', 'Asian',
                             'American Indian', 'Pacific Islander'),
                 probabilities=(0.9522, 0.0419, 0.0040, 0.0018, 1e-4),
                 generator=random_categorical,
                 randomized=randomized),
-            'tobaco': FeatureGenerator.categorical(
+            'tobaco': FeatureGenerator[Literal['No', 'Yes']].categorical(
                 name='tobaco',  # Aurora Avatar Population
                 categories=('No', 'Yes'),
                 probabilities=(0.9067, 0.0933),
                 generator=random_categorical,
                 randomized=randomized),
-            'amiodarone': FeatureGenerator.categorical(
+            'amiodarone': FeatureGenerator[Literal['No', 'Yes']].categorical(
                 name='amiodarone',  # Aurora Avatar Population
                 categories=('No', 'Yes'),
                 probabilities=(0.8849, 0.1151),
                 generator=random_categorical,
                 randomized=randomized),
-            'fluvastatin': FeatureGenerator.categorical(
+            'fluvastatin': FeatureGenerator[Literal['No', 'Yes']].categorical(
                 name='fluvastatin',  # Aurora Avatar Population
                 categories=('No', 'Yes'),
                 probabilities=(0.9998, 0.0002),
                 generator=random_categorical,
                 randomized=randomized),
-            'CYP2C9': FeatureGenerator.categorical(
+            'CYP2C9': FeatureGenerator[Literal[
+                '*1/*1', '*1/*2', '*1/*3', '*2/*2', '*2/*3', '*3/*3'
+            ]].categorical(
                 name='CYP2C9',  # Aurora Avatar Population
                 categories=('*1/*1', '*1/*2', '*1/*3',
                             '*2/*2', '*2/*3', '*3/*3'),
@@ -117,7 +122,9 @@ class PatientWarfarinRavvaz(Patient):
                 generator=random_categorical,
                 randomized=randomized,
                 allow_missing=allow_missing_genotypes),
-            'VKORC1': FeatureGenerator.categorical(
+            'VKORC1': FeatureGenerator[Literal[
+                'G/G', 'G/A', 'A/A'
+            ]].categorical(
                 name='VKORC1',  # Aurora Avatar Population
                 categories=('G/G', 'G/A', 'A/A'),
                 probabilities=(0.3837, 0.4418, 0.1745),
@@ -125,32 +132,32 @@ class PatientWarfarinRavvaz(Patient):
                 randomized=randomized,
                 allow_missing=allow_missing_genotypes),
 
-            'MTT_1': FeatureGenerator.numerical(
+            'MTT_1': FeatureGenerator[float].numerical(
                 name='MTT_1',  # (hours) Hamberg PK/PD
                 mean=math.log(HambergPKPD._MTT_1),
                 stdev=math.sqrt(HambergPKPD._omega_MTT_1),
                 generator=random_lognormal_truncated,
                 randomized=randomized),
-            'MTT_2': FeatureGenerator.numerical(
+            'MTT_2': FeatureGenerator[float].numerical(
                 name='MTT_2',  # (hours) Hamberg PK/PD
                 # Hamberg et al. (2007) - Table 4
                 mean=math.log(HambergPKPD._MTT_2),
                 stdev=math.sqrt(HambergPKPD._omega_MTT_2),
                 generator=random_lognormal_truncated,
                 randomized=randomized),
-            'CL_S_cyp_1_1': FeatureGenerator.numerical(
+            'CL_S_cyp_1_1': FeatureGenerator[float].numerical(
                 name='CL_S_cyp_1_1',  # (l/h) Hamberg PK/PD
                 mean=math.log(HambergPKPD._CL_s_1_1),
                 stdev=math.sqrt(HambergPKPD._omega_CL_s),
                 generator=random_lognormal_truncated,
                 randomized=randomized),
-            'V1': FeatureGenerator.numerical(
+            'V1': FeatureGenerator[float].numerical(
                 name='V1',  # (L) Volume in central compartment
                 mean=math.log(HambergPKPD._V1),
                 stdev=math.sqrt(HambergPKPD._omega_V1),
                 generator=random_lognormal_truncated,
                 randomized=randomized),
-            'V2': FeatureGenerator.numerical(
+            'V2': FeatureGenerator[float].numerical(
                 name='V2',  # (L) volume in peripheral compartment
                 mean=math.log(HambergPKPD._V2),
                 stdev=math.sqrt(HambergPKPD._omega_V2),
@@ -170,7 +177,9 @@ class PatientWarfarinRavvaz(Patient):
             #     randomized=randomized)
         }
 
-        self._sensitivity_gen = FeatureGenerator.categorical(
+        self._sensitivity_gen = FeatureGenerator[Literal[
+            'normal', 'sensitive', 'highly sensitive'
+        ]].categorical(
             name='sensitivity',
             categories=('normal', 'sensitive', 'highly sensitive'))
 
@@ -202,7 +211,7 @@ class PatientWarfarinRavvaz(Patient):
         else:  # 'A/A'
             mean = log_EC_50_AA
 
-        self.feature_gen_set['EC_50'] = FeatureGenerator.numerical(
+        self.feature_gen_set['EC_50'] = FeatureGenerator[float].numerical(
             name='EC_50',  # (mg/L) Hamberg PK/PD
             mean=mean,
             stdev=sqrt_omega_EC_50,
@@ -212,8 +221,8 @@ class PatientWarfarinRavvaz(Patient):
         self.feature_set['EC_50'] = self.feature_gen_set['EC_50']()
 
     def _generate_sensitivity(self):
-        combo = (self.feature_set['CYP2C9'].value +
-                 self.feature_set['VKORC1'].value)
+        combo = (str(self.feature_set['CYP2C9'].value) +
+                 str(self.feature_set['VKORC1'].value))
 
         if combo in ('*1/*1G/G', '*1/*2G/G', '*1/*1G/A'):
             s = 'normal'

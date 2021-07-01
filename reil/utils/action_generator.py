@@ -11,8 +11,7 @@ import itertools
 from typing import (Any, Dict, Generic, Iterator, Optional, Tuple, TypeVar,
                     Union)
 
-from reil.datatypes import Feature, FeatureArray
-from reil.datatypes.feature import FeatureGenerator
+from reil.datatypes.feature import Feature, FeatureArray, FeatureGenerator
 from reil.reilbase import ReilBase
 
 Categorical = TypeVar('Categorical')
@@ -25,7 +24,7 @@ class CategoricalComponent(Generic[Categorical]):
     possible_values: Tuple[Tuple[Categorical, ...], ...]
     categories: Tuple[Categorical, ...]
     length: int = dataclasses.field(init=False, hash=False, compare=False)
-    feature_generator: FeatureGenerator = dataclasses.field(
+    feature_generator: FeatureGenerator[Categorical] = dataclasses.field(
         init=False, hash=False, compare=False)
 
     def __post_init__(self):
@@ -35,7 +34,8 @@ class CategoricalComponent(Generic[Categorical]):
             FeatureGenerator.categorical(
                 name=self.name, categories=self.categories))
 
-    def generate(self, index: int) -> Iterator[Feature]:
+    def generate(self, index: int) -> Iterator[
+            Union[Feature[Categorical], Feature[Tuple[Categorical, ...]]]]:
         _index = min(index, self.length - 1)
         return (self.feature_generator(vi)
                 for vi in self.possible_values[_index])
@@ -48,7 +48,7 @@ class NumericalComponent(Generic[Numerical]):
     lower: Numerical
     upper: Numerical
     length: int = dataclasses.field(init=False, hash=False, compare=False)
-    feature_generator: FeatureGenerator = dataclasses.field(
+    feature_generator: FeatureGenerator[Numerical] = dataclasses.field(
         init=False, hash=False, compare=False)
 
     def __post_init__(self):
@@ -58,7 +58,8 @@ class NumericalComponent(Generic[Numerical]):
             FeatureGenerator.numerical(
                 name=self.name, lower=self.lower, upper=self.upper))
 
-    def generate(self, index: int) -> Iterator[Feature]:
+    def generate(self, index: int) -> Iterator[
+            Union[Feature[Numerical], Feature[Tuple[Numerical, ...]]]]:
         _index = min(index, self.length - 1)
         return (self.feature_generator(vi)
                 for vi in self.possible_values[_index])
@@ -72,9 +73,10 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
 
     def __init__(
             self,
-            components: Optional[
-                Dict[str,
-                     Union[CategoricalComponent, NumericalComponent]]] = None,
+            components: Optional[Dict[
+                str, Union[
+                    CategoricalComponent[Categorical],
+                    NumericalComponent[Numerical]]]] = None,
             **kwargs: Any) -> None:
         '''
         Initializes the `ActionGenerator` instance.
@@ -85,14 +87,17 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
             self._components = components
         else:
             self._components: Dict[
-                str, Union[CategoricalComponent, NumericalComponent]] = {}
+                str, Union[
+                    CategoricalComponent[Categorical],
+                    NumericalComponent[Numerical]]] = {}
         self._max_index: int = 0
         self.reset()
 
-    def add_categorical(self,
-                        component_name: str,
-                        possible_values: Tuple[Tuple[Categorical, ...], ...],
-                        categories: Tuple[Categorical, ...]) -> None:
+    def add_categorical(
+            self,
+            component_name: str,
+            possible_values: Tuple[Tuple[Categorical, ...], ...],
+            categories: Tuple[Categorical, ...]) -> None:
         '''
         Add a categorical component.
 
@@ -130,11 +135,12 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
             self._max_index,
             len(self._components[component_name].possible_values))
 
-    def add_numerical(self,
-                      component_name: str,
-                      possible_values: Tuple[Tuple[Numerical, ...]],
-                      lower: Numerical,
-                      upper: Numerical) -> None:
+    def add_numerical(
+            self,
+            component_name: str,
+            possible_values: Tuple[Tuple[Numerical, ...]],
+            lower: Numerical,
+            upper: Numerical) -> None:
         '''
         Add a numerical component.
 
@@ -266,14 +272,15 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
 
 
 if __name__ == "__main__":
-    AG = ActionGenerator()
+    AG = ActionGenerator[str, int]()
     AG.add_categorical(
         component_name='compass_directions',
         possible_values=(('N',), ('E', 'W'), ('N', 'S')),
         categories=('N', 'S', 'E', 'W'))
-    AG.add_numerical(component_name='odds',
-                     possible_values=((1,), (1, 3)),  # type: ignore
-                     lower=1, upper=9)
+    AG.add_numerical(
+        component_name='odds',
+        possible_values=((1,), (1, 3)),  # type: ignore
+        lower=1, upper=9)
     for i in ('1st', '2nd', '3rd', '4th'):
         print(f'calling possible_actions for the {i} time:')
         for action in AG.possible_actions():

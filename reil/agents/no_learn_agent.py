@@ -10,9 +10,8 @@ import random
 from typing import Any, Generator, Literal, Optional, Tuple, TypeVar, Union
 
 from reil import stateful
-from reil.datatypes import FeatureArray
+from reil.datatypes.feature import FeatureArray
 
-TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[float, ...]]
 T = TypeVar('T')
 
 

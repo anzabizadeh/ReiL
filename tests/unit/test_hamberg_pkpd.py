@@ -7,7 +7,7 @@ import unittest
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from reil.datatypes import Feature, FeatureGenerator
+from reil.datatypes.feature import Feature, FeatureGenerator
 from reil.healthcare.mathematical_models import HambergPKPD
 from reil.utils.functions import (random_categorical, random_lognormal,
                                   random_normal_truncated, random_uniform)

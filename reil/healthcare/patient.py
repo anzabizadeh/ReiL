@@ -8,7 +8,7 @@ This class is the base class to model patients with different characteristics.
 
 from typing import Any, Dict
 
-from reil.datatypes import Feature, FeatureGenerator
+from reil.datatypes.feature import Feature, FeatureGenerator
 from reil.healthcare.mathematical_models import HealthMathModel
 
 
@@ -29,9 +29,9 @@ class Patient:
             age=40.0 will set the initial age to 40.0.
         '''
         if not hasattr(self, 'feature_gen_set'):
-            self.feature_gen_set: Dict[str, FeatureGenerator] = {}
+            self.feature_gen_set: Dict[str, FeatureGenerator[Any]] = {}
         if not hasattr(self, 'feature_set'):
-            self.feature_set: Dict[str, Feature] = {}
+            self.feature_set: Dict[str, Feature[Any]] = {}
 
         for k in self.feature_gen_set:
             self.feature_set[k] = self.feature_gen_set[k](
