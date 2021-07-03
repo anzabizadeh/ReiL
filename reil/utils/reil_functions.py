@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-from typing import Any, List, NamedTuple, Optional, Tuple
+from typing import Generic, List, Optional, Tuple, TypeVar
 
 from reil.datatypes.feature import FeatureArray
 from reil.utils.functions import in_range, interpolate, square_dist
@@ -14,29 +14,25 @@ from reil.utils.functions import in_range, interpolate, square_dist
 # a number of times (sample size), then provide the outcome to the ReilFunction
 # and finally add that to the reward from the subject!
 
-
-class Arguments(NamedTuple):
-    y: str
-    x: Optional[str] = None
+TypeY = TypeVar('TypeY')
+TypeX = TypeVar('TypeX')
 
 
 @dataclasses.dataclass
-class ReilFunction:
+class ReilFunction(Generic[TypeY, TypeX]):
     name: str
-    arguments: Arguments
+    y_var_name: str
+    x_var_name: Optional[str] = None
     length: int = -1
     multiplier: float = 1.0
     retrospective: bool = True
     interpolate: bool = True
 
-    def __post_init__(self):
-        if not isinstance(self.arguments, Arguments):  # type: ignore
-            self.arguments = Arguments(*self.arguments)  # type: ignore
-
     def __call__(self, args: FeatureArray) -> float:
         temp = args.value
-        y = temp[self.arguments.y]
-        x = temp[self.arguments.x] if self.arguments.x is not None else None
+        y: List[TypeY] = temp[self.y_var_name]
+        x: Optional[List[TypeX]] = (
+            temp[self.x_var_name] if self.x_var_name is not None else None)
 
         fn = [functools.partial(self._no_retro_no_inter, y),
               functools.partial(self._no_retro_inter, y, x),
@@ -51,31 +47,31 @@ class ReilFunction:
 
         return result
 
-    def _retro_inter(self, y: List[Any], x: List[Any]) -> float:
+    def _retro_inter(self, y: List[TypeY], x: List[TypeX]) -> float:
         raise NotImplementedError
 
-    def _retro_no_inter(self, y: List[Any]) -> float:
+    def _retro_no_inter(self, y: List[TypeY]) -> float:
         raise NotImplementedError
 
-    def _no_retro_inter(self, y: List[Any], x: List[Any]) -> float:
+    def _no_retro_inter(self, y: List[TypeY], x: List[TypeX]) -> float:
         raise NotImplementedError
 
-    def _no_retro_no_inter(self, y: List[Any]) -> float:
+    def _no_retro_no_inter(self, y: List[TypeY]) -> float:
         raise NotImplementedError
 
     def _default_function(
-            self, y: List[Any], x: Optional[List[Any]] = None) -> float:
+            self, y: List[TypeY], x: Optional[List[TypeX]] = None) -> float:
         raise NotImplementedError
 
 
 @dataclasses.dataclass
-class NormalizedSquareDistance(ReilFunction):
+class NormalizedSquareDistance(ReilFunction[float, int]):
     center: float = 0.0
     band_width: float = 1.0
     exclude_first: bool = False
 
     def _default_function(
-            self, y: List[Any], x: Optional[List[Any]] = None) -> float:
+            self, y: List[float], x: Optional[List[int]] = None) -> float:
         _x = x or [1] * (len(y) - 1)
 
         if len(y) != len(_x) + 1:
@@ -99,12 +95,12 @@ class NormalizedSquareDistance(ReilFunction):
 
 
 @dataclasses.dataclass
-class PercentInRange(ReilFunction):
+class PercentInRange(ReilFunction[float, int]):
     acceptable_range: Tuple[float, float] = (0.0, 1.0)
     exclude_first: bool = False
 
     def _default_function(
-            self, y: List[Any], x: Optional[List[Any]] = None) -> float:
+            self, y: List[float], x: Optional[List[int]] = None) -> float:
         _x = x or [1] * (len(y) - 1)
         if len(y) != len(_x) + 1:
             raise ValueError(
@@ -128,24 +124,24 @@ class PercentInRange(ReilFunction):
 
 
 # TODO: not implemented yet!
-@dataclasses.dataclass
-class Delta(ReilFunction):
-    '''
-    Get changes in the series.
+# @dataclasses.dataclass
+# class Delta(ReilFunction):
+#     '''
+#     Get changes in the series.
 
-    available `op`s:
-        count: counts the number of change points in y.
-        sum: sum of value changes
-        average: average value change
+#     available `op`s:
+#         count: counts the number of change points in y.
+#         sum: sum of value changes
+#         average: average value change
 
-    available `interpolation_method`s:
-        linear
-        post: y = y[i] at x[i]
-        pre: y = y[i] at x[i-1]
-    '''
-    exclude_first: bool = False
-    op: str = 'count'
-    interpolation_method: str = 'linear'
+#     available `interpolation_method`s:
+#         linear
+#         post: y = y[i] at x[i]
+#         pre: y = y[i] at x[i-1]
+#     '''
+#     exclude_first: bool = False
+#     op: str = 'count'
+#     interpolation_method: str = 'linear'
 
 # def _default_function(
 #         self, y: List[Any], x: Optional[List[Any]] = None) -> float:
@@ -156,108 +152,42 @@ class Delta(ReilFunction):
 #     return result
 
 
-class Functions:
-    @staticmethod
-    def TTR(INRs: List[float],
-            intervals: Optional[List[int]] = None,
-            exclude_first: bool = False,
-            INR_range: Tuple[float, float] = (2.0, 3.0)) -> float:
-        if intervals is None:
-            temp = INRs[1:] if exclude_first else INRs
-            result = sum((1 if INR_range[0] <= INRi <= INR_range[1] else 0
-                          for INRi in temp)
-                         ) / len(temp)
-        else:
-            if len(INRs) != len(intervals) + 1:
-                raise ValueError(
-                    'INRs should have exactly one item more than intervals.')
+# class Functions:
+#     @staticmethod
+#     def dose_change_count(dose_list: List[float],
+#                           intervals: Optional[List[int]] = None) -> int:
+#         # assuming dose is fixed during each interval
+#         return sum(x != dose_list[i+1]
+#                    for i, x in enumerate(dose_list[:-1]))
 
-            result = 0.0
-            for i, current_interval in enumerate(intervals):
-                result += sum(
-                    1
-                    if INR_range[0] <=
-                    (INRs[i] + (INRs[i+1] - INRs[i])/current_interval*j)
-                    <= INR_range[1]
-                    else 0
-                    for j in range(1, current_interval + 1))
+#     @staticmethod
+#     def delta_dose(dose_list: List[float],
+#                    intervals: Optional[List[int]] = None) -> float:
+#         # assuming dose is fixed during each interval
+#         return sum(abs(x-dose_list[i+1])
+#                    for i, x in enumerate(dose_list[:-1]))
 
-            total_intervals = sum(intervals)
-            if not exclude_first:
-                result += Functions.TTR([INRs[0]])
-                total_intervals += 1
+#     @staticmethod
+#     def total_dose(dose_list: List[float],
+#                    intervals: Optional[List[int]] = None) -> float:
+#         if intervals is None:
+#             result = sum(dose_list)
+#         else:
+#             if len(dose_list) != len(intervals):
+#                 raise ValueError(
+#                     'dose_list and intervals should '
+#                     'have the same number of items.')
 
-            result /= total_intervals
+#             result = sum(dose*interval
+#                          for dose, interval in zip(dose_list, intervals))
 
-        return result
+#         return result
 
-    @staticmethod
-    def dose_change_count(dose_list: List[float],
-                          intervals: Optional[List[int]] = None) -> int:
-        # assuming dose is fixed during each interval
-        return sum(x != dose_list[i+1]
-                   for i, x in enumerate(dose_list[:-1]))
+#     @staticmethod
+#     def average_dose(dose_list: List[float],
+#                      intervals: Optional[List[int]] = None) -> float:
+#         total_dose = Functions.total_dose(dose_list, intervals)
+#         total_interval = len(
+#             dose_list) if intervals is None else sum(intervals)
 
-    @staticmethod
-    def delta_dose(dose_list: List[float],
-                   intervals: Optional[List[int]] = None) -> float:
-        # assuming dose is fixed during each interval
-        return sum(abs(x-dose_list[i+1])
-                   for i, x in enumerate(dose_list[:-1]))
-
-    @staticmethod
-    def total_dose(dose_list: List[float],
-                   intervals: Optional[List[int]] = None) -> float:
-        if intervals is None:
-            result = sum(dose_list)
-        else:
-            if len(dose_list) != len(intervals):
-                raise ValueError(
-                    'dose_list and intervals should '
-                    'have the same number of items.')
-
-            result = sum(dose*interval
-                         for dose, interval in zip(dose_list, intervals))
-
-        return result
-
-    @staticmethod
-    def average_dose(dose_list: List[float],
-                     intervals: Optional[List[int]] = None) -> float:
-        total_dose = Functions.total_dose(dose_list, intervals)
-        total_interval = len(
-            dose_list) if intervals is None else sum(intervals)
-
-        return total_dose / total_interval
-
-    @staticmethod
-    def normalized_square_dist(
-            INRs: List[float],
-            intervals: Optional[List[int]] = None,
-            exclude_first: bool = False,
-            INR_range: Tuple[float, float] = (2.0, 3.0)) -> float:
-
-        INR_mid = sum(INR_range) / 2.0
-
-        _intervals = intervals or [1] * (len(INRs) - 1)
-
-        if len(INRs) != len(_intervals) + 1:
-            raise ValueError(
-                'INRs should have exactly one item more than intervals.')
-
-        if not exclude_first:
-            _intervals = [1] + _intervals
-            _INRs = [0.0] + INRs
-        else:
-            _INRs = INRs
-
-        result = sum(
-            square_dist(
-                INR_mid,
-                interpolate(_INRs[i], _INRs[i+1], _intervals[i]))
-            for i in range(len(_intervals)))
-
-        # normalize
-        result *= (2.0 / (INR_range[1] - INR_range[0])) ** 2
-
-        return result
+#         return total_dose / total_interval

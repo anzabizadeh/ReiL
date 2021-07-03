@@ -36,20 +36,19 @@ class Warfarin(HealthSubject):
             A patient object that generates new patients and models
             interaction between dose and INR.
 
-        action_generator:
-            An `ActionGenerator` object with 'dose' and
-            'interval' components.
+        INR_range:
+            A tuple that specifies min and max INR.
+
+        dose_range:
+            A tuple that specifies min and max dose.
+
+        interval_range:
+            A tuple that specifies min and max number of days between two
+            measurements.
 
         max_day:
             Maximum duration of each trial.
 
-        Raises
-        ------
-        ValueError
-            action_generator should have a "dose" component.
-
-        ValueError
-            action_generator should have an "interval" component.
         '''
 
         super().__init__(
@@ -133,24 +132,24 @@ class Warfarin(HealthSubject):
         super()._generate_reward_defs()
 
         reward_sq_dist = reil_functions.NormalizedSquareDistance(
-            name='sq_dist', arguments=('daily_INR_history',),  # type: ignore
+            name='sq_dist', y_var_name='daily_INR_history',
             length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
             center=2.5, band_width=1.0, exclude_first=True)
 
         reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
             name='sq_dist_interpolation',
-            arguments=('INR_history', 'interval_history'),  # type: ignore
+            y_var_name='INR_history', x_var_name='interval_history',
             length=2, multiplier=-1.0, retrospective=True, interpolate=True,
             center=2.5, band_width=1.0, exclude_first=True)
 
         reward_PTTR = reil_functions.PercentInRange(
-            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
+            name='PTTR', y_var_name='daily_INR_history',
             length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
             acceptable_range=(2, 3), exclude_first=True)
 
         reward_PTTR_interpolation = reil_functions.PercentInRange(
             name='PTTR',
-            arguments=('INR_history', 'interval_history'),  # type: ignore
+            y_var_name='INR_history', x_var_name='interval_history',
             length=2, multiplier=-1.0, retrospective=True, interpolate=True,
             acceptable_range=(2, 3), exclude_first=True)
 
@@ -171,7 +170,7 @@ class Warfarin(HealthSubject):
         super()._generate_statistic_defs()
 
         statistic_PTTR = reil_functions.PercentInRange(
-            name='PTTR', arguments=('daily_INR_history',),  # type: ignore
+            name='PTTR', y_var_name='daily_INR_history',
             length=-1, multiplier=1.0, retrospective=True, interpolate=False,
             acceptable_range=(2, 3), exclude_first=True)
 

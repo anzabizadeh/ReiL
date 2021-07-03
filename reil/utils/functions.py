@@ -14,6 +14,9 @@ import numpy as np
 from reil.datatypes.feature import FeatureArray, FeatureGenerator
 from scipy.stats import lognorm
 
+Categorical = TypeVar('Categorical')
+T = TypeVar('T')
+
 
 def random_choice(f: Any):
     '''
@@ -91,9 +94,6 @@ def random_lognormal_truncated(f: FeatureGenerator[float]) -> float:
     return exp_mu
 
 
-Categorical = TypeVar('Categorical')
-
-
 def random_categorical(f: FeatureGenerator[Categorical]) -> Categorical:
     if (categories := f.categories) is None:
         raise TypeError('No categories found!')
@@ -120,9 +120,6 @@ def in_range(r: Tuple[float, float], x: Iterable[float]) -> int:
 def interpolate(start: float, end: float, steps: int) -> Iterable[float]:
     return (start + (end - start) / steps * j
             for j in range(1, steps + 1))
-
-
-T = TypeVar('T')
 
 
 def generate_modifier(

@@ -43,3 +43,4 @@ from .q_learning import QLearning  # noqa: W601
 from .deep_q_learning import DeepQLearning  # noqa: W601
 from .random_agent import RandomAgent  # noqa: W601
 from .user_agent import UserAgent  # noqa: W601
+from .agent_demon import AgentDemon  # noqa: W601
