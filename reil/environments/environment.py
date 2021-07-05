@@ -15,8 +15,8 @@ import pandas as pd
 from reil import stateful
 from reil.agents.agent import Agent
 from reil.agents.agent_demon import AgentDemon
+from reil.datatypes.dataclasses import InteractionProtocol
 from reil.datatypes.feature import FeatureArray
-from reil.datatypes.interaction_protocol import InteractionProtocol
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 from reil.utils.instance_generator import InstanceGenerator
@@ -341,7 +341,7 @@ class Environment(stateful.Stateful):
         for _ in range(times):
             reward = subject_instance.reward(
                 name=reward_name, _id=agent_id)
-            agent_observer.send(reward)
+            agent_observer.send({'reward': reward})
 
             state = subject_instance.state(name=state_name, _id=agent_id)
             possible_actions = subject_instance.possible_actions(
@@ -453,9 +453,10 @@ class Environment(stateful.Stateful):
                 'For subjects of non-instance generator, iteration and '
                 'instance are equivalent.')
 
-    def register(self,
-                 interaction_protocol: InteractionProtocol,
-                 get_agent_observer: bool = False) -> None:
+    def register_protocol(
+            self,
+            interaction_protocol: InteractionProtocol,
+            get_agent_observer: bool = False) -> None:
         '''
         Register the `agent` and `subject` of an interaction protocol.
 
@@ -607,10 +608,10 @@ class Environment(stateful.Stateful):
 
         return True
 
-    def load(self,  # noqa: C901
-             entity_name: Union[List[str], str] = 'all',
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    def load(  # noqa: C901
+            self, filename: str,
+            path: Optional[Union[str, pathlib.PurePath]],
+            entity_names: Optional[List[str]] = None) -> None:
         '''
         Load an entity or an `environment` from a file.
 
@@ -619,20 +620,19 @@ class Environment(stateful.Stateful):
         filename:
             The name of the file to be loaded.
 
-        entity_name:
+        entity_names:
             If specified, that entity (`agent` or `subject`) is being
-            loaded from file. 'all' loads an `environment`.
+            loaded from file. `None` loads an `environment`.
 
         Raises
         ------
         ValueError
             The filename is not specified.
         '''
-        _filename: str = filename or self._name
         _path = pathlib.Path(path or self._path)
 
-        if entity_name == 'all':
-            super().load(filename=_filename, path=_path)
+        if entity_names is None:
+            super().load(filename=filename, path=_path)
             self._instance_generators: Dict[str, EntityGenType[Any]] = {}
             self._agents: Dict[str, Agent[Any]] = {}
             self._subjects: Dict[str, Subject] = {}
@@ -641,7 +641,7 @@ class Environment(stateful.Stateful):
 
             for name, obj_type in self._env_data['instance_generators']:
                 self._instance_generators[name] = obj_type.from_pickle(
-                    path=(_path / f'{_filename}.instance_generators'),
+                    path=(_path / f'{filename}.instance_generators'),
                     filename=name)
 
             for name, obj_type in self._env_data['agents']:
@@ -650,7 +650,7 @@ class Environment(stateful.Stateful):
                         self._instance_generators[name]._object)
                 else:
                     self._agents[name] = obj_type.from_pickle(
-                        path=(_path / f'{_filename}.agents'), filename=name)
+                        path=(_path / f'{filename}.agents'), filename=name)
 
             for name, obj_type in self._env_data['subjects']:
                 if name in self._instance_generators:
@@ -658,51 +658,51 @@ class Environment(stateful.Stateful):
                         self._instance_generators[name]._object)
                 else:
                     self._subjects[name] = obj_type.from_pickle(
-                        path=(_path / f'{_filename}.subjects'), filename=name)
+                        path=(_path / f'{filename}.subjects'), filename=name)
 
             for name, obj_type in self._env_data['agent_demons']:
                 self._agent_demons[name] = obj_type.from_pickle(
-                    path=(_path / f'{_filename}.agent_demons'), filename=name)
+                    path=(_path / f'{filename}.agent_demons'), filename=name)
 
             for name, obj_type in self._env_data['subject_demons']:
                 self._subject_demons[name] = obj_type.from_pickle(
-                    path=(_path / f'{_filename}.subject_demons'),
+                    path=(_path / f'{filename}.subject_demons'),
                     filename=name)
 
             del self._env_data
 
         else:
-            for obj in entity_name:
+            for obj in entity_names:
                 if obj in self._instance_generators:
                     self._instance_generators[obj].load(
-                        path=(_path / f'{_filename}.instance_generators'),
+                        path=(_path / f'{filename}.instance_generators'),
                         filename=obj)
                     self._instance_generators[obj].reset()
 
                 if obj in self._agents:
                     self._agents[obj].load(
-                        path=(_path / f'{_filename}.agents'), filename=obj)
+                        path=(_path / f'{filename}.agents'), filename=obj)
                     self._agents[obj].reset()
                 elif obj in self._subjects:
                     self._subjects[obj].load(
-                        path=(_path / f'{_filename}.subjects'), filename=obj)
+                        path=(_path / f'{filename}.subjects'), filename=obj)
                     self._subjects[obj].reset()
                 elif obj in self._agent_demons:
                     self._agent_demons[obj].load(
-                        path=(_path / f'{_filename}.agent_demons'),
+                        path=(_path / f'{filename}.agent_demons'),
                         filename=obj)
                     self._agent_demons[obj].reset()
                 elif obj in self._subject_demons:
                     self._subject_demons[obj].load(
-                        path=(_path / f'{_filename}.subject_demons'),
+                        path=(_path / f'{filename}.subject_demons'),
                         filename=obj)
                     self._subject_demons[obj].reset()
 
-    def save(self,  # noqa: C901
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Union[List[str], str] = 'all'
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(  # noqa: C901
+            self, filename: Optional[str] = None,
+            path: Optional[Union[str, pathlib.PurePath]] = None,
+            entity_names: Optional[List[str]] = None
+    ) -> Tuple[pathlib.PurePath, str]:
         '''
         Save an entity or the `environment` to a file.
 
@@ -714,9 +714,9 @@ class Environment(stateful.Stateful):
         path:
             The path of the file to be saved.
 
-        entity_name:
+        entity_names:
             If specified, that entity (`agent` or `subject`) is being saved
-            to file. 'all' saves the `environment`.
+            to file. `None` saves the `environment`.
 
         Raises
         ------
@@ -726,7 +726,7 @@ class Environment(stateful.Stateful):
         _filename = filename or self._name
         _path = pathlib.Path(path or self._path)
 
-        if data_to_save == 'all':
+        if entity_names is None:
             open_observers = set(a_s_names
                                  for a_s_names in self._agent_observers
                                  if inspect.getgeneratorstate(
@@ -801,7 +801,7 @@ class Environment(stateful.Stateful):
                 self._agent_observers = temp
 
         else:
-            for obj in data_to_save:
+            for obj in entity_names:
                 if obj in self._instance_generators:
                     self._instance_generators[obj].save(
                         path=_path / f'{_filename}.instance_generators',
@@ -826,10 +826,12 @@ class Environment(stateful.Stateful):
 
         return _path, _filename
 
-    def report_statistics(self,
-                          unstack: bool = True,
-                          reset_history: bool = True
-                          ) -> Dict[Tuple[str, str], pd.DataFrame]:
+    def report_statistics(
+            self,
+            unstack: bool = True,
+            reset_history: bool = True,
+            dump_history: bool = False
+    ) -> Dict[Tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
         Parameters
@@ -839,6 +841,9 @@ class Environment(stateful.Stateful):
 
         reset_history:
             Whether to clear up the history after computing stats.
+
+        dump_history:
+            Whether to dump the history after computing stats.
 
         Returns
         -------
@@ -851,18 +856,15 @@ class Environment(stateful.Stateful):
     def __repr__(self) -> str:
         try:
             return (
-                super().__repr__() + '\n Agents:\n'
-                '\n\t'.join((a.__repr__()
-                             for a in self._agents.values())) +
-                '\nSubjects:\n'
-                '\n\t'.join((s.__repr__()
-                             for s in self._subjects.values())) +
-                '\n AgentDemons:\n'
-                '\n\t'.join((a.__repr__()
-                             for a in self._agent_demons.values())) +
-                '\nSubjectDemons:\n'
-                '\n\t'.join((s.__repr__()
-                             for s in self._subject_demons.values()))
-            )
+                (sup_repr := super().__repr__()) + '\n' + '=' * len(sup_repr) +
+                '\n'.join((
+                    f'\n{name}\n{"-"*len(name)}\n' + '\n'.join(
+                        (f'- {k}: {v.__repr__()}'
+                         for k, v in entity.items())))
+                    for name, entity in (
+                        ('Agents', self._agents),
+                        ('Subjects', self._subjects),
+                        ('Agent Demons', self._agent_demons),
+                        ('Subject Demons', self._subject_demons))))
         except AttributeError:
             return super().__repr__()

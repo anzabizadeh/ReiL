@@ -19,6 +19,7 @@ from reil.datatypes.feature import FeatureArray
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
 
 ArgsType = TypeVar('ArgsType', str, Tuple[str, ...], Dict[str, Any])
+ComponentReturnType = TypeVar('ComponentReturnType')
 
 
 @dataclasses.dataclass
@@ -220,7 +221,7 @@ class PrimaryComponent:
             for d in self._definitions[name.lower()])
 
 
-class SecondayComponent:
+class SecondayComponent(Generic[ComponentReturnType]):
     '''
     The datatype to specify secondary components, e.g. `statistic` and
     `reward`.
@@ -231,7 +232,7 @@ class SecondayComponent:
             name: str,
             primary_component: Optional[PrimaryComponent] = None,
             default_definition: Optional[Callable[[
-                Optional[int]], Any]] = None,
+                Optional[int]], ComponentReturnType]] = None,
             enabled: bool = True):
         '''
 
@@ -287,7 +288,8 @@ class SecondayComponent:
         self._primary_component = primary_component
 
     def set_default_definition(
-            self, default_definition: Callable[[Optional[int]], Any]
+            self,
+            default_definition: Callable[[Optional[int]], ComponentReturnType]
     ) -> None:
         '''Add a new component definition.
 
@@ -299,7 +301,7 @@ class SecondayComponent:
         self._default = default_definition
 
     def add_definition(
-            self, name: str, fn: Callable[..., Any],
+            self, name: str, fn: Callable[..., ComponentReturnType],
             primary_component_name: str = 'default') -> None:
         '''
         Add a new component definition.
@@ -347,7 +349,7 @@ class SecondayComponent:
             fn=fn,
             args=_primary_component_name)
 
-    def default(self, _id: Optional[int] = None) -> Any:
+    def default(self, _id: Optional[int] = None) -> ComponentReturnType:
         '''
         Generate the default component definition.
 
@@ -366,9 +368,9 @@ class SecondayComponent:
 
         raise AttributeError('Default definition not found.')
 
-    def __call__(self,
-                 name: str,
-                 _id: Optional[int] = None) -> Any:
+    def __call__(
+            self, name: str,
+            _id: Optional[int] = None) -> Union[ComponentReturnType, None]:
         '''
         Generate the component based on the specified `name` for the
         specified caller.

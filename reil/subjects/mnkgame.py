@@ -59,7 +59,7 @@ class MNKGame(MNKBoard, Subject):
         return tuple(FeatureArray(self._action_gen(v))
                      for v in self.get_action_set())
 
-    def take_effect(self, action: FeatureArray, _id: int) -> None:
+    def _take_effect(self, action: FeatureArray, _id: int) -> None:
         '''
         Set a piece for the given player on the board.
 

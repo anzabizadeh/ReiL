@@ -12,7 +12,7 @@ from reil.datatypes.feature import FeatureArray
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 
-LabelType = TypeVar('LabelType')
+LabelType = TypeVar('LabelType', covariant=True)
 
 
 class Learner(reilbase.ReilBase, Generic[LabelType]):

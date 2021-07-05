@@ -105,7 +105,7 @@ class WindyGridworld(MNKBoard, Subject):
             return Subject.register(self, player_name)
         raise ValueError('Windy Gridworld only accepts one player.')
 
-    def take_effect(self, action, _id=None):
+    def _take_effect(self, action, _id=None):
         '''
         Move according to the action.
 

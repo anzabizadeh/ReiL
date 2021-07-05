@@ -21,7 +21,6 @@ from ruamel.yaml import YAML
 
 import reil
 
-
 Parsable = Union[OrderedDict[str, Any], Any]
 
 
@@ -30,15 +29,16 @@ class ReilBase:
     The base class of all classes in the `ReiL` package.
     '''
 
-    def __init__(self,
-                 name: Optional[str] = None,
-                 path: Optional[pathlib.PurePath] = None,
-                 logger_name: Optional[str] = None,
-                 logger_level: Optional[int] = None,
-                 logger_filename: Optional[str] = None,
-                 persistent_attributes: Optional[List[str]] = None,
-                 save_zipped: bool = False,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            name: Optional[str] = None,
+            path: Optional[pathlib.PurePath] = None,
+            logger_name: Optional[str] = None,
+            logger_level: Optional[int] = None,
+            logger_filename: Optional[str] = None,
+            persistent_attributes: Optional[List[str]] = None,
+            save_zipped: bool = False,
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -147,9 +147,10 @@ class ReilBase:
         return instance
 
     @classmethod
-    def from_yaml_file(cls, node_reference: Tuple[str, ...],
-                       filename: str,
-                       path: Optional[Union[pathlib.PurePath, str]] = None):
+    def from_yaml_file(
+            cls, node_reference: Tuple[str, ...],
+            filename: str,
+            path: Optional[Union[pathlib.PurePath, str]] = None):
         '''
         Create an instance based on a yaml file.
 
@@ -295,8 +296,9 @@ class ReilBase:
         for key, value in params.items():
             self.__dict__[f'_{key}'] = value
 
-    def load(self, filename: str,  # noqa: C901
-             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    def load(  # noqa: C901
+            self, filename: str,
+            path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Load an object from a file.
 
@@ -316,9 +318,11 @@ class ReilBase:
         RuntimeError
             Corrupted or inaccessible data file.
         '''
-        _filename = (filename if filename.endswith(('.pkl', '.pbz2'))
-                     else
-                     f'{filename}{".pbz2" if self._save_zipped else ".pkl"}')
+        _filename = (
+            filename if filename.endswith(('.pkl', '.pbz2'))
+            else f'{filename}{".pbz2" if self._save_zipped else ".pkl"}'
+        )
+
         full_path = pathlib.Path(path or self._path) / _filename
 
         data: Optional[Dict[str, Any]] = None
@@ -337,7 +341,7 @@ class ReilBase:
                     f'Attempt {i} failed to load '
                     f'{full_path}.')
                 time.sleep(2)
-            if data is not None:
+            else:  # if data is not None:
                 break
 
         if data is None:
@@ -364,11 +368,12 @@ class ReilBase:
             self._logger.addHandler(
                 logging.FileHandler(self._logger_filename))
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(
+        self,
+        filename: Optional[str] = None,
+        path: Optional[Union[str, pathlib.PurePath]] = None,
+        data_to_save: Optional[Tuple[str, ...]] = None
+    ) -> Tuple[pathlib.PurePath, str]:
         '''
         Save the object to a file.
 

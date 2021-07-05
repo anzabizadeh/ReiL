@@ -397,7 +397,7 @@ class Dense_tf_2(Learner[float]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
+        _X: List[List[float]] = [x.normalized.flatten() for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -415,11 +415,12 @@ class Dense_tf_2(Learner[float]):
         '''
         self._iteration += 1
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(
+            self,
+            filename: Optional[str] = None,
+            path: Optional[Union[str, pathlib.PurePath]] = None,
+            data_to_save: Optional[Tuple[str, ...]] = None
+            ) -> Tuple[pathlib.PurePath, str]:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
 
@@ -454,9 +455,10 @@ class Dense_tf_2(Learner[float]):
 
         return p, f
 
-    def load(self,
-             filename: str,
-             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    def load(
+            self,
+            filename: str,
+            path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Extends `ReilBase.load` to handle `TF` objects.
 

@@ -9,19 +9,21 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Generic, Optional, Tuple, TypeVar, Union
 
 from reil.datatypes.components import SecondayComponent, Statistic
 from reil.datatypes.feature import FeatureArray
 from reil.subjects.subject import Subject
 
+T = TypeVar('T', FeatureArray, Tuple[FeatureArray, ...])
+
 
 @dataclasses.dataclass
-class Modifier:
+class Modifier(Generic[T]):
     name: str
     cond_state_def: Optional[str]
     condition_fn: Optional[Callable[[FeatureArray], bool]]
-    modifier_fn: Callable[[FeatureArray], FeatureArray]
+    modifier_fn: Callable[[T], T]
 
     def __post_init__(self):
         if self.condition_fn is not None:
@@ -41,8 +43,9 @@ class SubjectDemon(Subject):
     def __init__(
             self,
             subject: Optional[Subject] = None,
-            action_modifier: Optional[Modifier] = None,
-            state_modifier: Optional[Modifier] = None,
+            action_modifier: Optional[
+                Modifier[Tuple[FeatureArray, ...]]] = None,
+            state_modifier: Optional[Modifier[FeatureArray]] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -60,7 +63,7 @@ class SubjectDemon(Subject):
         super().__init__(**kwargs)
 
         self._subject: Subject
-        self.reward: SecondayComponent
+        self.reward: SecondayComponent[float]
         self.statistic: Statistic
 
         if subject:
@@ -120,7 +123,8 @@ class SubjectDemon(Subject):
 
     def possible_actions(
             self, name: str,
-            _id: Optional[int] = None) -> Any:
+            _id: Optional[int] = None
+    ) -> Union[Tuple[FeatureArray, ...], None]:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -145,7 +149,8 @@ class SubjectDemon(Subject):
         '''
         original_set = self._subject.possible_actions(name, _id)
         modifier = self._action_modifier
-        if (modifier is not None and
+        if (original_set is not None and
+            modifier is not None and
             (modifier.condition_fn is None
                 or modifier.condition_fn(self._subject.state(
                     modifier.cond_state_def, _id)))):  # type: ignore

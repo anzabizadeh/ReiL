@@ -19,9 +19,10 @@ class Subject(stateful.Stateful):
     The base class of all subject classes.
     '''
 
-    def __init__(self,
-                 sequential_interaction: bool = True,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            sequential_interaction: bool = True,
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -36,20 +37,19 @@ class Subject(stateful.Stateful):
         super().__init__(**kwargs)
 
         self._sequential_interaction = sequential_interaction
-        self.reward = SecondayComponent(
+        self.reward = SecondayComponent[float](
             name='reward',
             primary_component=self.state,
             default_definition=self._default_reward_definition,
             enabled=False)
 
-        self.possible_actions = SecondayComponent(
+        self.possible_actions = SecondayComponent[Tuple[FeatureArray, ...]](
             name='action',
             primary_component=self.state,
             default_definition=self._default_action_definition,
             enabled=True)
 
-    def _default_reward_definition(
-            self, _id: Optional[int] = None) -> float:
+    def _default_reward_definition(self, _id: Optional[int] = None) -> float:
         return 0.0
 
     def _default_action_definition(
@@ -89,15 +89,38 @@ class Subject(stateful.Stateful):
         _id:
             ID of the `agent` that has sent the `action`.
         '''
-        self.reward.enable()
+        if not self.reward._enabled:
+            self.reward.enable()
+
+        self._take_effect(action, _id)
+
+    def _take_effect(self, action: FeatureArray, _id: int = 0) -> None:
+        '''
+        Receive an `action` from `agent` with ID=`_id` and transition to
+        the next state.
+
+        This method implements the actual act of receiving and applying the
+        action. `take_effect` is the method to use, since it checks to see if
+        the `reward` is enabled.
+
+        Arguments
+        ---------
+        action:
+            The action sent by the `agent` that will affect this `subject`.
+
+        _id:
+            ID of the `agent` that has sent the `action`.
+        '''
+        raise NotImplementedError
 
     def reset(self) -> None:
         '''Reset the `subject`, so that it can resume accepting actions.'''
         super().reset()
         self.reward.disable()
 
-    def load(self, filename: str,
-             path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    def load(
+            self, filename: str,
+            path: Optional[Union[str, pathlib.PurePath]]) -> None:
 
         super().load(filename, path=path)
 
@@ -105,11 +128,11 @@ class Subject(stateful.Stateful):
         self.reward.set_default_definition(
             self._default_reward_definition)
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(
+            self, filename: Optional[str] = None,
+            path: Optional[Union[str, pathlib.PurePath]] = None,
+            data_to_save: Optional[Tuple[str, ...]] = None
+    ) -> Tuple[pathlib.PurePath, str]:
 
         prim_comp, self.reward._primary_component = (  # type: ignore
             self.reward._primary_component, None)

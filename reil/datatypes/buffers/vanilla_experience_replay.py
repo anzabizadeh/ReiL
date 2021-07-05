@@ -19,11 +19,12 @@ class VanillaExperienceReplay(CircularBuffer[T1, T2]):
     Extends `CircularBuffer` class.
     '''
 
-    def __init__(self,
-                 buffer_size: Optional[int] = None,
-                 batch_size: Optional[int] = None,
-                 buffer_names: Optional[List[str]] = None,
-                 clear_buffer: bool = False) -> None:
+    def __init__(
+            self,
+            buffer_size: Optional[int] = None,
+            batch_size: Optional[int] = None,
+            buffer_names: Optional[List[str]] = None,
+            clear_buffer: bool = False) -> None:
         '''
         Initialize the buffer.
 
@@ -44,13 +45,13 @@ class VanillaExperienceReplay(CircularBuffer[T1, T2]):
         self._batch_size = None
         self._clear_buffer = False
 
-        super().__init__(buffer_size=buffer_size,
-                         buffer_names=buffer_names, pick_mode='random')
+        super().__init__(
+            buffer_size=buffer_size,
+            buffer_names=buffer_names, pick_mode='random')
 
-        self.setup(buffer_size=buffer_size,
-                   batch_size=batch_size,
-                   buffer_names=buffer_names,
-                   clear_buffer=clear_buffer)
+        self.setup(
+            buffer_size=buffer_size, batch_size=batch_size,
+            buffer_names=buffer_names, clear_buffer=clear_buffer)
 
     def setup(
             self, buffer_size: Optional[int] = None,

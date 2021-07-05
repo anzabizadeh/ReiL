@@ -8,11 +8,11 @@ A Q-learning `agent`.
 
 '''
 
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Tuple, Union
 
 import numpy as np
-from reil import stateful
 from reil.agents.agent import Agent, TrainingData
+from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
 from reil.datatypes.feature import FeatureArray
 from reil.learners import Learner
@@ -26,12 +26,13 @@ class QLearning(Agent[float]):
     A Q-learning `agent`.
     '''
 
-    def __init__(self,
-                 learner: Learner[float],
-                 buffer: Buffer[FeatureArray, float],
-                 exploration_strategy: ExplorationStrategy,
-                 method: str = 'backward',
-                 **kwargs: Any):
+    def __init__(
+            self,
+            learner: Learner[float],
+            buffer: Buffer[FeatureArray, float],
+            exploration_strategy: ExplorationStrategy,
+            method: Literal['forward', 'backward'] = 'backward',
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -56,11 +57,11 @@ class QLearning(Agent[float]):
             how to choose the `action` if more than one is candidate
             to be chosen.
         '''
-        super().__init__(learner=learner,
-                         exploration_strategy=exploration_strategy,
-                         **kwargs)
+        super().__init__(
+            learner=learner, exploration_strategy=exploration_strategy,
+            **kwargs)
 
-        self._method = method.lower()
+        self._method: Literal['forward', 'backward'] = method
         if self._method not in ('backward', 'forward'):
             self._logger.warning(
                 f'method {method} is not acceptable. Should be '
@@ -71,12 +72,8 @@ class QLearning(Agent[float]):
         self._buffer.setup(buffer_names=['X', 'Y'])
 
     @classmethod
-    def _empty_instance(cls):  # type: ignore
-        class MockBuffer:
-            def setup(self, **kwargs: Any):
-                pass
-
-        return cls(None, MockBuffer(), None)  # type: ignore
+    def _empty_instance(cls):
+        return cls(Learner._empty_instance(), Buffer(), ExplorationStrategy())
 
     def _q(self,
            state: Feature_or_Tuple_of_Feature,
@@ -151,7 +148,7 @@ class QLearning(Agent[float]):
         return max_q
 
     def _prepare_training(
-            self, history: stateful.History) -> TrainingData[float]:
+            self, history: History) -> TrainingData[float]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -219,10 +216,10 @@ class QLearning(Agent[float]):
 
         return temp['X'], temp['Y']  # type: ignore
 
-    def best_actions(self,
-                     state: FeatureArray,
-                     actions: Tuple[FeatureArray, ...]
-                     ) -> Tuple[FeatureArray, ...]:
+    def best_actions(
+            self,
+            state: FeatureArray,
+            actions: Tuple[FeatureArray, ...]) -> Tuple[FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -240,9 +237,9 @@ class QLearning(Agent[float]):
             A list of best actions.
         '''
         # None is used to avoid redundant normalization of default_actions
-        q_values = self._q(state, None if actions ==
-                           self._default_actions else actions)
-        max_q = np.max(q_values)
+        q_values = self._q(
+            state, None if actions == self._default_actions else actions)
+        max_q: float = np.max(q_values)
         result = tuple(
             actions[i]  # type: ignore
             for i in np.nonzero(q_values == max_q)[0])

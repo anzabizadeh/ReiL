@@ -3,7 +3,7 @@ import pathlib
 from math import ceil, log10
 from typing import Dict, Literal, Optional, Tuple, Union
 
-from reil.datatypes.interaction_protocol import InteractionProtocol
+from reil.datatypes.dataclasses import InteractionProtocol
 from reil.environments.environment_static_map import EnvironmentStaticMap
 from reil.utils.output_writer import OutputWriter
 
@@ -27,8 +27,6 @@ class Task:
         self._start_iteration = start_iteration
         self._agent_training_triggers = agent_training_triggers
         self._writer = writer
-
-        # self._subjects = subjects
 
         self._save_iterations = save_iterations
         if save_iterations:
@@ -72,3 +70,21 @@ class Task:
         # self.simulate(env, self._writer)
         # f, p = env.save(
         #     filename=self._filename_format.format(self._name, iteration + 1),
+
+    def trajectory(
+            self, env: EnvironmentStaticMap,
+            iteration: int) -> EnvironmentStaticMap:
+        env.interaction_sequence = self._interaction_sequence
+
+        for agent, trigger in self._agent_training_triggers.items():
+            env._agents[agent]._training_trigger = trigger
+
+        for protocol in self._interaction_sequence:
+            env._iterations[protocol.subject.name] = iteration
+
+        env.simulate_pass()
+        if self._writer:
+            rep = env.report_statistics(unstack=True, reset_history=True)
+            self._writer.write_stats_output(rep)
+
+        return env

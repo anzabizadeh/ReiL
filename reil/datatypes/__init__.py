@@ -51,9 +51,14 @@ SecondayComponent:
     different definitions for the component, and call the instance to calculate
     them.
 '''
+from typing import List
+
 from . import buffers  # noqa: W601
-from .feature import Feature, FeatureArray, FeatureGenerator  # noqa: W601
 from .components import (PrimaryComponent, SecondayComponent,  # noqa: W601
                          Statistic)
-from .interaction_protocol import Entity, InteractionProtocol  # noqa: W601
+from .dataclasses import Entity, InteractionProtocol, Observation  # noqa: W601
+from .entity_register import EntityRegister  # noqa: W601
+from .feature import Feature, FeatureArray, FeatureGenerator  # noqa: W601
 from .mock_statistic import MockStatistic  # noqa: W601
+
+History = List[Observation]

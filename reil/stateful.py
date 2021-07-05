@@ -34,159 +34,14 @@ deregister:
 
 from __future__ import annotations
 
-import dataclasses
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from reil import reilbase
 from reil.datatypes.components import (PrimaryComponent, Statistic,
                                        SubComponentInfo)
+from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import Feature, FeatureArray
-
-
-@dataclasses.dataclass
-class Observation:
-    state: Optional[FeatureArray] = None
-    action: Optional[FeatureArray] = None
-    reward: Optional[float] = None
-
-
-History = List[Observation]
-
-
-class EntityRegister:
-    '''
-    Create and maintain a list of registered `entities`.
-
-
-    :meta private:
-    '''
-
-    def __init__(self, min_entity_count: int, max_entity_count: int,
-                 unique_entities: bool = True):
-        '''
-        Arguments
-        ---------
-        min_entity_count:
-            The minimum number of `entities` needed to be registered so that
-            the current `instance` is ready for interaction.
-
-        max_entity_count:
-            The maximum number of `entities` that can interact with this
-            instance.
-
-        unique_entities:
-            If `True`, each `entity` can be registered only once.
-        '''
-        self._id_list: List[int] = []
-        self._entity_list: List[str] = []
-        self._min_entity_count = min_entity_count
-        self._max_entity_count = max_entity_count
-        self._unique_entities = unique_entities
-
-    @property
-    def ready(self) -> bool:
-        '''
-        Determine if enough `entities` are registered.
-
-        Returns
-        -------
-        :
-            `True` if enough `entities` are registered, else `False`.
-        '''
-        return len(self._id_list) >= self._min_entity_count
-
-    def append(self, entity_name: str, _id: Optional[int] = None) -> int:
-        '''
-        Add a new `entity` to the end of the list.
-
-        Parameters
-        ----------
-        entity_name:
-            The name of the `entity` to add.
-
-        _id:
-            If provided, method tries to register the `entity` with the given
-            ID.
-
-        Returns
-        -------
-        :
-            The ID assigned to the `entity`.
-
-        Raises
-        ------
-        ValueError:
-            Capacity is reached. No new `entities` can be registered.
-
-        ValueError:
-            ID is already taken.
-
-        ValueError:
-            `entity_name` is already registered with a different ID.
-        '''
-        if (0 < self._max_entity_count < len(self._id_list)):
-            raise ValueError('Capacity is reached. No new entities can be'
-                             ' registered.')
-
-        # new_id = int(_id)  # type: ignore
-        if self._unique_entities:
-            if entity_name in self._entity_list:
-                current_id = self._id_list[
-                    self._entity_list.index(entity_name)]
-                if _id is None or _id == current_id:
-                    return current_id
-                else:
-                    raise ValueError(
-                        f'{entity_name} is already registered with '
-                        f'ID: {current_id}.')
-            # elif _id is None:
-            #     new_id = max(self._id_list, default=0) + 1
-            elif _id in self._id_list:
-                raise ValueError(f'{_id} is already taken.')
-            # else:
-            #     new_id = _id
-        # elif _id is None:
-        #     new_id = max(self._id_list, default=0) + 1
-        elif _id in self._id_list:
-            current_entity = self._entity_list[
-                self._id_list.index(_id)]
-            if entity_name == current_entity:
-                return _id
-            else:
-                raise ValueError(f'{_id} is already taken.')
-        # else:
-        #     new_id = _id
-
-        new_id = _id or max(self._id_list, default=0) + 1
-
-        self._entity_list.append(entity_name)
-        self._id_list.append(new_id)
-
-        return new_id
-
-    def remove(self, _id: int):
-        '''
-        Remove the `entity` registered by ID=`_id`.
-
-        Arguments
-        ---------
-        _id:
-            ID of the `entity` to remove.
-        '''
-        entity_name = self._entity_list[self._id_list.index(_id)]
-        self._entity_list.remove(entity_name)
-        self._id_list.remove(_id)
-
-    def clear(self):
-        '''
-        Clear the list.
-        '''
-        self._id_list: List[int] = []
-        self._entity_list: List[str] = []
-
-    def __contains__(self, _id: int) -> bool:
-        return _id in self._id_list
 
 
 class Stateful(reilbase.ReilBase):
@@ -194,25 +49,26 @@ class Stateful(reilbase.ReilBase):
     The base class of all stateful classes in the `ReiL` package.
     '''
 
-    def __init__(self,
-                 min_entity_count: int = 1,
-                 max_entity_count: int = -1,
-                 unique_entities: bool = True,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            min_entity_count: int = 1,
+            max_entity_count: int = -1,
+            unique_entities: bool = True,
+            **kwargs: Any):
 
         super().__init__(**kwargs)
 
         self.sub_comp_list = self._extract_sub_components()
-        self.state = PrimaryComponent(self,
-                                      self.sub_comp_list,
-                                      self._default_state_definition)
+        self.state = PrimaryComponent(
+            self, self.sub_comp_list, self._default_state_definition)
         self.statistic = Statistic(
             name='statistic', primary_component=self.state,
             default_definition=self._default_statistic_definition)
 
-        self._entity_list = EntityRegister(min_entity_count=min_entity_count,
-                                           max_entity_count=max_entity_count,
-                                           unique_entities=unique_entities)
+        self._entity_list = EntityRegister(
+            min_entity_count=min_entity_count,
+            max_entity_count=max_entity_count,
+            unique_entities=unique_entities)
 
     def _default_state_definition(
             self, _id: Optional[int] = None) -> FeatureArray:
@@ -335,23 +191,23 @@ class Stateful(reilbase.ReilBase):
         '''
         self._entity_list.remove(entity_id)
 
-    def load(self, filename: str,
-             path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    def load(
+            self, filename: str,
+            path: Optional[Union[str, pathlib.PurePath]]) -> None:
 
         super().load(filename, path=path)
 
         self.state.object_ref = self
         self.statistic.set_primary_component(self.state)
-        self.state.set_default_definition(
-            self._default_state_definition)
+        self.state.set_default_definition(self._default_state_definition)
         self.statistic.set_default_definition(
             self._default_statistic_definition)
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(
+            self, filename: Optional[str] = None,
+            path: Optional[Union[str, pathlib.PurePath]] = None,
+            data_to_save: Optional[Tuple[str, ...]] = None
+    ) -> Tuple[pathlib.PurePath, str]:
 
         object_ref_temp, self.state.object_ref = self.state.object_ref, None
         state_default, self.state._default = self.state._default, None

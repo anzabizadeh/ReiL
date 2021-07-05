@@ -97,7 +97,7 @@ class FrozenLake(MNKBoard, Subject):
             return Subject.register(self, player_name)
         raise ValueError('Windy Gridworld only accepts one player.')
 
-    def take_effect(self, action: ReilData, _id: int = 0) -> None:
+    def _take_effect(self, action: ReilData, _id: int = 0) -> None:
         '''
         Move according to the action.
 

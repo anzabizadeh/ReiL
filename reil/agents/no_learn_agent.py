@@ -7,24 +7,28 @@ The base class of all `agent` classes.
 '''
 
 import random
-from typing import Any, Generator, Literal, Optional, Tuple, TypeVar, Union
+from typing import (Any, Dict, Generator, Literal, Optional, Tuple, TypeVar,
+                    Union)
 
-from reil import stateful
+from reil.datatypes import History
+from reil.datatypes.dataclasses import Observation
 from reil.datatypes.feature import FeatureArray
+from reil.stateful import Stateful
 
 T = TypeVar('T')
 
 
-class NoLearnAgent(stateful.Stateful):
+class NoLearnAgent(Stateful):
     '''
     The base class of all `agent` classes. This class does not support any
     `learner`.
     '''
 
-    def __init__(self,
-                 default_actions: Tuple[FeatureArray, ...] = (),
-                 tie_breaker: Literal['first', 'last', 'random'] = 'random',
-                 **kwargs: Any):
+    def __init__(
+            self,
+            default_actions: Tuple[FeatureArray, ...] = (),
+            tie_breaker: Literal['first', 'last', 'random'] = 'random',
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -85,10 +89,9 @@ class NoLearnAgent(stateful.Stateful):
 
         return action
 
-    def best_actions(self,
-                     state: FeatureArray,
-                     actions: Tuple[FeatureArray, ...],
-                     ) -> Tuple[FeatureArray, ...]:
+    def best_actions(
+            self, state: FeatureArray,
+            actions: Tuple[FeatureArray, ...]) -> Tuple[FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -107,8 +110,10 @@ class NoLearnAgent(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    def observe(self, subject_id: int, stat_name: str,
-                ) -> Generator[Union[FeatureArray, None], Any, None]:
+    def observe(
+            self, subject_id: int,
+            stat_name: str) -> Generator[
+                Union[FeatureArray, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
 
@@ -134,38 +139,41 @@ class NoLearnAgent(stateful.Stateful):
         if subject_id not in self._entity_list:
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
-        history: stateful.History = []
-        new_observation = stateful.Observation()
+        history: History = []
+        new_observation = None
         while True:
             try:
-                new_observation = stateful.Observation()
-                temp = yield
-                new_observation.state = temp['state']
+                new_observation = Observation()
+                temp: Dict[str, Any] = yield
+                state: FeatureArray = temp['state']
                 actions: Tuple[FeatureArray, ...] = temp['actions']
                 iteration: int = temp['iteration']
 
+                new_observation.state = state
                 if actions is not None:
                     new_observation.action = self.act(
-                        state=new_observation.state,  # type: ignore
-                        subject_id=subject_id,
+                        state=state, subject_id=subject_id,
                         actions=actions, iteration=iteration)
 
-                    new_observation.reward = (yield new_observation.action)
+                    new_observation.reward = (
+                        yield new_observation.action)['reward']
 
                     history.append(new_observation)
+                else:  # No actions to take, so skip the reward.
+                    yield
 
             except GeneratorExit:
+                if new_observation is None:
+                    new_observation = Observation()
                 if new_observation.reward is None:  # terminated early!
                     history.append(new_observation)
-
-                # self._computed_stats.append(
-                #     self.statistic(stat_name, subject_id))
 
                 return
 
     @staticmethod
-    def _break_tie(input_tuple: Tuple[T, ...],
-                   method: Literal['first', 'last', 'random']) -> T:
+    def _break_tie(
+            input_tuple: Tuple[T, ...],
+            method: Literal['first', 'last', 'random']) -> T:
         '''
         Choose one item from the supplied list of options, based on the method.
 

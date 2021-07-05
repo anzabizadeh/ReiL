@@ -6,7 +6,7 @@ DeepQLearning class
 A Q-learning `agent` with a Neural Network Q-function approximator.
 '''
 
-from typing import Any
+from typing import Any, Literal
 
 from reil.agents.q_learning import QLearning
 from reil.datatypes.buffers import VanillaExperienceReplay
@@ -20,12 +20,13 @@ class DeepQLearning(QLearning):
     A Deep Q-learning `agent`.
     '''
 
-    def __init__(self,
-                 learner: Dense,
-                 buffer: VanillaExperienceReplay[FeatureArray, float],
-                 exploration_strategy: ExplorationStrategy,
-                 method: str = 'backward',
-                 **kwargs: Any):
+    def __init__(
+            self,
+            learner: Dense,
+            buffer: VanillaExperienceReplay[FeatureArray, float],
+            exploration_strategy: ExplorationStrategy,
+            method: Literal['forward', 'backward'] = 'backward',
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -47,8 +48,7 @@ class DeepQLearning(QLearning):
         kwargs:
             Keyword arguments to be passed on to the parent class.
         '''
-        super().__init__(learner=learner,
-                         buffer=buffer,
-                         exploration_strategy=exploration_strategy,
-                         method=method,
-                         **kwargs)
+        super().__init__(
+            learner=learner, buffer=buffer,
+            exploration_strategy=exploration_strategy,
+            method=method, **kwargs)

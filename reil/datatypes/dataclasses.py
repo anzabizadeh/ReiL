@@ -9,6 +9,8 @@ new values. This datatype uses `Entity` to specify an `agent` or a `subject`.
 import dataclasses
 from typing import Literal, Optional, Tuple
 
+from reil.datatypes.feature import FeatureArray
+
 
 @dataclasses.dataclass(frozen=True)
 class Entity:
@@ -42,3 +44,10 @@ class InteractionProtocol:
     reward_name: str
     n: int
     unit: Literal['interaction', 'instance', 'iteration']
+
+
+@dataclasses.dataclass
+class Observation:
+    state: Optional[FeatureArray] = None
+    action: Optional[FeatureArray] = None
+    reward: Optional[float] = None

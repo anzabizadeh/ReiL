@@ -18,9 +18,9 @@ class RandomAgent(NoLearnAgent):
     An agent that acts randomly.
     '''
 
-    def __init__(self,
-                 default_actions: Tuple[FeatureArray, ...] = (),
-                 **kwargs: Any):
+    def __init__(
+            self, default_actions: Tuple[FeatureArray, ...] = (),
+            **kwargs: Any):
         super().__init__(default_actions=default_actions, **kwargs)
 
     def act(self,

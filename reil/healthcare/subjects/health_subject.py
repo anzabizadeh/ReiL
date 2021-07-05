@@ -131,9 +131,8 @@ class HealthSubject(Subject):
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         return self._day >= self._max_day
 
-    def take_effect(
+    def _take_effect(
             self, action: FeatureArray, _id: int = 0) -> None:
-        Subject.take_effect(self, action, _id)
         action_temp = action.value
         current_dose = float(action_temp['dose'])
         current_interval = min(int(action_temp['interval']),

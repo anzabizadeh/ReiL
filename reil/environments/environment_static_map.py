@@ -12,7 +12,7 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import pandas as pd
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.interaction_protocol import InteractionProtocol
+from reil.datatypes.dataclasses import InteractionProtocol
 from reil.environments.environment import (EntityGenType, EntityType,
                                            Environment)
 from reil.subjects.subject_demon import SubjectDemon
@@ -140,7 +140,7 @@ class EnvironmentStaticMap(Environment):
         self._agent_observers = {}
         for protocol in seq:
             self.assert_protocol(protocol)
-            self.register(protocol, get_agent_observer=True)
+            self.register_protocol(protocol, get_agent_observer=True)
 
         self._interaction_sequence = seq
 
@@ -276,7 +276,7 @@ class EnvironmentStaticMap(Environment):
             success = self.reset_subject(subject_name)
 
             for p in affected_protocols:
-                self.register(p, get_agent_observer=True)
+                self.register_protocol(p, get_agent_observer=True)
 
         return success
 
@@ -298,10 +298,12 @@ class EnvironmentStaticMap(Environment):
 
         return super().reset_subject(subject_name)
 
-    def report_statistics(self,
-                          unstack: bool = True,
-                          reset_history: bool = True
-                          ) -> Dict[Tuple[str, str], pd.DataFrame]:
+    def report_statistics(
+            self,
+            unstack: bool = True,
+            reset_history: bool = True,
+            dump_history: bool = False
+    ) -> Dict[Tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
         Parameters
@@ -311,6 +313,9 @@ class EnvironmentStaticMap(Environment):
 
         reset_history:
             Whether to clear up the history after computing stats.
+
+        dump_history:
+            Whether to dump the history after computing stats.
 
         Returns
         -------
@@ -362,10 +367,10 @@ class EnvironmentStaticMap(Environment):
 
         return result
 
-    def load(self,  # noqa: C901
-             entity_name: Union[List[str], str] = 'all',
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    def load(  # noqa: C901
+            self, filename: str,
+            path: Optional[Union[str, pathlib.PurePath]],
+            entity_names: Optional[List[str]] = None) -> None:
         '''
         Load an entity or an `environment` from a file.
 
@@ -374,15 +379,15 @@ class EnvironmentStaticMap(Environment):
         filename:
             The name of the file to be loaded.
 
-        entity_name:
+        entity_names:
             If specified, that entity (`agent` or `subject`) is being
-            loaded from file. 'all' loads an `environment`.
+            loaded from file. `None` loads an `environment`.
 
         Raises
         ------
         ValueError
             The filename is not specified.
         '''
-        super().load(entity_name=entity_name, filename=filename, path=path)
+        super().load(filename=filename, path=path, entity_names=entity_names)
         # To generate observers!
         self.interaction_sequence = self.interaction_sequence

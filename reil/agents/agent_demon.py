@@ -10,10 +10,12 @@ from __future__ import annotations
 import pathlib
 from typing import Any, Callable, Optional, Tuple, Union
 
-from reil import reilbase, stateful
+from reil import reilbase
 from reil.agents.agent import Agent
 from reil.agents.no_learn_agent import NoLearnAgent
+from reil.datatypes import History
 from reil.datatypes.components import PrimaryComponent, Statistic
+from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import FeatureArray
 from reil.learners.learner import LabelType
 
@@ -48,7 +50,7 @@ class AgentDemon(Agent[LabelType]):
 
         self.state: PrimaryComponent
         self.statistic: Statistic
-        self._entity_list: stateful.EntityRegister
+        self._entity_list: EntityRegister
         self._training_trigger: str
 
         self._main_agent: Union[Agent[LabelType], None] = main_agent
@@ -191,7 +193,7 @@ class AgentDemon(Agent[LabelType]):
 
         return self._main_agent.act(state, subject_id, actions, iteration)
 
-    def learn(self, history: stateful.History) -> None:
+    def learn(self, history: History) -> None:
         '''
         Learn using history.
 

@@ -8,12 +8,14 @@ This `agent` class is the base class of all agent classes that can learn from
 '''
 
 import pathlib
-from typing import Any, Generator, Generic, Literal, Optional, Tuple, Union
+from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple,
+                    Union)
 
-from reil import stateful
 from reil.agents.no_learn_agent import NoLearnAgent
+from reil.datatypes import History
+from reil.datatypes.dataclasses import Observation
 from reil.datatypes.feature import FeatureArray
-from reil.learners.learner import Learner, LabelType
+from reil.learners.learner import LabelType, Learner
 from reil.utils.exploration_strategies import ExplorationStrategy
 
 TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[LabelType, ...]]
@@ -24,16 +26,17 @@ class Agent(NoLearnAgent, Generic[LabelType]):
     The base class of all agent classes that learn from history.
     '''
 
-    def __init__(self,
-                 learner: Learner[LabelType],
-                 exploration_strategy: ExplorationStrategy,
-                 discount_factor: float = 1.0,
-                 default_actions: Tuple[FeatureArray, ...] = (),
-                 tie_breaker: Literal['first', 'last', 'random'] = 'random',
-                 training_trigger: Literal[
-                     'none', 'termination',
-                     'state', 'action', 'reward'] = 'termination',
-                 **kwargs: Any):
+    def __init__(
+            self,
+            learner: Learner[LabelType],
+            exploration_strategy: ExplorationStrategy,
+            discount_factor: float = 1.0,
+            default_actions: Tuple[FeatureArray, ...] = (),
+            tie_breaker: Literal['first', 'last', 'random'] = 'random',
+            training_trigger: Literal[
+                'none', 'termination',
+                'state', 'action', 'reward'] = 'termination',
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -78,7 +81,7 @@ class Agent(NoLearnAgent, Generic[LabelType]):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(None, None)  # type: ignore
+        return cls(Learner._empty_instance(), ExplorationStrategy())
 
     def act(self,
             state: FeatureArray,
@@ -204,8 +207,7 @@ class Agent(NoLearnAgent, Generic[LabelType]):
 
         return _path, _filename
 
-    def _prepare_training(
-            self, history: stateful.History) -> TrainingData[LabelType]:
+    def _prepare_training(self, history: History) -> TrainingData[LabelType]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -225,7 +227,7 @@ class Agent(NoLearnAgent, Generic[LabelType]):
         '''
         raise NotImplementedError
 
-    def learn(self, history: stateful.History) -> None:
+    def learn(self, history: History) -> None:
         '''
         Learn using history.
 
@@ -247,7 +249,8 @@ class Agent(NoLearnAgent, Generic[LabelType]):
             self._learner.learn(X, Y)
 
     def observe(self, subject_id: int, stat_name: Optional[str],  # noqa: C901
-                ) -> Generator[Union[FeatureArray, None], Any, None]:
+                ) -> Generator[
+                Union[FeatureArray, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
         Extends `NoLearnAgent.observe`.
@@ -280,38 +283,41 @@ class Agent(NoLearnAgent, Generic[LabelType]):
         learn_on_reward = trigger == 'reward'
         learn_on_termination = trigger == 'termination'
 
-        history: stateful.History = []
-        new_observation = stateful.Observation()
+        history: History = []
+        new_observation = None
         while True:
             try:
-                new_observation = stateful.Observation()
-                temp = yield
-                new_observation.state = temp['state']
+                new_observation = Observation()
+                temp: Dict[str, Any] = yield
+                state: FeatureArray = temp['state']
                 actions: Tuple[FeatureArray, ...] = temp['actions']
                 iteration: int = temp['iteration']
 
+                new_observation.state = state
                 if learn_on_state:
                     self.learn([history[-1], new_observation])
 
                 if actions is not None:
                     new_observation.action = self.act(
-                        state=new_observation.state,  # type: ignore
-                        subject_id=subject_id,
+                        state=state, subject_id=subject_id,
                         actions=actions, iteration=iteration)
 
                     if learn_on_action:
                         self.learn([history[-1], new_observation])
 
-                    new_observation.reward = (yield new_observation.action)
+                    new_observation.reward = (
+                        yield new_observation.action)['reward']
 
                     history.append(new_observation)
 
                     if learn_on_reward:
                         self.learn(history[-2:])
-                else:
+                else:  # No actions to take, so skip the reward.
                     yield
 
             except GeneratorExit:
+                if new_observation is None:
+                    new_observation = Observation()
                 if new_observation.reward is None:  # terminated early!
                     history.append(new_observation)
 
