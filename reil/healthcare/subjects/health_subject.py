@@ -81,9 +81,13 @@ class HealthSubject(Subject):
                 ('interval_history', *self._interval_range),
                 ('dose', *self._dose_range),
                 ('interval', *self._interval_range),
-                ('day', 0, self._max_day - 1)
+                # ('day', 0, self._max_day - 1)
             )
         }
+
+        self.feature_gen_set['day'] = FeatureGenerator[int].numerical(
+            name='day', lower=0, upper=self._max_day - 1,
+            generator=lambda _: None)  # type: ignore
 
         self._generate_state_defs()
         self._generate_reward_defs()
@@ -194,7 +198,7 @@ class HealthSubject(Subject):
 
     def _get_history(
             self, list_name: str, length: int
-    ) -> Union[Feature[List[float]], Feature[List[int]]]:
+    ) -> Union[Feature[Tuple[float, ...]], Feature[Tuple[int, ...]]]:
         if length == 0:
             raise ValueError(
                 'length should be a positive integer, or '
@@ -234,11 +238,11 @@ class HealthSubject(Subject):
                 i1, i2 = 0, index-length
             result = [filler] * i1 + _list[i2:index]  # type: ignore
 
-        return self.feature_gen_set[list_name](result)  # type: ignore
+        return self.feature_gen_set[list_name](tuple(result))  # type: ignore
 
     def _sub_comp_dose_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[float]]:
+    ) -> Feature[Tuple[float, ...]]:
         return self._get_history('dose_history', length)  # type: ignore
 
     def _sub_comp_measurement_history(
@@ -249,7 +253,7 @@ class HealthSubject(Subject):
 
     def _sub_comp_interval_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[int]]:
+    ) -> Feature[Tuple[float, ...]]:
         return self._get_history('interval_history', length)  # type: ignore
 
     def _sub_comp_day(self, _id: int, **kwargs: Any) -> Feature[int]:
@@ -258,12 +262,12 @@ class HealthSubject(Subject):
 
     def _sub_comp_daily_dose_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[float]]:
+    ) -> Feature[Feature[Tuple[float, ...]]]:
         return self._get_history('daily_dose_history', length)  # type: ignore
 
     def _sub_comp_daily_measurement_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[float]]:
+    ) -> Feature[Feature[Tuple[float, ...]]]:
         return self._get_history(  # type: ignore
             f'daily_{self._measurement_name}_history', length)
 

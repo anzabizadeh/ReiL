@@ -341,15 +341,16 @@ class Environment(stateful.Stateful):
         for _ in range(times):
             reward = subject_instance.reward(
                 name=reward_name, _id=agent_id)
-            agent_observer.send({'reward': reward})
+            agent_observer.send(None if reward is None else {'reward': reward})
 
             state = subject_instance.state(name=state_name, _id=agent_id)
             possible_actions = subject_instance.possible_actions(
                 name=action_name, _id=agent_id)
             if possible_actions:
-                action = agent_observer.send({'state': state,
-                                              'actions': possible_actions,
-                                              'iteration': iteration})
+                action = agent_observer.send(
+                    {'state': state,
+                     'actions': possible_actions,
+                     'iteration': iteration})
                 subject_instance.take_effect(action, agent_id)  # type: ignore
 
     @classmethod
@@ -550,7 +551,7 @@ class Environment(stateful.Stateful):
         state = subject_instance.state(
             name=state_name, _id=a_id)
 
-        self._agent_observers[a_s_names].send(reward)
+        self._agent_observers[a_s_names].send({'reward': reward})
         self._agent_observers[a_s_names].send({'state': state,
                                                'actions': None,
                                                'iteration': None})
