@@ -9,13 +9,13 @@ in Ravvaz et al (2017).
 
 from typing import Any, Literal, Optional, Tuple
 
-from reil import agents
+from reil.agents.no_learn_agent import NoLearnAgent
 from reil.datatypes.feature import FeatureArray, FeatureGenerator
 from reil.healthcare.dosing_protocols.warfarin import (AAA, CAA, PGAA, PGPGA,
                                                        PGPGI)
 
 
-class WarfarinAgent(agents.NoLearnAgent):
+class WarfarinAgent(NoLearnAgent):
     '''
     An `agent` that prescribes dose for a warfarin `subject`,
     based on the dosing protocols defined in Ravvaz et al (2017).
