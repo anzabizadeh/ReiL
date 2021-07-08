@@ -62,11 +62,15 @@ class QLearning(Agent[float]):
             **kwargs)
 
         self._method: Literal['forward', 'backward'] = method
-        if self._method not in ('backward', 'forward'):
+        if method not in ('backward', 'forward'):
             self._logger.warning(
                 f'method {method} is not acceptable. Should be '
                 'either "forward" or "backward". Will use "backward".')
             self._method = 'backward'
+
+        if method == 'forward' and not kwargs.get('default_actions'):
+            raise ValueError(
+                'forward method requires `default_actions` to be non-empty.')
 
         self._buffer = buffer
         self._buffer.setup(buffer_names=['X', 'Y'])
@@ -100,26 +104,29 @@ class QLearning(Agent[float]):
 
         :meta public:
         '''
-        state_list = [state] if isinstance(state, FeatureArray) else state
-        len_state = len(state_list)
-
-        if action is None:
-            action_list = self._default_actions
+        if isinstance(action, FeatureArray):
+            action_list = (action,)
+            len_action = 1
         else:
-            action_list = ([action] if isinstance(action, FeatureArray)
-                           else action)
+            action_list = action or self._default_actions
+            len_action = len(action_list)
 
-        len_action = len(action_list)
+        if isinstance(state, FeatureArray):
+            state_list = [state] * len_action
+            len_state = len_action
+        else:
+            state_list = state
+            len_state = len(state_list)
 
         if len_state == len_action:
-            x = tuple(state_list[i] + action_list[i]
-                      for i in range(len_state))
-        elif len_action == 1:
-            x = tuple(state_list[i] + action_list[0]
-                      for i in range(len_state))
+            x = tuple(s + a
+                      for s, a in zip(state_list, action_list))
         elif len_state == 1:
-            x = tuple(state_list[0] + action_list[i]
-                      for i in range(len_action))
+            x = tuple(state_list[0] + a
+                      for a in action_list)
+        elif len_action == 1:
+            x = tuple(s + action_list[0]
+                      for s in state_list)
         else:
             raise ValueError(
                 'State and action should be of the same size'
@@ -242,7 +249,7 @@ class QLearning(Agent[float]):
         max_q: float = np.max(q_values)
         result = tuple(
             actions[i]  # type: ignore
-            for i in np.nonzero(q_values == max_q)[0])
+            for i in np.flatnonzero(q_values == max_q))
 
         return result
 

@@ -376,7 +376,7 @@ class Dense_tf_2(Learner[float]):
         :
             The predicted `y`.
         '''
-        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
+        _X: List[List[float]] = [x.normalized.flatten() for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
