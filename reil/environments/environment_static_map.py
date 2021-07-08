@@ -296,13 +296,22 @@ class EnvironmentStaticMap(Environment):
                 subject_name,
                 self._subjects[subject_name]).statistic.append(*e)
 
+        entities = set(
+            (p.subject.trajectory_name,
+             self._assignment_list[(p.agent.name, p.subject.name)][1])
+            for p in self.interaction_sequence
+            if p.subject.name == subject_name and
+            p.subject.trajectory_name is not None)
+
+        for e in entities:
+            self._subjects[subject_name].state.dump(*e)
+
         return super().reset_subject(subject_name)
 
     def report_statistics(
             self,
             unstack: bool = True,
             reset_history: bool = True,
-            dump_history: bool = False
     ) -> Dict[Tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
@@ -313,9 +322,6 @@ class EnvironmentStaticMap(Environment):
 
         reset_history:
             Whether to clear up the history after computing stats.
-
-        dump_history:
-            Whether to dump the history after computing stats.
 
         Returns
         -------

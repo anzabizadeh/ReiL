@@ -831,7 +831,6 @@ class Environment(stateful.Stateful):
             self,
             unstack: bool = True,
             reset_history: bool = True,
-            dump_history: bool = False
     ) -> Dict[Tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
@@ -842,9 +841,6 @@ class Environment(stateful.Stateful):
 
         reset_history:
             Whether to clear up the history after computing stats.
-
-        dump_history:
-            Whether to dump the history after computing stats.
 
         Returns
         -------

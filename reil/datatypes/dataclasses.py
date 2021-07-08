@@ -7,7 +7,7 @@ A datatype that accepts initial value and feature generator, and generates
 new values. This datatype uses `Entity` to specify an `agent` or a `subject`.
 '''
 import dataclasses
-from typing import Literal, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
 from reil.datatypes.feature import FeatureArray
 
@@ -23,6 +23,7 @@ class Entity:
     statistic_name: Optional[str] = None
     groupby: Optional[Tuple[str, ...]] = None
     aggregators: Optional[Tuple[str, ...]] = None
+    trajectory_name: Optional[str] = None
 
     def __post_init__(self):
         if self.groupby is not None:
@@ -51,3 +52,6 @@ class Observation:
     state: Optional[FeatureArray] = None
     action: Optional[FeatureArray] = None
     reward: Optional[float] = None
+
+
+History = List[Observation]

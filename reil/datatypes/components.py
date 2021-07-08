@@ -15,6 +15,7 @@ from typing import (Any, Callable, DefaultDict, Dict, Generic, List, Optional,
 
 import pandas as pd
 from reil.datatypes.feature import FeatureArray
+from reil.utils.feature_array_dumper import FeatureArrayDumper
 
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
 
@@ -44,7 +45,8 @@ class PrimaryComponent:
         object_ref: object,
         available_sub_components: Optional[Dict[str, SubComponentInfo]] = None,
         default_definition: Optional[Callable[[
-            Optional[int]], FeatureArray]] = None
+            Optional[int]], FeatureArray]] = None,
+        dumper: Optional[FeatureArrayDumper] = None
     ) -> None:
         '''
         Parameters
@@ -62,6 +64,7 @@ class PrimaryComponent:
 
         self.object_ref = object_ref
         self._default = default_definition
+        self._dumper = dumper
 
     @property
     def sub_components(self) -> Dict[str, SubComponentInfo]:
@@ -219,6 +222,10 @@ class PrimaryComponent:
         return FeatureArray(d.fn(
             self.object_ref, _id=_id, **d.args)  # type: ignore
             for d in self._definitions[name.lower()])
+
+    def dump(self, name: str, _id: Optional[int] = None) -> None:
+        if self._dumper:
+            self._dumper.dump(self.__call__(name, _id))
 
 
 class SecondayComponent(Generic[ComponentReturnType]):
