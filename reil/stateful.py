@@ -42,6 +42,7 @@ from reil.datatypes.components import (PrimaryComponent, Statistic,
                                        SubComponentInfo)
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import Feature, FeatureArray
+from reil.datatypes.feature_array_dumper import FeatureArrayDumper
 
 
 class Stateful(reilbase.ReilBase):
@@ -54,13 +55,15 @@ class Stateful(reilbase.ReilBase):
             min_entity_count: int = 1,
             max_entity_count: int = -1,
             unique_entities: bool = True,
+            state_dumper: Optional[FeatureArrayDumper] = None,
             **kwargs: Any):
 
         super().__init__(**kwargs)
 
         self.sub_comp_list = self._extract_sub_components()
         self.state = PrimaryComponent(
-            self, self.sub_comp_list, self._default_state_definition)
+            self, self.sub_comp_list, self._default_state_definition,
+            dumper=state_dumper)
         self.statistic = Statistic(
             name='statistic', primary_component=self.state,
             default_definition=self._default_statistic_definition)
