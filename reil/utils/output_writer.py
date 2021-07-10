@@ -39,10 +39,12 @@ class OutputWriter:
             filename: str, path: pathlib.PurePath) -> bool:
         '''Write stats to file.'''
         try:
-            with open(path / filename, 'a+', newline='') as f:
+            fname = pathlib.Path(path / filename)
+            header = not fname.exists()
+            with open(fname, 'a+', newline='') as f:
                 for s in stats_output.values():
                     print(s)
-                    s.to_csv(f, mode='a+', header=False)
+                    s.to_csv(f, mode='a+', header=header)
         except (PermissionError,):
             return False
 

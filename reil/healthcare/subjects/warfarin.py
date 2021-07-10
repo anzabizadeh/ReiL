@@ -8,7 +8,7 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 
 import functools
 import itertools
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 from reil.datatypes.feature import Feature, FeatureArray
 from reil.healthcare.patient import Patient
@@ -300,18 +300,18 @@ class Warfarin(HealthSubject):
 
     def _sub_comp_INR_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[float]]:
+    ) -> Feature[Tuple[float, ...]]:
         return self._sub_comp_measurement_history(
             _id, length, **kwargs)
 
     def _sub_comp_daily_INR_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[float]]:
+    ) -> Feature[Tuple[float, ...]]:
         return self._sub_comp_daily_measurement_history(
             _id, length, **kwargs)
 
     def _sub_comp_INR_within(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[float]]:
+    ) -> Feature[Tuple[float, ...]]:
         intervals = self._get_history('interval_history', length).value
         return self._get_history('daily_INR', sum(intervals))  # type: ignore

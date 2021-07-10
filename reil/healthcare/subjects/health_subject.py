@@ -247,7 +247,7 @@ class HealthSubject(Subject):
 
     def _sub_comp_measurement_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[List[float]]:
+    ) -> Feature[Tuple[float, ...]]:
         return self._get_history(  # type: ignore
             f'{self._measurement_name}_history', length)
 
@@ -262,12 +262,12 @@ class HealthSubject(Subject):
 
     def _sub_comp_daily_dose_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[Feature[Tuple[float, ...]]]:
+    ) -> Feature[Tuple[float, ...]]:
         return self._get_history('daily_dose_history', length)  # type: ignore
 
     def _sub_comp_daily_measurement_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[Feature[Tuple[float, ...]]]:
+    ) -> Feature[Tuple[float, ...]]:
         return self._get_history(  # type: ignore
             f'daily_{self._measurement_name}_history', length)
 

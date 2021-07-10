@@ -243,9 +243,7 @@ class QLearning(Agent[float]):
         :
             A list of best actions.
         '''
-        # None is used to avoid redundant normalization of default_actions
-        q_values = self._q(
-            state, None if actions == self._default_actions else actions)
+        q_values = self._q(state, actions)
         max_q: float = np.max(q_values)
         result = tuple(
             actions[i]  # type: ignore
