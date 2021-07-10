@@ -63,6 +63,5 @@ from .instance_generator import InstanceGenerator  # noqa: W0611
 from .argument_parser import (CommandlineArgument,   # noqa: W0611
                               CommandlineParser, ConfigParser)
 from .output_writer import OutputWriter  # noqa: W0611
-from .feature_array_dumper import FeatureArrayDumper  # noqa: W0611
 
 from .mnkboard import MNKBoard  # noqa: W0611

@@ -53,6 +53,7 @@ SecondayComponent:
 '''
 from . import buffers  # noqa: W601
 from .feature import Feature, FeatureArray, FeatureGenerator  # noqa: W601
+from .feature_array_dumper import FeatureArrayDumper  # noqa: W0611
 from .components import (PrimaryComponent, SecondayComponent,  # noqa: W601
                          Statistic)
 from .dataclasses import (Entity, History, InteractionProtocol,  # noqa: W601
