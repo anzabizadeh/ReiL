@@ -14,14 +14,23 @@ import importlib
 import logging
 import pathlib
 import time
-from typing import Any, Dict, List, Optional, OrderedDict, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dill
 from ruamel.yaml import YAML
 
 import reil
 
-Parsable = Union[OrderedDict[str, Any], Any]
+Parsable = Union[Dict[str, Any], Any]
+
+
+class CustomUnPickler(dill.Unpickler):
+    def find_class(self, module: str, name: str) -> Any:
+        if name == 'MockStatistic':
+            from reil.datatypes.mock_statistic import MockStatistic
+            return MockStatistic
+
+        return super().find_class(module, name)  # type: ignore
 
 
 class ReilBase:
@@ -98,14 +107,20 @@ class ReilBase:
             '_' + p
             for p in (persistent_attributes or [])]
 
-        self._logger_name = logger_name or __name__
+        self._logger_name = logger_name or self._name
         self._logger_level = logger_level or logging.WARNING
         self._logger_filename = logger_filename
 
         self._logger = logging.getLogger(self._logger_name)
         self._logger.setLevel(self._logger_level)
-        if self._logger_filename is not None:
-            self._logger.addHandler(logging.FileHandler(self._logger_filename))
+        if self._logger_filename is None:
+            handler = logging.StreamHandler()
+        else:
+            handler = logging.FileHandler(self._logger_filename)
+
+        handler.setFormatter(logging.Formatter(
+            fmt=' %(name)s :: %(levelname)-8s :: %(message)s'))
+        self._logger.addHandler(handler)
 
         self.set_params(**kwargs)
 
@@ -134,16 +149,19 @@ class ReilBase:
             A `ReilBase` instance.
         '''
         instance = cls._empty_instance()
-        instance._logger_name = __name__
+        instance._logger_name = instance.__class__.__qualname__
         instance._logger_level = logging.WARNING
         instance._logger_filename = None
         instance._logger = logging.getLogger(instance._logger_name)
-        instance._logger.setLevel(instance._logger_level)
-        if instance._logger_filename is not None:
-            instance._logger.addHandler(
-                logging.FileHandler(instance._logger_filename))
+        if not instance._logger.hasHandlers():
+            instance._logger.setLevel(instance._logger_level)
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter(
+                fmt=' %(name)s :: %(levelname)-8s :: %(message)s'))
+            instance._logger.addHandler(handler)
 
         instance.load(filename=filename, path=path)
+
         return instance
 
     @classmethod
@@ -177,7 +195,7 @@ class ReilBase:
 
         yaml = YAML()
         with open(_path / _filename, 'r') as f:
-            yaml_output: OrderedDict[str, Any] = yaml.load(f)  # type: ignore
+            yaml_output: Dict[str, Any] = yaml.load(f)  # type: ignore
 
         temp_yaml = yaml_output
         for key in node_reference:
@@ -215,8 +233,6 @@ class ReilBase:
             args = {'reil': reil}
             if 'args' in data:
                 args.update(ReilBase.parse_yaml(data['args']))
-            # else:
-            #     args = {}
             return eval(data['eval'], args)
 
         if len(data) == 1:
@@ -227,12 +243,12 @@ class ReilBase:
 
         args: Dict[str, Any] = {}
         for k, v in data.items():
-            if isinstance(v, dict):
-                v_obj = ReilBase.parse_yaml(data[k])
-            elif isinstance(v, list):
-                v_obj = [
-                    ReilBase.parse_yaml(v_i) for v_i in v]  # type: ignore
-            elif isinstance(v, str):
+            t = type(v)
+            if t is dict:
+                v_obj = ReilBase.parse_yaml(v)
+            elif t is list:
+                v_obj = [ReilBase.parse_yaml(v_i) for v_i in v]
+            elif t is str:
                 if v.startswith('lambda'):
                     v_obj = eval(v, {})
                 elif v.startswith('eval'):
@@ -247,7 +263,7 @@ class ReilBase:
         return args
 
     @staticmethod
-    def _create_component_from_yaml(name: str, args: OrderedDict[str, Any]):
+    def _create_component_from_yaml(name: str, args: Dict[str, Any]):
         '''
         Create a component from yaml data.
 
@@ -296,7 +312,7 @@ class ReilBase:
         for key, value in params.items():
             self.__dict__[f'_{key}'] = value
 
-    def load(  # noqa: C901
+    def load(
             self, filename: str,
             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
@@ -324,49 +340,53 @@ class ReilBase:
         )
 
         full_path = pathlib.Path(path or self._path) / _filename
+        file_handler, mode = (
+            bz2.BZ2File, 'r') if self._save_zipped else (open, 'rb')
 
-        data: Optional[Dict[str, Any]] = None
+        data: Dict[str, Any]
         for i in range(1, 6):
             try:
-                if self._save_zipped:
-                    with bz2.BZ2File(full_path, 'r') as f:
+                try:
+                    with file_handler(full_path, mode) as f:
                         data = dill.load(f)  # type: ignore
-                else:
-                    with open(full_path, 'rb') as f:
-                        data = dill.load(f)  # type: ignore
+                except AttributeError:
+                    self._logger.warning(
+                        'dill failed. Using CustomUnpickler.')
+                    with file_handler(full_path, mode) as f:
+                        data = CustomUnPickler(f).load()
             except FileNotFoundError:
                 raise
             except (EOFError, OSError):
                 self._logger.info(
                     f'Attempt {i} failed to load '
                     f'{full_path}.')
-                time.sleep(2)
+                time.sleep(1)
+
             else:  # if data is not None:
-                break
+                self._logger.info(
+                    'Changing the logger from '
+                    f'{self._logger_name} to {data["_logger_name"]}.')
 
-        if data is None:
-            self._logger.exception(
-                'Corrupted or inaccessible data file: '
-                f'{full_path}')
-            raise RuntimeError(
-                f'Corrupted or inaccessible data file: '
-                f'{full_path}')
+                persistent_attributes = self._persistent_attributes + \
+                    ['_persistent_attributes']
+                for key, value in data.items():
+                    if key not in persistent_attributes:
+                        self.__dict__[key] = value
 
-        self._logger.info(
-            'Changing the logger from '
-            f'{self._logger_name} to {data["_logger_name"]}.')
+                self._logger = logging.getLogger(self._logger_name)
+                self._logger.setLevel(self._logger_level)
+                if self._logger_filename is not None:
+                    self._logger.addHandler(
+                        logging.FileHandler(self._logger_filename))
 
-        persistent_attributes = self._persistent_attributes + \
-            ['_persistent_attributes']
-        for key, value in data.items():
-            if key not in persistent_attributes:
-                self.__dict__[key] = value
+                return
 
-        self._logger = logging.getLogger(self._logger_name)
-        self._logger.setLevel(self._logger_level)
-        if self._logger_filename is not None:
-            self._logger.addHandler(
-                logging.FileHandler(self._logger_filename))
+        self._logger.exception(
+            'Corrupted or inaccessible data file: '
+            f'{full_path}')
+        raise RuntimeError(
+            f'Corrupted or inaccessible data file: '
+            f'{full_path}')
 
     def save(
         self,
