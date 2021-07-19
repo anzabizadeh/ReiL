@@ -59,4 +59,3 @@ from .components import (PrimaryComponent, SecondayComponent,  # noqa: W601
 from .dataclasses import (Entity, History, InteractionProtocol,  # noqa: W601
                           Observation)
 from .entity_register import EntityRegister  # noqa: W601
-from .mock_statistic import MockStatistic  # noqa: W601
