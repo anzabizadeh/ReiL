@@ -32,3 +32,4 @@ from .environment_static_map import EnvironmentStaticMap  # noqa: W0611
 from .task import Task  # noqa: W0611
 from .session import Session  # noqa: W0611
 from .session_builder import SessionBuilder  # noqa: W0611
+from .trajectory import Trajectory  # noqa: W0611
