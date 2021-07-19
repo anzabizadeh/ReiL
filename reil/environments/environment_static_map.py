@@ -298,14 +298,24 @@ class EnvironmentStaticMap(Environment):
 
         entities = set(
             (p.subject.trajectory_name,
-             self._assignment_list[(p.agent.name, p.subject.name)][1])
+             self._assignment_list[(p.agent.name, p.subject.name)][1],
+             (('agent_name', p.agent.name),
+              ('agent_demon', p.agent.demon_name or 'none'),
+              ('subject_name', subject_name),
+              ('subject_demon', p.subject.demon_name or 'none'),
+              ('state_name', p.state_name),
+              ('action_name', p.action_name),
+              ('subject_instance_name', self._subjects[subject_name]._name),
+              ('environment', self._name),
+              ('iteration', self._iterations[subject_name])
+            ))
             for p in self.interaction_sequence
             if p.subject.name == subject_name and
             p.subject.trajectory_name is not None)
 
         for e in entities:
             self._subjects[subject_name].state.dump(
-                *e, {'name': self._subjects[subject_name]._name})
+                *e[:2], dict(e[-1]))
 
         return super().reset_subject(subject_name)
 
