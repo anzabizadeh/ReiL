@@ -204,7 +204,7 @@ class ReilBase:
         return cls.parse_yaml(temp_yaml)
 
     @staticmethod
-    def parse_yaml(data: Parsable) -> Parsable:  # noqa: C901
+    def parse_yaml(data: Parsable) -> Parsable:
         '''
         Parse a yaml tree.
 
@@ -226,7 +226,14 @@ class ReilBase:
               'parse_yaml` caller.
             * An instance of an object derived from `ReilBase`.
         '''
-        if isinstance(data, (int, float, str)):
+        if isinstance(data, (int, float)):
+            return data
+
+        if isinstance(data, str):
+            if data.startswith('lambda'):
+                return eval(data, {})
+            if data.startswith('eval'):
+                return eval(data[4:], {})
             return data
 
         if 'eval' in data:
@@ -243,22 +250,15 @@ class ReilBase:
 
         args: Dict[str, Any] = {}
         for k, v in data.items():
-            t = type(v)
-            if t is dict:
-                v_obj = ReilBase.parse_yaml(v)
-            elif t is list:
-                v_obj = [ReilBase.parse_yaml(v_i) for v_i in v]
-            elif t is str:
-                if v.startswith('lambda'):
-                    v_obj = eval(v, {})
-                elif v.startswith('eval'):
-                    v_obj = eval(v[4:], {})
-                else:
-                    v_obj = v
+            if isinstance(v, dict):
+                args[k] = ReilBase.parse_yaml(v)  # type: ignore
+            elif isinstance(v, list):
+                args[k] = [
+                    ReilBase.parse_yaml(v_i) for v_i in v]  # type: ignore
+            elif isinstance(v, str):
+                args[k] = ReilBase.parse_yaml(v)
             else:
-                v_obj = v
-
-            args.update({k: v_obj})
+                args[k] = v
 
         return args
 
@@ -351,7 +351,8 @@ class ReilBase:
                         data = dill.load(f)  # type: ignore
                 except AttributeError:
                     self._logger.warning(
-                        'dill failed. Using CustomUnpickler.')
+                        f'dill failed to load {full_path}. '
+                        'Using CustomUnpickler.')
                     with file_handler(full_path, mode) as f:
                         data = CustomUnPickler(f).load()
             except FileNotFoundError:
