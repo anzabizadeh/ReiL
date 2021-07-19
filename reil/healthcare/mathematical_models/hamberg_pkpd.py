@@ -203,15 +203,21 @@ class HambergPKPD(HealthMathModel):
         self._err_list: List[List[float]] = []  # hourly
         self._err_ss_list: List[List[float]] = []  # hourly
         self._exp_e_INR_list: List[List[float]] = []  # daily
-        self._last_computed_day = Day(0)
 
-        temp_cs_generator = self._CS_function_generator(dT(0), 1.0)
+        day_0 = Day(0)
+        dt_0 = dT(0)
+        self._last_computed_day = day_0
+
+        temp_cs_generator = self._CS_function_generator(dt_0, 1.0)
         self._cached_cs = {
             1.0: temp_cs_generator(range(cs_size))}  # type: ignore
 
         self._A = np.array([0.0] + [1.0] * 8)
-        # self._computed_INRs[0] = self._INR(self._A, Day(0))
-        self._computed_INRs[Day(0)] = self._INR(self._A, Day(0))
+
+        # running _err to initialize their cache for reproducibility purposes
+        self._err(dt_0, False)
+        self._err(dt_0, True)
+        self._computed_INRs[day_0] = self._INR(self._A, day_0)
 
     def run(self, **inputs: Any) -> Dict[str, Any]:
         '''
