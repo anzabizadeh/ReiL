@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import pathlib
-from typing import Any, Generic, Iterator, Optional, Tuple, TypeVar, Union
+from typing import Any, Generic, Iterable, Optional, Tuple, TypeVar, Union
 
 from reil import reilbase, stateful
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
@@ -82,7 +82,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
         self._object = object
 
-        self._instance_name_lists: Tuple[Iterator[str], ...] = ()
+        self._instance_name_lists: Tuple[Iterable[str], ...] = ()
         self._enumerate: enumerate[str] = enumerate([''])
         self._instance_name_index: Union[int, None] = None
 
@@ -120,11 +120,12 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     def from_instance_list(
             cls,
             object: T,
-            instance_name_lists: Tuple[Iterator[str], ...],
+            instance_name_lists: Tuple[Iterable[str], ...],
             save_instances: bool = False,
             overwrite_instances: bool = False,
             use_existing_instances: bool = True,
             save_path: Union[pathlib.PurePath, str] = '',
+            auto_rewind: bool = False,
             state_dumper: Optional[FeatureArrayDumper] = None,
             **kwargs: Any):
         '''
@@ -134,7 +135,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             An instance of an object.
 
         instance_name_lists:
-            A tuple of iterators that generates instance names.
+            A tuple of iterables that generates instance names.
 
         save_instances:
             Whether to save instances of the `object` or not.
@@ -156,7 +157,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             object=object,
             instance_counter_stops=(1,),
             first_instance_number=0,
-            auto_rewind=False,
+            auto_rewind=auto_rewind,
             save_instances=save_instances,
             overwrite_instances=overwrite_instances,
             use_existing_instances=use_existing_instances,
@@ -176,7 +177,12 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     def __next__(self) -> Tuple[int, T]:
         if self._instance_name_index is not None:
             if self._instance_name_index == -1:
-                raise StopIteration
+                if self._auto_rewind:
+                    self._instance_name_index = 0
+                    self._enumerate = enumerate(
+                        self._instance_name_lists[self._instance_name_index])
+                else:
+                    raise StopIteration
             try:
                 counter, filename = next(self._enumerate)
             except StopIteration:
@@ -284,6 +290,10 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         self._instance_counter = self._first_instance_number - 1
         self._stops_index = 0
         self._partially_terminated = False
+        if self._instance_name_index is not None:
+            self._instance_name_index = 0
+            self._enumerate = enumerate(self._instance_name_lists[0])
+
         self._determine_stop_check()
 
     def is_terminated(self, fully: bool = True) -> bool:

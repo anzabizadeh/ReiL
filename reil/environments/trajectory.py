@@ -15,9 +15,9 @@ from reil.utils.argument_parser import ConfigParser
 class Trajectory:
     def __init__(
             self,
-            parser: ConfigParser,
             env_filename: str,
             env_path: Optional[Union[pathlib.Path, str]],
+            parser: Optional[ConfigParser] = None,
             state_dumper: Optional[FeatureArrayDumper] = None,
             agent_name: Optional[str] = None,
             subject_name: Optional[str] = None,
@@ -38,6 +38,7 @@ class Trajectory:
     def run(
             self,
             trajectory_subjects: Union[InstanceGenerator[Subject], str],
+            iteration: int,
             subject_list: Optional[List[str]] = None,
             subject_save_path: str = '.',
             state_dumper: Optional[FeatureArrayDumper] = None,
@@ -50,8 +51,11 @@ class Trajectory:
         subjects: InstanceGenerator[Subject]
         dumper = state_dumper or self._state_dumper
         if isinstance(trajectory_subjects, str):
-            s = self._parser.extract(
-                'subjects', trajectory_subjects, True)
+            if self._parser:
+                s = self._parser.extract(
+                    'subjects', trajectory_subjects, True)
+            else:
+                raise ValueError('parser not found.')
         else:
             s = trajectory_subjects
 
@@ -73,7 +77,7 @@ class Trajectory:
                     'trajectory_subjects is of type str.')
 
             subjects = InstanceGenerator[Subject].from_instance_list(
-                s, (iter(subject_list),), save_instances=True,
+                s, (subject_list,), save_instances=True,
                 save_path=subject_save_path,
                 state_dumper=dumper)
 
@@ -118,7 +122,7 @@ class Trajectory:
             interaction_sequence=(protocol,),
         )
 
-        t.run_env(env, 0)
+        t.run_env(env, iteration)
 
 
 if __name__ == '__main__':
@@ -165,6 +169,7 @@ if __name__ == '__main__':
 
     t.run(
         trajectory_subjects='object',
+        iteration=71,
         subject_list=['10', '20', '30'],
         subject_save_path='../experiments/data',
         state_dumper=TrajectoryDumper('test', '../experiments/tr')
