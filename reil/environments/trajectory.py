@@ -3,8 +3,10 @@ import pathlib
 from typing import List, Optional, Union
 
 from reil.datatypes import Entity, InteractionProtocol
+from reil.datatypes.feature_array_dumper import FeatureArrayDumper
 from reil.environments.environment_static_map import EnvironmentStaticMap
 from reil.environments.task import Task
+from reil.healthcare.trajectory_dumper import TrajectoryDumper
 from reil.subjects.subject import Subject
 from reil.utils import InstanceGenerator
 from reil.utils.argument_parser import ConfigParser
@@ -16,6 +18,7 @@ class Trajectory:
             parser: ConfigParser,
             env_filename: str,
             env_path: Optional[Union[pathlib.Path, str]],
+            state_dumper: Optional[FeatureArrayDumper] = None,
             agent_name: Optional[str] = None,
             subject_name: Optional[str] = None,
             state_name: Optional[str] = None,
@@ -25,6 +28,7 @@ class Trajectory:
         self._env_filename = env_filename
         self._env_path = env_path
 
+        self._state_dumper = state_dumper
         self._agent_name = agent_name
         self._subject_name = subject_name
         self._state_name = state_name
@@ -36,6 +40,7 @@ class Trajectory:
             trajectory_subjects: Union[InstanceGenerator[Subject], str],
             subject_list: Optional[List[str]] = None,
             subject_save_path: str = '.',
+            state_dumper: Optional[FeatureArrayDumper] = None,
             agent_name: Optional[str] = None,
             subject_name: Optional[str] = None,
             state_name: Optional[str] = None,
@@ -43,27 +48,34 @@ class Trajectory:
             trajectory_name: Optional[str] = None) -> None:
 
         subjects: InstanceGenerator[Subject]
+        dumper = state_dumper or self._state_dumper
         if isinstance(trajectory_subjects, str):
             s = self._parser.extract(
                 'subjects', trajectory_subjects, True)
-            if isinstance(s, InstanceGenerator):
-                subjects = s
-                if subject_list is not None:
-                    logging.warning(
-                        'The parsed subject is an `InstanceGenerator`. '
-                        'subject_list will not be used.'
-                    )
-            else:
-                if subject_list is None:
-                    raise ValueError(
-                        'subject_list should be provided when '
-                        'trajectory_subjects is of type str.')
-
-                subjects = InstanceGenerator[Subject].from_instance_list(
-                    s, (iter(subject_list),), save_instances=True,
-                    save_path=subject_save_path)
         else:
-            subjects = trajectory_subjects
+            s = trajectory_subjects
+
+        if isinstance(s, InstanceGenerator):
+            subjects = s
+            if dumper:
+                subjects._state_dumper = dumper
+                subjects._object.state._dumper = dumper
+
+            if subject_list is not None:
+                logging.warning(
+                    'The parsed subject is an `InstanceGenerator`. '
+                    'subject_list will not be used.'
+                )
+        else:
+            if subject_list is None:
+                raise ValueError(
+                    'subject_list should be provided when '
+                    'trajectory_subjects is of type str.')
+
+            subjects = InstanceGenerator[Subject].from_instance_list(
+                s, (iter(subject_list),), save_instances=True,
+                save_path=subject_save_path,
+                state_dumper=dumper)
 
         _sub_name = subject_name or self._subject_name
         if _sub_name is None:
@@ -154,5 +166,6 @@ if __name__ == '__main__':
     t.run(
         trajectory_subjects='object',
         subject_list=['10', '20', '30'],
-        subject_save_path='../experiments/data'
+        subject_save_path='../experiments/data',
+        state_dumper=TrajectoryDumper('test', '../experiments/tr')
     )

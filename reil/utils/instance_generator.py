@@ -14,6 +14,7 @@ import pathlib
 from typing import Any, Generic, Iterator, Optional, Tuple, TypeVar, Union
 
 from reil import reilbase, stateful
+from reil.datatypes.feature_array_dumper import FeatureArrayDumper
 from reil.datatypes.mock_statistic import MockStatistic
 
 T = TypeVar('T', bound=stateful.Stateful)
@@ -39,6 +40,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             use_existing_instances: bool = True,
             save_path: Union[pathlib.PurePath, str] = '',
             filename_pattern: str = '{n:04}',
+            state_dumper: Optional[FeatureArrayDumper] = None,
             **kwargs: Any):
         '''
         Attributes
@@ -72,6 +74,9 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         filename_pattern:
             A string that uses "n" as the instance number, and is
             used for saving and loading instances.
+
+        state_dumper:
+            If provided, it will replace the `state._dumper` of the objects.
         '''
         super().__init__(**kwargs)
 
@@ -95,6 +100,8 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         self.is_finite = -1 not in instance_counter_stops and not auto_rewind
         self.statistic = MockStatistic(self._object)
 
+        self._state_dumper = state_dumper
+
         self.rewind()
 
         if self._object is None:
@@ -102,6 +109,8 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         else:
             self._object._name = self._filename_pattern.format(
                 n=self._instance_counter)
+            if self._state_dumper:
+                self._object.state._dumper = self._state_dumper
 
     @classmethod
     def _empty_instance(cls):
@@ -116,6 +125,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             overwrite_instances: bool = False,
             use_existing_instances: bool = True,
             save_path: Union[pathlib.PurePath, str] = '',
+            state_dumper: Optional[FeatureArrayDumper] = None,
             **kwargs: Any):
         '''
         Attributes
@@ -138,6 +148,9 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
         save_path:
             The path where instances should be saved to/ loaded from.
+
+        state_dumper:
+            If provided, it will replace the `state._dumper` of the objects.
         '''
         instance = cls(
             object=object,
@@ -149,6 +162,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             use_existing_instances=use_existing_instances,
             save_path=save_path,
             filename_pattern='{n}',
+            state_dumper=state_dumper,
             kwargs=kwargs)
         instance._instance_name_lists = instance_name_lists
         instance._instance_name_index = 0
@@ -242,6 +256,8 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
         self._object._name = current_instance
         self.statistic.set_object(self._object)
+        if self._state_dumper:
+            self._object.state._dumper = self._state_dumper
 
         if self._save_instances and new_instance:
             if (not self._overwrite_instances and
