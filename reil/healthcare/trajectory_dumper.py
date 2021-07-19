@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+from typing import Any, Dict, Optional
 import pandas as pd
 from reil.datatypes.feature import FeatureArray
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
@@ -11,6 +12,7 @@ class TrajectoryDumper(FeatureArrayDumper):
     @staticmethod
     def _dump(
             component: FeatureArray,
+            additional_info: Optional[Dict[str, Any]],
             filename: str, path: pathlib.PurePath) -> bool:
         '''Write stats to file.'''
 
@@ -34,6 +36,9 @@ class TrajectoryDumper(FeatureArrayDumper):
                          'day'] + [f'daily_{m}_history'
                                    for m in measure_names]:
                 temp[k] = v
+
+        for k, v in (additional_info or {}).items():
+            temp[k] = v
 
         try:
             fname = pathlib.Path(path / filename)

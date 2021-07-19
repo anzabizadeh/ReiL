@@ -304,7 +304,8 @@ class EnvironmentStaticMap(Environment):
             p.subject.trajectory_name is not None)
 
         for e in entities:
-            self._subjects[subject_name].state.dump(*e)
+            self._subjects[subject_name].state.dump(
+                *e, {'name': self._subjects[subject_name]._name})
 
         return super().reset_subject(subject_name)
 

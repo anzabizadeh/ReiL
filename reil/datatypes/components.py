@@ -223,9 +223,14 @@ class PrimaryComponent:
             self.object_ref, _id=_id, **d.args)  # type: ignore
             for d in self._definitions[name.lower()])
 
-    def dump(self, name: str, _id: Optional[int] = None) -> None:
+    def dump(
+            self, name: str, _id: Optional[int] = None,
+            additional_info: Optional[Dict[str, Any]] = None
+    ) -> None:
         if self._dumper:
-            self._dumper.dump(self.__call__(name, _id))
+            self._dumper.dump(
+                component=self.__call__(name, _id),
+                additional_info=additional_info)
 
 
 class SecondayComponent(Generic[ComponentReturnType]):
