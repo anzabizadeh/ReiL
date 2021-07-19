@@ -95,10 +95,12 @@ class SessionBuilder:
                     components[component].append(temp)
 
         if components['main_task']:
-            components['main_task'] = components['main_task'][0]
+            main_task = components['main_task'][0]
         else:
             raise ValueError(
                 f'main_task cannot be None for session {session_info}.')
+
+        components.pop('main_task')
 
         agents = {
             name: self._parser.extract('agents', typ, as_object=True)
@@ -122,4 +124,5 @@ class SessionBuilder:
             agents=agents, subjects=subjects, demons=demons,
             separate_process=session_info.get('separate_process'),
             process_type=session_info.get('process_type'),
-            **components)  # type: ignore
+            main_task=main_task,
+            **components)
