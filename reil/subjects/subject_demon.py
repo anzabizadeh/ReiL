@@ -13,6 +13,7 @@ from typing import Any, Callable, Generic, Optional, Tuple, TypeVar, Union
 
 from reil.datatypes.components import SecondayComponent, Statistic
 from reil.datatypes.feature import FeatureArray
+from reil.reilbase import ReilBase
 from reil.subjects.subject import Subject
 
 T = TypeVar('T', FeatureArray, Tuple[FeatureArray, ...])
@@ -33,7 +34,7 @@ class Modifier(Generic[T]):
                     '`cond_state_def=None`.')
 
 
-class SubjectDemon(Subject):
+class SubjectDemon(ReilBase):
     '''
     This class accepts a regular subject, and intervenes in its interaction
     with the agents. It can modify `state` representation or change
