@@ -4,8 +4,9 @@ import dataclasses
 import pathlib
 from typing import Any, Dict, List, Optional, Type, Union
 
-from reil.reilbase import ReilBase
 from ruamel.yaml import YAML
+
+from reil.utils.yaml_tools import parse_yaml
 
 
 @dataclasses.dataclass
@@ -91,7 +92,7 @@ class ConfigParser:
     ) -> Any:
         conf = self.config[root_name][branch_name]
         if as_object:
-            return ReilBase.parse_yaml(conf)
+            return parse_yaml(conf)
 
         return conf
 

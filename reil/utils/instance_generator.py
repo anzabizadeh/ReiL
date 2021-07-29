@@ -31,7 +31,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
     def __init__(
             self,
-            object: T,
+            obj: T,
             instance_counter_stops: Tuple[int, ...] = (-1,),  # -1: infinite
             first_instance_number: int = 0,
             auto_rewind: bool = False,
@@ -45,7 +45,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         '''
         Attributes
         ----------
-        object:
+        obj:
             An instance of an object.
 
         instance_counter_stops:
@@ -80,7 +80,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         '''
         super().__init__(**kwargs)
 
-        self._object = object
+        self._object = obj
 
         self._instance_name_lists: Tuple[Iterable[str], ...] = ()
         self._enumerate: enumerate[str] = enumerate([''])
@@ -119,7 +119,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     @classmethod
     def from_instance_list(
             cls,
-            object: T,
+            obj: T,
             instance_name_lists: Tuple[Iterable[str], ...],
             save_instances: bool = False,
             overwrite_instances: bool = False,
@@ -131,7 +131,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         '''
         Attributes
         ----------
-        object:
+        obj:
             An instance of an object.
 
         instance_name_lists:
@@ -154,7 +154,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             If provided, it will replace the `state._dumper` of the objects.
         '''
         instance = cls(
-            object=object,
+            obj=obj,
             instance_counter_stops=(1,),
             first_instance_number=0,
             auto_rewind=auto_rewind,

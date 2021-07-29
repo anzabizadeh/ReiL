@@ -1,7 +1,7 @@
+from typing import Any
 import unittest
 
 from reil.reilbase import ReilBase
-from ruamel.yaml import YAML
 
 
 class testReilBase(unittest.TestCase):
@@ -17,7 +17,7 @@ class testReilBase(unittest.TestCase):
 
     def test_inheritance(self):
         class interited(ReilBase):
-            def __init__(self, myarg: str = 'hello', **kwargs) -> None:
+            def __init__(self, myarg: str = 'hello', **kwargs: Any) -> None:
                 self._myarg = myarg
                 super().__init__(**kwargs)
 
@@ -26,17 +26,17 @@ class testReilBase(unittest.TestCase):
         self.assertEqual(test._name, 'inherited')
         self.assertIn('_another_arg', test.__dict__)
 
-    def test_yaml(self):
-        config = '''
-            base:
-                reil.ReilBase:
-                    name: test
-                    path: .
-        '''
-        y = YAML().load(config)
-        obj = ReilBase.parse_yaml(y['base'])
-        self.assertIsInstance(obj, ReilBase)
-        self.assertEqual(obj._name, 'test')  # type: ignore
+    # def test_yaml(self):
+    #     config = '''
+    #         base:
+    #             reil.ReilBase:
+    #                 name: test
+    #                 path: .
+    #     '''
+    #     y = YAML().load(config)
+    #     obj = ReilBase.parse_yaml(y['base'])
+    #     self.assertIsInstance(obj, ReilBase)
+    #     self.assertEqual(obj._name, 'test')  # type: ignore
 
 
 if __name__ == "__main__":
