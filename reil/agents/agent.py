@@ -158,13 +158,13 @@ class Agent(NoLearnAgent, Generic[LabelType]):
 
         # when loading, self._learner is the object type, not an instance.
         self._learner = self._learner.from_pickle(  # type: ignore
-            filename, _path / 'learner')
+            filename, _path.parent / 'learner')
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(
+            self,
+            filename: Optional[str] = None,
+            path: Optional[Union[str, pathlib.PurePath]] = None
+    ) -> pathlib.PurePath:
         '''
         Save the object to a file.
 
@@ -186,26 +186,10 @@ class Agent(NoLearnAgent, Generic[LabelType]):
             a `Path` object to the location of the saved file and its name as
             `str`
         '''
-        data = list(data_to_save or self.__dict__)
-        save_learner = '_learner' in data
-        if save_learner:
-            temp, self._learner = (  # type: ignore
-                self._learner, type(self._learner))
+        full_path = super().save(filename, path)
+        self._learner.save(full_path.name, full_path.parent / 'learner')
 
-        _path = pathlib.Path(path or self._path)
-        _filename = filename or self._name
-
-        try:
-            super().save(
-                _filename, _path, data_to_save=tuple(data))
-            if save_learner:
-                self._learner = temp  # type: ignore
-                self._learner.save(_filename, _path / 'learner')
-        finally:
-            if save_learner:
-                self._learner = temp  # type: ignore
-
-        return _path, _filename
+        return full_path
 
     def _prepare_training(self, history: History) -> TrainingData[LabelType]:
         '''
@@ -328,3 +312,10 @@ class Agent(NoLearnAgent, Generic[LabelType]):
                     self.statistic.append(stat_name, subject_id)
 
                 return
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+
+        state['_learner'] = type(self._learner)
+
+        return state

@@ -6,7 +6,7 @@ Dense class
 The Dense learner.
 '''
 import pathlib
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -186,9 +186,8 @@ class Dense_tf_1(Learner[float]):
 
     def save(self,
              filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+             path: Optional[Union[str, pathlib.PurePath]] = None
+             ) -> pathlib.PurePath:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
 
@@ -210,16 +209,19 @@ class Dense_tf_1(Learner[float]):
             a `Path` object to the location of the saved file and its name
             as `str`
         '''
-        p, f = super().save(
-            filename, path,
-            tuple(attr for attr in self.__dict__.keys()
-                  if attr not in ('_session', '_graph', '_model')))
+        _path = super().save(filename, path)
 
-        with self._session.as_default():
-            with self._graph.as_default():
-                self._model.save(p / f'{f}.tf')
+        try:
+            with self._session.as_default():
+                with self._graph.as_default():
+                    self._model.save(
+                        pathlib.Path(
+                            _path.parent, f'{_path.stem}.tf').resolve())
+        except ValueError:
+            self._logger.warning(
+                'Model is not compiled. Skipped saving the model.')
 
-        return p, f
+        return _path
 
     def load(self,
              filename: str,
@@ -246,8 +248,13 @@ class Dense_tf_1(Learner[float]):
         self._graph = tf.Graph()  # type: ignore
         with self._graph.as_default():
             self._session = keras.backend.get_session()
-            self._model = keras.models.load_model(
-                pathlib.Path(_path, f'{filename}.tf'))
+
+            if self._ann_ready:
+                self._model = keras.models.load_model(
+                    pathlib.Path(
+                        _path, f'{filename}.tf').resolve())
+            else:
+                self._model = keras.models.Sequential()
 
             self._tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self._tensorboard_path)
@@ -258,6 +265,24 @@ class Dense_tf_1(Learner[float]):
                     keras.callbacks.LearningRateScheduler(
                         self._learning_rate.new_rate, verbose=0)
                 self._callbacks.append(learning_rate_scheduler)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+
+        del state['_session']
+        del state['_graph']
+        del state['_model']
+
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        logger_data = state["_logger"]
+        self.__dict__.update(state)
+
+        self._logger = Logger(
+            logger_name=logger_data['name'],
+            logger_level=logger_data['level'],
+            logger_filename=logger_data['filename'])
 
 
 class Dense_tf_2(Learner[float]):
@@ -418,9 +443,8 @@ class Dense_tf_2(Learner[float]):
     def save(
             self,
             filename: Optional[str] = None,
-            path: Optional[Union[str, pathlib.PurePath]] = None,
-            data_to_save: Optional[Tuple[str, ...]] = None
-            ) -> Tuple[pathlib.PurePath, str]:
+            path: Optional[Union[str, pathlib.PurePath]] = None
+            ) -> pathlib.PurePath:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
 
@@ -442,18 +466,16 @@ class Dense_tf_2(Learner[float]):
             a `Path` object to the location of the saved file and its name
             as `str`
         '''
-        p, f = super().save(
-            filename, path,
-            tuple(attr for attr in self.__dict__.keys()
-                  if attr not in ('_session', '_graph', '_model')))
+        _path = super().save(filename, path)
 
         try:
-            self._model.save(pathlib.Path(p, f'{f}.tf').resolve())
+            self._model.save(pathlib.Path(
+                _path.parent, f'{_path.stem}.tf').resolve())
         except ValueError:
             self._logger.warning(
                 'Model is not compiled. Skipped saving the model.')
 
-        return p, f
+        return _path
 
     def load(
             self,
@@ -480,7 +502,7 @@ class Dense_tf_2(Learner[float]):
         _path = path or '.'
         if self._ann_ready:
             self._model = keras.models.load_model(
-                pathlib.Path(_path, f'{filename}.tf'))
+                pathlib.Path(_path, f'{filename}.tf').resolve())
         else:
             self._model = keras.models.Sequential()
 
@@ -493,6 +515,26 @@ class Dense_tf_2(Learner[float]):
                 keras.callbacks.LearningRateScheduler(
                     self._learning_rate.new_rate, verbose=0)
             self._callbacks.append(learning_rate_scheduler)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+
+        del state['_session']
+        del state['_graph']
+        del state['_model']
+
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        logger_data = state["_logger"]
+        self.__dict__.update(state)
+
+        self._logger = Logger(
+            logger_name=logger_data['name'],
+            logger_level=logger_data['level'],
+            logger_filename=logger_data['filename'])
+
+
 
 
 if tf.__version__[0] == '1':  # type: ignore

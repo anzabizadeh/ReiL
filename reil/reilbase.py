@@ -8,29 +8,11 @@ The base class for reinforcement learning
 
 from __future__ import annotations
 
-import bz2
-import copy
-import importlib
-import logging
 import pathlib
-import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
-import dill
-from ruamel.yaml import YAML
-
-import reil
-
-Parsable = Union[Dict[str, Any], Any]
-
-
-class CustomUnPickler(dill.Unpickler):
-    def find_class(self, module: str, name: str) -> Any:
-        if name == 'MockStatistic':
-            from reil.datatypes.mock_statistic import MockStatistic
-            return MockStatistic
-
-        return super().find_class(module, name)  # type: ignore
+from reil.logger import Logger
+from reil.pickler import PickleMe
 
 
 class ReilBase:
@@ -107,20 +89,11 @@ class ReilBase:
             '_' + p
             for p in (persistent_attributes or [])]
 
-        self._logger_name = logger_name or self._name
-        self._logger_level = logger_level or logging.WARNING
-        self._logger_filename = logger_filename
-
-        self._logger = logging.getLogger(self._logger_name)
-        self._logger.setLevel(self._logger_level)
-        if self._logger_filename is None:
-            handler = logging.StreamHandler()
-        else:
-            handler = logging.FileHandler(self._logger_filename)
-
-        handler.setFormatter(logging.Formatter(
-            fmt=' %(name)s :: %(levelname)-8s :: %(message)s'))
-        self._logger.addHandler(handler)
+        self._logger = Logger(
+            logger_name=logger_name or self._name,
+            logger_level=logger_level,
+            logger_filename=logger_filename
+        )
 
         self.set_params(**kwargs)
 
@@ -149,156 +122,11 @@ class ReilBase:
             A `ReilBase` instance.
         '''
         instance = cls._empty_instance()
-        instance._logger_name = instance.__class__.__qualname__
-        instance._logger_level = logging.WARNING
-        instance._logger_filename = None
-        instance._logger = logging.getLogger(instance._logger_name)
-        if not instance._logger.hasHandlers():
-            instance._logger.setLevel(instance._logger_level)
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter(
-                fmt=' %(name)s :: %(levelname)-8s :: %(message)s'))
-            instance._logger.addHandler(handler)
+        instance._logger = Logger(logger_name=instance.__class__.__qualname__)
 
         instance.load(filename=filename, path=path)
 
         return instance
-
-    @classmethod
-    def from_yaml_file(
-            cls, node_reference: Tuple[str, ...],
-            filename: str,
-            path: Optional[Union[pathlib.PurePath, str]] = None):
-        '''
-        Create an instance based on a yaml file.
-
-        Arguments
-        ---------
-        node_reference:
-            A list of node names that determines the location of the
-            specification in the yaml tree.
-
-        filename:
-            Name of the pickle file.
-
-        path:
-            Path of the pickle file.
-
-        Returns
-        -------
-        :
-            The generated instance.
-        '''
-        _path = pathlib.Path(path or '.')
-        _filename = filename if filename.endswith((
-            '.yaml', '.yml')) else f'{filename}.yaml'
-
-        yaml = YAML()
-        with open(_path / _filename, 'r') as f:
-            yaml_output: Dict[str, Any] = yaml.load(f)  # type: ignore
-
-        temp_yaml = yaml_output
-        for key in node_reference:
-            temp_yaml = temp_yaml[key]
-
-        return cls.parse_yaml(temp_yaml)
-
-    @staticmethod
-    def parse_yaml(data: Parsable) -> Parsable:
-        '''
-        Parse a yaml tree.
-
-        This method reads a yaml tree and recursively creates objects specified
-        by it.
-
-        Arguments
-        ---------
-        data:
-            A yaml tree data.
-
-        Returns
-        -------
-        :
-            Based on the tree, the method returns:
-
-            * A python object, e.g. `int`, `float`, `str`.
-            * A dictionary of arguments and their values to be fed to the
-              'parse_yaml` caller.
-            * An instance of an object derived from `ReilBase`.
-        '''
-        if isinstance(data, (int, float)):
-            return data
-
-        if isinstance(data, str):
-            if data.startswith('lambda'):
-                return eval(data, {})
-            if data.startswith('eval'):
-                return eval(data[4:], {})
-            return data
-
-        if 'eval' in data:
-            args = {'reil': reil}
-            if 'args' in data:
-                args.update(ReilBase.parse_yaml(data['args']))
-            return eval(data['eval'], args)
-
-        if len(data) == 1:
-            k, v = next(iter(data.items()))
-            result = ReilBase._create_component_from_yaml(k, v)
-            if result is not None:
-                return result
-
-        args: Dict[str, Any] = {}
-        for k, v in data.items():
-            if isinstance(v, dict):
-                args[k] = ReilBase.parse_yaml(v)  # type: ignore
-            elif isinstance(v, list):
-                args[k] = [
-                    ReilBase.parse_yaml(v_i) for v_i in v]  # type: ignore
-            elif isinstance(v, str):
-                args[k] = ReilBase.parse_yaml(v)
-            else:
-                args[k] = v
-
-        return args
-
-    @staticmethod
-    def _create_component_from_yaml(name: str, args: Dict[str, Any]):
-        '''
-        Create a component from yaml data.
-
-        This method attempts to import the `reil` class specified in `name`,
-        parse arguments specified in `args` and create an instance of the
-        class using the parsed arguments. If such class does not exist,
-        `None` will be returned.
-
-        Arguments
-        ---------
-        name:
-            Name of the object to be created.
-
-        args:
-            A yaml tree section that contains arguments and values to create
-            the object.
-
-        Returns
-        -------
-        :
-            The created object or `None`.
-        '''
-        temp = name.split('.')
-        try:
-            module = importlib.import_module('.'.join(temp[:-1]))
-        except ValueError:
-            return None
-
-        f = getattr(module, temp[-1])
-        if hasattr(f, 'parse_yaml'):
-            result = f(**f.parse_yaml(args))
-        else:
-            result = f(**ReilBase.parse_yaml(args))
-
-        return result
 
     def set_params(self, **params: Dict[str, Any]) -> None:
         '''
@@ -334,67 +162,29 @@ class ReilBase:
         RuntimeError
             Corrupted or inaccessible data file.
         '''
-        _filename = (
-            filename if filename.endswith(('.pkl', '.pbz2'))
-            else f'{filename}{".pbz2" if self._save_zipped else ".pkl"}'
+        pickler = PickleMe.get('pbz2' if self._save_zipped else 'pkl')
+        new_instance = pickler.load(filename=filename, path=path or self._path)
+
+        self._logger.info(
+            f'Changing the logger from {self._logger._name} '
+            f'to {new_instance.__dict__["_logger"]._name}.')
+
+        persistent_attributes = set(
+            self._persistent_attributes + ['_persistent_attributes'])
+
+        self.__dict__.update(
+            {
+                key: value
+                for key, value in new_instance.__dict__.items()
+                if key not in persistent_attributes
+            }
         )
-
-        full_path = pathlib.Path(path or self._path) / _filename
-        file_handler, mode = (
-            bz2.BZ2File, 'r') if self._save_zipped else (open, 'rb')
-
-        data: Dict[str, Any]
-        for i in range(1, 6):
-            try:
-                try:
-                    with file_handler(full_path, mode) as f:
-                        data = dill.load(f)  # type: ignore
-                except AttributeError:
-                    self._logger.warning(
-                        f'dill failed to load {full_path}. '
-                        'Using CustomUnpickler.')
-                    with file_handler(full_path, mode) as f:
-                        data = CustomUnPickler(f).load()
-            except FileNotFoundError:
-                raise
-            except (EOFError, OSError):
-                self._logger.info(
-                    f'Attempt {i} failed to load '
-                    f'{full_path}.')
-                time.sleep(1)
-
-            else:  # if data is not None:
-                self._logger.info(
-                    'Changing the logger from '
-                    f'{self._logger_name} to {data["_logger_name"]}.')
-
-                persistent_attributes = self._persistent_attributes + \
-                    ['_persistent_attributes']
-                for key, value in data.items():
-                    if key not in persistent_attributes:
-                        self.__dict__[key] = value
-
-                self._logger = logging.getLogger(self._logger_name)
-                self._logger.setLevel(self._logger_level)
-                if self._logger_filename is not None:
-                    self._logger.addHandler(
-                        logging.FileHandler(self._logger_filename))
-
-                return
-
-        self._logger.exception(
-            'Corrupted or inaccessible data file: '
-            f'{full_path}')
-        raise RuntimeError(
-            f'Corrupted or inaccessible data file: '
-            f'{full_path}')
 
     def save(
         self,
         filename: Optional[str] = None,
-        path: Optional[Union[str, pathlib.PurePath]] = None,
-        data_to_save: Optional[Tuple[str, ...]] = None
-    ) -> Tuple[pathlib.PurePath, str]:
+        path: Optional[Union[str, pathlib.PurePath]] = None
+    ) -> pathlib.PurePath:
         '''
         Save the object to a file.
 
@@ -406,42 +196,16 @@ class ReilBase:
         path:
             the path in which the file should be saved.
 
-        data_to_save:
-            a list of variables that should be pickled. If omitted,
-            the object is saved completely.
-
         Returns
         -------
         :
             a `Path` object to the location of the saved file and its name
             as `str`
         '''
-        if data_to_save is None:
-            data = self.__dict__
-        else:
-            data = {d: self.__dict__[d]
-                    for d in list(data_to_save) + ['_name', '_path']}
-
-        temp = None
-        if '_logger' in data:
-            temp = copy.deepcopy(self._logger)
-            data.pop('_logger')
-
-        _filename = filename or self._name
-        _path = pathlib.Path(path or self._path)
-        _path.mkdir(parents=True, exist_ok=True)
-
-        if self._save_zipped:
-            with bz2.BZ2File(_path / f'{_filename}.pbz2', 'w') as f:
-                dill.dump(data, f, dill.HIGHEST_PROTOCOL)  # type: ignore
-        else:
-            with open(_path / f'{_filename}.pkl', 'wb+') as f:
-                dill.dump(data, f, dill.HIGHEST_PROTOCOL)  # type: ignore
-
-        if temp:
-            self._logger = temp
-
-        return pathlib.PurePath(_path), _filename
+        pickler = PickleMe.get('pbz2' if self._save_zipped else 'pkl')
+        return pickler.dump(
+            obj=self, filename=filename or self._name,
+            path=path or self._path)
 
     def reset(self) -> None:
         ''' Reset the object.'''
@@ -449,3 +213,23 @@ class ReilBase:
 
     def __repr__(self) -> str:
         return self.__class__.__qualname__
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+
+        state['_logger'] = {
+            'name': self._logger._name,
+            'level': self._logger._level,
+            'filename': self._logger._filename,
+        }
+
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        logger_data = state["_logger"]
+        self.__dict__.update(state)
+
+        self._logger = Logger(
+            logger_name=logger_data['name'],
+            logger_level=logger_data['level'],
+            logger_filename=logger_data['filename'])

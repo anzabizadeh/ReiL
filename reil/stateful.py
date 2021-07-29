@@ -63,10 +63,11 @@ class Stateful(reilbase.ReilBase):
         self.sub_comp_list = self._extract_sub_components()
         self.state = PrimaryComponent(
             self, self.sub_comp_list, self._default_state_definition,
-            dumper=state_dumper)
+            dumper=state_dumper, pickle_stripped=True)
         self.statistic = Statistic(
             name='statistic', primary_component=self.state,
-            default_definition=self._default_statistic_definition)
+            default_definition=self._default_statistic_definition,
+            pickle_stripped=True)
 
         self._entity_list = EntityRegister(
             min_entity_count=min_entity_count,
@@ -194,43 +195,39 @@ class Stateful(reilbase.ReilBase):
         '''
         self._entity_list.remove(entity_id)
 
-    def load(
-            self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    # def save(
+    #         self, filename: Optional[str] = None,
+    #         path: Optional[Union[str, pathlib.PurePath]] = None,
+    # ) -> pathlib.PurePath:
 
-        super().load(filename, path=path)
+    #     object_ref_temp, self.state.object_ref = self.state.object_ref, None
+    #     state_default, self.state._default = self.state._default, None
+
+    #     prim_comp, self.statistic._primary_component = (  # type: ignore
+    #         self.statistic._primary_component, None)
+    #     statistic_default, self.statistic._default = (
+    #         self.statistic._default, None)
+
+    #     try:
+    #         _path = super().save(filename=filename, path=path)
+    #     finally:
+    #         self.state.object_ref = object_ref_temp
+    #         self.state._default = state_default
+
+    #         self.statistic._primary_component = prim_comp
+    #         self.statistic._default = statistic_default
+
+    #     return _path
+
+    def reset(self):
+        super().reset()
+        self._entity_list.clear()
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
 
         self.state.object_ref = self
         self.statistic.set_primary_component(self.state)
         self.state.set_default_definition(self._default_state_definition)
         self.statistic.set_default_definition(
             self._default_statistic_definition)
-
-    def save(
-            self, filename: Optional[str] = None,
-            path: Optional[Union[str, pathlib.PurePath]] = None,
-            data_to_save: Optional[Tuple[str, ...]] = None
-    ) -> Tuple[pathlib.PurePath, str]:
-
-        object_ref_temp, self.state.object_ref = self.state.object_ref, None
-        state_default, self.state._default = self.state._default, None
-
-        prim_comp, self.statistic._primary_component = (  # type: ignore
-            self.statistic._primary_component, None)
-        statistic_default, self.statistic._default = (
-            self.statistic._default, None)
-
-        try:
-            f, p = super().save(filename, path=path, data_to_save=data_to_save)
-        finally:
-            self.state.object_ref = object_ref_temp
-            self.state._default = state_default
-
-            self.statistic._primary_component = prim_comp
-            self.statistic._default = statistic_default
-
-        return f, p
-
-    def reset(self):
-        super().reset()
-        self._entity_list.clear()

@@ -7,7 +7,7 @@ This `subject` class is the base class of all subject classes.
 '''
 
 import pathlib
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from reil import stateful
 from reil.datatypes.components import SecondayComponent
@@ -41,13 +41,13 @@ class Subject(stateful.Stateful):
             name='reward',
             primary_component=self.state,
             default_definition=self._default_reward_definition,
-            enabled=False)
+            enabled=False, pickle_stripped=True)
 
         self.possible_actions = SecondayComponent[Tuple[FeatureArray, ...]](
             name='action',
             primary_component=self.state,
             default_definition=self._default_action_definition,
-            enabled=True)
+            enabled=True, pickle_stripped=True)
 
     def _default_reward_definition(self, _id: Optional[int] = None) -> float:
         return 0.0
@@ -118,30 +118,30 @@ class Subject(stateful.Stateful):
         super().reset()
         self.reward.disable()
 
-    def load(
-            self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    # def save(
+    #         self, filename: Optional[str] = None,
+    #         path: Optional[Union[str, pathlib.PurePath]] = None
+    # ) -> pathlib.PurePath:
 
-        super().load(filename, path=path)
+    #     prim_comp, self.reward._primary_component = (  # type: ignore
+    #         self.reward._primary_component, None)
+    #     reward_default, self.reward._default = (
+    #         self.reward._default, None)
+    #     try:
+    #         _path = super().save(filename, path=path)
+    #     finally:
+    #         self.reward._primary_component = prim_comp
+    #         self.reward._default = reward_default
+
+    #     return _path
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
 
         self.reward.set_primary_component(self.state)
         self.reward.set_default_definition(
             self._default_reward_definition)
 
-    def save(
-            self, filename: Optional[str] = None,
-            path: Optional[Union[str, pathlib.PurePath]] = None,
-            data_to_save: Optional[Tuple[str, ...]] = None
-    ) -> Tuple[pathlib.PurePath, str]:
-
-        prim_comp, self.reward._primary_component = (  # type: ignore
-            self.reward._primary_component, None)
-        reward_default, self.reward._default = (
-            self.reward._default, None)
-        try:
-            f, p = super().save(filename, path=path, data_to_save=data_to_save)
-        finally:
-            self.reward._primary_component = prim_comp
-            self.reward._default = reward_default
-
-        return f, p
+        self.possible_actions.set_primary_component(self.state)
+        self.possible_actions.set_default_definition(
+            self._default_action_definition)

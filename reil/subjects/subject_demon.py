@@ -159,18 +159,17 @@ class SubjectDemon(ReilBase):
 
         return original_set
 
-    def load(
-            self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]]) -> None:
-        super().load(filename, path)
+    # def load(
+    #         self, filename: str,
+    #         path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    #     super().load(filename, path)
 
-    def save(
-            self,
-            filename: Optional[str] = None,
-            path: Optional[Union[str, pathlib.PurePath]] = None,
-            data_to_save: Optional[Tuple[str, ...]] = None
-    ) -> Tuple[pathlib.PurePath, str]:
-        return super().save(filename, path, data_to_save)
+    # def save(
+    #         self,
+    #         filename: Optional[str] = None,
+    #         path: Optional[Union[str, pathlib.PurePath]] = None
+    # ) -> pathlib.PurePath:
+    #     return super().save(filename, path)
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         return self._subject.register(entity_name, _id)

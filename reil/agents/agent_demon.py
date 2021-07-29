@@ -73,8 +73,9 @@ class AgentDemon(Agent[LabelType]):
 
         return self
 
-    def load(self, filename: str,
-             path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    def load(
+            self, filename: str,
+            path: Optional[Union[str, pathlib.PurePath]]) -> None:
         _path = pathlib.Path(path or self._path)
         super().load(filename, _path)
 
@@ -85,49 +86,20 @@ class AgentDemon(Agent[LabelType]):
 
         self.__call__(self._main_agent)
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None,
-             data_to_save: Optional[Tuple[str, ...]] = None
-             ) -> Tuple[pathlib.PurePath, str]:
+    def save(
+            self,
+            filename: Optional[str] = None,
+            path: Optional[Union[str, pathlib.PurePath]] = None
+    ) -> pathlib.PurePath:
 
-        temp_main = self._main_agent
-        temp_sub = self._sub_agent
+        full_path = super().save(filename, path)
+        if self._main_agent:
+            self._main_agent.save(
+                full_path.name, full_path.parent / 'main_agent')
+        self._sub_agent.save(
+            full_path.name, full_path.parent / 'sub_agent')
 
-        data = list(data_to_save or self.__dict__)
-        save_main = '_main_agent' in data
-        save_sub = '_sub_agent' in data
-        if save_main:
-            self._main_agent = type(self._main_agent)
-
-        if save_sub:
-            self._sub_agent = type(self._sub_agent)  # type: ignore
-
-        if 'state' in data:
-            data.remove('state')
-
-        if 'statistic' in data:
-            data.remove('statistic')
-
-        _path = pathlib.Path(path or self._path)
-        _filename = filename or self._name
-
-        try:
-            super().save(
-                _filename, _path, data_to_save=tuple(data))
-            if save_main:
-                self._main_agent = temp_main
-                if self._main_agent:
-                    self._main_agent.save(_filename, _path / 'main_agent')
-            if save_sub:
-                self._sub_agent = temp_sub
-                self._sub_agent.save(_filename, _path / 'sub_agent')
-        finally:
-            if save_main:
-                self._main_agent = temp_main
-                self._sub_agent = temp_sub
-
-        return _path, _filename
+        return full_path
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         if self._main_agent is None:
@@ -210,3 +182,13 @@ class AgentDemon(Agent[LabelType]):
             raise ValueError('main_agent is not set.')
 
         self._main_agent.learn(history)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+
+        state['_main_agent'] = type(self._main_agent)
+        state['_sub_agent'] = type(self._sub_agent)
+        del state['state']
+        del state['statistic']
+
+        return state

@@ -41,13 +41,14 @@ class PrimaryComponent:
     '''
 
     def __init__(
-        self,
-        object_ref: object,
-        available_sub_components: Optional[Dict[str, SubComponentInfo]] = None,
-        default_definition: Optional[Callable[[
-            Optional[int]], FeatureArray]] = None,
-        dumper: Optional[FeatureArrayDumper] = None
-    ) -> None:
+            self,
+            object_ref: object,
+            available_sub_components: Optional[
+                Dict[str, SubComponentInfo]] = None,
+            default_definition: Optional[Callable[[
+                Optional[int]], FeatureArray]] = None,
+            dumper: Optional[FeatureArrayDumper] = None,
+            pickle_stripped: bool = False):
         '''
         Parameters
         ----------
@@ -65,6 +66,7 @@ class PrimaryComponent:
         self.object_ref = object_ref
         self._default = default_definition
         self._dumper = dumper
+        self._pickle_stripped = pickle_stripped
 
     @property
     def sub_components(self) -> Dict[str, SubComponentInfo]:
@@ -232,6 +234,16 @@ class PrimaryComponent:
                 component=self.__call__(name, _id),
                 additional_info=additional_info)
 
+    def __getstate__(self):
+        if not self._pickle_stripped:
+            return self.__dict__
+
+        state = self.__dict__.copy()
+        state['object_ref'] = None
+        state['_default'] = None
+
+        return state
+
 
 class SecondayComponent(Generic[ComponentReturnType]):
     '''
@@ -245,7 +257,8 @@ class SecondayComponent(Generic[ComponentReturnType]):
             primary_component: Optional[PrimaryComponent] = None,
             default_definition: Optional[Callable[[
                 Optional[int]], ComponentReturnType]] = None,
-            enabled: bool = True):
+            enabled: bool = True,
+            pickle_stripped: bool = False):
         '''
 
         Parameters
@@ -267,6 +280,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
         self._primary_component = primary_component
         self._default = default_definition
         self._enabled = enabled
+        self._pickle_stripped = pickle_stripped
 
         self._definitions: Dict[
             str, SubComponentInstance[str]] = defaultdict(None)
@@ -430,6 +444,16 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
         return d.fn(p)
 
+    def __getstate__(self):
+        if not self._pickle_stripped:
+            return self.__dict__
+
+        state = self.__dict__.copy()
+        state['_primary_component'] = None
+        state['_default'] = None
+
+        return state
+
 
 class Statistic:
     '''
@@ -443,7 +467,8 @@ class Statistic:
             primary_component: Optional[PrimaryComponent] = None,
             default_definition: Optional[Callable[[
                 Optional[int]], Tuple[FeatureArray, float]]] = None,
-            enabled: bool = True):
+            enabled: bool = True,
+            pickle_stripped: bool = False):
         '''
 
         Parameters
@@ -465,6 +490,7 @@ class Statistic:
         self._primary_component = primary_component
         self._default = default_definition
         self._enabled = enabled
+        self._pickle_stripped = pickle_stripped
 
         self._definitions: Dict[
             str, SubComponentInstance[Tuple[str, str]]] = defaultdict(None)
@@ -697,3 +723,13 @@ class Statistic:
             self._history_none: List[Tuple[FeatureArray, float]] = []
 
         return result
+
+    def __getstate__(self):
+        if not self._pickle_stripped:
+            return self.__dict__
+
+        state = self.__dict__.copy()
+        state['_primary_component'] = None
+        state['_default'] = None
+
+        return state

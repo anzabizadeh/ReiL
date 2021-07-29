@@ -703,7 +703,7 @@ class Environment(stateful.Stateful):
             self, filename: Optional[str] = None,
             path: Optional[Union[str, pathlib.PurePath]] = None,
             entity_names: Optional[List[str]] = None
-    ) -> Tuple[pathlib.PurePath, str]:
+    ) -> pathlib.PurePath:
         '''
         Save an entity or the `environment` to a file.
 
@@ -748,7 +748,7 @@ class Environment(stateful.Stateful):
 
             try:
                 for name, entity in self._instance_generators.items():
-                    _, filename = entity.save(
+                    filename, _ = entity.save(
                         path=_path / f'{_filename}.instance_generators',
                         filename=name)
                     self._env_data['instance_generators'].append(
@@ -758,7 +758,7 @@ class Environment(stateful.Stateful):
                     if name in self._instance_generators:
                         self._env_data['agents'].append((name, None))
                     else:
-                        _, filename = agent.save(
+                        filename, _ = agent.save(
                             path=_path / f'{_filename}.agents', filename=name)
                         self._env_data['agents'].append(
                             (filename, type(agent)))
@@ -767,21 +767,21 @@ class Environment(stateful.Stateful):
                     if name in self._instance_generators:
                         self._env_data['subjects'].append((name, None))
                     else:
-                        _, filename = subject.save(
+                        filename, _ = subject.save(
                             path=_path / f'{_filename}.subjects',
                             filename=name)
                         self._env_data['subjects'].append(
                             (filename, type(subject)))
 
                 for name, agent_demon in self._agent_demons.items():
-                    _, filename = agent_demon.save(
+                    filename, _ = agent_demon.save(
                         path=_path / f'{_filename}.agent_demons',
                         filename=name)
                     self._env_data['agent_demons'].append(
                         (filename, type(agent_demon)))
 
                 for name, subject_demon in self._subject_demons.items():
-                    _, filename = subject_demon.save(
+                    filename, _ = subject_demon.save(
                         path=_path / f'{_filename}.subject_demons',
                         filename=name)
                     self._env_data['subject_demons'].append(
@@ -825,7 +825,7 @@ class Environment(stateful.Stateful):
                     self._logger.warning(f'Cannot save {obj} individually. '
                                          'Try saving the whole environment.')
 
-        return _path, _filename
+        return _filename, _path
 
     def report_statistics(
             self,
