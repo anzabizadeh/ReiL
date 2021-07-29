@@ -198,7 +198,7 @@ class Lenzini(dp.DosingProtocol):
 
         # Since on day 4, we don't have dose-4, a zero is padded to avoid
         # producing error in the run time.
-        dose_4, dose_3, dose_2 = ([0] + patient['dose_history'])[-4:-1]
+        dose_4, dose_3, dose_2 = ([0] + list(patient['dose_history']))[-4:-1]
 
         dose = exp(3.10894
                    - 0.00767 * age
