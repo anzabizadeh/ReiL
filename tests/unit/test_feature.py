@@ -130,7 +130,7 @@ class testFeature(unittest.TestCase):
             {reilarray['cats'].name: reilarray['cats'].categories,
              reilarray['nums'].name: reilarray['nums'].categories})
 
-        self.assertEqual(reilarray.normalized.flatten(),
+        self.assertEqual(reilarray.normalized.flattened,
                          list(reilarray['cats'].normalized) +
                          [reilarray['nums'].normalized])
 

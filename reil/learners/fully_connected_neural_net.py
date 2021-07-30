@@ -141,7 +141,7 @@ class Dense_tf_1(Learner[float]):
         :
             The predicted `y`.
         '''
-        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
+        _X: List[List[Any]] = [x.normalized.flattened for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -164,7 +164,7 @@ class Dense_tf_1(Learner[float]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X: List[List[Any]] = [x.normalized.flatten() for x in X]
+        _X: List[List[Any]] = [x.normalized.flattened for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -401,7 +401,7 @@ class Dense_tf_2(Learner[float]):
         :
             The predicted `y`.
         '''
-        _X: List[List[float]] = [x.normalized.flatten() for x in X]
+        _X: List[List[float]] = [x.normalized.flattened for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -422,7 +422,7 @@ class Dense_tf_2(Learner[float]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X: List[List[float]] = [x.normalized.flatten() for x in X]
+        _X: List[List[float]] = [x.normalized.flattened for x in X]
         if not self._ann_ready:
             self._input_length = len(_X[0])
             self._generate_network()

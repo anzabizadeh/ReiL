@@ -13,6 +13,7 @@ dictionary that contains instances of `Feature`.
 from __future__ import annotations
 
 import dataclasses
+from functools import cached_property
 import itertools
 from typing import (Any, Callable, Dict, Generic, Iterable, Literal, Optional,
                     Tuple, TypeVar, Union)
@@ -101,6 +102,7 @@ class Feature(Generic[T]):
         return cls(name=name, value=value, is_numerical=False,
                    categories=categories, normalized=normalized)
 
+    @cached_property
     def as_dict(self):
         '''
         Return the data as a dictionary.
@@ -416,16 +418,8 @@ class FeatureArray:
                 raise TypeError(f'Unknown input type {type(d)} for item: {d}')
 
         self._data = temp
-        self._clear_temps()
 
-    def _clear_temps(self):
-        self._value: Union[Dict[str, Any], None] = None
-        self._lower: Union[Dict[str, Any], None] = None
-        self._upper: Union[Dict[str, Any], None] = None
-        self._categories: Union[Dict[str, Any], None] = None
-        self._is_numerical: Union[Dict[str, Any], None] = None
-
-    @property
+    @cached_property
     def value(self):
         '''
         Return a dictionary with elements' names as keys and
@@ -436,13 +430,9 @@ class FeatureArray:
         :
             Names of the elements and their values.
         '''
-        if self._value is None:
-            self._value = {name: v.value
-                           for name, v in self._data.items()}
+        return {name: v.value for name, v in self._data.items()}
 
-        return self._value
-
-    @property
+    @cached_property
     def lower(self):
         '''
         Return all `lower` attributes.
@@ -453,13 +443,9 @@ class FeatureArray:
             `lower` attribute of all `NumericalData` variables with their names
             as keys.
         '''
-        if self._lower is None:
-            self._lower = {name: v.lower
-                           for name, v in self._data.items()}
+        return {name: v.lower for name, v in self._data.items()}
 
-        return self._lower
-
-    @property
+    @cached_property
     def upper(self):
         '''
         Return all `upper` attributes.
@@ -470,13 +456,9 @@ class FeatureArray:
             `upper` attribute of all `NumericalData` variables with their names
             as keys.
         '''
-        if self._upper is None:
-            self._upper = {name: v.upper
-                           for name, v in self._data.items()}
+        return {name: v.upper for name, v in self._data.items()}
 
-        return self._upper
-
-    @property
+    @cached_property
     def categories(self):
         '''
         Return all `categories` attributes.
@@ -487,14 +469,9 @@ class FeatureArray:
             `categories` attribute of all `CategoricalData` variables with
             their names as keys.
         '''
-        if self._categories is None:
-            self._categories = {name:
-                                v.categories
-                                for name, v in self._data.items()}
+        return {name: v.categories for name, v in self._data.items()}
 
-        return self._categories
-
-    @property
+    @cached_property
     def normalized(self):
         '''
         Normalize all items in the instance.
@@ -510,7 +487,8 @@ class FeatureArray:
             (v.normalized)  # type: ignore
             for name, v in self._data.items())
 
-    def flatten(self):
+    @cached_property
+    def flattened(self):
         """Combine values of all items in the instance.
 
         Returns
@@ -521,8 +499,9 @@ class FeatureArray:
         def make_iterable(x: Any) -> Iterable[Any]:
             return x if hasattr(x, '__iter__') else [x]
 
-        return list(itertools.chain(*[make_iterable(sublist)
-                                      for sublist in self.value.values()]))
+        return list(
+            itertools.chain(
+                *[make_iterable(sublist) for sublist in self.value.values()]))
 
     def split(self):
         """Split the `FeatureArray` into a list of `FeatureArray`s.
@@ -537,7 +516,7 @@ class FeatureArray:
             if not isinstance(d.value, (list, tuple)):
                 splitted_list = FeatureArray(d)
             else:
-                temp = d.as_dict()
+                temp = d.as_dict
                 cls = type(d)
                 value = temp['value']
                 del temp['value']
