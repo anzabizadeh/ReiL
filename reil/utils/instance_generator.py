@@ -83,7 +83,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         self._object = obj
 
         self._instance_name_lists: Tuple[Iterable[str], ...] = ()
-        self._enumerate: enumerate[str] = enumerate([''])
+        self._enumerate: enumerate[Any] = enumerate([''])
         self._instance_name_index: Union[int, None] = None
 
         self._save_instances = save_instances
