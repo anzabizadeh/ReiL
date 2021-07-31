@@ -19,19 +19,13 @@ VariableEpsilonGreedy:
 '''
 import random
 import warnings
-from typing import Callable
-
-from reil import reilbase
+from typing import Callable, Protocol
 
 
-class ExplorationStrategy(reilbase.ReilBase):
+class ExplorationStrategy(Protocol):
     '''
     The base class for all exploration strategies.
     '''
-
-    def __init__(self) -> None:
-        pass
-
     def explore(self, iteration: int = 0) -> bool:
         '''
         Return `True` if the `agent` needs to explore.
@@ -49,7 +43,7 @@ class ExplorationStrategy(reilbase.ReilBase):
         return True
 
 
-class ConstantEpsilonGreedy(ExplorationStrategy):
+class ConstantEpsilonGreedy:
     '''
     An epsilon greedy object with constant epsilon.
     '''
@@ -87,7 +81,7 @@ class ConstantEpsilonGreedy(ExplorationStrategy):
         return random.random() < self._epsilon
 
 
-class VariableEpsilonGreedy(ExplorationStrategy):
+class VariableEpsilonGreedy:
     '''
     An epsilon greedy object with constant epsilon.
     '''
@@ -106,14 +100,14 @@ class VariableEpsilonGreedy(ExplorationStrategy):
             `epsilon` is not callable.
         '''
         if not callable(epsilon):
-            raise TypeError('epsilon should be callable. '
-                            'For constant epsilon, '
-                            'use `ConstantEpsilonGreedy` class.')
+            raise TypeError(
+                'epsilon should be callable. For constant epsilon, '
+                'use `ConstantEpsilonGreedy` class.')
         self._epsilon = epsilon
 
-    @classmethod
-    def _empty_instance(cls):
-        return cls(lambda e: 0.0)
+    # @classmethod
+    # def _empty_instance(cls):
+    #     return cls(lambda e: 0.0)
 
     def explore(self, iteration: int) -> bool:
         '''

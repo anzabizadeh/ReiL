@@ -16,7 +16,8 @@ from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
 from reil.datatypes.feature import FeatureArray
 from reil.learners import Learner
-from reil.utils.exploration_strategies import ExplorationStrategy
+from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
+                                               ExplorationStrategy)
 
 Feature_or_Tuple_of_Feature = Union[Tuple[FeatureArray, ...], FeatureArray]
 
@@ -77,7 +78,8 @@ class QLearning(Agent[float]):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(Learner._empty_instance(), Buffer(), ExplorationStrategy())
+        return cls(
+            Learner._empty_instance(), Buffer(), ConstantEpsilonGreedy())
 
     def _q(self,
            state: Feature_or_Tuple_of_Feature,
@@ -247,7 +249,7 @@ class QLearning(Agent[float]):
         max_q: float = np.max(q_values)
         result = tuple(
             actions[i]  # type: ignore
-            for i in np.flatnonzero(q_values == max_q))
+            for i in np.flatnonzero(q_values == max_q))  # type: ignore
 
         return result
 
