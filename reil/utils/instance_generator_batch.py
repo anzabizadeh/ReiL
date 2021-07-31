@@ -10,13 +10,14 @@ an iterator.
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Dict, Iterable, Optional, Tuple, TypeVar, Union
+import time
 from copy import deepcopy
+from typing import Any, Dict, Iterable, Optional, Tuple, TypeVar, Union
+
 from reil import stateful
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
-from reil.utils.instance_generator import InstanceGenerator
 from reil.pickler import PickleMe
-
+from reil.utils.instance_generator import InstanceGenerator
 
 T = TypeVar('T', bound=stateful.Stateful)
 
@@ -177,10 +178,6 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
         return end
 
     def _generate_batch(self):
-        # TODO: What if the loaded file has different number of instances
-        # or different format for names?!
-        # One idea is to just check the length and the first name to see if
-        # they match with what we want!
         new_instance: bool = True
         self._instances = {}
         from_number = (
@@ -191,14 +188,33 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
         pickler = PickleMe.get('pbz2' if self._save_zipped else 'pkl')
 
         if self._use_existing_instances:
-            try:
-                self._instances = pickler.load(
-                    filename=self._filename_pattern.format(
-                        n=self._stops_index),
-                    path=self._save_path)
-                new_instance = False
-            except FileNotFoundError:
-                pass
+            for _ in range(6):
+                try:
+                    self._instances = pickler.load(
+                        filename=self._filename_pattern.format(
+                            n=self._stops_index),
+                        path=self._save_path)
+                    new_instance = False
+                except FileNotFoundError:
+                    break
+                except RuntimeError:
+                    self._logger.info(f'Waiting for 20 secs.')
+                    time.sleep(20)
+                else:
+                    file_count = len(self._instances)
+                    expected_count = to_number - from_number
+                    if (file_count != expected_count):
+                        raise RuntimeError(
+                            f'The loaded file has {file_count} instances, '
+                            f'while expected {expected_count}.')
+
+                    expected_name = self._instance_name_pattern.format(
+                        n=from_number)
+
+                    if (first := next(iter(self._instances))) != expected_name:
+                        raise ValueError(
+                            f'The first loaded instance is {first}, '
+                            f'expected {expected_name}.')
 
         if not self._instances:
             self._instances = self.generate_instances(
@@ -212,7 +228,3 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
                 filename=self._filename_pattern.format(n=self._stops_index),
                 path=self._save_path)
         self._enumerate = enumerate(self._instances.items(), from_number)
-
-    def _generate_new_instance(
-            self, filename: Optional[str] = None) -> None:
-        raise NotImplementedError
