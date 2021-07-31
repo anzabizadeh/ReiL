@@ -1,3 +1,4 @@
+# type: ignore
 #%%
 import weka.core.jvm as jvm
 import weka.core.converters as converters
