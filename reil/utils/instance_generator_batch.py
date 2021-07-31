@@ -9,15 +9,13 @@ an iterator.
 
 from __future__ import annotations
 
-import os
 import pathlib
 from typing import Any, Dict, Iterable, Optional, Tuple, TypeVar, Union
 from copy import deepcopy
 from reil import stateful
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
-from reil.datatypes.mock_statistic import MockStatistic
 from reil.utils.instance_generator import InstanceGenerator
-from reil.pickler import LowLevelPickler, PickleMe
+from reil.pickler import PickleMe
 
 
 T = TypeVar('T', bound=stateful.Stateful)
@@ -124,9 +122,9 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
         result: Dict[str, T] = {}
         for i in range(from_number, to_number):
             name = instance_name_pattern.format(n=i)
+            obj.reset()
             obj._name = name
             result[name] = deepcopy(obj)
-            obj.reset()
 
         return result
 
@@ -197,7 +195,7 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
                 self._instances = pickler.load(
                     filename=self._filename_pattern.format(
                         n=self._stops_index),
-                    path=self._path)
+                    path=self._save_path)
                 new_instance = False
             except FileNotFoundError:
                 pass
@@ -212,7 +210,7 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
             pickler.dump(
                 obj=self._instances,
                 filename=self._filename_pattern.format(n=self._stops_index),
-                path=self._path)
+                path=self._save_path)
         self._enumerate = enumerate(self._instances.items(), from_number)
 
     def _generate_new_instance(
