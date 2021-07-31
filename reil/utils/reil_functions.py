@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-import functools
-from typing import Generic, List, Optional, Tuple, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
 
 from reil.datatypes.feature import FeatureArray
 from reil.utils.functions import in_range, interpolate, square_dist
@@ -28,22 +27,27 @@ class ReilFunction(Generic[TypeY, TypeX]):
     retrospective: bool = True
     interpolate: bool = True
 
+    def __post_init__(self):
+        choice = self.retrospective*2 + self.interpolate
+        if choice == 0:
+            self._fn = self._no_retro_no_inter
+        elif choice == 1:
+            self._fn = self._no_retro_inter
+        elif choice == 2:
+            self._fn = self._retro_no_inter
+        else:
+            self._fn = self._retro_inter
+
     def __call__(self, args: FeatureArray) -> float:
         temp = args.value
-        y: List[TypeY] = temp[self.y_var_name]
-        x: Optional[List[TypeX]] = (
-            temp[self.x_var_name] if self.x_var_name is not None else None)
-
-        fn = [functools.partial(self._no_retro_no_inter, y),
-              functools.partial(self._no_retro_inter, y, x),
-              functools.partial(self._retro_no_inter, y),
-              functools.partial(self._retro_inter, y, x)
-              ][self.retrospective*2 + self.interpolate]
+        fn_args: Dict[str, Any] = {'y': temp[self.y_var_name]}
+        if self.x_var_name:
+            fn_args['x'] = temp[self.x_var_name]
 
         try:
-            result = self.multiplier * fn()
+            result = self.multiplier * self._fn(**fn_args)
         except NotImplementedError:
-            result = self.multiplier * self._default_function(y, x)
+            result = self.multiplier * self._default_function(**fn_args)
 
         return result
 
