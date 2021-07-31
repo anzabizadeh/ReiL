@@ -7,7 +7,6 @@ from reil.datatypes import Entity, InteractionProtocol
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
 from reil.environments.environment_static_map import EnvironmentStaticMap
 from reil.environments.task import Task
-from reil.healthcare.trajectory_dumper import TrajectoryDumper
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 from reil.utils import InstanceGenerator
@@ -38,7 +37,7 @@ class Trajectory:
         self._state_name = state_name
         self._action_name = action_name
 
-    def run(
+    def run(  # noqa: C901
             self,
             trajectory_subjects: Union[InstanceGenerator[Subject], str],
             iteration: int,
@@ -119,54 +118,3 @@ class Trajectory:
         )
 
         t.run_env(env, iteration)
-
-
-if __name__ == '__main__':
-    configs = {
-        c: f'{c}.yaml'
-        for c in (
-            'sessions',
-            'tasks',
-            'agents',
-            'subjects',
-            'demons',
-            'interaction_protocols',
-        )
-    }
-    config_path = './Warfarin-Dosing/configs'
-
-    vars_dict = {
-        # 'session': None,
-        # 'project_path': None,
-        # 'env_filename': None,
-        'start_iteration': '0',
-        'h': '01',
-        'action': '237_15',
-        # 'sdemon': None,
-        'arm': 'aaa',
-        'size': '10000',
-        'size_tr': '10',
-        'iterations': '100',
-    }
-
-    parser = ConfigParser(
-        config_filenames=configs, config_path=config_path,
-        vars_dict=vars_dict)
-
-    t = Trajectory(
-        parser=parser, env_filename='h01_237_15_10k_validation_71',
-        env_path='Z:/experiments/h01_237_15_10k',
-        agent_name='protocol',
-        subject_name='patient_trajectory',
-        state_name='patient_w_dosing_01',
-        action_name='daily_15',
-        trajectory_name='patient_w_full_dosing',
-    )
-
-    t.run(
-        trajectory_subjects='object',
-        iteration=71,
-        subject_list=['10', '20', '30'],
-        subject_save_path='../experiments/data',
-        state_dumper=TrajectoryDumper('test', '../experiments/tr')
-    )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import pandas as pd
 from reil.datatypes.feature import FeatureArray
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
@@ -24,8 +24,10 @@ class TrajectoryDumper(FeatureArrayDumper):
                              for m in measure_names})
         temp.drop(temp.tail(1).index, inplace=True)  # type: ignore
         temp['dose'] = component_dict['daily_dose_history']
+        interval_history: List[int] = \
+            component_dict['interval_history']  # type: ignore
         temp['decision_points'] = [
-            a for t in component_dict['interval_history']
+            a for t in interval_history
             for a in ([1] + [0] * (t-1))]
 
         temp['day'] = temp.index + 1  # type: ignore

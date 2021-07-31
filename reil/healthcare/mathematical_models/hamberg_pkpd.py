@@ -192,12 +192,12 @@ class HambergPKPD(HealthMathModel):
         # 11.6 h (Figure 2), so each should take $\frac{1}{6} MTT_1$
         ktr1 = 6.0/MTT_1  # (1/hours)
         ktr2 = 1.0/MTT_2  # (1/hours)
-        self._ktr = np.array([0.0] + [ktr1] * 6 + [0.0, ktr2])
+        self._ktr = np.array([0.0] + [ktr1] * 6 + [0.0, ktr2])  # type: ignore
         self._EC_50_gamma = EC_50 ** self._gamma
 
         self._dose_records: Dict[Day, DoseEffect] = {}
         cs_size = self._cache_size * 24 * self._per_hour
-        self._total_cs = np.array([0.0] * cs_size)  # hourly
+        self._total_cs = np.array([0.0] * cs_size)  # type: ignore  hourly
         # self._computed_INRs = [0.0] * (self._cache_size + 1)  # daily
         self._computed_INRs: Dict[Day, float] = {}  # daily
         self._err_list: List[List[float]] = []  # hourly
@@ -212,7 +212,7 @@ class HambergPKPD(HealthMathModel):
         self._cached_cs = {
             1.0: temp_cs_generator(range(cs_size))}  # type: ignore
 
-        self._A = np.array([0.0] + [1.0] * 8)
+        self._A = np.array([0.0] + [1.0] * 8)  # type: ignore
 
         # running _err to initialize their cache for reproducibility purposes
         self._err(dt_0, False)
@@ -285,8 +285,11 @@ class HambergPKPD(HealthMathModel):
                 self._dose_records[day] = DoseEffect(
                     _dose, self._CS_function_generator(dt, _dose))
 
-                self._total_cs += np.array(self._dose_records[day].Cs(range(
-                    self._cache_size * 24 * self._per_hour)))  # type: ignore
+                self._total_cs += np.array(  # type: ignore
+                    self._dose_records[day].Cs(range(
+                        self._cache_size * 24 * self._per_hour)  # type: ignore
+                    )
+                )
 
     def INR(self, measurement_days: Union[Day, List[Day]]) -> List[float]:
         '''
@@ -531,7 +534,7 @@ class HambergPKPD(HealthMathModel):
 
         return inflow
 
-    def _INR(self, A: List[float], d: Day) -> float:
+    def _INR(self, A: np.ndarray, d: Day) -> float:
         '''
         Compute the INR on day `d`.
 

@@ -64,7 +64,7 @@ class testHambergPKPD(unittest.TestCase):
 
         h = HambergPKPD(cache_size=60, randomized=False)  # type: ignore
         h._per_hour = 1
-        errors = ''
+        errors: str = ''
         for (i, j), info in patients.items():
             for age, cyp, vkor, dose, inr in info:
                 if vkor == 'G/G':
@@ -90,7 +90,8 @@ class testHambergPKPD(unittest.TestCase):
                 except AssertionError as e:
                     errors += f'\n({age:4.2f}, {cyp}, {vkor})\t{e}'
 
-                sns.lineplot(data=h._computed_INRs, ax=axes[i][j])
+                sns.lineplot(  # type: ignore
+                    data=h._computed_INRs, ax=axes[i][j])
                 axes[i][j].set_ylabel('INR', fontsize=12)
                 axes[i][j].set_ylim((0, 8))
                 axes[i][j].set_xlim((0, 59))
@@ -107,17 +108,22 @@ class testHambergPKPD(unittest.TestCase):
     def test_replicate_fig_4a(self) -> None:
         data = testHambergPKPD.fig_4_generator(
             100, random_pkpd=False)
-        data = data[data.t > 0]
-        data['t_w_jitter'] = data.t  # + data.x_jitter
-        ax = sns.scatterplot(
+        data = data[data.t > 0]  # type: ignore
+        data['t_w_jitter'] = data.t  # type: ignore
+        ax = sns.scatterplot(  # type: ignore
             data=data, x='t_w_jitter', y='Cs', size=1, legend=False)
-        print(data.groupby(['t'])['Cs'].quantile(0.025),
-              data.groupby(['t'])['Cs'].median(),
-              data.groupby(['t'])['Cs'].quantile(0.975),
-              )
-        sns.lineplot(data=data.groupby(['t'])['Cs'].quantile(0.025), ax=ax)
-        sns.lineplot(data=data.groupby(['t'])['Cs'].median(), ax=ax)
-        sns.lineplot(data=data.groupby(['t'])['Cs'].quantile(0.975), ax=ax)
+        print(
+            data.groupby(['t'])['Cs'].quantile(0.025),  # type: ignore
+            data.groupby(['t'])['Cs'].median(),  # type: ignore
+            data.groupby(['t'])['Cs'].quantile(0.975))  # type: ignore
+        sns.lineplot(  # type: ignore
+            data=data.groupby(['t'])['Cs'].quantile(0.025),  # type: ignore
+            ax=ax)
+        sns.lineplot(  # type: ignore
+            data=data.groupby(['t'])['Cs'].median(), ax=ax)  # type: ignore
+        sns.lineplot(  # type: ignore
+            data=data.groupby(['t'])['Cs'].quantile(0.975),  # type: ignore
+            ax=ax)
         ax.set_ylim((0.0, 0.8))
         ax.set_xlabel('Time (h)')
         ax.set_ylabel('Concentration (mg/l)')
@@ -131,17 +137,23 @@ class testHambergPKPD(unittest.TestCase):
             random_pkpd=True,
             measurement_days=[0, 0.5, 1.5, 2.5]
             )
-        data['t_w_jitter'] = data.t + data.x_jitter
-        ax = sns.scatterplot(
+        data['t_w_jitter'] = data.t + data.x_jitter  # type: ignore
+        ax = sns.scatterplot(  # type: ignore
             data=data, x='t_w_jitter', y='INR', size=1, legend=False)
         # style='run')
-        print(data.groupby(['t'])['INR'].quantile(0.025),
-              data.groupby(['t'])['INR'].median(),
-              data.groupby(['t'])['INR'].quantile(0.975),
-              )
-        sns.lineplot(data=data.groupby(['t'])['INR'].quantile(0.025), ax=ax)
-        sns.lineplot(data=data.groupby(['t'])['INR'].median(), ax=ax)
-        sns.lineplot(data=data.groupby(['t'])['INR'].quantile(0.975), ax=ax)
+        print(
+            data.groupby(['t'])['INR'].quantile(0.025),  # type: ignore
+            data.groupby(['t'])['INR'].median(),  # type: ignore
+            data.groupby(['t'])['INR'].quantile(0.975))  # type: ignore
+        sns.lineplot(  # type: ignore
+            data=data.groupby(['t'])['INR'].quantile(0.025),  # type: ignore
+            ax=ax)
+        sns.lineplot(  # type: ignore
+            data=data.groupby(['t'])['INR'].median(),  # type: ignore
+            ax=ax)
+        sns.lineplot(  # type: ignore
+            data=data.groupby(['t'])['INR'].quantile(0.975),  # type: ignore
+            ax=ax)
         ax.set_ylim((0.8, 2.0))
         ax.set_xlabel('Time (h)')
         ax.set_ylabel('INR')
@@ -149,14 +161,15 @@ class testHambergPKPD(unittest.TestCase):
 
     @staticmethod
     def fig_4_generator(
-        n,
+        n: int,
         days: int = 60,
         measurement_days: List[float] = [0, 0.5, 1.5, 2.5],
         INR: bool = False,
         random_parameters: bool = True,
         random_demographic: bool = True,
         random_pkpd: bool = True,
-        random_gen: Callable[[FeatureGenerator], float] = random_lognormal,
+        random_gen: Callable[
+            [FeatureGenerator[float]], float] = random_lognormal,
         data_source: Literal[
             'Study I', 'Study II', 'Total', 'Ravvaz'] = 'Total'
     ) -> pd.DataFrame:
@@ -169,7 +182,7 @@ class testHambergPKPD(unittest.TestCase):
             age_info = dict(lower=22.0, upper=84.0, mean=70.0)
             CYP2C9_info = dict(probabilities=(
                 0.580, 0.161, 0.172, 0.022, 0.043, 0.022))
-            warning.warn(
+            warning(
                 'VKORC1 is not available for Study II. Total is used instead.')
             VKORC1_info = dict(probabilities=(0.39, 0.41, 0.20))
         elif data_source == 'Total':
@@ -268,7 +281,7 @@ class testHambergPKPD(unittest.TestCase):
             if not INR:
                 INR_values = [0.0] * len(measurement_days)
             # sns.lineplot(y=h._total_cs, x=range(len(h._total_cs)))
-            concentrations.extend([
+            concentrations.extend([  # type: ignore
                 (i, t * 24,
                  h._total_cs[int(t * 24)]
                  * h._err(int(t * 24), False),  # type: ignore

@@ -20,12 +20,12 @@ class testFeature(unittest.TestCase):
         lower = min(self._numerical_data)
         upper = max(self._numerical_data)
 
-        def midpoint(f):
-            return (f.lower + f.upper)/2
+        def midpoint(f: feature.Feature[float]) -> float:
+            return (f.lower + f.upper)/2  # type: ignore
 
         numerical = feature.FeatureGenerator.numerical(
             name='num', lower=lower,
-            upper=upper, generator=midpoint, randomized=True)
+            upper=upper, generator=midpoint, randomized=True)  # type: ignore
 
         self.assertEqual(numerical.name, 'num')
         self.assertEqual(numerical().value, (lower + upper)/2)
@@ -131,7 +131,7 @@ class testFeature(unittest.TestCase):
              reilarray['nums'].name: reilarray['nums'].categories})
 
         self.assertEqual(reilarray.normalized.flattened,
-                         list(reilarray['cats'].normalized) +
+                         list(reilarray['cats'].normalized) +  # type: ignore
                          [reilarray['nums'].normalized])
 
         self.assertEqual(
@@ -145,7 +145,7 @@ class testFeature(unittest.TestCase):
             name='test', categories=tuple(self._categorical_data),
             allow_missing=True)
         self.assertEqual(
-            feature.change_to_missing(categoricals(
+            feature.change_to_missing(categoricals(  # type: ignore
                 self._categorical_data[0])).normalized,
             tuple([0]*len(self._categorical_data)))
 
@@ -161,13 +161,13 @@ class testFeature(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             feature.change_to_missing(
-                feature.FeatureGenerator.categorical(
+                feature.FeatureGenerator.categorical(  # type: ignore
                     name='test', categories=tuple(self._categorical_data),
                     allow_missing=False)(self._categorical_data[0]))
 
         with self.assertRaises(ValueError):
             feature.change_to_missing(
-                feature.FeatureGenerator.categorical(
+                feature.FeatureGenerator.categorical(  # type: ignore
                     name='test',
                     allow_missing=True)(self._categorical_data[0]))
 

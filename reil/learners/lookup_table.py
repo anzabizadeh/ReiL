@@ -33,7 +33,7 @@ class LookupTable(Dict[Any, TableEntry[T]]):
     '''
     def __setitem__(self, key: Hashable, item: Any):
         if isinstance(item, TableEntry):
-            super().__setitem__(key, item)
+            super().__setitem__(key, item)  # type: ignore
         else:
             raise TypeError('item should be of type TableEntry.')
 

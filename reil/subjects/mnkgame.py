@@ -72,7 +72,7 @@ class MNKGame(MNKBoard, Subject):
             ID of the player who sets the piece.
         '''
         Subject.take_effect(self, action, _id)
-        self.set_piece(_id, index=int(action.value['square']))
+        self.set_piece(_id, index=int(action.value['square']))  # type: ignore
 
     def _default_reward_definition(
             self, _id: Optional[int] = None) -> int:

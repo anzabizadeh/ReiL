@@ -6,8 +6,7 @@ subject class
 This `subject` class is the base class of all subject classes.
 '''
 
-import pathlib
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 from reil import stateful
 from reil.datatypes.components import SecondayComponent

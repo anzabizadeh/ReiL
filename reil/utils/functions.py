@@ -12,7 +12,7 @@ from typing import Any, Callable, Iterable, List, Optional, Tuple, TypeVar
 
 import numpy as np
 from reil.datatypes.feature import FeatureArray, FeatureGenerator
-from scipy.stats import lognorm
+from scipy.stats import lognorm  # type: ignore
 
 Categorical = TypeVar('Categorical')
 T = TypeVar('T')
@@ -68,7 +68,7 @@ def random_lognormal(f: FeatureGenerator[float]) -> float:
         raise ValueError('mean should be a number.')
 
     if f.randomized:
-        return lognorm.rvs(s=f.stdev, scale=exp_mu)
+        return lognorm.rvs(s=f.stdev, scale=exp_mu)  # type: ignore
 
     return exp_mu
 
@@ -83,10 +83,10 @@ def random_lognormal_truncated(f: FeatureGenerator[float]) -> float:
 
     if f.randomized:
         quartileRange = (0.25, 0.75)
-        lnorm = lognorm(f.stdev, scale=exp_mu)
-        qValues: Tuple[float, float] = lnorm.ppf(quartileRange)
+        lnorm = lognorm(f.stdev, scale=exp_mu)  # type: ignore
+        qValues: Tuple[float, float] = lnorm.ppf(quartileRange)  # type: ignore
         values: List[float] = list(
-            v for v in lnorm.rvs(size=1000)
+            v for v in lnorm.rvs(size=1000)  # type: ignore
             if (v > qValues[0]) & (v < qValues[1]))
 
         return random.sample(values, 1)[0]

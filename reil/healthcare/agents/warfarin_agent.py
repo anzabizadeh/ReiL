@@ -77,7 +77,7 @@ class WarfarinAgent(NoLearnAgent):
             The action
         '''
         patient = state.value
-        patient['day'] += 1
+        patient['day'] += 1  # type: ignore
 
         decision = self._protocol.prescribe(patient)
         dose = decision.dose
