@@ -16,7 +16,8 @@ from reil.datatypes import History
 from reil.datatypes.dataclasses import Observation
 from reil.datatypes.feature import FeatureArray
 from reil.learners.learner import LabelType, Learner
-from reil.utils.exploration_strategies import ExplorationStrategy
+from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
+                                               ExplorationStrategy)
 
 TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[LabelType, ...]]
 
@@ -81,7 +82,7 @@ class Agent(NoLearnAgent, Generic[LabelType]):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(Learner._empty_instance(), ExplorationStrategy())
+        return cls(Learner._empty_instance(), ConstantEpsilonGreedy())
 
     def act(self,
             state: FeatureArray,
@@ -314,7 +315,7 @@ class Agent(NoLearnAgent, Generic[LabelType]):
                 return
 
     def __getstate__(self):
-        state = self.__dict__.copy()
+        state = super().__getstate__()
 
         state['_learner'] = type(self._learner)
 

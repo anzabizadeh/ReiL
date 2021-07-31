@@ -6,7 +6,7 @@ Dense class
 The Dense learner.
 '''
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -111,19 +111,22 @@ class Dense_tf_1(Learner[float]):
 
         with self._graph.as_default():
             self._model = keras.models.Sequential()
-            self._model.add(
-                keras.layers.Dense(self._hidden_layer_sizes[0],
-                                   activation='relu',
-                                   name='layer_01',
-                                   input_shape=(self._input_length,)))
+            self._model.add(  # type: ignore
+                keras.layers.Dense(
+                    self._hidden_layer_sizes[0],
+                    activation='relu',
+                    name='layer_01',
+                    input_shape=(self._input_length,)))
             for i, v in enumerate(self._hidden_layer_sizes[1:]):
-                self._model.add(keras.layers.Dense(
+                self._model.add(keras.layers.Dense(  # type: ignore
                     v, activation='relu', name=f'layer_{i+2:0>2}'))
 
-            self._model.add(keras.layers.Dense(1, name='output'))
+            self._model.add(  # type: ignore
+                keras.layers.Dense(1, name='output'))
 
-            self._model.compile(optimizer=keras.optimizers.Adam(
-                learning_rate=self._learning_rate.initial_lr), loss='mae')
+            self._model.compile(  # type: ignore
+                optimizer=keras.optimizers.Adam(
+                    learning_rate=self._learning_rate.initial_lr), loss='mae')
 
         self._ann_ready = True
 
@@ -146,7 +149,7 @@ class Dense_tf_1(Learner[float]):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        with self._session.as_default():
+        with self._session.as_default():  # type: ignore
             with self._graph.as_default():
                 result = self._model.predict(np.array(_X))  # type: ignore
 
@@ -169,10 +172,10 @@ class Dense_tf_1(Learner[float]):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        with self._session.as_default():
+        with self._session.as_default():  # type: ignore
             with self._graph.as_default():
-                self._model.fit(
-                    np.array(_X), np.array(Y),
+                self._model.fit(  # type: ignore
+                    np.array(_X), np.array(Y),  # type: ignore
                     initial_epoch=self._iteration, epochs=self._iteration+1,
                     callbacks=self._callbacks,
                     validation_split=self._validation_split,
@@ -184,10 +187,11 @@ class Dense_tf_1(Learner[float]):
         '''
         self._iteration += 1
 
-    def save(self,
-             filename: Optional[str] = None,
-             path: Optional[Union[str, pathlib.PurePath]] = None
-             ) -> pathlib.PurePath:
+    def save(
+        self,
+        filename: Optional[str] = None,
+        path: Optional[Union[str, pathlib.PurePath]] = None
+    ) -> pathlib.PurePath:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
 
@@ -212,9 +216,9 @@ class Dense_tf_1(Learner[float]):
         _path = super().save(filename, path)
 
         try:
-            with self._session.as_default():
+            with self._session.as_default():  # type: ignore
                 with self._graph.as_default():
-                    self._model.save(
+                    self._model.save(  # type: ignore
                         pathlib.Path(
                             _path.parent, f'{_path.stem}.tf').resolve())
         except ValueError:
@@ -223,9 +227,10 @@ class Dense_tf_1(Learner[float]):
 
         return _path
 
-    def load(self,
-             filename: str,
-             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    def load(
+            self,
+            filename: str,
+            path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
         '''
         Extends `ReilBase.load` to handle `TF` objects.
 
@@ -247,10 +252,10 @@ class Dense_tf_1(Learner[float]):
         _path = path or '.'
         self._graph = tf.Graph()  # type: ignore
         with self._graph.as_default():
-            self._session = keras.backend.get_session()
+            self._session = keras.backend.get_session()  # type: ignore
 
             if self._ann_ready:
-                self._model = keras.models.load_model(
+                self._model = keras.models.load_model(  # type: ignore
                     pathlib.Path(
                         _path, f'{filename}.tf').resolve())
             else:
@@ -267,22 +272,13 @@ class Dense_tf_1(Learner[float]):
                 self._callbacks.append(learning_rate_scheduler)
 
     def __getstate__(self):
-        state = self.__dict__.copy()
+        state = super().__getstate__()
 
         del state['_session']
         del state['_graph']
         del state['_model']
 
         return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        logger_data = state["_logger"]
-        self.__dict__.update(state)
-
-        self._logger = Logger(
-            logger_name=logger_data['name'],
-            logger_level=logger_data['level'],
-            logger_filename=logger_data['filename'])
 
 
 class Dense_tf_2(Learner[float]):
@@ -371,19 +367,21 @@ class Dense_tf_2(Learner[float]):
         Generate a multilayer neural net using `keras.Dense`.
         '''
         self._model = keras.models.Sequential()
-        self._model.add(
-            keras.layers.Dense(self._hidden_layer_sizes[0],
-                               activation='relu',
-                               name='layer_01',
-                               input_shape=(self._input_length,)))
+        self._model.add(  # type: ignore
+            keras.layers.Dense(
+                self._hidden_layer_sizes[0],
+                activation='relu',
+                name='layer_01',
+                input_shape=(self._input_length,)))
         for i, v in enumerate(self._hidden_layer_sizes[1:]):
-            self._model.add(keras.layers.Dense(
+            self._model.add(keras.layers.Dense(  # type: ignore
                 v, activation='relu', name=f'layer_{i+2:0>2}'))
 
-        self._model.add(keras.layers.Dense(1, name='output'))
+        self._model.add(keras.layers.Dense(1, name='output'))  # type: ignore
 
-        self._model.compile(optimizer=keras.optimizers.Adam(
-            learning_rate=self._learning_rate.initial_lr), loss='mae')
+        self._model.compile(  # type: ignore
+            optimizer=keras.optimizers.Adam(
+                learning_rate=self._learning_rate.initial_lr), loss='mae')
 
         self._ann_ready = True
 
@@ -406,7 +404,7 @@ class Dense_tf_2(Learner[float]):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        result = self._model.predict(np.array(_X))
+        result = self._model.predict(np.array(_X))  # type: ignore
 
         return result  # type: ignore
 
@@ -427,8 +425,8 @@ class Dense_tf_2(Learner[float]):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        self._model.fit(
-            np.array(_X), np.array(Y),
+        self._model.fit(  # type: ignore
+            np.array(_X), np.array(Y),  # type: ignore
             initial_epoch=self._iteration, epochs=self._iteration+1,
             callbacks=self._callbacks,
             validation_split=self._validation_split,
@@ -469,7 +467,7 @@ class Dense_tf_2(Learner[float]):
         _path = super().save(filename, path)
 
         try:
-            self._model.save(pathlib.Path(
+            self._model.save(pathlib.Path(  # type: ignore
                 _path.parent, f'{_path.stem}.tf').resolve())
         except ValueError:
             self._logger.warning(
@@ -501,7 +499,7 @@ class Dense_tf_2(Learner[float]):
 
         _path = path or '.'
         if self._ann_ready:
-            self._model = keras.models.load_model(
+            self._model = keras.models.load_model(  # type: ignore
                 pathlib.Path(_path, f'{filename}.tf').resolve())
         else:
             self._model = keras.models.Sequential()
@@ -517,24 +515,11 @@ class Dense_tf_2(Learner[float]):
             self._callbacks.append(learning_rate_scheduler)
 
     def __getstate__(self):
-        state = self.__dict__.copy()
+        state = super().__getstate__()
 
-        del state['_session']
-        del state['_graph']
         del state['_model']
 
         return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        logger_data = state["_logger"]
-        self.__dict__.update(state)
-
-        self._logger = Logger(
-            logger_name=logger_data['name'],
-            logger_level=logger_data['level'],
-            logger_filename=logger_data['filename'])
-
-
 
 
 if tf.__version__[0] == '1':  # type: ignore

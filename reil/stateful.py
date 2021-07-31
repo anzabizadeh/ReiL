@@ -34,8 +34,7 @@ deregister:
 
 from __future__ import annotations
 
-import pathlib
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 from reil import reilbase
 from reil.datatypes.components import (PrimaryComponent, Statistic,
@@ -194,30 +193,6 @@ class Stateful(reilbase.ReilBase):
             The ID of the `entity` to be deregistered.
         '''
         self._entity_list.remove(entity_id)
-
-    # def save(
-    #         self, filename: Optional[str] = None,
-    #         path: Optional[Union[str, pathlib.PurePath]] = None,
-    # ) -> pathlib.PurePath:
-
-    #     object_ref_temp, self.state.object_ref = self.state.object_ref, None
-    #     state_default, self.state._default = self.state._default, None
-
-    #     prim_comp, self.statistic._primary_component = (  # type: ignore
-    #         self.statistic._primary_component, None)
-    #     statistic_default, self.statistic._default = (
-    #         self.statistic._default, None)
-
-    #     try:
-    #         _path = super().save(filename=filename, path=path)
-    #     finally:
-    #         self.state.object_ref = object_ref_temp
-    #         self.state._default = state_default
-
-    #         self.statistic._primary_component = prim_comp
-    #         self.statistic._default = statistic_default
-
-    #     return _path
 
     def reset(self):
         super().reset()

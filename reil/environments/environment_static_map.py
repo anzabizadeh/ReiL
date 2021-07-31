@@ -206,6 +206,13 @@ class EnvironmentStaticMap(Environment):
                     if (unit == 'iteration'
                             and subject_name in self._instance_generators):
                         while self.check_subject(subject_name):
+                            if protocol.subject.demon_name is None:
+                                subject_instance = self._subjects[subject_name]
+                            else:
+                                subject_instance = \
+                                    self._subject_demons[
+                                        protocol.subject.demon_name](
+                                            self._subjects[subject_name])
                             self.interact_while(
                                 agent_id=agent_id,  # type: ignore
                                 agent_observer=self._agent_observers[a_s_name],
@@ -405,6 +412,6 @@ class EnvironmentStaticMap(Environment):
         ValueError
             The filename is not specified.
         '''
-        super().load(filename=filename, path=path, entity_names=entity_names)
+        super().load(filename=filename, path=path)
         # To generate observers!
         self.interaction_sequence = self.interaction_sequence

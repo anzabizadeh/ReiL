@@ -169,16 +169,11 @@ class ReilBase:
             f'Changing the logger from {self._logger._name} '
             f'to {new_instance.__dict__["_logger"]._name}.')
 
-        persistent_attributes = set(
-            self._persistent_attributes + ['_persistent_attributes'])
+        for key in set(self._persistent_attributes
+                       + ['_persistent_attributes']):
+            new_instance.__dict__[key] = self.__dict__[key]
 
-        self.__dict__.update(
-            {
-                key: value
-                for key, value in new_instance.__dict__.items()
-                if key not in persistent_attributes
-            }
-        )
+        self = new_instance
 
     def save(
         self,
@@ -217,19 +212,21 @@ class ReilBase:
     def __getstate__(self):
         state = self.__dict__.copy()
 
-        state['_logger'] = {
-            'name': self._logger._name,
-            'level': self._logger._level,
-            'filename': self._logger._filename,
-        }
+        if '_logger' in state:
+            state['_logger'] = {
+                'name': self._logger._name,
+                'level': self._logger._level,
+                'filename': self._logger._filename,
+            }
 
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        logger_data = state["_logger"]
+        logger_data = state.get("_logger")
         self.__dict__.update(state)
 
-        self._logger = Logger(
-            logger_name=logger_data['name'],
-            logger_level=logger_data['level'],
-            logger_filename=logger_data['filename'])
+        if logger_data:
+            self._logger = Logger(
+                logger_name=logger_data['name'],
+                logger_level=logger_data['level'],
+                logger_filename=logger_data['filename'])

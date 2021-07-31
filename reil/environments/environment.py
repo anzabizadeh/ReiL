@@ -25,10 +25,11 @@ T = TypeVar('T')
 
 AgentSubjectTuple = Tuple[str, str]
 EntityType = Union[Agent[T], Subject]
-EntityGenType = Union[InstanceGenerator[Agent[T]],
-                      InstanceGenerator[AgentDemon[T]],
-                      InstanceGenerator[Subject],
-                      InstanceGenerator[SubjectDemon]]
+EntityGenType = Union[
+    InstanceGenerator[Agent[T]],
+    InstanceGenerator[AgentDemon[T]],
+    InstanceGenerator[Subject],
+    InstanceGenerator[SubjectDemon]]  # type: ignore
 
 
 class Environment(stateful.Stateful):
@@ -137,7 +138,7 @@ class Environment(stateful.Stateful):
 
                 _, instance = next(_obj)
                 if isinstance(instance, Agent):
-                    self._agents.update({name: instance})
+                    self._agents.update({name: instance})  # type: ignore
                 elif isinstance(instance, Subject):
                     self._subjects.update({name: instance})
                 else:
@@ -147,7 +148,7 @@ class Environment(stateful.Stateful):
 
             elif isinstance(_obj, Agent):
                 self._agents.update({name: _obj})
-            elif isinstance(_obj, Subject):
+            elif isinstance(_obj, Subject):  # type: ignore
                 self._subjects.update({name: _obj})
             else:
                 raise TypeError(
@@ -220,7 +221,7 @@ class Environment(stateful.Stateful):
                 _obj = obj
             if isinstance(_obj, AgentDemon):
                 self._agent_demons.update({name: _obj})
-            elif isinstance(_obj, SubjectDemon):
+            elif isinstance(_obj, SubjectDemon):  # type: ignore
                 self._subject_demons.update({name: _obj})
             else:
                 raise TypeError(
@@ -609,10 +610,9 @@ class Environment(stateful.Stateful):
 
         return True
 
-    def load(  # noqa: C901
+    def load(
             self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]],
-            entity_names: Optional[List[str]] = None) -> None:
+            path: Optional[Union[str, pathlib.PurePath]]) -> None:
         '''
         Load an entity or an `environment` from a file.
 
@@ -621,9 +621,8 @@ class Environment(stateful.Stateful):
         filename:
             The name of the file to be loaded.
 
-        entity_names:
-            If specified, that entity (`agent` or `subject`) is being
-            loaded from file. `None` loads an `environment`.
+        path:
+            The path of the file to be loaded.
 
         Raises
         ------
@@ -632,77 +631,55 @@ class Environment(stateful.Stateful):
         '''
         _path = pathlib.Path(path or self._path)
 
-        if entity_names is None:
-            super().load(filename=filename, path=_path)
-            self._instance_generators: Dict[str, EntityGenType[Any]] = {}
-            self._agents: Dict[str, Agent[Any]] = {}
-            self._subjects: Dict[str, Subject] = {}
-            self._agent_demons: Dict[str, AgentDemon[Any]] = {}
-            self._subject_demons: Dict[str, SubjectDemon] = {}
+        super().load(filename=filename, path=_path)
+        self._env_data: Dict[str, List[Tuple[str, Any]]]
 
-            for name, obj_type in self._env_data['instance_generators']:
-                self._instance_generators[name] = obj_type.from_pickle(
+        self._instance_generators = {
+            name: (
+                obj_type.from_pickle(
                     path=(_path / f'{filename}.instance_generators'),
-                    filename=name)
+                    filename=name))
+            for name, obj_type in self._env_data['instance_generators']
+        }
 
-            for name, obj_type in self._env_data['agents']:
-                if name in self._instance_generators:
-                    self._agents[name] = (  # type: ignore
-                        self._instance_generators[name]._object)
-                else:
-                    self._agents[name] = obj_type.from_pickle(
-                        path=(_path / f'{filename}.agents'), filename=name)
+        self._agents: Dict[str, Agent[Any]] = {  # type: ignore
+            name: (
+                self._instance_generators[name]._object
+                if name in self._instance_generators
+                else obj_type.from_pickle(
+                    path=(_path / f'{filename}.agents'), filename=name))
+            for name, obj_type in self._env_data['agents']}
 
-            for name, obj_type in self._env_data['subjects']:
-                if name in self._instance_generators:
-                    self._subjects[name] = (  # type: ignore
-                        self._instance_generators[name]._object)
-                else:
-                    self._subjects[name] = obj_type.from_pickle(
-                        path=(_path / f'{filename}.subjects'), filename=name)
+        self._subjects: Dict[str, Subject] = {  # type: ignore
+            name: (
+                self._instance_generators[name]._object
+                if name in self._instance_generators
+                else obj_type.from_pickle(
+                    path=(_path / f'{filename}.subjects'), filename=name))
+            for name, obj_type in self._env_data['subjects']}
 
-            for name, obj_type in self._env_data['agent_demons']:
-                self._agent_demons[name] = obj_type.from_pickle(
-                    path=(_path / f'{filename}.agent_demons'), filename=name)
+        self._agent_demons = {
+            name: (
+                obj_type.from_pickle(
+                    path=(_path / f'{filename}.agent_demons'),
+                    filename=name))
+            for name, obj_type in self._env_data['agent_demons']
+        }
 
-            for name, obj_type in self._env_data['subject_demons']:
-                self._subject_demons[name] = obj_type.from_pickle(
+        self._subject_demons = {
+            name: (
+                obj_type.from_pickle(
                     path=(_path / f'{filename}.subject_demons'),
-                    filename=name)
+                    filename=name))
+            for name, obj_type in self._env_data['subject_demons']
+        }
 
-            del self._env_data
+        del self._env_data
 
-        else:
-            for obj in entity_names:
-                if obj in self._instance_generators:
-                    self._instance_generators[obj].load(
-                        path=(_path / f'{filename}.instance_generators'),
-                        filename=obj)
-                    self._instance_generators[obj].reset()
-
-                if obj in self._agents:
-                    self._agents[obj].load(
-                        path=(_path / f'{filename}.agents'), filename=obj)
-                    self._agents[obj].reset()
-                elif obj in self._subjects:
-                    self._subjects[obj].load(
-                        path=(_path / f'{filename}.subjects'), filename=obj)
-                    self._subjects[obj].reset()
-                elif obj in self._agent_demons:
-                    self._agent_demons[obj].load(
-                        path=(_path / f'{filename}.agent_demons'),
-                        filename=obj)
-                    self._agent_demons[obj].reset()
-                elif obj in self._subject_demons:
-                    self._subject_demons[obj].load(
-                        path=(_path / f'{filename}.subject_demons'),
-                        filename=obj)
-                    self._subject_demons[obj].reset()
-
-    def save(  # noqa: C901
-            self, filename: Optional[str] = None,
-            path: Optional[Union[str, pathlib.PurePath]] = None,
-            entity_names: Optional[List[str]] = None
+    def save(
+        self,
+        filename: Optional[str] = None,
+        path: Optional[Union[str, pathlib.PurePath]] = None
     ) -> pathlib.PurePath:
         '''
         Save an entity or the `environment` to a file.
@@ -715,117 +692,44 @@ class Environment(stateful.Stateful):
         path:
             The path of the file to be saved.
 
-        entity_names:
-            If specified, that entity (`agent` or `subject`) is being saved
-            to file. `None` saves the `environment`.
-
         Raises
         ------
         ValueError
             The filename is not specified.
         '''
-        _filename = filename or self._name
-        _path = pathlib.Path(path or self._path)
+        full_path = super().save(
+            filename=filename or self._name, path=path or self._path)
 
-        if entity_names is None:
-            open_observers = set(a_s_names
-                                 for a_s_names in self._agent_observers
-                                 if inspect.getgeneratorstate(
-                                     self._agent_observers[a_s_names]
-                                 ) not in [inspect.GEN_CREATED or
-                                           inspect.GEN_CLOSED])
-            if open_observers:
-                raise RuntimeError('Cannot save an environment in '
-                                   'the middle of a simulation. '
-                                   'These agent/subject interactions '
-                                   'are still underway:\n'
-                                   f'{open_observers}')
+        _path = full_path.parent
+        _filename = full_path.stem
 
-            temp, self._agent_observers = (  # type: ignore
-                self._agent_observers, None)
+        for name, entity in self._instance_generators.items():
+            full_path = entity.save(
+                path=_path / f'{_filename}.instance_generators',
+                filename=name)
 
-            self._env_data: Dict[str, List[Any]] = defaultdict(list)
+        for name, agent in self._agents.items():
+            if name not in self._instance_generators:
+                agent.save(
+                    path=_path / f'{_filename}.agents', filename=name)
 
-            try:
-                for name, entity in self._instance_generators.items():
-                    filename, _ = entity.save(
-                        path=_path / f'{_filename}.instance_generators',
-                        filename=name)
-                    self._env_data['instance_generators'].append(
-                        (filename, type(entity)))
+        for name, subject in self._subjects.items():
+            if name not in self._instance_generators:
+                subject.save(
+                    path=_path / f'{_filename}.subjects',
+                    filename=name)
 
-                for name, agent in self._agents.items():
-                    if name in self._instance_generators:
-                        self._env_data['agents'].append((name, None))
-                    else:
-                        filename, _ = agent.save(
-                            path=_path / f'{_filename}.agents', filename=name)
-                        self._env_data['agents'].append(
-                            (filename, type(agent)))
+        for name, agent_demon in self._agent_demons.items():
+            agent_demon.save(
+                path=_path / f'{_filename}.agent_demons',
+                filename=name)
 
-                for name, subject in self._subjects.items():
-                    if name in self._instance_generators:
-                        self._env_data['subjects'].append((name, None))
-                    else:
-                        filename, _ = subject.save(
-                            path=_path / f'{_filename}.subjects',
-                            filename=name)
-                        self._env_data['subjects'].append(
-                            (filename, type(subject)))
+        for name, subject_demon in self._subject_demons.items():
+            subject_demon.save(
+                path=_path / f'{_filename}.subject_demons',
+                filename=name)
 
-                for name, agent_demon in self._agent_demons.items():
-                    filename, _ = agent_demon.save(
-                        path=_path / f'{_filename}.agent_demons',
-                        filename=name)
-                    self._env_data['agent_demons'].append(
-                        (filename, type(agent_demon)))
-
-                for name, subject_demon in self._subject_demons.items():
-                    filename, _ = subject_demon.save(
-                        path=_path / f'{_filename}.subject_demons',
-                        filename=name)
-                    self._env_data['subject_demons'].append(
-                        (filename, type(subject_demon)))
-
-                super().save(
-                    filename=_filename, path=_path,
-                    data_to_save=tuple(v for v in self.__dict__
-                                       if v not in ('_agents',
-                                                    '_subjects',
-                                                    '_instance_generators',
-                                                    '_agent_demons',
-                                                    '_subject_demons')))
-
-                del self._env_data
-
-            finally:
-                self._agent_observers = temp
-
-        else:
-            for obj in entity_names:
-                if obj in self._instance_generators:
-                    self._instance_generators[obj].save(
-                        path=_path / f'{_filename}.instance_generators',
-                        filename=obj)
-                elif obj in self._agents:
-                    self._agents[obj].save(
-                        path=_path / f'{_filename}.agents', filename=obj)
-                elif obj in self._subjects:
-                    self._subjects[obj].save(
-                        path=_path / f'{_filename}.subjects', filename=obj)
-                elif obj in self._agent_demons:
-                    self._agent_demons[obj].save(
-                        path=_path / f'{_filename}.agent_demons',
-                        filename=obj)
-                elif obj in self._subject_demons:
-                    self._subject_demons[obj].save(
-                        path=_path / f'{_filename}.subject_demons',
-                        filename=obj)
-                else:
-                    self._logger.warning(f'Cannot save {obj} individually. '
-                                         'Try saving the whole environment.')
-
-        return _filename, _path
+        return full_path
 
     def report_statistics(
             self,
@@ -865,3 +769,50 @@ class Environment(stateful.Stateful):
                         ('Subject Demons', self._subject_demons))))
         except AttributeError:
             return super().__repr__()
+
+    def __getstate__(self):
+        open_observers = set(
+            a_s_names
+            for a_s_names in self._agent_observers
+            if inspect.getgeneratorstate(self._agent_observers[a_s_names])
+            not in [inspect.GEN_CREATED or inspect.GEN_CLOSED]
+        )
+
+        if open_observers:
+            raise RuntimeError(
+                'Cannot save an environment in the middle of a simulation. '
+                'These agent/subject interactions are still underway:\n'
+                f'{open_observers}'
+            )
+
+        state = super().__getstate__()
+
+        state['_agent_observers'] = None
+
+        state['_env_data'] = {
+            'instance_generators': [
+                (name, type(entity))
+                for name, entity in self._instance_generators.items()],
+            'agents': [
+                (name, None if name in self._instance_generators
+                 else type(entity))
+                for name, entity in self._agents.items()],
+            'subjects': [
+                (name, None if name in self._instance_generators
+                 else type(entity))
+                for name, entity in self._subjects.items()],
+            'agent_demons': [
+                (name, type(entity))
+                for name, entity in self._agent_demons.items()],
+            'subject_demons': [
+                (name, type(entity))
+                for name, entity in self._subject_demons.items()],
+        }
+
+        del state['_instance_generators']
+        del state['_agents']
+        del state['_subjects']
+        del state['_agent_demons']
+        del state['_subject_demons']
+
+        return state

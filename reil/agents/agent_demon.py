@@ -184,7 +184,7 @@ class AgentDemon(Agent[LabelType]):
         self._main_agent.learn(history)
 
     def __getstate__(self):
-        state = self.__dict__.copy()
+        state = super().__getstate__()
 
         state['_main_agent'] = type(self._main_agent)
         state['_sub_agent'] = type(self._sub_agent)
