@@ -564,8 +564,9 @@ class Dense_tf_2(Learner[float]):
         else:
             self._model = keras.models.Sequential()
 
-        self._tensorboard = keras.callbacks.TensorBoard(
-            log_dir=self._tensorboard_path)
+        if self._tensorboard_path is not None:
+            self._tensorboard = keras.callbacks.TensorBoard(
+                log_dir=self._tensorboard_path)
 
         if not isinstance(self._learning_rate,
                           ConstantLearningRate):
@@ -576,17 +577,38 @@ class Dense_tf_2(Learner[float]):
 
     def __getstate__(self):
         state = super().__getstate__()
-        state['_serialized_model'] = SerializeTF().dump(state['_model'])
+        if state['_ann_ready']:
+            state['_serialized_model'] = SerializeTF().dump(state['_model'])
 
         del state['_model']
+        del state['_callbacks']
+        if '_tensorboard' in state:
+            del state['_tensorboard']
 
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        self._model = SerializeTF().load(state['_serialized_model'])
-        del state['_serialized_model']
+        if state['_ann_ready']:
+            self._model = SerializeTF().load(state['_serialized_model'])
+            del state['_serialized_model']
+        else:
+            self._model = keras.models.Sequential()
 
         self.__dict__.update(state)
+
+        self._callbacks: List[Any] = []
+        if self._tensorboard_path is not None:
+            self._tensorboard = keras.callbacks.TensorBoard(
+                log_dir=self._tensorboard_path)
+            # , histogram_freq=1)  #, write_images=True)
+            self._callbacks.append(self._tensorboard)
+
+        if not isinstance(self._learning_rate,
+                          ConstantLearningRate):
+            learning_rate_scheduler = \
+                keras.callbacks.LearningRateScheduler(
+                    self._learning_rate.new_rate, verbose=0)
+            self._callbacks.append(learning_rate_scheduler)
 
 
 if tf.__version__[0] == '1':  # type: ignore
