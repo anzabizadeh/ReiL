@@ -9,7 +9,7 @@ This `subject` class is the base class of all subject classes.
 from typing import Any, Dict, Optional, Tuple
 
 from reil import stateful
-from reil.datatypes.components import SecondayComponent
+from reil.datatypes.components import ActionSet, Reward
 from reil.datatypes.feature import Feature, FeatureArray
 
 
@@ -36,15 +36,15 @@ class Subject(stateful.Stateful):
         super().__init__(**kwargs)
 
         self._sequential_interaction = sequential_interaction
-        self.reward = SecondayComponent[float](
+        self.reward = Reward(
             name='reward',
-            primary_component=self.state,
+            state=self.state,
             default_definition=self._default_reward_definition,
             enabled=False, pickle_stripped=True)
 
-        self.possible_actions = SecondayComponent[Tuple[FeatureArray, ...]](
+        self.possible_actions = ActionSet(
             name='action',
-            primary_component=self.state,
+            state=self.state,
             default_definition=self._default_action_definition,
             enabled=True, pickle_stripped=True)
 
@@ -117,30 +117,27 @@ class Subject(stateful.Stateful):
         super().reset()
         self.reward.disable()
 
-    # def save(
-    #         self, filename: Optional[str] = None,
-    #         path: Optional[Union[str, pathlib.PurePath]] = None
-    # ) -> pathlib.PurePath:
-
-    #     prim_comp, self.reward._primary_component = (  # type: ignore
-    #         self.reward._primary_component, None)
-    #     reward_default, self.reward._default = (
-    #         self.reward._default, None)
-    #     try:
-    #         _path = super().save(filename, path=path)
-    #     finally:
-    #         self.reward._primary_component = prim_comp
-    #         self.reward._default = reward_default
-
-    #     return _path
-
     def __setstate__(self, state: Dict[str, Any]) -> None:
         super().__setstate__(state)
+        try:
+            self.reward.set_state(self.state)
+        except ValueError:
+            self._logger.warning(
+                'Primary component is already set for `reward` to .'
+                f'{self.reward._state}. Resetting the value!')
+            self.reward._state = self.state
 
-        self.reward.set_primary_component(self.state)
         self.reward.set_default_definition(
             self._default_reward_definition)
 
-        self.possible_actions.set_primary_component(self.state)
+        try:
+            self.possible_actions.set_state(self.state)
+        except ValueError:
+            self._logger.warning(
+                'Primary component is already set for `possible_actions` to .'
+                f'{self.possible_actions._state}. '
+                'Resetting the value!')
+            self.possible_actions._state = self.state
+
         self.possible_actions.set_default_definition(
             self._default_action_definition)
