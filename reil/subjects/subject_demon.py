@@ -11,7 +11,7 @@ import dataclasses
 import pathlib
 from typing import Any, Callable, Generic, Optional, Tuple, TypeVar, Union
 
-from reil.datatypes.components import SecondayComponent, Statistic
+from reil.datatypes.components import Reward, Statistic
 from reil.datatypes.feature import FeatureArray
 from reil.reilbase import ReilBase
 from reil.subjects.subject import Subject
@@ -64,7 +64,7 @@ class SubjectDemon(ReilBase):
         super().__init__(**kwargs)
 
         self._subject: Subject
-        self.reward: SecondayComponent[float]
+        self.reward: Reward
         self.statistic: Statistic
 
         if subject:
