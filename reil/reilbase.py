@@ -165,10 +165,6 @@ class ReilBase:
         pickler = PickleMe.get('pbz2' if self._save_zipped else 'pkl')
         new_instance = pickler.load(filename=filename, path=path or self._path)
 
-        self._logger.info(
-            f'Changing the logger from {self._logger._name} '
-            f'to {new_instance.__dict__["_logger"]._name}.')
-
         for key in set(self._persistent_attributes
                        + ['_persistent_attributes']):
             new_instance.__dict__[key] = self.__dict__[key]
@@ -210,23 +206,7 @@ class ReilBase:
         return self.__class__.__qualname__
 
     def __getstate__(self):
-        state = self.__dict__.copy()
-
-        if '_logger' in state:
-            state['_logger'] = {
-                'name': self._logger._name,
-                'level': self._logger._level,
-                'filename': self._logger._filename,
-            }
-
-        return state
+        return self.__dict__.copy()
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        logger_data = state.get("_logger")
         self.__dict__.update(state)
-
-        if logger_data:
-            self._logger = Logger(
-                logger_name=logger_data['name'],
-                logger_level=logger_data['level'],
-                logger_filename=logger_data['filename'])

@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 class Logger:
@@ -7,11 +7,10 @@ class Logger:
             self, logger_name: str, logger_level: Optional[int] = None,
             logger_filename: Optional[str] = None,
             fmt: Optional[str] = None) -> None:
-        pass
-
         self._name = logger_name
         self._level = logger_level or logging.WARNING
         self._filename = logger_filename
+        self._fmt = fmt or ' %(name)s :: %(levelname)-8s :: %(message)s'
 
         self._logger = logging.getLogger(self._name)
         self._logger.setLevel(self._level)
@@ -21,8 +20,7 @@ class Logger:
             else:
                 handler = logging.FileHandler(self._filename)
 
-            handler.setFormatter(logging.Formatter(
-                fmt=fmt or ' %(name)s :: %(levelname)-8s :: %(message)s'))
+            handler.setFormatter(logging.Formatter(fmt=self._fmt))
             self._logger.addHandler(handler)
         else:
             self._logger.debug(
@@ -45,3 +43,16 @@ class Logger:
 
     def critical(self, msg: str):
         self._logger.critical(msg)
+
+    def __getstate__(self):
+        return {
+                '_name': self._name,
+                '_level': self._level,
+                '_filename': self._filename,
+                '_fmt': self._fmt
+        }
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self.__init__(
+            logger_name=state['_name'], logger_level=state.get('_level'),
+            logger_filename=state.get('_filename'), fmt=state.get('_fmt'))
