@@ -7,7 +7,6 @@ This `agent` class is the base class of all agent classes that can learn from
 `history`.
 '''
 
-import pathlib
 from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple,
                     Union)
 

@@ -156,7 +156,7 @@ class EnvironmentStaticMap(Environment):
 
         self._interaction_sequence = seq
 
-    def simulate_pass(self, n: int = 1) -> None:
+    def simulate_pass(self, n: int = 1) -> None:  # noqa: C901
         '''
         Go through the interaction sequence for a number of passes and
         simulate interactions accordingly.
@@ -174,13 +174,13 @@ class EnvironmentStaticMap(Environment):
                     continue
 
                 agent_name = protocol.agent.name
-                subject_demon = protocol.subject.demon_name
                 a_s_name = (agent_name, subject_name)
                 agent_id, _ = self._assignment_list[a_s_name]
                 if agent_id is None:
-                    raise ValueError(f'a_s_name are not assigned!')
+                    raise ValueError(f'{a_s_name} are not assigned!')
 
                 subject_instance = self._subjects[subject_name]
+                subject_demon = protocol.subject.demon_name
                 if subject_demon:
                     subject_instance = \
                         self._subject_demons[subject_demon](subject_instance)
@@ -225,9 +225,6 @@ class EnvironmentStaticMap(Environment):
 
                     else:
                         self.check_subject(subject_name)
-
-                else:
-                    raise ValueError(f'Unknown protocol unit: {unit}.')
 
     def simulate_to_termination(self) -> None:
         '''
