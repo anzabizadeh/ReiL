@@ -2,7 +2,7 @@ from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Tuple,
                     Union)
 
 import pandas as pd
-from reil.datatypes.components import PrimaryComponent
+from reil.datatypes.components import State
 from reil.datatypes.feature import FeatureArray
 from reil.stateful import Stateful
 
@@ -36,10 +36,10 @@ class MockStatistic:
     def disable(self) -> None:
         return self._obj.statistic.disable()
 
-    def set_primary_component(
+    def set_state(
             self,
-            primary_component: PrimaryComponent) -> None:
-        return self._obj.statistic.set_primary_component(primary_component)
+            state: State) -> None:
+        return self._obj.statistic.set_state(state)
 
     def add_definition(
             self,

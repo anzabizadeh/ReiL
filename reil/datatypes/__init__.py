@@ -40,9 +40,9 @@ Numerical:
     A factory class that creates `Feature` objects with lower and upper
     bounds.
 
-PrimaryComponent:
+State:
     A datatype that is being used mostly by children of `Stateful` to include
-    a `PrimaryComponent`, e.g. a state. It allows defining different
+    a `State`, e.g. a state. It allows defining different
     definitions for the component, and call the instance to calculate them.
 
 SecondayComponent:
@@ -54,8 +54,8 @@ SecondayComponent:
 from . import buffers  # noqa: W601
 from .feature import Feature, FeatureArray, FeatureGenerator  # noqa: W601
 from .feature_array_dumper import FeatureArrayDumper  # noqa: W0611
-from .components import (PrimaryComponent, SecondayComponent,  # noqa: W601
-                         Statistic)
+from .components import (ActionSet, Reward, State,  # noqa: W601
+                         SecondayComponent, Statistic)
 from .dataclasses import (Entity, History, InteractionProtocol,  # noqa: W601
                           Observation)
 from .entity_register import EntityRegister  # noqa: W601

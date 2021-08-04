@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-PrimaryComponent and SecondayComponent classes
+State, ActionSet, Reward and Statistic classes
 ==============================================
 
 A datatype used to specify entity components, such as `state`, `reward`,
@@ -35,9 +35,9 @@ class SubComponentInstance(Generic[ArgsType]):
     fn: Callable[..., Any]
 
 
-class PrimaryComponent:
+class State:
     '''
-    The datatype to specify primary component, e.g., `state`.
+    The datatype to specify `state`.
     '''
 
     def __init__(
@@ -244,6 +244,12 @@ class PrimaryComponent:
 
         return state
 
+    def __setstate__(self, state: Dict[str, Any]):
+        if '_pickle_stripped' not in state:
+            state['_pickle_stripped'] = True
+
+        self.__dict__.update(state)
+
 
 class SecondayComponent(Generic[ComponentReturnType]):
     '''
@@ -254,7 +260,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
     def __init__(
             self,
             name: str,
-            primary_component: Optional[PrimaryComponent] = None,
+            state: Optional[State] = None,
             default_definition: Optional[Callable[[
                 Optional[int]], ComponentReturnType]] = None,
             enabled: bool = True,
@@ -266,8 +272,8 @@ class SecondayComponent(Generic[ComponentReturnType]):
         name:
             The name of the secondary component.
 
-        primary_component:
-            An instance of a `PrimaryComponent` from which component
+        state:
+            An instance of a `State` from which component
             definitions are used.
 
         default_definition:
@@ -277,7 +283,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
             Whether to return the computed value or `None`.
         '''
         self._name = name
-        self._primary_component = primary_component
+        self._state = state
         self._default = default_definition
         self._enabled = enabled
         self._pickle_stripped = pickle_stripped
@@ -291,15 +297,15 @@ class SecondayComponent(Generic[ComponentReturnType]):
     def disable(self) -> None:
         self._enabled = False
 
-    def set_primary_component(
+    def set_state(
             self,
-            primary_component: PrimaryComponent) -> None:
+            state: State) -> None:
         '''Set the primary component.
 
         Parameters
         ----------
-        primary_component:
-            An instance of a `PrimaryComponent` from which component
+        state:
+            An instance of a `State` from which component
             definitions are used.
 
         Raises
@@ -307,11 +313,11 @@ class SecondayComponent(Generic[ComponentReturnType]):
         ValueError
             Primary component is already set.
         '''
-        if self._primary_component is not None:
+        if self._state is not None:
             raise ValueError('Primary component is already set. '
                              'Cannot modify it.')
 
-        self._primary_component = primary_component
+        self._state = state
 
     def set_default_definition(
             self,
@@ -328,7 +334,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
     def add_definition(
             self, name: str, fn: Callable[..., ComponentReturnType],
-            primary_component_name: str = 'default') -> None:
+            state_name: str = 'default') -> None:
         '''
         Add a new component definition.
 
@@ -341,7 +347,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
             The function that will receive the primary component instance and
             computes the value of the secondary component.
 
-        primary_component_name:
+        state_name:
             The component name that will be used by `fn`.
 
         Raises
@@ -353,7 +359,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
             Undefined primary component name.
         '''
         _name = name.lower()
-        _primary_component_name = primary_component_name.lower()
+        _state_name = state_name.lower()
 
         if _name == 'default':
             raise ValueError('Use `set_default_definition` for the default '
@@ -362,18 +368,18 @@ class SecondayComponent(Generic[ComponentReturnType]):
         if _name in self._definitions:
             raise ValueError(f'Definition {name} already exists.')
 
-        if self._primary_component is None:
+        if self._state is None:
             raise ValueError(
                 'Primary component is not defined. '
-                'Use `set_primary_component` to specify it.')
+                'Use `set_state` to specify it.')
 
-        if _primary_component_name not in self._primary_component.definitions:
-            raise ValueError(f'Undefined {_primary_component_name}.')
+        if _state_name not in self._state.definitions:
+            raise ValueError(f'Undefined {_state_name}.')
 
         self._definitions[_name] = SubComponentInstance(
             name=_name,
             fn=fn,
-            args=_primary_component_name)
+            args=_state_name)
 
     def default(self, _id: Optional[int] = None) -> ComponentReturnType:
         '''
@@ -430,17 +436,17 @@ class SecondayComponent(Generic[ComponentReturnType]):
             except AttributeError:
                 pass
 
-        if self._primary_component is None:
+        if self._state is None:
             raise ValueError(
                 'Primary component is not defined. '
-                'Use `set_primary_component` to specify it.')
+                'Use `set_state` to specify it.')
 
         try:
             d = self._definitions[_name]
         except KeyError:
             raise ValueError(f'Definition {name} not found.')
 
-        p = self._primary_component(name=d.args, _id=_id)
+        p = self._state(name=d.args, _id=_id)
 
         return d.fn(p)
 
@@ -449,10 +455,22 @@ class SecondayComponent(Generic[ComponentReturnType]):
             return self.__dict__
 
         state = self.__dict__.copy()
-        state['_primary_component'] = None
+        state['_state'] = None
         state['_default'] = None
 
         return state
+
+    def __setstate__(self, state: Dict[str, Any]):
+        if '_pickle_stripped' not in state:
+            state['_pickle_stripped'] = True
+        if '_state' not in state:
+            state['_state'] = state['_primary_component']
+
+        del state['_primary_component']
+
+        self.__dict__.update(state)
+
+        self.__dict__.update(state)
 
 
 class Statistic:
@@ -464,7 +482,7 @@ class Statistic:
     def __init__(
             self,
             name: str,
-            primary_component: Optional[PrimaryComponent] = None,
+            state: Optional[State] = None,
             default_definition: Optional[Callable[[
                 Optional[int]], Tuple[FeatureArray, float]]] = None,
             enabled: bool = True,
@@ -476,8 +494,8 @@ class Statistic:
         name:
             The name of the secondary component.
 
-        primary_component:
-            An instance of a `PrimaryComponent` from which component
+        state:
+            An instance of a `State` from which component
             definitions are used.
 
         default_definition:
@@ -487,7 +505,7 @@ class Statistic:
             Whether to return the computed value or `None`.
         '''
         self._name = name
-        self._primary_component = primary_component
+        self._state = state
         self._default = default_definition
         self._enabled = enabled
         self._pickle_stripped = pickle_stripped
@@ -506,15 +524,15 @@ class Statistic:
     def disable(self) -> None:
         self._enabled = False
 
-    def set_primary_component(
+    def set_state(
             self,
-            primary_component: PrimaryComponent) -> None:
+            state: State) -> None:
         '''Set the primary component.
 
         Parameters
         ----------
-        primary_component:
-            An instance of a `PrimaryComponent` from which component
+        state:
+            An instance of a `State` from which component
             definitions are used.
 
         Raises
@@ -522,11 +540,11 @@ class Statistic:
         ValueError
             Primary component is already set.
         '''
-        if self._primary_component is not None:
+        if self._state is not None:
             raise ValueError('Primary component is already set. '
                              'Cannot modify it.')
 
-        self._primary_component = primary_component
+        self._state = state
 
     def set_default_definition(
             self,
@@ -581,15 +599,15 @@ class Statistic:
         if _name in self._definitions:
             raise ValueError(f'Definition {name} already exists.')
 
-        if self._primary_component is None:
+        if self._state is None:
             raise ValueError(
                 'Primary component is not defined. '
-                'Use `set_primary_component` to specify it.')
+                'Use `set_state` to specify it.')
 
-        if _stat_component not in self._primary_component.definitions:
+        if _stat_component not in self._state.definitions:
             raise ValueError(f'Undefined {_stat_component}.')
 
-        if _aggregation_component not in self._primary_component.definitions:
+        if _aggregation_component not in self._state.definitions:
             raise ValueError(f'Undefined {_aggregation_component}.')
 
         self._definitions[_name] = SubComponentInstance[Tuple[str, str]](
@@ -654,10 +672,10 @@ class Statistic:
             except AttributeError:
                 pass
 
-        if self._primary_component is None:
+        if self._state is None:
             raise ValueError(
                 'Primary component is not defined. '
-                'Use `set_primary_component` to specify it.')
+                'Use `set_state` to specify it.')
 
         try:
             d = self._definitions[_name]
@@ -666,8 +684,8 @@ class Statistic:
 
         agg, comp_name = d.args
 
-        return (self._primary_component(name=agg, _id=_id),
-                d.fn(self._primary_component(name=comp_name, _id=_id)))
+        return (self._state(name=agg, _id=_id),
+                d.fn(self._state(name=comp_name, _id=_id)))
 
     def append(self,
                name: str,
@@ -729,7 +747,21 @@ class Statistic:
             return self.__dict__
 
         state = self.__dict__.copy()
-        state['_primary_component'] = None
+        state['_state'] = None
         state['_default'] = None
 
         return state
+
+    def __setstate__(self, state: Dict[str, Any]):
+        if '_pickle_stripped' not in state:
+            state['_pickle_stripped'] = True
+        if '_state' not in state:
+            state['_state'] = state['_primary_component']
+
+        del state['_primary_component']
+
+        self.__dict__.update(state)
+
+
+ActionSet = SecondayComponent[Tuple[FeatureArray, ...]]
+Reward = SecondayComponent[float]
