@@ -69,6 +69,17 @@ class State:
         self._pickle_stripped = pickle_stripped
 
     @property
+    def definitions(self):
+        '''Return the dictionary of component definitions.
+
+        Returns
+        -------
+        :
+            The dictionary of component definitions.
+        '''
+        return self._definitions
+
+    @property
     def sub_components(self) -> Dict[str, SubComponentInfo]:
         '''Get and set the dictionary of sub components.
 
@@ -158,17 +169,6 @@ class State:
 
             self._definitions[_name].append(SubComponentInstance(
                 name=sub_comp_name, fn=fn, args=kwargs))
-
-    @property
-    def definitions(self):
-        '''Return the dictionary of component definitions.
-
-        Returns
-        -------
-        :
-            The dictionary of component definitions.
-        '''
-        return self._definitions
 
     def default(self, _id: Optional[int] = None) -> FeatureArray:
         '''
@@ -290,6 +290,17 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
         self._definitions: Dict[
             str, SubComponentInstance[str]] = defaultdict(None)
+
+    @property
+    def definitions(self):
+        '''Return the dictionary of component definitions.
+
+        Returns
+        -------
+        :
+            The dictionary of component definitions.
+        '''
+        return self._definitions
 
     def enable(self) -> None:
         self._enabled = True
@@ -517,6 +528,17 @@ class Statistic:
             int,
             List[Tuple[FeatureArray, float]]] = DefaultDict(list)
         self._history_none: List[Tuple[FeatureArray, float]] = []
+
+    @property
+    def definitions(self):
+        '''Return the dictionary of component definitions.
+
+        Returns
+        -------
+        :
+            The dictionary of component definitions.
+        '''
+        return self._definitions
 
     def enable(self) -> None:
         self._enabled = True
