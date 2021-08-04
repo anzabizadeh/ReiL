@@ -8,13 +8,16 @@ This class provides a learning environment for any reinforcement learning
 are determined by a fixed `interaction_sequence`.
 '''
 import pathlib
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
+                    TypedDict, Union)
 
 import pandas as pd
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol
+from reil.datatypes.feature import FeatureArray
 from reil.environments.environment import (EntityGenType, EntityType,
                                            Environment)
+from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 
 
@@ -25,6 +28,16 @@ class StatInfo(NamedTuple):
     a_s_name: Tuple[str, str]
     aggregators: Optional[Tuple[str, ...]]
     groupby: Optional[Tuple[str, ...]]
+
+
+class InteractArgs(TypedDict):
+    agent_id: int
+    agent_observer: Generator[Union[FeatureArray, None], Dict[str, Any], None]
+    subject_instance: Union[Subject, SubjectDemon]
+    state_name: str
+    action_name: str
+    reward_name: str
+    iteration: int
 
 
 class EnvironmentStaticMap(Environment):
@@ -85,10 +98,10 @@ class EnvironmentStaticMap(Environment):
         lists. Hence, it is not recommended to use the same name for both
         an `agent` and a `subject`.
         '''
-        names_in_use = [p.agent.name
-                        for p in self._interaction_sequence] + \
-                       [p.subject.name
-                        for p in self._interaction_sequence]
+        names_in_use = [
+            p.agent.name for p in self._interaction_sequence] + [
+            p.subject.name for p in self._interaction_sequence]
+
         temp = set(entity_names).difference(names_in_use)
         if temp:
             raise RuntimeError(f'Some entities are in use: {temp}')
@@ -120,10 +133,9 @@ class EnvironmentStaticMap(Environment):
         Hence, it is not recommended to use the same name for both
         an `agent demon` and a `subject demon`.
         '''
-        names_in_use = [p.agent.demon_name
-                        for p in self._interaction_sequence] + \
-                       [p.subject.demon_name
-                        for p in self._interaction_sequence]
+        names_in_use = [
+            p.agent.demon_name for p in self._interaction_sequence] + [
+            p.subject.demon_name for p in self._interaction_sequence]
         temp = set(demon_names).difference(names_in_use)
         if temp:
             raise RuntimeError(f'Some demons are in use: {temp}')
@@ -162,65 +174,54 @@ class EnvironmentStaticMap(Environment):
                     continue
 
                 agent_name = protocol.agent.name
+                subject_demon = protocol.subject.demon_name
                 a_s_name = (agent_name, subject_name)
-                unit = protocol.unit
-                state_name = protocol.state_name
-                action_name = protocol.action_name
-                reward_name = protocol.reward_name
                 agent_id, _ = self._assignment_list[a_s_name]
+                if agent_id is None:
+                    raise ValueError(f'a_s_name are not assigned!')
 
-                if protocol.subject.demon_name is None:
-                    subject_instance = self._subjects[subject_name]
-                else:
+                subject_instance = self._subjects[subject_name]
+                if subject_demon:
                     subject_instance = \
-                        self._subject_demons[protocol.subject.demon_name](
-                            self._subjects[subject_name])
+                        self._subject_demons[subject_demon](subject_instance)
 
+                args: InteractArgs = {
+                    'agent_id': agent_id,
+                    'agent_observer': self._agent_observers[a_s_name],
+                    'subject_instance': subject_instance,
+                    'state_name': protocol.state_name,
+                    'action_name': protocol.action_name,
+                    'reward_name': protocol.reward_name,
+                    'iteration': self._iterations[subject_name]}
+
+                unit = protocol.unit
                 if unit == 'interaction':
-                    self.interact(
-                        agent_id=agent_id,  # type: ignore
-                        agent_observer=self._agent_observers[a_s_name],
-                        subject_instance=subject_instance,
-                        state_name=state_name,
-                        action_name=action_name,
-                        reward_name=reward_name,
-                        iteration=self._iterations[subject_name],
-                        times=protocol.n)
+                    self.interact(**args, times=protocol.n)
 
                     if self._subjects[subject_name].is_terminated(None):
                         self.check_subject(subject_name)
 
-                elif unit in ('instance', 'iteration'):
+                elif unit == 'instance':
+                    self.interact_while(**args)
+
+                elif unit == 'iteration':
                     # For iteration, simulate the current instance, then in
                     # the next if statement, simulate the rest of the
                     # generated instances.
-                    self.interact_while(
-                        agent_id=agent_id,  # type: ignore
-                        agent_observer=self._agent_observers[a_s_name],
-                        subject_instance=subject_instance,
-                        state_name=state_name,
-                        action_name=action_name,
-                        reward_name=reward_name,
-                        iteration=self._iterations[subject_name])
+                    self.interact_while(**args)
 
-                    if (unit == 'iteration'
-                            and subject_name in self._instance_generators):
+                    if subject_name in self._instance_generators:
                         while self.check_subject(subject_name):
-                            if protocol.subject.demon_name is None:
-                                subject_instance = self._subjects[subject_name]
-                            else:
+                            subject_instance = self._subjects[subject_name]
+                            if subject_demon:
                                 subject_instance = \
-                                    self._subject_demons[
-                                        protocol.subject.demon_name](
-                                            self._subjects[subject_name])
-                            self.interact_while(
-                                agent_id=agent_id,  # type: ignore
-                                agent_observer=self._agent_observers[a_s_name],
-                                subject_instance=subject_instance,
-                                state_name=state_name,
-                                action_name=action_name,
-                                reward_name=reward_name,
-                                iteration=self._iterations[subject_name])
+                                    self._subject_demons[subject_demon](
+                                            subject_instance)
+                            args['subject_instance'] = subject_instance
+                            args['agent_observer'] = \
+                                self._agent_observers[a_s_name]
+
+                            self.interact_while(**args)
 
                     else:
                         self.check_subject(subject_name)
@@ -245,20 +246,21 @@ class EnvironmentStaticMap(Environment):
             Attempt to call this method will normal subjects in the interaction
             sequence.
         '''
-        subjects_in_use = set(s.subject.name
-                              for s in self.interaction_sequence)
+        subjects_in_use = set(
+            s.subject.name for s in self.interaction_sequence)
         no_generators = subjects_in_use.difference(self._instance_generators)
         if no_generators:
             raise TypeError(
                 'Found subject(s) in the interaction_sequence that '
                 f'are not instance generators: {no_generators}')
 
-        infinites = [s
-                     for s in subjects_in_use
-                     if not self._instance_generators[s].is_finite]
+        infinites = [
+            s for s in subjects_in_use
+            if not self._instance_generators[s].is_finite]
         if infinites:
-            raise TypeError('Found infinite instance generator(s) in the '
-                            f'interaction_sequence: {infinites}')
+            raise TypeError(
+                'Found infinite instance generator(s) in the '
+                f'interaction_sequence: {infinites}')
 
         while not all(self._instance_generators[s].is_terminated()
                       for s in subjects_in_use):
@@ -271,9 +273,9 @@ class EnvironmentStaticMap(Environment):
         Go over all `subjects`. If terminated, close related `agent_observers`,
         reset the `subject`, and create new `agent_observers`.
         '''
-        # print(self._subjects[subject_name])
-        affected_protocols = list(p for p in self._interaction_sequence
-                                  if p.subject.name == subject_name)
+        affected_protocols = list(
+            p for p in self._interaction_sequence
+            if p.subject.name == subject_name)
 
         success: bool = True
         if affected_protocols:
@@ -314,8 +316,8 @@ class EnvironmentStaticMap(Environment):
               ('action_name', p.action_name),
               ('subject_instance_name', self._subjects[subject_name]._name),
               ('environment', self._name),
-              ('iteration', self._iterations[subject_name])
-            ))
+              ('iteration', self._iterations[subject_name])))
+
             for p in self.interaction_sequence
             if p.subject.name == subject_name and
             p.subject.trajectory_name is not None)
@@ -391,10 +393,9 @@ class EnvironmentStaticMap(Environment):
 
         return result
 
-    def load(  # noqa: C901
+    def load(
             self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]],
-            entity_names: Optional[List[str]] = None) -> None:
+            path: Optional[Union[str, pathlib.PurePath]]) -> None:
         '''
         Load an entity or an `environment` from a file.
 
