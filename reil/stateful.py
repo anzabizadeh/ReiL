@@ -37,7 +37,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple
 
 from reil import reilbase
-from reil.datatypes.components import (PrimaryComponent, Statistic,
+from reil.datatypes.components import (State, Statistic,
                                        SubComponentInfo)
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import Feature, FeatureArray
@@ -60,11 +60,11 @@ class Stateful(reilbase.ReilBase):
         super().__init__(**kwargs)
 
         self.sub_comp_list = self._extract_sub_components()
-        self.state = PrimaryComponent(
+        self.state = State(
             self, self.sub_comp_list, self._default_state_definition,
             dumper=state_dumper, pickle_stripped=True)
         self.statistic = Statistic(
-            name='statistic', primary_component=self.state,
+            name='statistic', state=self.state,
             default_definition=self._default_statistic_definition,
             pickle_stripped=True)
 
@@ -202,7 +202,14 @@ class Stateful(reilbase.ReilBase):
         super().__setstate__(state)
 
         self.state.object_ref = self
-        self.statistic.set_primary_component(self.state)
+        try:
+            self.statistic.set_state(self.state)
+        except ValueError:
+            self._logger.warning(
+                'Primary component is already set for `statistic` to .'
+                f'{self.statistic._state}. Resetting the value!')
+            self.statistic._state = self.state
+
         self.state.set_default_definition(self._default_state_definition)
         self.statistic.set_default_definition(
             self._default_statistic_definition)
