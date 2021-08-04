@@ -5,39 +5,24 @@ Learner class
 
 The base class for all `learner` classes.
 '''
-from typing import Any, Generic, Tuple, TypeVar
+from abc import abstractmethod
+from typing import Any, Protocol, Tuple, TypeVar
 
 from reil import reilbase
 from reil.datatypes.feature import FeatureArray
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 
-LabelType = TypeVar('LabelType', covariant=True)
+LabelType = TypeVar('LabelType')
 
 
-class Learner(reilbase.ReilBase, Generic[LabelType]):
+class LearnerProtocol(Protocol[LabelType]):
     '''
     The base class for all `learner` classes.
     '''
-    def __init__(self,
-                 learning_rate: LearningRateScheduler,
-                 **kwargs: Any) -> None:
-        '''
-        Arguments
-        ---------
-        learning_rate:
-            A `LearningRateScheduler` object that determines the learning rate
-            based on iteration. If any scheduler other than constant is
-            provided, the model uses the `new_rate` method of the scheduler to
-            determine the learning rate at each iteration.
-        '''
-        super().__init__(**kwargs)
-        self._learning_rate = learning_rate
+    _learning_rate: LearningRateScheduler
 
-    @classmethod
-    def _empty_instance(cls):
-        return cls(learning_rate=ConstantLearningRate(0.0))
-
+    @abstractmethod
     def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[LabelType, ...]:
         '''
         predict `y` for a given input list `X`.
@@ -54,6 +39,7 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
         '''
         raise NotImplementedError
 
+    @abstractmethod
     def learn(
             self, X: Tuple[FeatureArray, ...], Y: Tuple[LabelType, ...]
     ) -> None:
@@ -69,3 +55,26 @@ class Learner(reilbase.ReilBase, Generic[LabelType]):
             A list of float labels for the learning model.
         '''
         raise NotImplementedError
+
+
+class Learner(reilbase.ReilBase, LearnerProtocol[LabelType]):
+    '''
+    The base class for all `learner` classes.
+    '''
+    def __init__(
+            self, learning_rate: LearningRateScheduler, **kwargs: Any) -> None:
+        '''
+        Arguments
+        ---------
+        learning_rate:
+            A `LearningRateScheduler` object that determines the learning rate
+            based on iteration. If any scheduler other than constant is
+            provided, the model uses the `new_rate` method of the scheduler to
+            determine the learning rate at each iteration.
+        '''
+        super().__init__(**kwargs)
+        self._learning_rate = learning_rate
+
+    @classmethod
+    def _empty_instance(cls):
+        return cls(learning_rate=ConstantLearningRate(0.0))
