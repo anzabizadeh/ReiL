@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-NoLearnAgent class
+AgentBase class
 ==================
 
 The base class of all `agent` classes.
@@ -18,7 +18,7 @@ from reil.stateful import Stateful
 T = TypeVar('T')
 
 
-class NoLearnAgent(Stateful):
+class AgentBase(Stateful):
     '''
     The base class of all `agent` classes. This class does not support any
     `learner`.
@@ -111,9 +111,8 @@ class NoLearnAgent(Stateful):
         raise NotImplementedError
 
     def observe(
-            self, subject_id: int,
-            stat_name: str) -> Generator[
-                Union[FeatureArray, None], Dict[str, Any], None]:
+            self, subject_id: int, stat_name: str
+    ) -> Generator[Union[FeatureArray, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
 
@@ -167,6 +166,9 @@ class NoLearnAgent(Stateful):
                     new_observation = Observation()
                 if new_observation.reward is None:  # terminated early!
                     history.append(new_observation)
+
+                if stat_name is not None:
+                    self.statistic.append(stat_name, subject_id)
 
                 return
 

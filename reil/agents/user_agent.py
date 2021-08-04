@@ -7,11 +7,11 @@ An agent that prints the state and asks the user for action.
 '''
 from typing import Any, Optional, Tuple
 
-from reil.agents.no_learn_agent import NoLearnAgent
+from reil.agents.agent_base import AgentBase
 from reil.datatypes.feature import FeatureArray
 
 
-class UserAgent(NoLearnAgent):
+class UserAgent(AgentBase):
     '''
     An agent that acts based on user input.
     '''

@@ -77,7 +77,7 @@ class QLearning(Agent[float]):
         self._buffer.setup(buffer_names=['X', 'Y'])
 
     @classmethod
-    def _empty_instance(cls):
+    def _empty_instance(cls):  # type: ignore
         return cls(
             Learner._empty_instance(), Buffer(), ConstantEpsilonGreedy())
 

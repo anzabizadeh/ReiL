@@ -11,7 +11,7 @@ import pathlib
 from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple,
                     Union)
 
-from reil.agents.no_learn_agent import NoLearnAgent
+from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
 from reil.datatypes.dataclasses import Observation
 from reil.datatypes.feature import FeatureArray
@@ -22,7 +22,7 @@ from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
 TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[LabelType, ...]]
 
 
-class Agent(NoLearnAgent, Generic[LabelType]):
+class Agent(AgentBase, Generic[LabelType]):
     '''
     The base class of all agent classes that learn from history.
     '''
@@ -125,8 +125,9 @@ class Agent(NoLearnAgent, Generic[LabelType]):
             action = self._break_tie(
                 possible_actions, self._tie_breaker)
         else:
-            action = super().act(state=state, subject_id=subject_id,
-                                 actions=actions, iteration=iteration)
+            action = super().act(
+                state=state, subject_id=subject_id,
+                actions=actions, iteration=iteration)
 
         return action
 
@@ -136,61 +137,62 @@ class Agent(NoLearnAgent, Generic[LabelType]):
         if self._training_trigger != 'none':
             self._learner.reset()
 
-    def load(self, filename: str,
-             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
-        '''
-        Load an object from a file.
+    # def load(
+    #         self, filename: str,
+    #         path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    #     '''
+    #     Load an object from a file.
 
-        Arguments
-        ---------
-        filename:
-            the name of the file to be loaded.
+    #     Arguments
+    #     ---------
+    #     filename:
+    #         the name of the file to be loaded.
 
-        path:
-            the path in which the file is saved.
+    #     path:
+    #         the path in which the file is saved.
 
-        Raises
-        ------
-            ValueError
-                Filename is not specified.
-        '''
-        _path = pathlib.Path(path or self._path)
-        super().load(filename, _path)
+    #     Raises
+    #     ------
+    #         ValueError
+    #             Filename is not specified.
+    #     '''
+    #     _path = pathlib.Path(path or self._path)
+    #     super().load(filename, _path)
 
-        # when loading, self._learner is the object type, not an instance.
-        self._learner = self._learner.from_pickle(  # type: ignore
-            filename, _path.parent / 'learner')
+    #     # when loading, self._learner is the object type, not an instance.
+    #     self._learner = self._learner.from_pickle(  # type: ignore
+    #         filename, _path.parent / 'learner')
 
-    def save(
-            self,
-            filename: Optional[str] = None,
-            path: Optional[Union[str, pathlib.PurePath]] = None
-    ) -> pathlib.PurePath:
-        '''
-        Save the object to a file.
+    # def save(
+    #         self,
+    #         filename: Optional[str] = None,
+    #         path: Optional[Union[str, pathlib.PurePath]] = None
+    # ) -> pathlib.PurePath:
+    #     '''
+    #     Save the object to a file.
 
-        Arguments
-        ---------
-        filename:
-            the name of the file to be saved.
+    #     Arguments
+    #     ---------
+    #     filename:
+    #         the name of the file to be saved.
 
-        path:
-            the path in which the file should be saved.
+    #     path:
+    #         the path in which the file should be saved.
 
-        data_to_save:
-            a list of variables that should be pickled. If omitted,
-            the `agent` is saved completely.
+    #     data_to_save:
+    #         a list of variables that should be pickled. If omitted,
+    #         the `agent` is saved completely.
 
-        Returns
-        -------
-        :
-            a `Path` object to the location of the saved file and its name as
-            `str`
-        '''
-        full_path = super().save(filename, path)
-        self._learner.save(full_path.name, full_path.parent / 'learner')
+    #     Returns
+    #     -------
+    #     :
+    #         a `Path` object to the location of the saved file and its name as
+    #         `str`
+    #     '''
+    #     full_path = super().save(filename, path)
+    #     self._learner.save(full_path.name, full_path.parent / 'learner')
 
-        return full_path
+    #     return full_path
 
     def _prepare_training(self, history: History) -> TrainingData[LabelType]:
         '''
@@ -233,12 +235,12 @@ class Agent(NoLearnAgent, Generic[LabelType]):
         if X:
             self._learner.learn(X, Y)
 
-    def observe(self, subject_id: int, stat_name: Optional[str],  # noqa: C901
-                ) -> Generator[
-                Union[FeatureArray, None], Dict[str, Any], None]:
+    def observe(  # noqa: C901
+            self, subject_id: int, stat_name: Optional[str],
+    ) -> Generator[Union[FeatureArray, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
-        Extends `NoLearnAgent.observe`.
+        Extends `AgentBase.observe`.
 
         This method creates a generator for `subject_id` that
         receives `state`, yields `action` and receives `reward`
@@ -314,9 +316,9 @@ class Agent(NoLearnAgent, Generic[LabelType]):
 
                 return
 
-    def __getstate__(self):
-        state = super().__getstate__()
+    # def __getstate__(self):
+    #     state = super().__getstate__()
 
-        state['_learner'] = type(self._learner)
+    #     state['_learner'] = type(self._learner)
 
-        return state
+    #     return state

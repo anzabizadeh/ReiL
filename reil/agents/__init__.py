@@ -7,7 +7,7 @@ This module provides different agents in reinforcement learning context.
 
 Classes
 -------
-NoLearnAgent
+AgentBase
     the base class of all agent classes
 
 Agent
@@ -37,7 +37,7 @@ TrainingData
     `FeatureArray` for X matrix and a tuple of floats for Y vector.
 
 '''
-from .no_learn_agent import NoLearnAgent  # noqa: W601
+from .agent_base import AgentBase  # noqa: W601
 from .agent import Agent, TrainingData  # noqa: W601
 from .q_learning import QLearning  # noqa: W601
 from .deep_q_learning import DeepQLearning  # noqa: W601

@@ -12,9 +12,9 @@ from typing import Any, Callable, Optional, Tuple, Union
 
 from reil import reilbase
 from reil.agents.agent import Agent
-from reil.agents.no_learn_agent import NoLearnAgent
+from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
-from reil.datatypes.components import PrimaryComponent, Statistic
+from reil.datatypes.components import State, Statistic
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import FeatureArray
 from reil.learners.learner import LabelType
@@ -29,7 +29,7 @@ class AgentDemon(Agent[LabelType]):
 
     def __init__(
             self,
-            sub_agent: NoLearnAgent,
+            sub_agent: AgentBase,
             condition_fn: Callable[[FeatureArray, int], bool],
             main_agent: Optional[Agent[LabelType]] = None,
             **kwargs: Any):
@@ -48,13 +48,13 @@ class AgentDemon(Agent[LabelType]):
         '''
         reilbase.ReilBase.__init__(self, **kwargs)
 
-        self.state: PrimaryComponent
+        self.state: State
         self.statistic: Statistic
         self._entity_list: EntityRegister
         self._training_trigger: str
 
         self._main_agent: Union[Agent[LabelType], None] = main_agent
-        self._sub_agent: NoLearnAgent = sub_agent
+        self._sub_agent: AgentBase = sub_agent
         self._condition_fn = condition_fn
 
         if main_agent is not None:
@@ -62,7 +62,7 @@ class AgentDemon(Agent[LabelType]):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(NoLearnAgent(), lambda f, i: True, None)
+        return cls(AgentBase(), lambda f, i: True, None)
 
     def __call__(self, main_agent: Agent[LabelType]) -> AgentDemon[LabelType]:
         self._main_agent = main_agent
