@@ -228,3 +228,25 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
                 filename=self._filename_pattern.format(n=self._stops_index),
                 path=self._save_path)
         self._enumerate = enumerate(self._instances.items(), from_number)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+
+        state['_instances'] = {}
+        del state['_enumerate']
+
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+
+        try:
+            self._generate_batch()
+        except IndexError:
+            if self._auto_rewind:
+                self.rewind()
+                self._generate_batch()
+
+        while (self._instance_counter !=
+                self._instance_counter_stops[self._stops_index - 1] - 1):
+            self.__next__()
