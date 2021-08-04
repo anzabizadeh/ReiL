@@ -59,9 +59,9 @@ class Stateful(reilbase.ReilBase):
 
         super().__init__(**kwargs)
 
-        self.sub_comp_list = self._extract_sub_components()
+        sub_comp_list = self._extract_sub_components()
         self.state = State(
-            self, self.sub_comp_list, self._default_state_definition,
+            self, sub_comp_list, self._default_state_definition,
             dumper=state_dumper, pickle_stripped=True)
         self.statistic = Statistic(
             name='statistic', state=self.state,
@@ -80,6 +80,12 @@ class Stateful(reilbase.ReilBase):
     def _default_statistic_definition(
             self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
         return (self._default_state_definition(_id), 0.0)
+
+    def _generate_state_defs(self) -> None:
+        raise NotImplementedError
+
+    def _generate_statistic_defs(self) -> None:
+        raise NotImplementedError
 
     def _extract_sub_components(self) -> Dict[str, SubComponentInfo]:
         '''

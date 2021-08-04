@@ -6,6 +6,7 @@ subject class
 This `subject` class is the base class of all subject classes.
 '''
 
+from abc import abstractmethod
 from typing import Any, Dict, Optional, Tuple
 
 from reil import stateful
@@ -48,6 +49,8 @@ class Subject(stateful.Stateful):
             default_definition=self._default_action_definition,
             enabled=True, pickle_stripped=True)
 
+        Subject._generate_reward_defs(self)
+
     def _default_reward_definition(self, _id: Optional[int] = None) -> float:
         return 0.0
 
@@ -55,6 +58,15 @@ class Subject(stateful.Stateful):
             self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
         return (FeatureArray(Feature[Any](name='default_action')),)
 
+    def _generate_reward_defs(self) -> None:
+        if 'no_reward' not in self.reward.definitions:
+            self.reward.add_definition(
+                'no_reward', lambda _: 0.0, 'default_state')
+
+    def _generate_action_defs(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''
         Determine if the `subject` is terminated for the given `agent` ID.
@@ -93,6 +105,7 @@ class Subject(stateful.Stateful):
 
         self._take_effect(action, _id)
 
+    @abstractmethod
     def _take_effect(self, action: FeatureArray, _id: int = 0) -> None:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to

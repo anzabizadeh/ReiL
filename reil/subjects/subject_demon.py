@@ -8,7 +8,6 @@ SubjectDemon class
 from __future__ import annotations
 
 import dataclasses
-import pathlib
 from typing import Any, Callable, Generic, Optional, Tuple, TypeVar, Union
 
 from reil.datatypes.components import Reward, Statistic

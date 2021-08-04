@@ -89,26 +89,14 @@ class HealthSubject(Subject):
             name='day', lower=0, upper=self._max_day - 1,
             generator=lambda _: None)  # type: ignore
 
-        self._generate_state_defs()
-        self._generate_reward_defs()
-        self._generate_statistic_defs()
-        self._generate_action_defs()
+        HealthSubject._generate_state_defs(self)
 
         self.reset()
 
     def _generate_state_defs(self):
-        self.state.add_definition('day',
-                                  ('day', {}))
-
-    def _generate_reward_defs(self):
-        self.reward.add_definition(
-            'no_reward', lambda _: 0.0, 'day')
-
-    def _generate_statistic_defs(self):
-        pass
-
-    def _generate_action_defs(self):
-        pass
+        if 'day' not in self.state.definitions:
+            self.state.add_definition(
+                'day', ('day', {}))
 
     @classmethod
     def _empty_instance(cls):

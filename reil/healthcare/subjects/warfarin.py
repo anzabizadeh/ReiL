@@ -60,9 +60,12 @@ class Warfarin(HealthSubject):
             max_day=max_day,
             **kwargs)
 
-    def _generate_state_defs(self):
-        super()._generate_state_defs()
+        Warfarin._generate_state_defs(self)
+        Warfarin._generate_action_defs(self)
+        Warfarin._generate_reward_defs(self)
+        Warfarin._generate_state_defs(self)
 
+    def _generate_state_defs(self):
         patient_basic: Tuple[Tuple[str, Dict[str, Any]], ...] = (
             ('age', {}), ('CYP2C9', {}),
             ('VKORC1', {}), ('sensitivity', {})
@@ -98,7 +101,7 @@ class Warfarin(HealthSubject):
             ('INR_history', {'length': 4}),
             ('interval_history', {'length': 4}))
 
-        for i in (1, 3, 5, 7, 9):
+        for i in range(1, 10):
             self.state.add_definition(
                 f'patient_w_dosing_{i:02}',
                 *patient_basic,
@@ -129,8 +132,6 @@ class Warfarin(HealthSubject):
             ('daily_INR_history', {'length': -1}))
 
     def _generate_reward_defs(self):
-        super()._generate_reward_defs()
-
         reward_sq_dist = reil_functions.NormalizedSquareDistance(
             name='sq_dist', y_var_name='daily_INR_history',
             length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
@@ -167,8 +168,6 @@ class Warfarin(HealthSubject):
             'PTTR_interpolation', reward_PTTR_interpolation, 'Measured_INR_2')
 
     def _generate_statistic_defs(self):
-        super()._generate_statistic_defs()
-
         statistic_PTTR = reil_functions.PercentInRange(
             name='PTTR', y_var_name='daily_INR_history',
             length=-1, multiplier=1.0, retrospective=True, interpolate=False,
@@ -181,8 +180,6 @@ class Warfarin(HealthSubject):
             'PTTR_exact', statistic_PTTR, 'daily_INR', 'patient')
 
     def _generate_action_defs(self):
-        super()._generate_action_defs()
-
         dose_gen = self.feature_gen_set['dose']
         interval_gen = self.feature_gen_set['interval']
 
@@ -197,10 +194,12 @@ class Warfarin(HealthSubject):
 
             return tuple(FeatureArray(a) for a in actions)
 
-        caps = tuple(i for i in (5.0, 10.0, 15.0)
-                     if self._dose_range[0] <= i <= self._dose_range[1])
-        dose = {cap: tuple(self.generate_dose_values(0.0, cap, 0.5))
-                for cap in caps}
+        caps = tuple(
+            i for i in (5.0, 10.0, 15.0)
+            if self._dose_range[0] <= i <= self._dose_range[1])
+        dose = {
+            cap: tuple(self.generate_dose_values(0.0, cap, 0.5))
+            for cap in caps}
 
         int_fixed = {
             i: (i,) for i in (1, 2, 3, 7)
@@ -211,16 +210,19 @@ class Warfarin(HealthSubject):
         int_free = tuple(range(
             self._interval_range[0], self._interval_range[0] + 1))
 
-        dose_int_fixed = {(d[0], i[0]): _actions(d[1], i[1])
-                          for d, i in itertools.product(
-                              dose.items(), int_fixed.items())
-                          }
+        dose_int_fixed = {
+            (d[0], i[0]): _actions(d[1], i[1])
+            for d, i in itertools.product(
+                dose.items(), int_fixed.items())
+        }
 
-        dose_int_free = {k: _actions(v, int_free)
-                         for k, v in dose.items()}
+        dose_int_free = {
+            k: _actions(v, int_free)
+            for k, v in dose.items()}
 
-        dose_int_weekly = {k: _actions(v, int_weekly)
-                           for k, v in dose.items()}
+        dose_int_weekly = {
+            k: _actions(v, int_weekly)
+            for k, v in dose.items()}
 
         max_cap = min(caps[-1], self._dose_range[1])
 
