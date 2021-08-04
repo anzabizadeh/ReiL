@@ -6,7 +6,8 @@ Dense class
 The Dense learner.
 '''
 import pathlib
-from typing import Any, List, Optional, Tuple, Union
+import random
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -15,6 +16,65 @@ from reil.learners.learner import Learner
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 from tensorflow import keras
+
+
+class SerializeTF:
+    def __init__(self, temp_path: Union[str, pathlib.PurePath] = '.') -> None:
+        self._temp_path = (
+            pathlib.PurePath(temp_path) /
+            '{n:06}'.format(n=random.randint(1, 1000000)))
+
+    def dump(self, model: keras.Model) -> Dict[str, List[Any]]:
+        path = pathlib.Path(self._temp_path)
+        model.save(path)  # type: ignore
+        result = self.traverse(path)
+        self.__remove_dir(path)
+
+        return result
+
+    def load(self, data: Dict[str, List[Any]]) -> keras.Model:
+        path = pathlib.Path(self._temp_path)
+        self.generate(path, data)
+        sub_folder = next(iter(data))
+
+        model = keras.models.load_model(path / sub_folder)  # type: ignore
+        self.__remove_dir(path)
+
+        return model  # type: ignore
+
+    @staticmethod
+    def traverse(root: pathlib.Path) -> Dict[str, List[Any]]:
+        result: Dict[str, List[Any]] = {root.name: []}
+        for child in root.iterdir():
+            if child.is_dir():
+                result[root.name].append(SerializeTF.traverse(child))
+            else:
+                with open(child, 'rb') as f:
+                    data = f.read()
+                result[root.name].append({child.name: data})
+
+        return result
+
+    @staticmethod
+    def generate(
+            root: pathlib.Path, data: Dict[str, List[Any]]) -> None:
+        for name, sub in data.items():
+            if isinstance(sub, bytes):
+                with open(root / name, 'wb+') as f:
+                    f.write(sub)
+            else:
+                (root / name).mkdir(parents=True, exist_ok=True)
+                for s in sub:
+                    SerializeTF.generate(root / name, s)
+
+    @staticmethod
+    def __remove_dir(root: pathlib.Path) -> None:
+        for child in root.iterdir():
+            if child.is_dir():
+                SerializeTF.__remove_dir(child)
+                child.rmdir()
+            else:
+                child.unlink()
 
 
 class Dense_tf_1(Learner[float]):
@@ -516,10 +576,17 @@ class Dense_tf_2(Learner[float]):
 
     def __getstate__(self):
         state = super().__getstate__()
+        state['_serialized_model'] = SerializeTF().dump(state['_model'])
 
         del state['_model']
 
         return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self._model = SerializeTF().load(state['_serialized_model'])
+        del state['_serialized_model']
+
+        self.__dict__.update(state)
 
 
 if tf.__version__[0] == '1':  # type: ignore

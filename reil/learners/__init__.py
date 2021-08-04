@@ -28,4 +28,4 @@ from .learning_rate_schedulers import (  # noqa: W0611
 
 from .learner import Learner  # noqa: W0611
 from .lookup_table import QLookupTable, TableEntry  # noqa: W0611
-from .fully_connected_neural_net import Dense  # noqa: W0611
+from .dense import Dense  # noqa: W0611
