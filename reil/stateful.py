@@ -219,3 +219,13 @@ class Stateful(reilbase.ReilBase):
         self.state.set_default_definition(self._default_state_definition)
         self.statistic.set_default_definition(
             self._default_statistic_definition)
+
+        # try:
+        #     self._generate_state_defs()
+        # except NotImplementedError:
+        #     pass
+
+        # try:
+        #     self._generate_statistic_defs()
+        # except NotImplementedError:
+        #     pass

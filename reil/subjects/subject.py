@@ -61,7 +61,7 @@ class Subject(stateful.Stateful):
     def _generate_reward_defs(self) -> None:
         if 'no_reward' not in self.reward.definitions:
             self.reward.add_definition(
-                'no_reward', lambda _: 0.0, 'default_state')
+                'no_reward', lambda _: 0.0, 'default')
 
     def _generate_action_defs(self) -> None:
         raise NotImplementedError
@@ -154,3 +154,13 @@ class Subject(stateful.Stateful):
 
         self.possible_actions.set_default_definition(
             self._default_action_definition)
+
+        # try:
+        #     self._generate_reward_defs()
+        # except NotImplementedError:
+        #     pass
+
+        # try:
+        #     self._generate_action_defs()
+        # except NotImplementedError:
+        #     pass
