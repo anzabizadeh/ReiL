@@ -15,7 +15,7 @@ Submodules
 
    reil.agents.agent
    reil.agents.deep_q_learning
-   reil.agents.no_learn_agent
+   reil.agents.agent_base
    reil.agents.q_learning
    reil.agents.random_agent
    reil.agents.user_agent
