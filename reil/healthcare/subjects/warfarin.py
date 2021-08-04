@@ -8,12 +8,92 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 
 import functools
 import itertools
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from reil.datatypes.feature import Feature, FeatureArray
 from reil.healthcare.patient import Patient
 from reil.healthcare.subjects.health_subject import HealthSubject
 from reil.utils import reil_functions
+
+
+patient_basic: Tuple[Tuple[str, Dict[str, Any]], ...] = (
+    ('age', {}), ('CYP2C9', {}),
+    ('VKORC1', {}), ('sensitivity', {})
+)
+patient_extra: Tuple[Tuple[str, Dict[str, Any]], ...] = (
+    ('weight', {}), ('height', {}),
+    ('gender', {}), ('race', {}), ('tobaco', {}),
+    ('amiodarone', {}), ('fluvastatin', {})
+)
+
+state_definitions: Dict[str, Tuple[Tuple[str, Dict[str, Any]], ...]] = {
+    'age': (('age', {}),),
+    'patient_basic': patient_basic,
+    'patient': (*patient_basic, *patient_extra),
+    'patient_w_dosing': (
+        *patient_basic, *patient_extra,
+        ('day', {}),
+        ('dose_history', {'length': -1}),
+        ('INR_history', {'length': -1}),
+        ('interval_history', {'length': -1})),
+    'patient_for_baseline': (
+        *patient_basic, *patient_extra,
+        ('day', {}),
+        ('dose_history', {'length': 4}),
+        ('INR_history', {'length': 4}),
+        ('interval_history', {'length': 4})),
+
+    **{
+        f'patient_w_dosing_{i:02}': (
+            *patient_basic,
+            ('day', {}),
+            ('dose_history', {'length': i}),
+            ('INR_history', {'length': i}),
+            ('interval_history', {'length': i}))
+        for i in range(1, 10)},
+
+    'patient_w_full_dosing': (
+        *patient_basic, *patient_extra,
+        ('day', {}),
+        ('daily_dose_history', {'length': -1}),
+        ('daily_INR_history', {'length': -1}),
+        ('interval_history', {'length': -1})),
+
+    'daily_INR': (('daily_INR_history', {'length': -1}),),
+
+    'Measured_INR_2': (
+        ('INR_history', {'length': 2}),
+        ('interval_history', {'length': 1})),
+
+    'INR_within_2': (('daily_INR_history', {'length': -1}),),
+}
+
+reward_sq_dist = reil_functions.NormalizedSquareDistance(
+    name='sq_dist', y_var_name='daily_INR_history',
+    length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+    center=2.5, band_width=1.0, exclude_first=True)
+
+reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
+    name='sq_dist_interpolation',
+    y_var_name='INR_history', x_var_name='interval_history',
+    length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+    center=2.5, band_width=1.0, exclude_first=True)
+
+reward_PTTR = reil_functions.PercentInRange(
+    name='PTTR', y_var_name='daily_INR_history',
+    length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+    acceptable_range=(2, 3), exclude_first=True)
+
+reward_PTTR_interpolation = reil_functions.PercentInRange(
+    name='PTTR',
+    y_var_name='INR_history', x_var_name='interval_history',
+    length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+    acceptable_range=(2, 3), exclude_first=True)
+
+statistic_PTTR = reil_functions.PercentInRange(
+    name='PTTR', y_var_name='daily_INR_history',
+    length=-1, multiplier=1.0, retrospective=True, interpolate=False,
+    acceptable_range=(2, 3), exclude_first=True)
 
 
 class Warfarin(HealthSubject):
@@ -63,121 +143,99 @@ class Warfarin(HealthSubject):
         Warfarin._generate_state_defs(self)
         Warfarin._generate_action_defs(self)
         Warfarin._generate_reward_defs(self)
-        Warfarin._generate_state_defs(self)
+        Warfarin._generate_statistic_defs(self)
 
     def _generate_state_defs(self):
-        patient_basic: Tuple[Tuple[str, Dict[str, Any]], ...] = (
-            ('age', {}), ('CYP2C9', {}),
-            ('VKORC1', {}), ('sensitivity', {})
-        )
-        patient_extra: Tuple[Tuple[str, Dict[str, Any]], ...] = (
-            ('weight', {}), ('height', {}),
-            ('gender', {}), ('race', {}), ('tobaco', {}),
-            ('amiodarone', {}), ('fluvastatin', {})
-        )
+        current_defs = self.state.definitions
+        for name, args in state_definitions.items():
+            if name not in current_defs:
+                self.state.add_definition(name, *args)
 
-        self.state.add_definition(
-            'age', ('age', {}))
+        # self.state.add_definition(
+        #     'age', ('age', {}))
 
-        self.state.add_definition(
-            'patient_basic', *patient_basic)
+        # self.state.add_definition(
+        #     'patient_basic', *patient_basic)
 
-        self.state.add_definition(
-            'patient', *patient_basic, *patient_extra)
+        # self.state.add_definition(
+        #     'patient', *patient_basic, *patient_extra)
 
-        self.state.add_definition(
-            'patient_w_dosing',
-            *patient_basic, *patient_extra,
-            ('day', {}),
-            ('dose_history', {'length': -1}),
-            ('INR_history', {'length': -1}),
-            ('interval_history', {'length': -1}))
+        # self.state.add_definition(
+        #     'patient_w_dosing',
+        #     *patient_basic, *patient_extra,
+        #     ('day', {}),
+        #     ('dose_history', {'length': -1}),
+        #     ('INR_history', {'length': -1}),
+        #     ('interval_history', {'length': -1}))
 
-        self.state.add_definition(
-            'patient_for_baseline',
-            *patient_basic, *patient_extra,
-            ('day', {}),
-            ('dose_history', {'length': 4}),
-            ('INR_history', {'length': 4}),
-            ('interval_history', {'length': 4}))
+        # self.state.add_definition(
+        #     'patient_for_baseline',
+        #     *patient_basic, *patient_extra,
+        #     ('day', {}),
+        #     ('dose_history', {'length': 4}),
+        #     ('INR_history', {'length': 4}),
+        #     ('interval_history', {'length': 4}))
 
-        for i in range(1, 10):
-            self.state.add_definition(
-                f'patient_w_dosing_{i:02}',
-                *patient_basic,
-                ('day', {}),
-                ('dose_history', {'length': i}),
-                ('INR_history', {'length': i}),
-                ('interval_history', {'length': i}))
+        # for i in range(1, 10):
+        #     self.state.add_definition(
+        #         f'patient_w_dosing_{i:02}',
+        #         *patient_basic,
+        #         ('day', {}),
+        #         ('dose_history', {'length': i}),
+        #         ('INR_history', {'length': i}),
+        #         ('interval_history', {'length': i}))
 
-        self.state.add_definition(
-            'patient_w_full_dosing',
-            *patient_basic, *patient_extra,
-            ('day', {}),
-            ('daily_dose_history', {'length': -1}),
-            ('daily_INR_history', {'length': -1}),
-            ('interval_history', {'length': -1}))
+        # self.state.add_definition(
+        #     'patient_w_full_dosing',
+        #     *patient_basic, *patient_extra,
+        #     ('day', {}),
+        #     ('daily_dose_history', {'length': -1}),
+        #     ('daily_INR_history', {'length': -1}),
+        #     ('interval_history', {'length': -1}))
 
-        self.state.add_definition(
-            'daily_INR',
-            ('daily_INR_history', {'length': -1}))
+        # self.state.add_definition(
+        #     'daily_INR',
+        #     ('daily_INR_history', {'length': -1}))
 
-        self.state.add_definition(
-            'Measured_INR_2',
-            ('INR_history', {'length': 2}),
-            ('interval_history', {'length': 1}))
+        # self.state.add_definition(
+        #     'Measured_INR_2',
+        #     ('INR_history', {'length': 2}),
+        #     ('interval_history', {'length': 1}))
 
-        self.state.add_definition(
-            'INR_within_2',
-            ('daily_INR_history', {'length': -1}))
+        # self.state.add_definition(
+        #     'INR_within_2',
+        #     ('daily_INR_history', {'length': -1}))
 
     def _generate_reward_defs(self):
-        reward_sq_dist = reil_functions.NormalizedSquareDistance(
-            name='sq_dist', y_var_name='daily_INR_history',
-            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
-            center=2.5, band_width=1.0, exclude_first=True)
+        current_defs = self.reward.definitions
 
-        reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
-            name='sq_dist_interpolation',
-            y_var_name='INR_history', x_var_name='interval_history',
-            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
-            center=2.5, band_width=1.0, exclude_first=True)
+        if 'sq_dist_exact' not in current_defs:
+            self.reward.add_definition(
+                'sq_dist_exact', reward_sq_dist, 'INR_within_2')
 
-        reward_PTTR = reil_functions.PercentInRange(
-            name='PTTR', y_var_name='daily_INR_history',
-            length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
-            acceptable_range=(2, 3), exclude_first=True)
+        if 'sq_dist_interpolation' not in current_defs:
+            self.reward.add_definition(
+                'sq_dist_interpolation', reward_sq_dist_interpolation,
+                'Measured_INR_2')
 
-        reward_PTTR_interpolation = reil_functions.PercentInRange(
-            name='PTTR',
-            y_var_name='INR_history', x_var_name='interval_history',
-            length=2, multiplier=-1.0, retrospective=True, interpolate=True,
-            acceptable_range=(2, 3), exclude_first=True)
+        if 'PTTR_exact' not in current_defs:
+            self.reward.add_definition(
+                'PTTR_exact', reward_PTTR, 'INR_within_2')
 
-        self.reward.add_definition(
-            'sq_dist_exact', reward_sq_dist, 'INR_within_2')
-
-        self.reward.add_definition(
-            'sq_dist_interpolation', reward_sq_dist_interpolation,
-            'Measured_INR_2')
-
-        self.reward.add_definition(
-            'PTTR_exact', reward_PTTR, 'INR_within_2')
-
-        self.reward.add_definition(
-            'PTTR_interpolation', reward_PTTR_interpolation, 'Measured_INR_2')
+        if 'PTTR_interpolation' not in current_defs:
+            self.reward.add_definition(
+                'PTTR_interpolation', reward_PTTR_interpolation,
+                'Measured_INR_2')
 
     def _generate_statistic_defs(self):
-        statistic_PTTR = reil_functions.PercentInRange(
-            name='PTTR', y_var_name='daily_INR_history',
-            length=-1, multiplier=1.0, retrospective=True, interpolate=False,
-            acceptable_range=(2, 3), exclude_first=True)
+        if 'PTTR_exact_basic' not in self.statistic.definitions:
+            self.statistic.add_definition(
+                'PTTR_exact_basic', statistic_PTTR,
+                'daily_INR', 'patient_basic')
 
-        self.statistic.add_definition(
-            'PTTR_exact_basic', statistic_PTTR, 'daily_INR', 'patient_basic')
-
-        self.statistic.add_definition(
-            'PTTR_exact', statistic_PTTR, 'daily_INR', 'patient')
+        if 'PTTR_exact' not in self.statistic.definitions:
+            self.statistic.add_definition(
+                'PTTR_exact', statistic_PTTR, 'daily_INR', 'patient')
 
     def _generate_action_defs(self):
         dose_gen = self.feature_gen_set['dose']
@@ -237,19 +295,42 @@ class Warfarin(HealthSubject):
             else:
                 raise ValueError(f'Wrong day: {day}.')
 
-        for cap in caps:
-            self.possible_actions.add_definition(
-                f'daily_{int(cap):02}',
-                lambda _: dose_int_fixed[cap, 1], 'day')
+        defs: Dict[str, Tuple[Callable[[Any], Tuple[FeatureArray, ...]], str]]
+        defs = {
+            **{
+                f'daily_{int(cap):02}':
+                    (lambda _: dose_int_fixed[cap, 1], 'day')  # type: ignore
+                for cap in caps},
+            **{
+                f'237_{int(cap):02}':
+                    (functools.partial(_237, cap=cap), 'day')
+                for cap in caps},
+            **{
+                f'free_{int(cap):02}':
+                    (lambda _: dose_int_free[cap], 'day')  # type: ignore
+                for cap in caps},
+            **{
+                f'weekly_{int(cap):02}':
+                    (lambda _: dose_int_weekly[cap], 'day')  # type: ignore
+                for cap in caps}
+        }
 
-            self.possible_actions.add_definition(
-                f'237_{int(cap):02}', functools.partial(_237, cap=cap), 'day')
+        current_defs = self.possible_actions.definitions
+        for name, args in defs.items():
+            if name not in current_defs:
+                self.possible_actions.add_definition(name, *args)
 
-            self.possible_actions.add_definition(
-                f'free_{int(cap):02}', lambda _: dose_int_free[cap], 'day')
+            # self.possible_actions.add_definition(
+            #     f'237_{int(cap):02}',
+            #     functools.partial(_237, cap=cap), 'day')
 
-            self.possible_actions.add_definition(
-                f'weekly_{int(cap):02}', lambda _: dose_int_weekly[cap], 'day')
+            # self.possible_actions.add_definition(
+            #     f'free_{int(cap):02}',
+            #     lambda _: dose_int_free[cap], 'day')
+
+            # self.possible_actions.add_definition(
+            #     f'weekly_{int(cap):02}',
+            #     lambda _: dose_int_weekly[cap], 'day')
 
     def _default_state_definition(
             self, _id: Optional[int] = None) -> FeatureArray:
