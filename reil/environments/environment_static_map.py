@@ -147,8 +147,8 @@ class EnvironmentStaticMap(Environment):
         return self._interaction_sequence
 
     @interaction_sequence.setter
-    def interaction_sequence(self,
-                             seq: Tuple[InteractionProtocol, ...]) -> None:
+    def interaction_sequence(
+            self, seq: Tuple[InteractionProtocol, ...]) -> None:
         self._agent_observers = {}
         for protocol in seq:
             self.assert_protocol(protocol)
@@ -390,26 +390,31 @@ class EnvironmentStaticMap(Environment):
 
         return result
 
-    def load(
-            self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]]) -> None:
-        '''
-        Load an entity or an `environment` from a file.
-
-        Arguments
-        ---------
-        filename:
-            The name of the file to be loaded.
-
-        entity_names:
-            If specified, that entity (`agent` or `subject`) is being
-            loaded from file. `None` loads an `environment`.
-
-        Raises
-        ------
-        ValueError
-            The filename is not specified.
-        '''
-        super().load(filename=filename, path=path)
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
         # To generate observers!
         self.interaction_sequence = self.interaction_sequence
+
+    # def load(
+    #         self, filename: str,
+    #         path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    #     '''
+    #     Load an entity or an `environment` from a file.
+
+    #     Arguments
+    #     ---------
+    #     filename:
+    #         The name of the file to be loaded.
+
+    #     entity_names:
+    #         If specified, that entity (`agent` or `subject`) is being
+    #         loaded from file. `None` loads an `environment`.
+
+    #     Raises
+    #     ------
+    #     ValueError
+    #         The filename is not specified.
+    #     '''
+    #     super().load(filename=filename, path=path)
+    #     # To generate observers!
+    #     self.interaction_sequence = self.interaction_sequence

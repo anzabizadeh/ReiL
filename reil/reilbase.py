@@ -165,11 +165,11 @@ class ReilBase:
         pickler = PickleMe.get('pbz2' if self._save_zipped else 'pkl')
         new_instance = pickler.load(filename=filename, path=path or self._path)
 
-        for key in set(self._persistent_attributes
-                       + ['_persistent_attributes']):
+        for key in set(
+                self._persistent_attributes + ['_persistent_attributes']):
             new_instance.__dict__[key] = self.__dict__[key]
 
-        self = new_instance
+        self.__dict__.update(new_instance.__dict__)
 
     def save(
         self,
