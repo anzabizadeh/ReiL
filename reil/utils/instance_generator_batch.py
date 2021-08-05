@@ -247,6 +247,9 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
                 self.rewind()
                 self._generate_batch()
 
-        while (self._instance_counter !=
-                self._instance_counter_stops[self._stops_index - 1] - 1):
+        counter = (
+            self._instance_counter
+            - ([0] + list(self._instance_counter_stops))[self._stops_index])
+
+        for _ in range(counter):
             self.__next__()
