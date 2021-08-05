@@ -7,7 +7,6 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-import pathlib
 from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
                     TypedDict, Union)
 
