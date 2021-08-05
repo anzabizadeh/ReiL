@@ -29,6 +29,7 @@ class SerializeTF:
         model.save(path)  # type: ignore
         result = self.traverse(path)
         self.__remove_dir(path)
+        path.rmdir()
 
         return result
 
@@ -39,6 +40,7 @@ class SerializeTF:
 
         model = keras.models.load_model(path / sub_folder)  # type: ignore
         self.__remove_dir(path)
+        path.rmdir()
 
         return model  # type: ignore
 
