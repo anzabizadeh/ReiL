@@ -14,6 +14,7 @@ import time
 from copy import deepcopy
 from typing import Any, Dict, Iterable, Optional, Tuple, TypeVar, Union
 
+import dill as pickle
 from reil import stateful
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
 from reil.pickler import PickleMe
@@ -197,8 +198,10 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
                     new_instance = False
                 except FileNotFoundError:
                     break
-                except RuntimeError:
-                    self._logger.info(f'Waiting for 20 secs.')
+                except (EOFError, OSError, pickle.UnpicklingError):
+                    self._logger.info(
+                        'Ran into an issue while loading! '
+                        'Waiting for 20 secs.')
                     time.sleep(20)
                 else:
                     file_count = len(self._instances)
