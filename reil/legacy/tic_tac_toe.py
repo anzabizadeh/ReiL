@@ -8,7 +8,7 @@ The standard Tic-Tac-Toe game.
 import random
 from typing import Any, Dict, Optional
 
-from reil.subjects.mnkgame import MNKGame
+from reil.legacy.mnkgame import MNKGame
 from reil.datatypes.feature import FeatureArray, FeatureGenerator
 
 

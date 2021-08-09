@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# TODO: Components (state, possible actions, etc.) should be updated
+# according to the new implementation of `Subject`.
+
 '''
 FrozenLake class
 =================
@@ -13,13 +16,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from reil.utils.mnkboard import MNKBoard
 from reil.subjects.subject import Subject
-from reil.datatypes import ReilData
+from reil.datatypes.feature import Feature, FeatureArray
 
 
 class FrozenLake(MNKBoard, Subject):
     '''
-    Build an m-by-n grid (using mnkboard super class) in which 1 player can play.
-    Player wins if it can get to the goal square. Each element in the graph can be:
+    Build an m-by-n grid (using mnkboard super class) in which 1 player can
+    play. Player wins if it can get to the goal square. Each element in the
+    graph can be:
         S: starting point, safe
         F: frozen surface, safe
         H: hole (end with reward -1)
@@ -32,8 +36,11 @@ class FrozenLake(MNKBoard, Subject):
 
     Methods
     -------
-        register: register the player and return its ID or return ID of current player.
+        register: register the player and return its ID or return ID of current
+        player.
+
         take_effect: moves the player on the grid.
+
         reset: clears the grid.
     '''
     def __init__(self, map: Optional[List[List[str]]] = None, **kwargs: Any):
@@ -44,10 +51,11 @@ class FrozenLake(MNKBoard, Subject):
             the map to be used
         '''
 
-        default_map = [['S', 'F', 'F', 'F'],
-                       ['F', 'H', 'F', 'H'],
-                       ['F', 'F', 'F', 'H'],
-                       ['H', 'F', 'F', 'G']]
+        default_map = [
+            ['S', 'F', 'F', 'F'],
+            ['F', 'H', 'F', 'H'],
+            ['F', 'F', 'F', 'H'],
+            ['H', 'F', 'F', 'G']]
 
         def locate(map: List[List[Any]], element: Any) -> Tuple[int, int]:
             row = [element in m_i
@@ -63,48 +71,35 @@ class FrozenLake(MNKBoard, Subject):
 
         moves = ('U', 'D', 'R', 'L')
         self._default_moves = tuple(
-            ReilData.single_categorical(
-                name='move', value=m, categories=moves)
+            Feature.categorical(name='move', value=m, categories=moves)
             for m in moves)
 
+        Subject.__init__(self, max_entity_count=1, **kwargs)
         MNKBoard.__init__(self, m=self._dim[0], n=self._dim[1], players=1)
-        Subject.__init__(**kwargs)
         self.reset()
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''Return True if the player get to the goal.'''
         return self._player_location == self._goal
 
-    def possible_actions(self, _id: int = 0) -> Tuple[ReilData, ...]:
+    def possible_actions(self, _id: int = 0) -> Tuple[Feature[str], ...]:
         '''Return the set of possible moves.'''
         return self._default_moves
 
-    def default_reward(self, _id: int = 0) -> ReilData:
-        return ReilData.single_base(name='reward', value=(float(self._player_location == self._goal) - 0.5) * 2)
+    def default_reward(self, _id: int = 0) -> Feature[float]:
+        return Feature.numerical(
+            name='reward',
+            value=(float(self._player_location == self._goal) - 0.5) * 2)
 
-    def register(self, player_name):
-        '''
-        Register an agent and return its ID.
-
-        If the agent is new, a new ID is generated and the agent_name is added to agent_list.
-        Arguments
-        ---------
-            agent_name: the name of the agent to be registered.
-
-        Raises ValueError for an attempt to register more than one agent.
-        '''
-        if len(self._agent_list) == 0:
-            return Subject.register(self, player_name)
-        raise ValueError('Windy Gridworld only accepts one player.')
-
-    def _take_effect(self, action: ReilData, _id: int = 0) -> None:
+    def _take_effect(self, action: FeatureArray, _id: int = 0) -> None:
         '''
         Move according to the action.
 
         Arguments
         ---------
             _id: ID of the player.
-            action: the location in which the piece is set. Can be either in index format or row column format.
+            action: the location in which the piece is set. Can be either
+            in index format or row column format.
         '''
         Subject.take_effect(self, action, _id)
 
@@ -124,12 +119,14 @@ class FrozenLake(MNKBoard, Subject):
             min(max(temp[1], 0), max_column)
         )
 
-        if self._map[self._player_location[0]][self._player_location[1]] == 'H':
+        if self._map[
+                self._player_location[0]][self._player_location[1]] == 'H':
             self._player_location = self._start
 
-        MNKBoard.set_piece(self, player=1,
-                           row=self._player_location[0],
-                           column=self._player_location[1])
+        MNKBoard.set_piece(
+            self, player=1,
+            row=self._player_location[0],
+            column=self._player_location[1])
 
     def reset(self):
         '''Clear the board and update board_status.'''
@@ -151,12 +148,14 @@ class FrozenLake(MNKBoard, Subject):
             'full_map': full_map,
         }
 
+
 if __name__ == '__main__':
     board = FrozenLake()
     _ = board.register('P1')
     for _ in range(10):
         print(board.state)
-        my_action = choice(board.possible_actions)
+        my_action = FeatureArray(
+            choice(board.possible_actions))  # type: ignore
         board.take_effect(my_action, 1)
         print(my_action.value)
         print(f'{board}')

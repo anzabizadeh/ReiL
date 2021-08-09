@@ -83,7 +83,7 @@ class DefaultPickler(LowLevelPickler):
                         obj = CustomUnPickler(f).load()
             except FileNotFoundError:
                 raise
-            except (EOFError, OSError) as e:
+            except (EOFError, OSError, pickle.UnpicklingError) as e:
                 err = e
                 logging.info(
                     f'Attempt {i} failed to load {_path}.')
@@ -94,9 +94,8 @@ class DefaultPickler(LowLevelPickler):
         logging.exception(
             'Corrupted or inaccessible data file: '
             f'{full_path}')
-        raise RuntimeError(
-            f'Corrupted or inaccessible data file: '
-            f'{full_path}') from err
+        if err:
+            raise err
 
     def dump(
         self, obj: Any,
