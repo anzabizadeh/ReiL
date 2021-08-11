@@ -23,7 +23,6 @@ MISSING = '__missing_feature__'
 T = TypeVar('T')
 MissingType = Literal['__missing_feature__']
 
-call_count = 0
 
 @dataclasses.dataclass(frozen=True)
 class Feature(Generic[T]):
@@ -293,11 +292,11 @@ class FeatureGenerator(Generic[T]):
             if _value == MISSING:
                 raise ValueError('Numerical feature cannot accept MISSING.')
 
-            return_value = self._call_numerical(_value)
+            return_value = self._call_numerical(_value)  # type: ignore
         else:
-            return_value = self._call_categorical(_value)
+            return_value = self._call_categorical(_value)  # type: ignore
 
-        self.recent_values[_value] = return_value
+        self.__dict__['recent_values'][_value] = return_value  # type: ignore
 
         return return_value
 
@@ -375,8 +374,6 @@ class FeatureGenerator(Generic[T]):
     def _call_numerical(
             self, value: Union[T, Tuple[T, ...]]
     ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
-        global call_count
-        call_count += 1
         normalizer = self.normalizer
         lower = self.lower
         upper = self.upper
