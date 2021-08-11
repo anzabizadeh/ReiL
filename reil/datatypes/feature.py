@@ -23,6 +23,7 @@ MISSING = '__missing_feature__'
 T = TypeVar('T')
 MissingType = Literal['__missing_feature__']
 
+call_count = 0
 
 @dataclasses.dataclass(frozen=True)
 class Feature(Generic[T]):
@@ -89,8 +90,9 @@ class Feature(Generic[T]):
             lower: Optional[T] = None, upper: Optional[T] = None,
             normalized: Optional[Tuple[float, ...]] = None):
         '''Create a numerical instance of `Feature`.'''
-        return cls(name=name, value=value, is_numerical=True,
-                   lower=lower, upper=upper, normalized=normalized)
+        return cls(
+            name=name, value=value, is_numerical=True,
+            lower=lower, upper=upper, normalized=normalized)
 
     @classmethod
     def categorical(
@@ -99,8 +101,9 @@ class Feature(Generic[T]):
             categories: Optional[Tuple[T, ...]] = None,
             normalized: Optional[Tuple[float, ...]] = None):
         '''Create a categorical instance of `Feature`.'''
-        return cls(name=name, value=value, is_numerical=False,
-                   categories=categories, normalized=normalized)
+        return cls(
+            name=name, value=value, is_numerical=False,
+            categories=categories, normalized=normalized)
 
     @cached_property
     def as_dict(self):
@@ -117,8 +120,9 @@ class Feature(Generic[T]):
     def __add__(self, other: Any):
         my_type = type(self)
         if type(other) != my_type:
-            raise TypeError("unsupported operand type(s) for +: "
-                            f"'{my_type}' and '{type(other)}'")
+            raise TypeError(
+                "unsupported operand type(s) for +: "
+                f"'{my_type}' and '{type(other)}'")
 
         for k, v in self.__dict__.items():
             if k not in ('value', 'normalized'):
@@ -206,6 +210,9 @@ class FeatureGenerator(Generic[T]):
     generator: Optional[
         Callable[[FeatureGenerator[T]], Union[T, Tuple[T, ...]]]] = None
     allow_missing: bool = False
+    recent_values: Dict[T, Union[Feature[T], Feature[Tuple[T, ...]]]] = \
+        dataclasses.field(
+            default_factory=dict, init=False, repr=False, compare=False)
 
     @classmethod
     def numerical(
@@ -239,8 +246,8 @@ class FeatureGenerator(Generic[T]):
             if self.categories is not None:
                 raise ValueError('Numerical type cannot have categories.')
             if self.allow_missing:
-                raise TypeError('Only categorical type can accept '
-                                'missing values.')
+                raise TypeError(
+                    'Only categorical type can accept missing values.')
 
             self._process_numerical()
         else:
@@ -252,15 +259,17 @@ class FeatureGenerator(Generic[T]):
             categories = self.categories
             if probabilities is not None:
                 if abs(sum(probabilities) - 1.0) > 1e-6:
-                    raise ValueError('probabilities should add up to 1.0.'
-                                     f'Got {sum(probabilities)}')
+                    raise ValueError(
+                        'probabilities should add up to 1.0.'
+                        f'Got {sum(probabilities)}')
                 if categories is None:
                     raise ValueError(
                         'probabilities cannot be set for None categories.')
                 if len(probabilities) != len(categories):
-                    raise ValueError('Size mismatch. '
-                                     f'{len(categories)} categories vs. '
-                                     f'{len(probabilities)} probabilities')
+                    raise ValueError(
+                        'Size mismatch. '
+                        f'{len(categories)} categories vs. '
+                        f'{len(probabilities)} probabilities')
 
             self._process_categorical()
 
@@ -268,37 +277,49 @@ class FeatureGenerator(Generic[T]):
         self, value: Optional[Union[T, Tuple[T, ...], MissingType]] = None
     ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
         if value is None:
-            if self.generator is None:
+            if (gen := self.generator) is None:
                 raise RuntimeError('generator not found.')
-            _value = self.generator(self)
+            _value = gen(self)
         else:
             _value = value
+
+        return_value: Union[Feature[T], Feature[Tuple[T, ...]]] = \
+            self.recent_values.get(_value)  # type: ignore
+
+        if return_value is not None:
+            return return_value
 
         if self.is_numerical:
             if _value == MISSING:
                 raise ValueError('Numerical feature cannot accept MISSING.')
 
-            return self._call_numerical(_value)
+            return_value = self._call_numerical(_value)
         else:
-            return self._call_categorical(_value)
+            return_value = self._call_categorical(_value)
+
+        self.recent_values[_value] = return_value
+
+        return return_value
 
     def _process_categorical(self):
-        if self.categories is None:
+        cats = self.categories
+        allow_missing = self.allow_missing
+        if cats is None:
             return
 
-        allow_missing_offset = int(self.allow_missing)
-        cat_count = len(self.categories) - 1 + allow_missing_offset
+        allow_missing_offset = int(allow_missing)
+        cat_count = len(cats) - 1 + allow_missing_offset
         normalizer = {}
-        for i, c in enumerate(self.categories[:-1]):
+        for i, c in enumerate(cats[:-1]):
             temp = [0] * cat_count
             temp[i] = 1
             normalizer[c] = tuple(temp)
 
         temp = [0] * cat_count
         temp[-1] = allow_missing_offset
-        normalizer[self.categories[-1]] = tuple(temp)
+        normalizer[cats[-1]] = tuple(temp)
 
-        if self.allow_missing:
+        if allow_missing:
             normalizer[MISSING] = tuple([0] * cat_count)
 
         self.__dict__['normalizer'] = normalizer
@@ -311,8 +332,9 @@ class FeatureGenerator(Generic[T]):
             self.__dict__['normalizer'] = lambda _: None  # type: ignore
         else:
             if lower > upper:
-                raise ValueError(f'lower ({lower}) cannot be '
-                                 f'greater than upper ({upper}).')
+                raise ValueError(
+                    f'lower ({lower}) cannot be '
+                    f'greater than upper ({upper}).')
 
             denominator = upper - lower
 
@@ -353,6 +375,8 @@ class FeatureGenerator(Generic[T]):
     def _call_numerical(
             self, value: Union[T, Tuple[T, ...]]
     ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
+        global call_count
+        call_count += 1
         normalizer = self.normalizer
         lower = self.lower
         upper = self.upper
@@ -383,11 +407,18 @@ class FeatureGenerator(Generic[T]):
             normalized = normalizer(value)  # type: ignore
 
         instance: Union[Feature[T], Feature[Tuple[T, ...]]] = \
-            Feature.numerical(name=self.name, value=value,   # type: ignore
-                              lower=lower, upper=upper,
-                              normalized=normalized)
+            Feature.numerical(
+                name=self.name, value=value,   # type: ignore
+                lower=lower, upper=upper,
+                normalized=normalized)
 
         return instance
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        if 'recent_values' not in state:
+            state['recent_values'] = {}
+
+        self.__dict__.update(state)
 
 
 class FeatureArray:
@@ -524,9 +555,7 @@ class FeatureArray:
                     del temp['is_numerical']
 
                 splitted_list = [
-                    FeatureArray(cls(
-                        value=v,
-                        **temp))
+                    FeatureArray(cls(value=v, **temp))
                     for v in value]
 
         else:
@@ -564,8 +593,8 @@ class FeatureArray:
         if overlaps:
             raise ValueError(f'Objects already exist: {overlaps}.')
 
-        return FeatureArray(itertools.chain(self._data.values(),
-                                            new_data._data.values()))
+        return FeatureArray(itertools.chain(
+            self._data.values(), new_data._data.values()))
 
     def __neg__(self):
         temp = [v
@@ -578,9 +607,10 @@ class FeatureArray:
                 if lower <= neg_value <= upper:
                     object.__setattr__(item, 'value', neg_value)
                 else:
-                    raise ValueError(f'Bounds violated: lower: {lower}, '
-                                     f'upper: {upper}, '
-                                     f'negative value: {neg_value}')
+                    raise ValueError(
+                        f'Bounds violated: lower: {lower}, '
+                        f'upper: {upper}, '
+                        f'negative value: {neg_value}')
 
         return FeatureArray(temp)  # type: ignore
 
@@ -599,8 +629,9 @@ def change_to_missing(feature: Feature[T]) -> Feature[T]:
     if categories is None:
         raise ValueError('No categories defined!')
     if normalized is None:
-        raise ValueError('Cannot generate normal form for a feature '
-                         'without the normal form.')
+        raise ValueError(
+            'Cannot generate normal form for a feature '
+            'without the normal form.')
 
     if len(categories) != len(normalized):
         raise TypeError('Feature is not allowed to have MISSING')
