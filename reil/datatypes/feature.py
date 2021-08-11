@@ -16,7 +16,7 @@ import dataclasses
 from functools import cached_property
 import itertools
 from typing import (Any, Callable, Dict, Iterable, Literal, Optional,
-                    Tuple, TypeVar, Union)
+                    Tuple, Union)
 
 MISSING = '__missing_feature__'
 
@@ -84,7 +84,8 @@ class Feature:
 
     @classmethod
     def numerical(
-            cls, name: str, value: Optional[Union[Any, Tuple[Any, ...]]] = None,
+            cls, name: str,
+            value: Optional[Union[Any, Tuple[Any, ...]]] = None,
             lower: Optional[Any] = None, upper: Optional[Any] = None,
             normalized: Optional[Tuple[float, ...]] = None):
         '''Create a numerical instance of `Feature`.'''

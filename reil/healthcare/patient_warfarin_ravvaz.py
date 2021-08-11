@@ -24,7 +24,7 @@ Features included in this model are:
 * EC_50
 '''
 import math
-from typing import Any, Literal
+from typing import Any
 
 from reil.datatypes.feature import FeatureGenerator
 from reil.healthcare.patient import Patient
