@@ -26,7 +26,7 @@ def random_choice(f: Any):
     return random.choice(f)
 
 
-def random_uniform(f: FeatureGenerator[float]) -> float:
+def random_uniform(f: FeatureGenerator) -> float:
     if f.randomized:
         return np.random.uniform(f.lower, f.upper)
 
@@ -39,7 +39,7 @@ def random_uniform(f: FeatureGenerator[float]) -> float:
     return (f.upper - f.lower) / 2.0
 
 
-def random_normal(f: FeatureGenerator[float]) -> float:
+def random_normal(f: FeatureGenerator) -> float:
     if f.randomized:
         return np.random.normal(f.mean, f.stdev)
 
@@ -49,7 +49,7 @@ def random_normal(f: FeatureGenerator[float]) -> float:
     return f.mean
 
 
-def random_normal_truncated(f: FeatureGenerator[float]) -> float:
+def random_normal_truncated(f: FeatureGenerator) -> float:
     if f.randomized:
         return min(max(
             np.random.normal(f.mean, f.stdev), f.lower),
@@ -61,7 +61,7 @@ def random_normal_truncated(f: FeatureGenerator[float]) -> float:
     return f.mean
 
 
-def random_lognormal(f: FeatureGenerator[float]) -> float:
+def random_lognormal(f: FeatureGenerator) -> float:
     try:
         exp_mu = math.exp(f.mean)  # type: ignore
     except TypeError:
@@ -73,7 +73,7 @@ def random_lognormal(f: FeatureGenerator[float]) -> float:
     return exp_mu
 
 
-def random_lognormal_truncated(f: FeatureGenerator[float]) -> float:
+def random_lognormal_truncated(f: FeatureGenerator) -> float:
     # capture 50% of the data.
     # This restricts the log values to a "reasonable" range
     try:
@@ -94,7 +94,7 @@ def random_lognormal_truncated(f: FeatureGenerator[float]) -> float:
     return exp_mu
 
 
-def random_categorical(f: FeatureGenerator[Categorical]) -> Categorical:
+def random_categorical(f: FeatureGenerator) -> Any:
     if (categories := f.categories) is None:
         raise TypeError('No categories found!')
 

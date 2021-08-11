@@ -16,7 +16,7 @@ class HealthMathModel:
     The base class of all mathematical models in healthcare.
     '''
 
-    def setup(self, **arguments: Feature[Any]) -> None:
+    def setup(self, **arguments: Feature) -> None:
         '''
         Set up the model.
 

@@ -15,16 +15,17 @@ from __future__ import annotations
 import dataclasses
 from functools import cached_property
 import itertools
-from typing import (Any, Callable, Dict, Iterable, Literal, Optional,
+from typing import (Any, Callable, Dict, Generic, Iterable, Literal, Optional,
                     Tuple, TypeVar, Union)
 
 MISSING = '__missing_feature__'
 
+T = TypeVar('T')
 MissingType = Literal['__missing_feature__']
 
 
 @dataclasses.dataclass(frozen=True)
-class Feature:
+class Feature(Generic[T]):
     '''
     Attributes
     ----------
@@ -51,14 +52,14 @@ class Feature:
         The upper limit for numerical values.
     '''
     name: str
-    value: Optional[Union[Any, Tuple[Any, ...], MissingType]] = None
+    value: Optional[Union[T, Tuple[T, ...], MissingType]] = None
     is_numerical: Optional[bool] = dataclasses.field(
         default=None, repr=False, compare=False)
-    categories: Optional[Tuple[Any, ...]] = dataclasses.field(
+    categories: Optional[Tuple[T, ...]] = dataclasses.field(
         default=None, repr=False, compare=False)
-    lower: Optional[Any] = dataclasses.field(
+    lower: Optional[T] = dataclasses.field(
         default=None, repr=False, compare=False)
-    upper: Optional[Any] = dataclasses.field(
+    upper: Optional[T] = dataclasses.field(
         default=None, repr=False, compare=False)
     normalized: Optional[
         Union[Tuple[float, ...], Tuple[int, ...]]] = dataclasses.field(
@@ -84,8 +85,8 @@ class Feature:
 
     @classmethod
     def numerical(
-            cls, name: str, value: Optional[Union[Any, Tuple[Any, ...]]] = None,
-            lower: Optional[Any] = None, upper: Optional[Any] = None,
+            cls, name: str, value: Optional[Union[T, Tuple[T, ...]]] = None,
+            lower: Optional[T] = None, upper: Optional[T] = None,
             normalized: Optional[Tuple[float, ...]] = None):
         '''Create a numerical instance of `Feature`.'''
         return cls(
@@ -95,8 +96,8 @@ class Feature:
     @classmethod
     def categorical(
             cls, name: str,
-            value: Optional[Union[Any, Tuple[Any, ...], MissingType]] = None,
-            categories: Optional[Tuple[Any, ...]] = None,
+            value: Optional[Union[T, Tuple[T, ...], MissingType]] = None,
+            categories: Optional[Tuple[T, ...]] = None,
             normalized: Optional[Tuple[float, ...]] = None):
         '''Create a categorical instance of `Feature`.'''
         return cls(
@@ -141,7 +142,7 @@ class Feature:
 
 
 @dataclasses.dataclass(frozen=True)
-class FeatureGenerator:
+class FeatureGenerator(Generic[T]):
     '''
     A class to generate `Feature`s.
 
@@ -196,19 +197,19 @@ class FeatureGenerator:
     name: str
     is_numerical: bool = dataclasses.field(
         default=False, repr=False, compare=False)
-    categories: Optional[Tuple[Any, ...]] = None
+    categories: Optional[Tuple[T, ...]] = None
     probabilities: Optional[Tuple[float, ...]] = None
-    mean: Optional[Any] = None
-    stdev: Optional[Any] = None
-    lower: Optional[Any] = None
-    upper: Optional[Any] = None
+    mean: Optional[T] = None
+    stdev: Optional[T] = None
+    lower: Optional[T] = None
+    upper: Optional[T] = None
     normalizer: Optional[Any] = dataclasses.field(
         default=None, init=False, repr=False, compare=False)
     randomized: Optional[bool] = True
     generator: Optional[
-        Callable[[FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None
+        Callable[[FeatureGenerator[T]], Union[T, Tuple[T, ...]]]] = None
     allow_missing: bool = False
-    recent_values: Dict[Any, Feature] = \
+    recent_values: Dict[T, Union[Feature[T], Feature[Tuple[T, ...]]]] = \
         dataclasses.field(
             default_factory=dict, init=False, repr=False, compare=False)
 
@@ -218,7 +219,7 @@ class FeatureGenerator:
             mean: Optional[float] = None, stdev: Optional[float] = None,
             lower: Optional[float] = None, upper: Optional[float] = None,
             generator: Optional[Callable[
-                [FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None,
+                [FeatureGenerator[T]], Union[T, Tuple[T, ...]]]] = None,
             randomized: Optional[bool] = None):
         return cls(
             name=name, is_numerical=True, lower=lower, upper=upper, mean=mean,
@@ -228,10 +229,10 @@ class FeatureGenerator:
     @classmethod
     def categorical(
             cls, name: str,
-            categories: Optional[Tuple[Any, ...]] = None,
+            categories: Optional[Tuple[T, ...]] = None,
             probabilities: Optional[Tuple[float, ...]] = None,
             generator: Optional[Callable[
-                [FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None,
+                [FeatureGenerator[T]], Union[T, Tuple[T, ...]]]] = None,
             randomized: Optional[bool] = None, allow_missing: bool = False):
         return cls(
             name=name, is_numerical=False,
@@ -272,8 +273,8 @@ class FeatureGenerator:
             self._process_categorical()
 
     def __call__(
-        self, value: Optional[Union[Any, Tuple[Any, ...], MissingType]] = None
-    ) -> Feature:
+        self, value: Optional[Union[T, Tuple[T, ...], MissingType]] = None
+    ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
         if value is None:
             if (gen := self.generator) is None:
                 raise RuntimeError('generator not found.')
@@ -281,7 +282,7 @@ class FeatureGenerator:
         else:
             _value = value
 
-        return_value: Feature = \
+        return_value: Union[Feature[T], Feature[Tuple[T, ...]]] = \
             self.recent_values.get(_value)  # type: ignore
 
         if return_value is not None:
@@ -342,8 +343,8 @@ class FeatureGenerator:
             self.__dict__['normalizer'] = normalizer
 
     def _call_categorical(
-            self, value: Union[Any, Tuple[Any, ...], MissingType]
-    ) -> Feature:
+            self, value: Union[T, Tuple[T, ...], MissingType]
+    ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
         normalizer = self.normalizer
         categories = self.categories or ()
 
@@ -371,8 +372,8 @@ class FeatureGenerator:
         return instance
 
     def _call_numerical(
-            self, value: Union[Any, Tuple[Any, ...]]
-    ) -> Feature:
+            self, value: Union[T, Tuple[T, ...]]
+    ) -> Union[Feature[T], Feature[Tuple[T, ...]]]:
         normalizer = self.normalizer
         lower = self.lower
         upper = self.upper
@@ -402,7 +403,7 @@ class FeatureGenerator:
 
             normalized = normalizer(value)  # type: ignore
 
-        instance: Feature = \
+        instance: Union[Feature[T], Feature[Tuple[T, ...]]] = \
             Feature.numerical(
                 name=self.name, value=value,   # type: ignore
                 lower=lower, upper=upper,
@@ -423,14 +424,14 @@ class FeatureArray:
     between objects in `reil`.
     '''
 
-    def __init__(self, data: Union[Feature, Iterable[Feature]]):
+    def __init__(self, data: Union[Feature[Any], Iterable[Feature[Any]]]):
         '''
         Arguments
         ---------
         data:
             One or a sequence of `Feature`s.
         '''
-        temp: Dict[str, Feature] = {}
+        temp: Dict[str, Feature[Any]] = {}
         _data: Iterable[Any] = (  # type: ignore
             data if hasattr(data, '__iter__') else [data])
 
@@ -617,7 +618,7 @@ class FeatureArray:
         return f"[{', '.join((d.__str__() for d in self._data.items()))}]"
 
 
-def change_to_missing(feature: Feature) -> Feature:
+def change_to_missing(feature: Feature[T]) -> Feature[T]:
     if feature.is_numerical:
         raise TypeError('Only categorical features can have missing.')
     categories = feature.categories
@@ -638,7 +639,7 @@ def change_to_missing(feature: Feature) -> Feature:
 
 def change_array_to_missing(
         features: FeatureArray, suppress_error: bool = True) -> FeatureArray:
-    def try_to_change(feature: Feature) -> Feature:
+    def try_to_change(feature: Feature[T]) -> Feature[T]:
         try:
             return change_to_missing(feature)
         except (TypeError, ValueError):

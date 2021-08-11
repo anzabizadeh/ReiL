@@ -90,7 +90,7 @@ class HambergPKPD(HealthMathModel):
         self._last_computed_day: Day = Day(0)
         self._cached_cs: Dict[float, List[float]] = {}
 
-    def setup(self, **arguments: Feature[Any]) -> None:
+    def setup(self, **arguments: Feature) -> None:
         '''
         Set up the model.
 
@@ -525,6 +525,7 @@ class HambergPKPD(HealthMathModel):
         try:
             Cs = self._total_cs[t]
         except IndexError:
+            print('compute Cs')
             Cs = sum(v.Cs([t])[0]
                      for v in self._dose_records.values())
 

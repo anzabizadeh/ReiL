@@ -29,9 +29,9 @@ class Patient:
             age=40.0 will set the initial age to 40.0.
         '''
         if not hasattr(self, 'feature_gen_set'):
-            self.feature_gen_set: Dict[str, FeatureGenerator[Any]] = {}
+            self.feature_gen_set: Dict[str, FeatureGenerator] = {}
         if not hasattr(self, 'feature_set'):
-            self.feature_set: Dict[str, Feature[Any]] = {}
+            self.feature_set: Dict[str, Feature] = {}
 
         for k in self.feature_gen_set:
             self.feature_set[k] = self.feature_gen_set[k](

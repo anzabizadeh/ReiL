@@ -56,7 +56,7 @@ class Subject(stateful.Stateful):
 
     def _default_action_definition(
             self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
-        return (FeatureArray(Feature[Any](name='default_action')),)
+        return (FeatureArray(Feature(name='default_action')),)
 
     def _generate_reward_defs(self) -> None:
         if 'no_reward' not in self.reward.definitions:

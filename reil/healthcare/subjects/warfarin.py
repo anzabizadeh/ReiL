@@ -340,61 +340,61 @@ class Warfarin(HealthSubject):
             patient_features['CYP2C9'],
             patient_features['VKORC1']])
 
-    def _sub_comp_age(self, _id: int, **kwargs: Any) -> Feature[float]:
+    def _sub_comp_age(self, _id: int, **kwargs: Any) -> Feature:
         return super()._numerical_sub_comp('age')
 
-    def _sub_comp_weight(self, _id: int, **kwargs: Any) -> Feature[float]:
+    def _sub_comp_weight(self, _id: int, **kwargs: Any) -> Feature:
         return self._numerical_sub_comp('weight')
 
-    def _sub_comp_height(self, _id: int, **kwargs: Any) -> Feature[float]:
+    def _sub_comp_height(self, _id: int, **kwargs: Any) -> Feature:
         return self._numerical_sub_comp('height')
 
-    def _sub_comp_gender(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_gender(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('gender')
 
-    def _sub_comp_race(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_race(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('race')
 
-    def _sub_comp_tobaco(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_tobaco(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('tobaco')
 
-    def _sub_comp_amiodarone(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_amiodarone(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('amiodarone')
 
-    def _sub_comp_fluvastatin(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_fluvastatin(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('fluvastatin')
 
-    def _sub_comp_CYP2C9(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_CYP2C9(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('CYP2C9')
 
     def _sub_comp_CYP2C9_masked(
-            self, _id: int, days: int, **kwargs: Any) -> Feature[str]:
+            self, _id: int, days: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('CYP2C9', self._day < days)
 
-    def _sub_comp_VKORC1(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_VKORC1(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('VKORC1')
 
     def _sub_comp_VKORC1_masked(
-            self, _id: int, days: int, **kwargs: Any) -> Feature[str]:
+            self, _id: int, days: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('VKORC1', self._day < days)
 
-    def _sub_comp_sensitivity(self, _id: int, **kwargs: Any) -> Feature[str]:
+    def _sub_comp_sensitivity(self, _id: int, **kwargs: Any) -> Feature:
         return self._categorical_sub_comp('sensitivity')
 
     def _sub_comp_INR_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[Tuple[float, ...]]:
+    ) -> Feature:
         return self._sub_comp_measurement_history(
             _id, length, **kwargs)
 
     def _sub_comp_daily_INR_history(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[Tuple[float, ...]]:
+    ) -> Feature:
         return self._sub_comp_daily_measurement_history(
             _id, length, **kwargs)
 
     def _sub_comp_INR_within(
             self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature[Tuple[float, ...]]:
+    ) -> Feature:
         intervals = self._get_history('interval_history', length).value
         return self._get_history('daily_INR', sum(intervals))  # type: ignore

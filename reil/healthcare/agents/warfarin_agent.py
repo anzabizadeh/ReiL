@@ -46,9 +46,9 @@ class WarfarinAgent(AgentBase):
         elif study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
             self._protocol = PGPGA()
 
-        self._dose_gen = FeatureGenerator[float].numerical(
+        self._dose_gen = FeatureGenerator.numerical(
             name='dose', lower=dose_range[0], upper=dose_range[1])
-        self._interval_gen = FeatureGenerator[float].numerical(
+        self._interval_gen = FeatureGenerator.numerical(
             name='interval', lower=interval_range[0], upper=interval_range[1])
 
     def act(self,

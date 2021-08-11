@@ -169,7 +169,7 @@ class testHambergPKPD(unittest.TestCase):
         random_demographic: bool = True,
         random_pkpd: bool = True,
         random_gen: Callable[
-            [FeatureGenerator[float]], float] = random_lognormal,
+            [FeatureGenerator], float] = random_lognormal,
         data_source: Literal[
             'Study I', 'Study II', 'Total', 'Ravvaz'] = 'Total'
     ) -> pd.DataFrame:

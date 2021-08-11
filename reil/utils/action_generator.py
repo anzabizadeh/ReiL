@@ -24,7 +24,7 @@ class CategoricalComponent(Generic[Categorical]):
     possible_values: Tuple[Tuple[Categorical, ...], ...]
     categories: Tuple[Categorical, ...]
     length: int = dataclasses.field(init=False, hash=False, compare=False)
-    feature_generator: FeatureGenerator[Categorical] = dataclasses.field(
+    feature_generator: FeatureGenerator = dataclasses.field(
         init=False, hash=False, compare=False)
 
     def __post_init__(self):
@@ -34,8 +34,7 @@ class CategoricalComponent(Generic[Categorical]):
             FeatureGenerator.categorical(
                 name=self.name, categories=self.categories))
 
-    def generate(self, index: int) -> Iterator[
-            Union[Feature[Categorical], Feature[Tuple[Categorical, ...]]]]:
+    def generate(self, index: int) -> Iterator[Feature]:
         _index = min(index, self.length - 1)
         return (self.feature_generator(vi)
                 for vi in self.possible_values[_index])
@@ -48,7 +47,7 @@ class NumericalComponent(Generic[Numerical]):
     lower: Numerical
     upper: Numerical
     length: int = dataclasses.field(init=False, hash=False, compare=False)
-    feature_generator: FeatureGenerator[Numerical] = dataclasses.field(
+    feature_generator: FeatureGenerator = dataclasses.field(
         init=False, hash=False, compare=False)
 
     def __post_init__(self):
@@ -58,8 +57,7 @@ class NumericalComponent(Generic[Numerical]):
             FeatureGenerator.numerical(
                 name=self.name, lower=self.lower, upper=self.upper))
 
-    def generate(self, index: int) -> Iterator[
-            Union[Feature[Numerical], Feature[Tuple[Numerical, ...]]]]:
+    def generate(self, index: int) -> Iterator[Feature]:
         _index = min(index, self.length - 1)
         return (self.feature_generator(vi)
                 for vi in self.possible_values[_index])

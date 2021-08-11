@@ -20,7 +20,7 @@ class testFeature(unittest.TestCase):
         lower = min(self._numerical_data)
         upper = max(self._numerical_data)
 
-        def midpoint(f: feature.Feature[float]) -> float:
+        def midpoint(f: feature.Feature) -> float:
             return (f.lower + f.upper)/2  # type: ignore
 
         numerical = feature.FeatureGenerator.numerical(

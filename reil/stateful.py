@@ -75,7 +75,7 @@ class Stateful(reilbase.ReilBase):
 
     def _default_state_definition(
             self, _id: Optional[int] = None) -> FeatureArray:
-        return FeatureArray(Feature[Any](name='default_state'))
+        return FeatureArray(Feature(name='default_state'))
 
     def _default_statistic_definition(
             self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
