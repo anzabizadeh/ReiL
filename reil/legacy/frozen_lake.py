@@ -82,11 +82,11 @@ class FrozenLake(MNKBoard, Subject):
         '''Return True if the player get to the goal.'''
         return self._player_location == self._goal
 
-    def possible_actions(self, _id: int = 0) -> Tuple[Feature[str], ...]:
+    def possible_actions(self, _id: int = 0) -> Tuple[Feature, ...]:
         '''Return the set of possible moves.'''
         return self._default_moves
 
-    def default_reward(self, _id: int = 0) -> Feature[float]:
+    def default_reward(self, _id: int = 0) -> Feature:
         return Feature.numerical(
             name='reward',
             value=(float(self._player_location == self._goal) - 0.5) * 2)

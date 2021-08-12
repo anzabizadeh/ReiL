@@ -411,12 +411,6 @@ class FeatureGenerator(Generic[T]):
 
         return instance
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        if 'recent_values' not in state:
-            state['recent_values'] = {}
-
-        self.__dict__.update(state)
-
 
 class FeatureArray:
     '''
