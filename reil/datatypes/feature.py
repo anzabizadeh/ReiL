@@ -209,9 +209,8 @@ class FeatureGenerator:
     generator: Optional[
         Callable[[FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None
     allow_missing: bool = False
-    recent_values: Dict[Any, Feature] = \
-        dataclasses.field(
-            default_factory=dict, init=False, repr=False, compare=False)
+    recent_value: Tuple[Any, Feature] = dataclasses.field(
+        default=(None, Feature('')), init=False, repr=False, compare=False)
 
     @classmethod
     def numerical(
@@ -241,6 +240,8 @@ class FeatureGenerator:
             allow_missing=allow_missing)
 
     def __post_init__(self):
+        self.__dict__['recent_value'] = (None, None)
+
         if self.is_numerical:
             if self.categories is not None:
                 raise ValueError('Numerical type cannot have categories.')
@@ -282,11 +283,8 @@ class FeatureGenerator:
         else:
             _value = value
 
-        return_value: Feature = \
-            self.recent_values.get(_value)  # type: ignore
-
-        if return_value is not None:
-            return return_value
+        if _value == self.recent_value[0]:
+            return self.recent_value[1]
 
         if self.is_numerical:
             if _value == MISSING:
@@ -296,7 +294,7 @@ class FeatureGenerator:
         else:
             return_value = self._call_categorical(_value)  # type: ignore
 
-        self.__dict__['recent_values'][_value] = return_value  # type: ignore
+        self.__dict__['recent_value'] = (_value, return_value)
 
         return return_value
 
