@@ -14,4 +14,4 @@ Submodules
    :maxdepth: 4
 
    reil.environments.environment
-   reil.environments.environment_static_map
+   reil.environments.sequential

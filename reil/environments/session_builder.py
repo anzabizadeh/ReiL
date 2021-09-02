@@ -28,11 +28,6 @@ class SessionBuilder:
         path = components['path']
         agent_training_triggers = components['agent_training_triggers']
 
-        interaction_sequence = tuple(
-            self._parser.extract('interaction_protocols', name, as_object=True)
-            for name in components['interaction_sequence']
-        )
-
         start_iteration = components.get('start_iteration', 0)
         max_iterations = components.get('max_iterations', 1)
         save_iterations = components.get('save_iterations', True)
@@ -50,7 +45,7 @@ class SessionBuilder:
             name=name,
             path=pathlib.PurePath(parent_session_path, path),
             agent_training_triggers=agent_training_triggers,
-            interaction_sequence=interaction_sequence,
+            plan_name=components['plan_name'],
             start_iteration=start_iteration,
             max_iterations=max_iterations,
             writer=writer,
@@ -102,6 +97,12 @@ class SessionBuilder:
 
         components.pop('main_task')
 
+        plans = {
+            name: self._parser.extract(
+                'interaction_protocols', typ, as_object=True)
+            for name, typ in (session_info.get('plans') or {}).items()
+        }
+
         agents = {
             name: self._parser.extract('agents', typ, as_object=True)
             for name, typ in session_info['agents'].items()
@@ -121,7 +122,8 @@ class SessionBuilder:
             name=session_info['name'],
             path=pathlib.PurePath(
                 parent_session_path or '.', session_info['path']),
-            agents=agents, subjects=subjects, demons=demons,
+            agents=agents, subjects=subjects,
+            plans=plans, demons=demons,
             separate_process=session_info.get('separate_process'),
             process_type=session_info.get('process_type'),
             main_task=main_task,

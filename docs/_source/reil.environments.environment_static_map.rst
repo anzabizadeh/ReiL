@@ -1,4 +1,4 @@
-.. automodule:: reil.environments.environment_static_map
+.. automodule:: reil.environments.sequential
    :members:
    :undoc-members:
    :inherited-members:
