@@ -12,8 +12,8 @@ Classes
 Environment:
     The base class of all environment classes.
 
-EnvironmentStaticMap:
-    An environment with static interaction sequence.
+Sequential:
+    An environment with static interaction sequences.
 
 Task:
     A class to define a `ReiL` task.
@@ -27,8 +27,9 @@ SessionBuilder:
 '''
 
 from .environment import (  # noqa: W0611
-    Environment, EntityType, EntityGenType, AgentSubjectTuple)
-from .environment_static_map import EnvironmentStaticMap  # noqa: W0611
+    Environment, EntityType, EntityGenType, AgentSubjectTuple, Plan)
+from .single import Single  #noqa: W0611
+from .sequential import Sequential  # noqa: W0611
 from .task import Task  # noqa: W0611
 from .session import Session  # noqa: W0611
 from .session_builder import SessionBuilder  # noqa: W0611

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-EnvironmentStaticMap class
+Sequential class
 ==========================
 
 This class provides a learning environment for any reinforcement learning
@@ -15,7 +15,7 @@ from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol
 from reil.datatypes.feature import FeatureArray
 from reil.environments.environment import (EntityGenType, EntityType,
-                                           Environment)
+                                           Environment, Plan)
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 
@@ -39,11 +39,12 @@ class InteractArgs(TypedDict):
     iteration: int
 
 
-class EnvironmentStaticMap(Environment):
+class Sequential(Environment):
     '''
     Provide an interaction and learning environment for `agents` and
     `subjects`, based on a static interaction sequence.
     '''
+    _object_version: str = '0.0.01'
 
     def __init__(
             self,
@@ -51,8 +52,8 @@ class EnvironmentStaticMap(Environment):
                 EntityType[Any], EntityGenType[Any], str]]] = None,
             demon_dict: Optional[Dict[str, Union[
                 AgentDemon[Any], SubjectDemon, str]]] = None,
-            interaction_sequence: Optional[
-                Tuple[InteractionProtocol, ...]] = None,
+            interaction_plans: Optional[
+                Dict[str, Tuple[InteractionProtocol, ...]]] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -61,17 +62,14 @@ class EnvironmentStaticMap(Environment):
             a dictionary that contains `agents`, `subjects`, and
             `generators`.
 
-        interaction_sequence:
-            a tuple of `InteractionProtocols` that specify
+        interaction_plans:
+            a dictionary with plan names as keys and
+            tuple of `InteractionProtocols` that specify
             how entities interact in the simulation.
         '''
         super().__init__(
-            entity_dict=entity_dict, demon_dict=demon_dict, **kwargs)
-
-        self._interaction_sequence: Tuple[InteractionProtocol, ...] = ()
-
-        if interaction_sequence is not None:
-            self.interaction_sequence = interaction_sequence
+            entity_dict=entity_dict, demon_dict=demon_dict,
+            interaction_plans=interaction_plans, **kwargs)
 
     def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
         '''
@@ -97,13 +95,14 @@ class EnvironmentStaticMap(Environment):
         lists. Hence, it is not recommended to use the same name for both
         an `agent` and a `subject`.
         '''
-        names_in_use = [
-            p.agent.name for p in self._interaction_sequence] + [
-            p.subject.name for p in self._interaction_sequence]
+        if (plan := self._active_plan.plan):
+            names_in_use = [
+                p.agent.name for p in plan] + [
+                p.subject.name for p in plan]
 
-        temp = set(entity_names).difference(names_in_use)
-        if temp:
-            raise RuntimeError(f'Some entities are in use: {temp}')
+            temp = set(entity_names).difference(names_in_use)
+            if temp:
+                raise RuntimeError(f'Some entities are in use: {temp}')
 
         super().remove_entity(entity_names)
 
@@ -132,28 +131,41 @@ class EnvironmentStaticMap(Environment):
         Hence, it is not recommended to use the same name for both
         an `agent demon` and a `subject demon`.
         '''
-        names_in_use = [
-            p.agent.demon_name for p in self._interaction_sequence] + [
-            p.subject.demon_name for p in self._interaction_sequence]
-        temp = set(demon_names).difference(names_in_use)
-        if temp:
-            raise RuntimeError(f'Some demons are in use: {temp}')
+        if (plan := self._active_plan.plan):
+            names_in_use = [
+                p.agent.demon_name for p in plan] + [
+                p.subject.demon_name for p in plan]
+            temp = set(demon_names).difference(names_in_use)
+            if temp:
+                raise RuntimeError(f'Some demons are in use: {temp}')
 
         super().remove_demon(demon_names)
 
-    @property
-    def interaction_sequence(self) -> Tuple[InteractionProtocol, ...]:
-        return self._interaction_sequence
+    def add_plans(self, interaction_plans: Dict[str, Any]) -> None:
+        for seq in interaction_plans.values():
+            for protocol in seq:
+                self.assert_protocol(protocol)
 
-    @interaction_sequence.setter
-    def interaction_sequence(
-            self, seq: Tuple[InteractionProtocol, ...]) -> None:
-        self._agent_observers = {}
-        for protocol in seq:
-            self.assert_protocol(protocol)
+        super().add_plans(interaction_plans)
+
+    def activate_plan(self, plan_name: str) -> None:
+        super().activate_plan(plan_name)
+        for protocol in self._active_plan.plan:  # type: ignore
             self.register_protocol(protocol, get_agent_observer=True)
 
-        self._interaction_sequence = seq
+    # @property
+    # def interaction_sequence(self) -> Tuple[InteractionProtocol, ...]:
+    #     return self._interaction_sequence
+
+    # @interaction_sequence.setter
+    # def interaction_sequence(
+    #         self, seq: Tuple[InteractionProtocol, ...]) -> None:
+    #     self._agent_observers = {}
+    #     for protocol in seq:
+    #         self.assert_protocol(protocol)
+    #         self.register_protocol(protocol, get_agent_observer=True)
+
+    #     self._interaction_sequence = seq
 
     def simulate_pass(self, n: int = 1) -> None:  # noqa: C901
         '''
@@ -165,8 +177,12 @@ class EnvironmentStaticMap(Environment):
         n:
             The number of passes that simulation should go.
         '''
+        plan = self._active_plan.plan
+        if plan is None:
+            raise ValueError('No active plan!')
+
         for _ in range(n):
-            for protocol in self._interaction_sequence:
+            for protocol in plan:
                 subject_name = protocol.subject.name
 
                 if self._subjects[subject_name].is_terminated(None):
@@ -242,8 +258,12 @@ class EnvironmentStaticMap(Environment):
             Attempt to call this method will normal subjects in the interaction
             sequence.
         '''
+        plan = self._active_plan.plan
+        if plan is None:
+            raise ValueError('No active plan!')
+
         subjects_in_use = set(
-            s.subject.name for s in self.interaction_sequence)
+            s.subject.name for s in plan)
         no_generators = subjects_in_use.difference(self._instance_generators)
         if no_generators:
             raise TypeError(
@@ -269,8 +289,12 @@ class EnvironmentStaticMap(Environment):
         Go over all `subjects`. If terminated, close related `agent_observers`,
         reset the `subject`, and create new `agent_observers`.
         '''
+        plan = self._active_plan.plan
+        if plan is None:
+            raise ValueError('No active plan!')
+
         affected_protocols = list(
-            p for p in self._interaction_sequence
+            p for p in plan
             if p.subject.name == subject_name)
 
         success: bool = True
@@ -289,10 +313,14 @@ class EnvironmentStaticMap(Environment):
         '''
         Extends `Environment.reset_subject()`.
         '''
+        plan = self._active_plan.plan
+        if plan is None:
+            raise ValueError('No active plan!')
+
         entities = set(
             (p.subject.statistic_name,
              self._assignment_list[(p.agent.name, p.subject.name)][1])
-            for p in self.interaction_sequence
+            for p in plan
             if p.subject.name == subject_name and
             p.subject.statistic_name is not None)
 
@@ -301,20 +329,20 @@ class EnvironmentStaticMap(Environment):
                 subject_name,
                 self._subjects[subject_name]).statistic.append(*e)
 
-        entities = set(
-            (p.subject.trajectory_name,
-             self._assignment_list[(p.agent.name, p.subject.name)][1],
-             (('agent_name', p.agent.name),
-              ('agent_demon', p.agent.demon_name or 'none'),
-              ('subject_name', subject_name),
-              ('subject_demon', p.subject.demon_name or 'none'),
-              ('state_name', p.state_name),
-              ('action_name', p.action_name),
-              ('subject_instance_name', self._subjects[subject_name]._name),
-              ('environment', self._name),
-              ('iteration', self._iterations[subject_name])))
+        entities = set((
+            p.subject.trajectory_name,
+            self._assignment_list[(p.agent.name, p.subject.name)][1],
+            (('agent_name', p.agent.name),
+             ('agent_demon', p.agent.demon_name or 'none'),
+             ('subject_name', subject_name),
+             ('subject_demon', p.subject.demon_name or 'none'),
+             ('state_name', p.state_name),
+             ('action_name', p.action_name),
+             ('subject_instance_name', self._subjects[subject_name]._name),
+             ('environment', self._name),
+             ('iteration', self._iterations[subject_name])))
 
-            for p in self.interaction_sequence
+            for p in plan
             if p.subject.name == subject_name and
             p.subject.trajectory_name is not None)
 
@@ -345,18 +373,24 @@ class EnvironmentStaticMap(Environment):
             A dictionary with state-subject pairs as keys and dataframes as
             values.
         '''
+        plan = self._active_plan.plan
+        if plan is None:
+            raise ValueError('No active plan!')
+
         entities = set(
-            StatInfo('_agents', p.agent.name, p.subject.name,
-                     (p.agent.name, p.subject.name),
-                     p.agent.aggregators, p.agent.groupby)
-            for p in self.interaction_sequence
+            StatInfo(
+                '_agents', p.agent.name, p.subject.name,
+                (p.agent.name, p.subject.name),
+                p.agent.aggregators, p.agent.groupby)
+            for p in plan
             if p.agent.statistic_name is not None)
 
         entities.update(set(
-            StatInfo('_subjects', p.subject.name, p.agent.name,
-                     (p.agent.name, p.subject.name),
-                     p.subject.aggregators, p.subject.groupby)
-            for p in self.interaction_sequence
+            StatInfo(
+                '_subjects', p.subject.name, p.agent.name,
+                (p.agent.name, p.subject.name),
+                p.subject.aggregators, p.subject.groupby)
+            for p in plan
             if p.subject.statistic_name is not None))
 
         def do_transform(x: pd.DataFrame) -> pd.DataFrame:
@@ -371,49 +405,33 @@ class EnvironmentStaticMap(Environment):
         else:
             transform = no_transform
 
-        result = {e.a_s_name:
-                  transform(  # type: ignore
-                      self._instance_generators.get(
-                          e.entity_name,
-                          self.__dict__[e.obj][e.entity_name]
-                      ).statistic.aggregate(  # type: ignore
-                          e.aggregators, e.groupby,
-                          self._assignment_list[e.a_s_name][e.a_s_name.index(
-                              e.entity_name)],
-                          reset_history=reset_history)
-                  ).assign(
-                      entity=e.entity_name,
-                      assigned_to=e.assigned_to,
-                      iteration=self._iterations[e.a_s_name[1]])
-                  for e in entities}
+        result = {
+            e.a_s_name: transform(  # type: ignore
+                self._instance_generators.get(
+                    e.entity_name,
+                    self.__dict__[e.obj][e.entity_name]
+                ).statistic.aggregate(  # type: ignore
+                    e.aggregators, e.groupby,
+                    self._assignment_list[e.a_s_name][e.a_s_name.index(
+                        e.entity_name)],
+                    reset_history=reset_history)
+            ).assign(
+                entity=e.entity_name,
+                assigned_to=e.assigned_to,
+                iteration=self._iterations[e.a_s_name[1]])
+            for e in entities}
 
         return result
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        super().__setstate__(state)
-        # To generate observers!
-        self.interaction_sequence = self.interaction_sequence
+        # ver = state.get('_object_version')
+        if 'interaction_sequence' in state:
+            state['_plans'] = {
+                'interaction_sequence': state['interaction_sequence']}
+            state['_active_plan'] = Plan()
+            del state['interaction_sequence']
 
-    # def load(
-    #         self, filename: str,
-    #         path: Optional[Union[str, pathlib.PurePath]]) -> None:
-    #     '''
-    #     Load an entity or an `environment` from a file.
-
-    #     Arguments
-    #     ---------
-    #     filename:
-    #         The name of the file to be loaded.
-
-    #     entity_names:
-    #         If specified, that entity (`agent` or `subject`) is being
-    #         loaded from file. `None` loads an `environment`.
-
-    #     Raises
-    #     ------
-    #     ValueError
-    #         The filename is not specified.
-    #     '''
-    #     super().load(filename=filename, path=path)
-    #     # To generate observers!
-    #     self.interaction_sequence = self.interaction_sequence
+            super().__setstate__(state)
+            self.activate_plan('interaction_sequence')
+        else:
+            super().__setstate__(state)

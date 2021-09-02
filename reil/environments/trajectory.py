@@ -1,16 +1,17 @@
 import logging
 import pathlib
+import random
 from typing import Any, Dict, List, Optional, Union
-from reil.agents.agent_demon import AgentDemon
 
-from reil.datatypes import Entity, InteractionProtocol
+from reil.agents.agent_demon import AgentDemon
+from reil.datatypes.dataclasses import Entity, InteractionProtocol
 from reil.datatypes.feature_array_dumper import FeatureArrayDumper
-from reil.environments.environment_static_map import EnvironmentStaticMap
+from reil.environments.single import Single
 from reil.environments.task import Task
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
-from reil.utils import InstanceGenerator
 from reil.utils.argument_parser import ConfigParser
+from reil.utils.instance_generator import InstanceGenerator
 
 
 class Trajectory:
@@ -96,25 +97,30 @@ class Trajectory:
         if (_action_name := action_name or self._action_name) is None:
             raise TypeError('action_name is not specified.')
 
-        env = EnvironmentStaticMap.from_pickle(
+        env = Single.from_pickle(
             filename=self._env_filename, path=self._env_path)
         if (_demons := demons or self._demons):
             env.add_demons(_demons)
         env.add_entities({_subject_entity.name: subjects})
 
-        protocol = InteractionProtocol(
-            agent=_agent_entity,
-            subject=_subject_entity,
-            state_name=_state_name,
-            action_name=_action_name,
-            reward_name='no_reward',
-            n=1, unit='iteration')
+        while (plan_name := str(random.random())) in env._plans:
+            pass
+
+        env.add_plans({
+            plan_name:
+                InteractionProtocol(
+                    agent=_agent_entity,
+                    subject=_subject_entity,
+                    state_name=_state_name,
+                    action_name=_action_name,
+                    reward_name='no_reward',
+                    n=1, unit='iteration')})
 
         t = Task(
             name='trajectory',
             path='../experiments/trajectories',
             agent_training_triggers={_agent_entity.name: 'none'},
-            interaction_sequence=(protocol,),
+            plan_name=plan_name,
         )
 
         t.run_env(env, iteration)

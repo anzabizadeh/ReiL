@@ -7,10 +7,10 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from reil.agents.agent import Agent
 from reil.agents.agent_demon import AgentDemon
+from reil.environments.single import Single
 from reil.environments.task import Task
-from reil.environments.environment_static_map import EnvironmentStaticMap
-from reil.subjects.subject_demon import SubjectDemon
 from reil.subjects.subject import Subject
+from reil.subjects.subject_demon import SubjectDemon
 
 # TODO: Documentation
 
@@ -21,6 +21,7 @@ class Session:
             main_task: Task,
             agents: Dict[str, Union[Agent[Any], str]],
             subjects: Dict[str, Union[Subject, str]],
+            plans: Dict[str, Any],
             demons: Optional[Dict[
                 str, Union[AgentDemon[Any], SubjectDemon, str]]] = None,
             tasks_before: Optional[List[Task]] = None,
@@ -35,10 +36,12 @@ class Session:
             process_type: Optional[Literal[
                 'spawn', 'fork', 'forkserver']] = None):
 
-        self._environment = EnvironmentStaticMap(
-            name=name, path=pathlib.PurePath(path), demon_dict=demons or {})
+        self._environment = Single(
+            name=name, path=pathlib.PurePath(path),
+            demon_dict=demons or {})
         self._environment.add_entities(agents)  # type: ignore
         self._environment.add_entities(subjects)  # type: ignore
+        self._environment.add_plans(plans)
 
         self._main_task = main_task
         self._tasks_before = tasks_before
@@ -55,7 +58,7 @@ class Session:
     @staticmethod
     def _run_tasks(
             task_list: Optional[List[Task]],
-            environment: EnvironmentStaticMap,
+            environment: Single,
             iteration: int, separate_process: bool,
             context: Optional[BaseContext] = None):
         path = environment._path / environment._name
@@ -63,7 +66,6 @@ class Session:
         if task_list:
             for t in task_list:
                 filename = f'{t._name}_{str(iteration)}'
-                environment.interaction_sequence = ()
                 if separate_process and context:
                     environment.save(
                         filename=filename, path=path)

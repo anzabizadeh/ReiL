@@ -1,10 +1,8 @@
-import logging
 import pathlib
 from math import ceil, log10
-from typing import Dict, Literal, Optional, Tuple, Union
+from typing import Dict, Literal, Optional, Union
 
-from reil.datatypes.dataclasses import InteractionProtocol
-from reil.environments.environment_static_map import EnvironmentStaticMap
+from reil.environments.single import Single
 from reil.utils.output_writer import OutputWriter
 
 # TODO: Documentation
@@ -17,7 +15,7 @@ class Task:
             agent_training_triggers: Dict[str, Literal[
                 'none', 'termination',
                 'state', 'action', 'reward']],
-            interaction_sequence: Tuple[InteractionProtocol, ...],
+            plan_name: str,
             start_iteration: int = 0, max_iterations: int = 1,
             writer: Optional[OutputWriter] = None,
             save_iterations: bool = True):
@@ -34,30 +32,32 @@ class Task:
         else:
             self._filename_format = f'{{}}'
 
-        for protocol in interaction_sequence:
-            if protocol.unit != 'iteration':
-                logging.warning(
-                    'Interaction protocol unit should be "iteration". '
-                    'Current unit might have unintended consequences.')
+        # for protocol in interaction_sequence:
+        #     if protocol.unit != 'iteration':
+        #         logging.warning(
+        #             'Interaction protocol unit should be "iteration". '
+        #             'Current unit might have unintended consequences.')
 
-        self._interaction_sequence = interaction_sequence
+        self._plan_name = plan_name
 
     def run_file(
         self, environment_filename: str,
         path: pathlib.PurePath, iteration: int
-    ) -> EnvironmentStaticMap:
-        return self.run_env(EnvironmentStaticMap.from_pickle(
+    ) -> Single:
+        return self.run_env(Single.from_pickle(
             environment_filename, path), iteration)
 
     def run_env(
-            self, env: EnvironmentStaticMap,
-            iteration: int) -> EnvironmentStaticMap:
-        env.interaction_sequence = self._interaction_sequence
+            self, env: Single,
+            iteration: int) -> Single:
+        env.activate_plan(self._plan_name)
+        if env._active_plan.plan is None:
+            raise ValueError('Plan is None!')
 
         for agent, trigger in self._agent_training_triggers.items():
             env._agents[agent]._training_trigger = trigger
 
-        for protocol in self._interaction_sequence:
+        for protocol in env._active_plan.plan:
             env._iterations[protocol.subject.name] = iteration
 
         env.simulate_pass()
@@ -72,14 +72,16 @@ class Task:
         #     filename=self._filename_format.format(self._name, iteration + 1),
 
     def trajectory(
-            self, env: EnvironmentStaticMap,
-            iteration: int) -> EnvironmentStaticMap:
-        env.interaction_sequence = self._interaction_sequence
+            self, env: Single,
+            iteration: int) -> Single:
+        env.activate_plan(self._plan_name)
+        if env._active_plan.plan is None:
+            raise ValueError('Plan is None!')
 
         for agent, trigger in self._agent_training_triggers.items():
             env._agents[agent]._training_trigger = trigger
 
-        for protocol in self._interaction_sequence:
+        for protocol in env._active_plan.plan:
             env._iterations[protocol.subject.name] = iteration
 
         env.simulate_pass()
