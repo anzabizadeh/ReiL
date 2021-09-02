@@ -28,7 +28,7 @@ def random_choice(f: Any):
 
 def random_uniform(f: FeatureGenerator) -> float:
     if f.randomized:
-        return np.random.uniform(f.lower, f.upper)
+        return np.random.uniform(f.lower, f.upper)  # type: ignore
 
     if f.mean is not None:
         return f.mean
@@ -41,7 +41,7 @@ def random_uniform(f: FeatureGenerator) -> float:
 
 def random_normal(f: FeatureGenerator) -> float:
     if f.randomized:
-        return np.random.normal(f.mean, f.stdev)
+        return np.random.normal(f.mean, f.stdev)  # type: ignore
 
     if f.mean is None:
         raise ValueError('mean should be a number.')
@@ -52,7 +52,7 @@ def random_normal(f: FeatureGenerator) -> float:
 def random_normal_truncated(f: FeatureGenerator) -> float:
     if f.randomized:
         return min(max(
-            np.random.normal(f.mean, f.stdev), f.lower),
+            np.random.normal(f.mean, f.stdev), f.lower),  # type: ignore
             f.upper)
 
     if f.mean is None:
@@ -102,7 +102,7 @@ def random_categorical(f: FeatureGenerator) -> Any:
         if (probs := f.probabilities) is None:
             return random.choice(categories)
         else:
-            return np.random.choice(categories, 1, p=probs)[0]
+            return np.random.choice(categories, 1, p=probs)[0]  # type: ignore
 
     return categories[0]
 

@@ -17,6 +17,9 @@ class CustomUnPickler(pickle.Unpickler):
         if name == 'PrimaryComponent':
             from reil.datatypes.components import State
             return State
+        if name == 'EnvironmentStaticMap':
+            from reil.environments.sequential import Sequential
+            return Sequential
 
         return super().find_class(module, name)  # type: ignore
 

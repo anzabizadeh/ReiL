@@ -268,7 +268,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
             items as values.
         '''
         if self._buffer:
-            index = np.random.choice(
+            index = np.random.choice(  # type: ignore
                 self._count, count, replace=False)
             return {name: tuple(buffer[i] for i in index)  # type: ignore
                     for name, buffer in self._buffer.items()}

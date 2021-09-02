@@ -40,11 +40,11 @@ class CircularBuffer(Buffer[T1, T2]):
         If the buffer is full, new items will be writen over the oldest one.
         '''
         try:
-            super().add(data)
+            super().add(data)  # type: ignore
         except IndexError:
             self._buffer_full = True
             self._buffer_index = -1
-            super().add(data)
+            super().add(data)  # type: ignore
 
         # the size does not change if buffer is full.
         self._count -= self._buffer_full

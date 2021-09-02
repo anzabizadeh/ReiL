@@ -8,7 +8,7 @@ AgentDemon class
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 from reil import reilbase
 from reil.agents.agent import Agent
@@ -51,7 +51,8 @@ class AgentDemon(Agent[LabelType]):
         self.state: State
         self.statistic: Statistic
         self._entity_list: EntityRegister
-        self._training_trigger: str
+        self._training_trigger: Literal[
+            'none', 'termination', 'state', 'action', 'reward']
 
         self._main_agent: Union[Agent[LabelType], None] = main_agent
         self._sub_agent: AgentBase = sub_agent

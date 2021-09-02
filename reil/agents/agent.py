@@ -77,7 +77,9 @@ class Agent(AgentBase, Generic[LabelType]):
                 f' [0.0, 1.0]. Got {discount_factor}. Set to 1.0.')
         self._discount_factor = min(discount_factor, 1.0)
         self._exploration_strategy = exploration_strategy
-        self._training_trigger = training_trigger
+        self._training_trigger: Literal[
+            'none', 'termination', 'state', 'action', 'reward'
+            ] = training_trigger
 
     @classmethod
     def _empty_instance(cls):

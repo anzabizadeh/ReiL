@@ -1,10 +1,14 @@
-from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Tuple,
-                    Union)
+from __future__ import annotations
+
+from typing import (TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List,
+                    Optional, Tuple, Union)
 
 import pandas as pd
 from reil.datatypes.components import State
 from reil.datatypes.feature import FeatureArray
-from reil.stateful import Stateful
+
+if TYPE_CHECKING:
+    from reil.stateful import Stateful
 
 
 class MockStatistic:

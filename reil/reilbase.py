@@ -19,6 +19,7 @@ class ReilBase:
     '''
     The base class of all classes in the `ReiL` package.
     '''
+    _object_version: str = '0.0.0'
 
     def __init__(
             self,
@@ -209,4 +210,6 @@ class ReilBase:
         return self.__dict__.copy()
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
+        if '_object_version' not in state:
+            state['_object_version'] = ReilBase._object_version
         self.__dict__.update(state)

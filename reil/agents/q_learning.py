@@ -150,7 +150,7 @@ class QLearning(Agent[float]):
         '''
         try:
             q_values = self._q(state)
-            max_q: float = np.max(q_values)
+            max_q: float = np.max(q_values)  # type: ignore
         except ValueError:
             max_q = 0.0
 
@@ -246,7 +246,7 @@ class QLearning(Agent[float]):
             A list of best actions.
         '''
         q_values = self._q(state, actions)
-        max_q: float = np.max(q_values)
+        max_q: float = np.max(q_values)  # type: ignore
         result = tuple(
             actions[i]  # type: ignore
             for i in np.flatnonzero(q_values == max_q))  # type: ignore

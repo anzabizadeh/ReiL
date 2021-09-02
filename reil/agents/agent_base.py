@@ -10,8 +10,7 @@ import random
 from typing import (Any, Dict, Generator, Literal, Optional, Tuple, TypeVar,
                     Union)
 
-from reil.datatypes import History
-from reil.datatypes.dataclasses import Observation
+from reil.datatypes.dataclasses import Observation, History
 from reil.datatypes.feature import FeatureArray
 from reil.stateful import Stateful
 
