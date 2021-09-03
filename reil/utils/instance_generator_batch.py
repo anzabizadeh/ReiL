@@ -236,7 +236,8 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
         state = super().__getstate__()
 
         state['_instances'] = {}
-        del state['_enumerate']
+        if '_enumerate' in state:
+            del state['_enumerate']
 
         return state
 
