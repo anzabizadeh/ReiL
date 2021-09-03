@@ -9,7 +9,7 @@ class OutputWriter:
     def __init__(
             self, filename: str,
             path: Union[str, pathlib.PurePath] = '.',
-            columns: Optional[Tuple[str]] = None) -> None:
+            columns: Optional[Tuple[str, ...]] = None) -> None:
 
         self._path = pathlib.PurePath(path)
         self._csv_filename = filename if filename.endswith(
