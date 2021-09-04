@@ -27,9 +27,8 @@ class MockStatistic:
         '''
         self._obj = obj
         self._history: Dict[
-            int,
+            Optional[int],
             List[Tuple[FeatureArray, float]]] = DefaultDict(list)
-        self._history_none: List[Tuple[FeatureArray, float]] = []
 
     def set_object(self, obj: Stateful) -> None:
         self._obj = obj
@@ -85,12 +84,8 @@ class MockStatistic:
             Definition not found.
         '''
         s = self._obj.statistic.__call__(name, _id)
-        # print(s[0].value, s[1])
         if s is not None:
-            if _id is None:
-                self._history_none.append(s)
-            else:
-                self._history[_id].append(s)
+            self._history[_id].append(s)
 
     def aggregate(
             self,
@@ -98,14 +93,13 @@ class MockStatistic:
             groupby: Optional[Tuple[str, ...]] = None,
             _id: Optional[int] = None,
             reset_history: bool = False):
-        temp = self._history_none if _id is None else self._history[_id]
+        temp = self._history[_id]
         if not temp:
             return None
 
-        df = pd.DataFrame({'instance_id': i,  # type: ignore
-                           **x[0].value,
-                           'value': x[1]}
-                          for i, x in enumerate(temp))
+        df = pd.DataFrame(
+            {'instance_id': i, **x[0].value, 'value': x[1]}  # type: ignore
+            for i, x in enumerate(temp))
         temp_group_by = ['instance_id'] if groupby is None else list(groupby)
         grouped_df = df.groupby(temp_group_by)
 
@@ -117,7 +111,7 @@ class MockStatistic:
 
         if reset_history:
             self._history: Dict[
-                int, List[Tuple[FeatureArray, float]]] = DefaultDict(list)
-            self._history_none: List[Tuple[FeatureArray, float]] = []
+                Optional[int],
+                List[Tuple[FeatureArray, float]]] = DefaultDict(list)
 
         return result
