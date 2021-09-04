@@ -8,12 +8,11 @@ on one or more `subjects`.
 '''
 import inspect
 from collections import defaultdict
-from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple, TypeVar,
-                    Union)
+from typing import Any, Dict, Generator, NamedTuple, Optional, Tuple, Union
 
 import pandas as pd
 from reil import stateful
-from reil.agents.agent import Agent
+from reil.agents.agent_base import AgentBase
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol
 from reil.datatypes.feature import FeatureArray
@@ -21,13 +20,11 @@ from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 from reil.utils.instance_generator import InstanceGenerator
 
-T = TypeVar('T')
-
 AgentSubjectTuple = Tuple[str, str]
-EntityType = Union[Agent[T], Subject]
+EntityType = Union[AgentBase, Subject]
 EntityGenType = Union[
-    InstanceGenerator[Agent[T]],
-    InstanceGenerator[AgentDemon[T]],
+    InstanceGenerator[AgentBase],
+    InstanceGenerator[AgentDemon],
     InstanceGenerator[Subject],
     InstanceGenerator[SubjectDemon]]  # type: ignore
 
@@ -59,9 +56,9 @@ class Environment(stateful.Stateful):
     def __init__(
             self,
             entity_dict: Optional[Dict[str, Union[
-                EntityType[Any], EntityGenType[Any], str]]] = None,
+                EntityType, EntityGenType, str]]] = None,
             demon_dict: Optional[Dict[str, Union[
-                AgentDemon[Any], SubjectDemon, str]]] = None,
+                AgentDemon, SubjectDemon, str]]] = None,
             interaction_plans: Optional[Dict[str, Any]] = None,
             **kwargs: Any):
         '''
@@ -73,11 +70,11 @@ class Environment(stateful.Stateful):
         '''
         super().__init__(**kwargs)
 
-        self._agents: Dict[str, Agent[Any]] = {}
+        self._agents: Dict[str, AgentBase] = {}
         self._subjects: Dict[str, Subject] = {}
-        self._agent_demons: Dict[str, AgentDemon[Any]] = {}
+        self._agent_demons: Dict[str, AgentDemon] = {}
         self._subject_demons: Dict[str, SubjectDemon] = {}
-        self._instance_generators: Dict[str, EntityGenType[Any]] = {}
+        self._instance_generators: Dict[str, EntityGenType] = {}
         self._assignment_list: Dict[
             AgentSubjectTuple,
             Tuple[Union[int, None], Union[int, None]]] = \
@@ -105,7 +102,7 @@ class Environment(stateful.Stateful):
     def add_entities(
             self,
             entity_dict: Dict[str, Union[
-                EntityType[Any], EntityGenType[Any], str]]) -> None:
+                EntityType, EntityGenType, str]]) -> None:
         '''
         Add `agents` and `subjects` to the environment.
 
@@ -153,7 +150,7 @@ class Environment(stateful.Stateful):
                 self._instance_generators.update({name: _obj})
 
                 _, instance = next(_obj)
-                if isinstance(instance, Agent):
+                if isinstance(instance, AgentBase):
                     self._agents.update({name: instance})  # type: ignore
                 elif isinstance(instance, Subject):
                     self._subjects.update({name: instance})
@@ -162,7 +159,7 @@ class Environment(stateful.Stateful):
                         f'entity {name} is niether an agent generator nor a '
                         'subject generator.')
 
-            elif isinstance(_obj, Agent):
+            elif isinstance(_obj, AgentBase):
                 self._agents.update({name: _obj})
             elif isinstance(_obj, Subject):  # type: ignore
                 self._subjects.update({name: _obj})
@@ -197,7 +194,7 @@ class Environment(stateful.Stateful):
     def add_demons(
             self,
             demon_dict: Dict[str, Union[
-                AgentDemon[Any], SubjectDemon, str]]) -> None:
+                AgentDemon, SubjectDemon, str]]) -> None:
         '''
         Add `AgentDemon`s and `SubjectDemon`s to the environment.
 

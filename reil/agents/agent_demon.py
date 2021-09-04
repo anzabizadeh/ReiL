@@ -11,16 +11,14 @@ import pathlib
 from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 from reil import reilbase
-from reil.agents.agent import Agent
 from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
 from reil.datatypes.components import State, Statistic
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import FeatureArray
-from reil.learners.learner import LabelType
 
 
-class AgentDemon(Agent[LabelType]):
+class AgentDemon(AgentBase):
     '''
     This class accepts a regular `agent`, and intervenes in its interaction
     with the subjects. A substitute `agent` acts whenever a condition is
@@ -31,7 +29,7 @@ class AgentDemon(Agent[LabelType]):
             self,
             sub_agent: AgentBase,
             condition_fn: Callable[[FeatureArray, int], bool],
-            main_agent: Optional[Agent[LabelType]] = None,
+            main_agent: Optional[AgentBase] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -54,7 +52,7 @@ class AgentDemon(Agent[LabelType]):
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward']
 
-        self._main_agent: Union[Agent[LabelType], None] = main_agent
+        self._main_agent: Optional[AgentBase] = main_agent
         self._sub_agent: AgentBase = sub_agent
         self._condition_fn = condition_fn
 
@@ -65,7 +63,7 @@ class AgentDemon(Agent[LabelType]):
     def _empty_instance(cls):
         return cls(AgentBase(), lambda f, i: True, None)
 
-    def __call__(self, main_agent: Agent[LabelType]) -> AgentDemon[LabelType]:
+    def __call__(self, main_agent: AgentBase) -> AgentDemon:
         self._main_agent = main_agent
         self.state = main_agent.state
         self.statistic = main_agent.statistic
@@ -80,7 +78,7 @@ class AgentDemon(Agent[LabelType]):
         _path = pathlib.Path(path or self._path)
         super().load(filename, _path)
 
-        self._main_agent = (self._main_agent or Agent).from_pickle(
+        self._main_agent = (self._main_agent or AgentBase).from_pickle(
             filename, _path / 'main_agent')
         self._sub_agent = self._sub_agent.from_pickle(
             filename, _path / 'sub_agent')
@@ -182,7 +180,8 @@ class AgentDemon(Agent[LabelType]):
         if self._main_agent is None:
             raise ValueError('main_agent is not set.')
 
-        self._main_agent.learn(history)
+        if self._training_trigger != 'none':
+            self._main_agent.learn(history)  # type: ignore
 
     def __getstate__(self):
         state = super().__getstate__()

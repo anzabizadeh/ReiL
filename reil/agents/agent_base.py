@@ -46,7 +46,8 @@ class AgentBase(Stateful):
         super().__init__(**kwargs)
 
         self._default_actions = default_actions
-        self._training_trigger = 'none'
+        self._training_trigger: Literal[
+            'none', 'termination', 'state', 'action', 'reward'] = 'none'
 
         if tie_breaker not in ['first', 'last', 'random']:
             raise ValueError(
@@ -110,7 +111,7 @@ class AgentBase(Stateful):
         raise NotImplementedError
 
     def observe(
-            self, subject_id: int, stat_name: str
+            self, subject_id: int, stat_name: Optional[str]
     ) -> Generator[Union[FeatureArray, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).

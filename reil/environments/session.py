@@ -23,7 +23,7 @@ class Session:
             subjects: Dict[str, Union[Subject, str]],
             plans: Dict[str, Any],
             demons: Optional[Dict[
-                str, Union[AgentDemon[Any], SubjectDemon, str]]] = None,
+                str, Union[AgentDemon, SubjectDemon, str]]] = None,
             tasks_before: Optional[List[Task]] = None,
             tasks_after: Optional[List[Task]] = None,
             tasks_before_iteration: Optional[List[Task]] = None,

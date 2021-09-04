@@ -1,7 +1,7 @@
 import logging
 import pathlib
 import random
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import Entity, InteractionProtocol
@@ -24,7 +24,7 @@ class Trajectory:
             agent_entity: Optional[Entity] = None,
             subject_entity: Optional[Entity] = None,
             demons: Optional[
-                Dict[str, Union[AgentDemon[Any], SubjectDemon, str]]] = None,
+                Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
             state_name: Optional[str] = None,
             action_name: Optional[str] = None):
         self._parser = parser
@@ -48,7 +48,7 @@ class Trajectory:
             agent_entity: Optional[Entity] = None,
             subject_entity: Optional[Entity] = None,
             demons: Optional[
-                Dict[str, Union[AgentDemon[Any], SubjectDemon, str]]] = None,
+                Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
             state_name: Optional[str] = None,
             action_name: Optional[str] = None) -> None:
 

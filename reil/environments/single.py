@@ -49,9 +49,9 @@ class Single(Environment):
     def __init__(
             self,
             entity_dict: Optional[Dict[str, Union[
-                EntityType[Any], EntityGenType[Any], str]]] = None,
+                EntityType, EntityGenType, str]]] = None,
             demon_dict: Optional[Dict[str, Union[
-                AgentDemon[Any], SubjectDemon, str]]] = None,
+                AgentDemon, SubjectDemon, str]]] = None,
             interaction_plans: Optional[
                 Dict[str, InteractionProtocol]] = None,
             **kwargs: Any):
