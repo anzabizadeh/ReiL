@@ -218,6 +218,7 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
                         raise ValueError(
                             f'The first loaded instance is {first}, '
                             f'expected {expected_name}.')
+                    break
 
         if not self._instances:
             self._instances = self.generate_instances(
