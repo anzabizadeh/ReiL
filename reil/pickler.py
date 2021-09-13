@@ -78,7 +78,7 @@ class DefaultPickler(LowLevelPickler):
                 try:
                     with file_fn(_path, mode) as f:
                         obj = pickle.load(f)  # type: ignore
-                except AttributeError:
+                except (AttributeError, ModuleNotFoundError):
                     logging.warning(
                         f'pickle failed to load {_path}. '
                         'Using CustomUnpickler.')
