@@ -7,12 +7,13 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
+import re
 from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
                     TypedDict, Union)
 
 import pandas as pd
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import InteractionProtocol
+from reil.datatypes.dataclasses import Entity, InteractionProtocol
 from reil.datatypes.feature import FeatureArray
 from reil.environments.environment import (EntityGenType, EntityType,
                                            Environment, Plan)
@@ -425,13 +426,79 @@ class Sequential(Environment):
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         # ver = state.get('_object_version')
-        if 'interaction_sequence' in state:
-            state['_plans'] = {
-                'interaction_sequence': state['interaction_sequence']}
-            state['_active_plan'] = Plan()
-            del state['interaction_sequence']
+        if '_plans' not in state:
+            name = state['_name']
+            temp = re.findall(r'^\D*(\d*)_(\d{3}_\d{2})(.*)_10k$', name)[0]
+            hist = temp[0]
+            action = temp[1]
+            if temp[2]:
+                demon = temp[2][1:]
+            else:
+                demon = None
 
-            super().__setstate__(state)
-            self.activate_plan('interaction_sequence')
-        else:
-            super().__setstate__(state)
+            state['_plans'] = {
+                'training': InteractionProtocol(
+                    agent=Entity(
+                        name='protocol', demon_name=None,
+                        statistic_name=None, groupby=None, aggregators=None,
+                        trajectory_name=None),
+                    subject=Entity(
+                        name='patient_training', demon_name=demon,
+                        statistic_name=None, groupby=None, aggregators=None,
+                        trajectory_name=None),
+                    state_name=f'patient_w_dosing_{hist}',
+                    action_name=action, reward_name='sq_dist_exact',
+                    n=100, unit='iteration'),
+                'validation': InteractionProtocol(
+                    agent=Entity(
+                        name='protocol', demon_name=None,
+                        statistic_name=None, groupby=None, aggregators=None,
+                        trajectory_name=None),
+                    subject=Entity(
+                        name='patient_validation', demon_name=demon,
+                        statistic_name='PTTR_exact', groupby=('sensitivity',),
+                        aggregators=('mean', 'std'), trajectory_name=None),
+                    state_name=f'patient_w_dosing_{hist}',
+                    action_name=action, reward_name='no_reward',
+                    n=1, unit='iteration'),
+                'test': InteractionProtocol(
+                    agent=Entity(
+                        name='protocol', demon_name=None,
+                        statistic_name=None, groupby=None, aggregators=None,
+                        trajectory_name=None),
+                    subject=Entity(
+                        name='patient_test', demon_name=demon,
+                        statistic_name='PTTR_exact', groupby=('sensitivity',),
+                        aggregators=('mean', 'std'), trajectory_name=None),
+                    state_name=f'patient_w_dosing_{hist}',
+                    action_name=action, reward_name='no_reward',
+                    n=1, unit='iteration'),
+                'trajectory': InteractionProtocol(
+                    agent=Entity(
+                        name='protocol', demon_name=None,
+                        statistic_name=None, groupby=None, aggregators=None,
+                        trajectory_name=None),
+                    subject=Entity(
+                        name='patient_trajectory', demon_name=demon,
+                        statistic_name='PTTR_exact', groupby=('sensitivity',),
+                        aggregators=('mean', 'std'),
+                        trajectory_name='patient_w_full_dosing'),
+                    state_name=f'patient_w_dosing_{hist}',
+                    action_name=action, reward_name='no_reward',
+                    n=1, unit='iteration')
+            }
+
+        if '_active_plan' not in state:
+            state['_active_plan'] = Plan()
+
+        if state.get('_interaction_sequence'):
+            state['_plans'].update({  # type: ignore
+                'interaction_sequence': state['_interaction_sequence']})
+
+        if '_interaction_sequence' in state:
+            del state['_interaction_sequence']
+
+        if state['_agent_observers'] is None:
+            state['_agent_observers'] = {}
+
+        super().__setstate__(state)
