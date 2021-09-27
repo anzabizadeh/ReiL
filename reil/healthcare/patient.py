@@ -30,14 +30,15 @@ class Patient:
         '''
         if not hasattr(self, 'feature_gen_set'):
             self.feature_gen_set: Dict[str, FeatureGenerator] = {}
-        if not hasattr(self, 'feature_set'):
-            self.feature_set: Dict[str, Feature] = {}
 
-        for k in self.feature_gen_set:
-            self.feature_set[k] = self.feature_gen_set[k](
-                feature_values.get(k))
+        self.feature_set: Dict[str, Feature] = {
+            k: fx(feature_values.get(k))
+            for k, fx in self.feature_gen_set.items()
+        }
 
         self._model = model
+        self.feature_set.update(
+            self._model.generate(self.feature_set, **feature_values))
         self._model.setup(**self.feature_set)
 
     def generate(self) -> None:
@@ -50,6 +51,7 @@ class Patient:
         for k in self.feature_gen_set:
             self.feature_set[k] = self.feature_gen_set[k]()
 
+        self.feature_set.update(self._model.generate(self.feature_set))
         self._model.setup(**self.feature_set)
 
     def model(self, **inputs: Any) -> Dict[str, Any]:

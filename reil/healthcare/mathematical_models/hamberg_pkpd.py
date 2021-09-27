@@ -8,12 +8,14 @@ DOI: 10.1038/sj.clpt.6100084
 '''
 import math
 from typing import (Any, Callable, Dict, Final, Iterable, List, NamedTuple,
-                    NewType, Union)
+                    NewType, Optional, Union)
 
 import numpy as np
-from reil.datatypes.feature import Feature
+from reil.datatypes.feature import Feature, FeatureGenerator
 from reil.healthcare.mathematical_models.health_math_model import \
     HealthMathModel
+from reil.utils.functions import random_lognormal_truncated
+
 
 Day = NewType('Day', float)
 Hour = NewType('Hour', int)
@@ -72,6 +74,46 @@ class HambergPKPD(HealthMathModel):
     # Hamberg et al. (2007) - Misc.
     _INR_max: Final = 20.0  # page 538
 
+    _parameter_generators: Dict[str, FeatureGenerator] = {
+        'MTT_1': FeatureGenerator.numerical(
+            name='MTT_1',  # (hours) Hamberg PK/PD
+            mean=math.log(_MTT_1),
+            stdev=math.sqrt(_omega_MTT_1),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'MTT_2': FeatureGenerator.numerical(
+            name='MTT_2',  # (hours) Hamberg PK/PD
+            # Hamberg et al. (2007) - Table 4
+            mean=math.log(_MTT_2),
+            stdev=math.sqrt(_omega_MTT_2),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'CL_S_cyp_1_1': FeatureGenerator.numerical(
+            name='CL_S_cyp_1_1',  # (l/h) Hamberg PK/PD
+            mean=math.log(_CL_s_1_1),
+            stdev=math.sqrt(_omega_CL_s),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'V1': FeatureGenerator.numerical(
+            name='V1',  # (L) Volume in central compartment
+            mean=math.log(_V1),
+            stdev=math.sqrt(_omega_V1),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'V2': FeatureGenerator.numerical(
+            name='V2',  # (L) volume in peripheral compartment
+            mean=math.log(_V2),
+            stdev=math.sqrt(_omega_V2),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        }
+
+    # pre-computing to gain some speed boost!
+    __log_EC_50_GG: Final[float] = math.log(_EC_50_GG)
+    __log_EC_50_GA: Final[float] = math.log(_EC_50_GA)
+    __log_EC_50_AA: Final[float] = math.log(_EC_50_AA)
+    __sqrt_omega_EC_50: Final[float] = math.sqrt(_omega_EC_50)
+
     def __init__(
             self, randomized: bool = True,
             cache_size: Day = Day(30)) -> None:
@@ -89,6 +131,48 @@ class HambergPKPD(HealthMathModel):
         self._cache_size = math.ceil(cache_size)
         self._last_computed_day: Day = Day(0)
         self._cached_cs: Dict[float, List[float]] = {}
+
+    @classmethod
+    def generate(
+            cls,
+            input_features: Optional[Dict[str, Feature]] = None,
+            **kwargs: Any) -> Dict[str, Feature]:
+
+        feature_set = super(HambergPKPD, cls).generate(
+            input_features, **kwargs)
+
+        temp = (input_features or {}).get('VKORC1')
+        if temp is None:
+            if 'EC_50' not in kwargs:
+                raise ValueError(
+                    'Either input_features should contain VKORC1 or '
+                    'EC_50 should be provided as a keyword argument.'
+                )
+
+            feature_set['EC_50'] = FeatureGenerator.numerical(
+                name='EC_50',  # (mg/L) Hamberg PK/PD
+                mean=1.0,
+                stdev=HambergPKPD.__sqrt_omega_EC_50,
+                generator=random_lognormal_truncated,
+                randomized=False)(kwargs['EC_50'])
+
+        else:
+            vkorc1 = temp.value
+            if vkorc1 == 'G/G':
+                mean = HambergPKPD.__log_EC_50_GG
+            elif vkorc1 in ('G/A', 'A/G'):
+                mean = HambergPKPD.__log_EC_50_GA
+            else:  # 'A/A'
+                mean = HambergPKPD.__log_EC_50_AA
+
+            feature_set['EC_50'] = FeatureGenerator.numerical(
+                name='EC_50',  # (mg/L) Hamberg PK/PD
+                mean=mean,
+                stdev=HambergPKPD.__sqrt_omega_EC_50,
+                generator=random_lognormal_truncated,
+                randomized=True)()
+
+        return feature_set
 
     def setup(self, **arguments: Feature) -> None:
         '''

@@ -11,7 +11,7 @@ from typing import (Any, Callable, Dict, Final, Iterable, List, NamedTuple,
                     NewType, Union)
 
 import numpy as np
-from reil.datatypes.feature import Feature
+from reil.datatypes.feature import Feature, FeatureGenerator
 from reil.healthcare.mathematical_models.health_math_model import \
     HealthMathModel
 
@@ -63,6 +63,40 @@ class HambergPKPD2010(HealthMathModel):
 
     # Hamberg et al. (2010) - Misc.
     _INR_max: Final = 20.0  # page 733
+
+    _parameter_generators: Dict[str, FeatureGenerator] = {
+        'MTT_1': FeatureGenerator.numerical(
+            name='MTT_1',  # (hours) Hamberg PK/PD
+            mean=math.log(_MTT_1),
+            stdev=math.sqrt(_omega_MTT_1),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'MTT_2': FeatureGenerator.numerical(
+            name='MTT_2',  # (hours) Hamberg PK/PD
+            # Hamberg et al. (2007) - Table 4
+            mean=math.log(_MTT_2),
+            stdev=math.sqrt(_omega_MTT_2),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'CL_S_cyp_1_1': FeatureGenerator.numerical(
+            name='CL_S_cyp_1_1',  # (l/h) Hamberg PK/PD
+            mean=math.log(_CL_s_1_1),
+            stdev=math.sqrt(_omega_CL_s),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'V1': FeatureGenerator.numerical(
+            name='V1',  # (L) Volume in central compartment
+            mean=math.log(_V1),
+            stdev=math.sqrt(_omega_V1),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        'V2': FeatureGenerator.numerical(
+            name='V2',  # (L) volume in peripheral compartment
+            mean=math.log(_V2),
+            stdev=math.sqrt(_omega_V2),
+            generator=random_lognormal_truncated,
+            randomized=True),
+        }
 
     def __init__(
             self, randomized: bool = True,
