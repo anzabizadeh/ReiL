@@ -262,11 +262,14 @@ class Warfarin(HealthSubject):
         int_fixed = {
             i: (i,) for i in (1, 2, 3, 7)
             if self._interval_range[0] <= i <= self._interval_range[1]}
+        int_free = tuple(range(
+            self._interval_range[0], self._interval_range[1] + 1))
+        int_semi_free = tuple(
+            i for i in (1, 2, 3, 7, 14, 21, 28)
+            if self._interval_range[0] <= i <= self._interval_range[1])
         int_weekly = tuple(
             i for i in (7, 14, 21, 28)
             if self._interval_range[0] <= i <= self._interval_range[1])
-        int_free = tuple(range(
-            self._interval_range[0], self._interval_range[0] + 1))
 
         dose_int_fixed = {
             (d[0], i[0]): _actions(d[1], i[1])
@@ -276,6 +279,10 @@ class Warfarin(HealthSubject):
 
         dose_int_free = {
             k: _actions(v, int_free)
+            for k, v in dose.items()}
+
+        dose_int_semi_free = {
+            k: _actions(v, int_semi_free)
             for k, v in dose.items()}
 
         dose_int_weekly = {
@@ -308,6 +315,10 @@ class Warfarin(HealthSubject):
             **{
                 f'free_{int(cap):02}':
                     (lambda _: dose_int_free[cap], 'day')  # type: ignore
+                for cap in caps},
+            **{
+                f'semi_{int(cap):02}':
+                    (lambda _: dose_int_semi_free[cap], 'day')  # type: ignore
                 for cap in caps},
             **{
                 f'weekly_{int(cap):02}':
