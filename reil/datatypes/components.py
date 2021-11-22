@@ -242,12 +242,6 @@ class State:
 
         return state
 
-    # def __setstate__(self, state: Dict[str, Any]):
-    #     if '_pickle_stripped' not in state:
-    #         state['_pickle_stripped'] = True
-
-    #     self.__dict__.update(state)
-
 
 class SecondayComponent(Generic[ComponentReturnType]):
     '''
@@ -462,15 +456,6 @@ class SecondayComponent(Generic[ComponentReturnType]):
         state['_default'] = None
 
         return state
-
-    # def __setstate__(self, state: Dict[str, Any]):
-    #     if '_pickle_stripped' not in state:
-    #         state['_pickle_stripped'] = True
-    #     if '_state' not in state:
-    #         state['_state'] = state['_primary_component']
-    #         del state['_primary_component']
-
-    #     self.__dict__.update(state)
 
 
 class Statistic:
@@ -757,15 +742,6 @@ class Statistic:
         state['_default'] = None
 
         return state
-
-    # def __setstate__(self, state: Dict[str, Any]):
-    #     if '_pickle_stripped' not in state:
-    #         state['_pickle_stripped'] = True
-    #     if '_state' not in state:
-    #         state['_state'] = state['_primary_component']
-    #         del state['_primary_component']
-
-    #     self.__dict__.update(state)
 
 
 ActionSet = SecondayComponent[Tuple[FeatureArray, ...]]

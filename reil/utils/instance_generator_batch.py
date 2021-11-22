@@ -244,9 +244,9 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         # TODO: This is a hack! remove it after the experiments!
-        if 'trajectory' in state['_save_path']:
-            state['_instance_counter_stops'] = [10000]
-            state['_filename_pattern'] = 'batch_10000_{n:03}'
+        # if 'trajectory' in state['_save_path']:
+        #     state['_instance_counter_stops'] = [10000]
+        #     state['_filename_pattern'] = 'batch_10000_{n:03}'
         super().__setstate__(state)
 
         try:

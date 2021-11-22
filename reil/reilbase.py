@@ -210,6 +210,6 @@ class ReilBase:
         return self.__dict__.copy()
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        if '_object_version' not in state:
-            state['_object_version'] = ReilBase._object_version
+        # if '_object_version' not in state:
+        #     state['_object_version'] = ReilBase._object_version
         self.__dict__.update(state)
