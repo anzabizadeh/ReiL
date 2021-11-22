@@ -16,19 +16,25 @@ from reil.healthcare.subjects.health_subject import HealthSubject
 from reil.utils import reil_functions
 
 
-patient_basic: Tuple[Tuple[str, Dict[str, Any]], ...] = (
+DefComponents = Tuple[Tuple[str, Dict[str, Any]], ...]
+
+patient_basic: DefComponents = (
     ('age', {}), ('CYP2C9', {}),
-    ('VKORC1', {}), ('sensitivity', {})
+    ('VKORC1', {})
 )
-patient_extra: Tuple[Tuple[str, Dict[str, Any]], ...] = (
+patient_extra: DefComponents = (
     ('weight', {}), ('height', {}),
     ('gender', {}), ('race', {}), ('tobaco', {}),
     ('amiodarone', {}), ('fluvastatin', {})
 )
 
-state_definitions: Dict[str, Tuple[Tuple[str, Dict[str, Any]], ...]] = {
+sensitivity: DefComponents = (('sensitivity', {}),)
+
+state_definitions: Dict[str, DefComponents] = {
     'age': (('age', {}),),
     'patient_basic': patient_basic,
+    'patient_w_sensitivity_basic': (*patient_basic, *sensitivity),
+    'patient_w_sensitivity': (*patient_basic, *sensitivity, *patient_extra),
     'patient': (*patient_basic, *patient_extra),
     'patient_w_dosing': (
         *patient_basic, *patient_extra,
@@ -231,11 +237,12 @@ class Warfarin(HealthSubject):
         if 'PTTR_exact_basic' not in self.statistic.definitions:
             self.statistic.add_definition(
                 'PTTR_exact_basic', statistic_PTTR,
-                'daily_INR', 'patient_basic')
+                'daily_INR', 'patient_w_sensitivity_basic')
 
         if 'PTTR_exact' not in self.statistic.definitions:
             self.statistic.add_definition(
-                'PTTR_exact', statistic_PTTR, 'daily_INR', 'patient')
+                'PTTR_exact', statistic_PTTR,
+                'daily_INR', 'patient_w_sensitivity')
 
     def _generate_action_defs(self):
         dose_gen = self.feature_gen_set['dose']

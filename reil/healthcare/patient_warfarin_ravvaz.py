@@ -125,7 +125,8 @@ class PatientWarfarinRavvaz(Patient):
 
         self._sensitivity_gen = FeatureGenerator.categorical(
             name='sensitivity',
-            categories=('normal', 'sensitive', 'highly sensitive'))
+            categories=('normal', 'sensitive', 'highly sensitive'),
+            allow_missing=allow_missing_genotypes)
 
         self._randomized = randomized
         super().__init__(model, **feature_values)
