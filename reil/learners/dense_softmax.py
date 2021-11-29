@@ -81,7 +81,8 @@ class DenseSoftMax(Dense_tf_2):
 
     def _generate_network(self) -> None:
         '''
-        Generate a multilayer neural net using `keras.Dense`.
+        Generate a multilayer neural net using `keras.Dense` and a softmax
+        layer in the output.
         '''
 
         self._model = keras.models.Sequential()
