@@ -380,7 +380,9 @@ class Environment(stateful.Stateful):
                     {'state': state,
                      'actions': possible_actions,
                      'iteration': iteration})
-                subject_instance.take_effect(action, agent_id)  # type: ignore
+                action_taken = subject_instance.take_effect(
+                    action, agent_id)  # type: ignore
+                agent_observer.send({'action_taken': action_taken})
 
     @classmethod
     def interact_while(

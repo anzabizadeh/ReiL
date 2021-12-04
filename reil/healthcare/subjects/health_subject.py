@@ -124,7 +124,7 @@ class HealthSubject(Subject):
         return self._day >= self._max_day
 
     def _take_effect(
-            self, action: FeatureArray, _id: int = 0) -> None:
+            self, action: FeatureArray, _id: int = 0) -> FeatureArray:
         action_temp = action.value
         current_dose = float(action_temp['dose'])  # type: ignore
         current_interval = min(int(action_temp['interval']),  # type: ignore
@@ -157,6 +157,8 @@ class HealthSubject(Subject):
         self._decision_points_measurement_history[
             self._decision_points_index] = \
             self._full_measurement_history[self._day]
+
+        return action
 
     def reset(self) -> None:
         Subject.reset(self)

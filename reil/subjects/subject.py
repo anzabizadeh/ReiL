@@ -87,7 +87,7 @@ class Subject(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    def take_effect(self, action: FeatureArray, _id: int = 0) -> None:
+    def take_effect(self, action: FeatureArray, _id: int = 0) -> FeatureArray:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
         the next state.
@@ -103,10 +103,11 @@ class Subject(stateful.Stateful):
         if not self.reward._enabled:
             self.reward.enable()
 
-        self._take_effect(action, _id)
+        taken_action = self._take_effect(action, _id)
+        return taken_action
 
     @abstractmethod
-    def _take_effect(self, action: FeatureArray, _id: int = 0) -> None:
+    def _take_effect(self, action: FeatureArray, _id: int = 0) -> FeatureArray:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
         the next state.

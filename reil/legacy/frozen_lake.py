@@ -91,7 +91,7 @@ class FrozenLake(MNKBoard, Subject):
             name='reward',
             value=(float(self._player_location == self._goal) - 0.5) * 2)
 
-    def _take_effect(self, action: FeatureArray, _id: int = 0) -> None:
+    def _take_effect(self, action: FeatureArray, _id: int = 0) -> FeatureArray:
         '''
         Move according to the action.
 
@@ -127,6 +127,8 @@ class FrozenLake(MNKBoard, Subject):
             self, player=1,
             row=self._player_location[0],
             column=self._player_location[1])
+
+        return action
 
     def reset(self):
         '''Clear the board and update board_status.'''
