@@ -424,8 +424,8 @@ class FeatureArray:
             One or a sequence of `Feature`s.
         '''
         temp: Dict[str, Feature] = {}
-        _data: Iterable[Any] = (  # type: ignore
-            data if hasattr(data, '__iter__') else [data])
+        _data: Iterable[Any] = (
+            data if hasattr(data, '__iter__') else [data])  # type: ignore
 
         for d in _data:
             if isinstance(d, Feature):
