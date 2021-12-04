@@ -95,7 +95,10 @@ class QLookupTable(Learner[float]):
 
         return result
 
-    def learn(self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...]) -> None:
+    def learn(
+            self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...],
+            **kwargs: Any
+            ) -> None:
         '''
         Learn using the training set `X` and `Y`.
 

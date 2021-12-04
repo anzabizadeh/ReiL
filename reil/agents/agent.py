@@ -18,7 +18,8 @@ from reil.learners.learner import LabelType, Learner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
-TrainingData = Tuple[Tuple[FeatureArray, ...], Tuple[LabelType, ...]]
+TrainingData = Tuple[
+    Tuple[FeatureArray, ...], Tuple[LabelType, ...], Dict[str, Any]]
 
 
 class Agent(AgentBase, Generic[LabelType]):
@@ -138,6 +139,130 @@ class Agent(AgentBase, Generic[LabelType]):
         if self._training_trigger != 'none':
             self._learner.reset()
 
+    def _prepare_training(self, history: History) -> TrainingData[LabelType]:
+        '''
+        Use `history` to create the training set in the form of `X` and `y`
+        vectors.
+
+        Arguments
+        ---------
+        history:
+            a `History` object from which the `agent` learns.
+
+        Returns
+        -------
+        :
+            a `TrainingData` object that contains `X` and 'y` vectors
+
+
+        :meta public:
+        '''
+        raise NotImplementedError
+
+    def learn(self, history: History) -> None:
+        '''
+        Learn using history.
+
+        Arguments
+        ---------
+        subject_id:
+            the ID of the `subject` whose history is being used for learning.
+
+        next_state:
+            The new `state` of the `subject` after taking `agent`'s action.
+            Some methods
+        '''
+        training_data: TrainingData[Any] = (), (), {}
+        if history is not None:
+            training_data = self._prepare_training(history)
+
+        X, Y, kwargs = training_data
+        if X:
+            self._learner.learn(X, Y, **kwargs)
+
+    def observe(  # noqa: C901
+            self, subject_id: int, stat_name: Optional[str],
+    ) -> Generator[Union[FeatureArray, None], Dict[str, Any], None]:
+        '''
+        Create a generator to interact with the subject (`subject_id`).
+        Extends `AgentBase.observe`.
+
+        This method creates a generator for `subject_id` that
+        receives `state`, yields `action` and receives `reward`
+        until it is closed. When `.close()` is called on the generator,
+        `statistics` are calculated.
+
+        Arguments
+        ---------
+        subject_id:
+            the ID of the `subject` on which action happened.
+
+        stat_name:
+            The name of the `statistic` that should be computed at the end of
+            each trajectory.
+
+        Raises
+        ------
+        ValueError
+            Subject with `subject_id` not found.
+        '''
+        if subject_id not in self._entity_list:
+            raise ValueError(f'Subject with ID={subject_id} not found.')
+
+        trigger = self._training_trigger
+        learn_on_state = trigger == 'state'
+        learn_on_action = trigger == 'action'
+        learn_on_reward = trigger == 'reward'
+        learn_on_termination = trigger == 'termination'
+
+        history: History = []
+        new_observation = None
+        while True:
+            try:
+                new_observation = Observation()
+                temp: Dict[str, Any] = yield
+                state: FeatureArray = temp['state']
+                actions: Tuple[FeatureArray, ...] = temp['actions']
+                iteration: int = temp['iteration']
+
+                new_observation.state = state
+                if learn_on_state:
+                    self.learn([history[-1], new_observation])
+
+                if actions is not None:
+                    new_observation.action = self.act(
+                        state=state, subject_id=subject_id,
+                        actions=actions, iteration=iteration)
+
+                    new_observation.action_taken = (
+                        yield new_observation.action)['action_taken']
+
+                    if learn_on_action:
+                        self.learn([history[-1], new_observation])
+
+                    new_observation.reward = (yield None)['reward']
+
+                    history.append(new_observation)
+
+                    if learn_on_reward:
+                        self.learn(history[-2:])
+                else:  # No actions to take, so skip the reward.
+                    yield
+
+            except GeneratorExit:
+                if new_observation is None:
+                    new_observation = Observation()
+                if new_observation.reward is None:  # terminated early!
+                    history.append(new_observation)
+
+                if learn_on_termination:
+                    self.learn(history)
+
+                if stat_name is not None:
+                    self.statistic.append(stat_name, subject_id)
+
+                return
+
     # def load(
     #         self, filename: str,
     #         path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
@@ -194,128 +319,6 @@ class Agent(AgentBase, Generic[LabelType]):
     #     self._learner.save(full_path.name, full_path.parent / 'learner')
 
     #     return full_path
-
-    def _prepare_training(self, history: History) -> TrainingData[LabelType]:
-        '''
-        Use `history` to create the training set in the form of `X` and `y`
-        vectors.
-
-        Arguments
-        ---------
-        history:
-            a `History` object from which the `agent` learns.
-
-        Returns
-        -------
-        :
-            a `TrainingData` object that contains `X` and 'y` vectors
-
-
-        :meta public:
-        '''
-        raise NotImplementedError
-
-    def learn(self, history: History) -> None:
-        '''
-        Learn using history.
-
-        Arguments
-        ---------
-        subject_id:
-            the ID of the `subject` whose history is being used for learning.
-
-        next_state:
-            The new `state` of the `subject` after taking `agent`'s action.
-            Some methods
-        '''
-        training_data: TrainingData[Any] = (), ()
-        if history is not None:
-            training_data = self._prepare_training(history)
-
-        X, Y = training_data
-        if X:
-            self._learner.learn(X, Y)
-
-    def observe(  # noqa: C901
-            self, subject_id: int, stat_name: Optional[str],
-    ) -> Generator[Union[FeatureArray, None], Dict[str, Any], None]:
-        '''
-        Create a generator to interact with the subject (`subject_id`).
-        Extends `AgentBase.observe`.
-
-        This method creates a generator for `subject_id` that
-        receives `state`, yields `action` and receives `reward`
-        until it is closed. When `.close()` is called on the generator,
-        `statistics` are calculated.
-
-        Arguments
-        ---------
-        subject_id:
-            the ID of the `subject` on which action happened.
-
-        stat_name:
-            The name of the `statistic` that should be computed at the end of
-            each trajectory.
-
-        Raises
-        ------
-        ValueError
-            Subject with `subject_id` not found.
-        '''
-        if subject_id not in self._entity_list:
-            raise ValueError(f'Subject with ID={subject_id} not found.')
-
-        trigger = self._training_trigger
-        learn_on_state = trigger == 'state'
-        learn_on_action = trigger == 'action'
-        learn_on_reward = trigger == 'reward'
-        learn_on_termination = trigger == 'termination'
-
-        history: History = []
-        new_observation = None
-        while True:
-            try:
-                new_observation = Observation()
-                temp: Dict[str, Any] = yield
-                state: FeatureArray = temp['state']
-                actions: Tuple[FeatureArray, ...] = temp['actions']
-                iteration: int = temp['iteration']
-
-                new_observation.state = state
-                if learn_on_state:
-                    self.learn([history[-1], new_observation])
-
-                if actions is not None:
-                    new_observation.action = self.act(
-                        state=state, subject_id=subject_id,
-                        actions=actions, iteration=iteration)
-
-                    if learn_on_action:
-                        self.learn([history[-1], new_observation])
-
-                    new_observation.reward = (
-                        yield new_observation.action)['reward']
-
-                    history.append(new_observation)
-
-                    if learn_on_reward:
-                        self.learn(history[-2:])
-                else:  # No actions to take, so skip the reward.
-                    yield
-
-            except GeneratorExit:
-                if new_observation is None:
-                    new_observation = Observation()
-                if new_observation.reward is None:  # terminated early!
-                    history.append(new_observation)
-
-                if learn_on_termination:
-                    self.learn(history)
-
-                if stat_name is not None:
-                    self.statistic.append(stat_name, subject_id)
-
-                return
 
     # def __getstate__(self):
     #     state = super().__getstate__()

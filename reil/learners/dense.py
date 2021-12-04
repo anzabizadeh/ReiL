@@ -217,7 +217,10 @@ class Dense_tf_1(Learner[float]):
 
         return result  # type: ignore
 
-    def learn(self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...]) -> None:
+    def learn(
+            self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...],
+            **kwargs: Any
+            ) -> None:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -470,7 +473,10 @@ class Dense_tf_2(Learner[float]):
 
         return result  # type: ignore
 
-    def learn(self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...]) -> None:
+    def learn(
+            self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...],
+            **kwargs: Any
+            ) -> None:
         '''
         Learn using the training set `X` and `Y`.
 

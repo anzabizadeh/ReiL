@@ -41,7 +41,8 @@ class LearnerProtocol(Protocol[LabelType]):
 
     @abstractmethod
     def learn(
-            self, X: Tuple[FeatureArray, ...], Y: Tuple[LabelType, ...]
+            self, X: Tuple[FeatureArray, ...], Y: Tuple[LabelType, ...],
+            **kwargs: Any
     ) -> None:
         '''
         Learn using the training set `X` and `Y`.
