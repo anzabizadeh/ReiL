@@ -6,10 +6,11 @@ TicTacToe class
 The standard Tic-Tac-Toe game.
 '''
 import random
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-from reil.legacy.mnkgame import MNKGame
-from reil.datatypes.feature import FeatureArray, FeatureGenerator
+from reil.datatypes.dataclasses import Index_FeatureArray
+from reil.datatypes.feature import FeatureGenerator
+from reil.subjects.mnkgame import MNKGame
 
 
 class TicTacToe(MNKGame):
@@ -28,20 +29,6 @@ class TicTacToe(MNKGame):
         self._state_gen = FeatureGenerator.numerical(
             name='state', lower=-1, upper=1)
 
-    def default_state(self, _id: Optional[int] = None) -> FeatureArray:
-        def modify(i: int, _id: Optional[int]) -> float:
-            if i == _id:
-                return 1
-            if i == 0:
-                return 0
-            return -1
-
-        return FeatureArray(self._state_gen(tuple(modify(i, _id)
-                                                  for i in self._board)))
-
-    def __repr__(self):
-        return self.__class__.__qualname__
-
 
 if __name__ == '__main__':
     board = TicTacToe()
@@ -50,11 +37,15 @@ if __name__ == '__main__':
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')
     while not board.is_terminated():
-        board.state
         current_player = ['P1', 'P2'][p]
         print(p, current_player)
-        actions = board.possible_actions(player[current_player])
-        board.take_effect(random.choice(actions), player[current_player])
-        print(f'{board}\n', board.reward(
-            'default', player['P1']), board.reward('default', player['P2']))
+        actions = board.possible_actions(
+            'square', player[current_player]) or ()
+        index = random.randrange(0, len(actions))
+        board.take_effect(
+            Index_FeatureArray(index, actions[index]),
+            player[current_player])
+        print(f'{board}\n',
+              board.reward('default', player['P1']),
+              board.reward('default', player['P2']))
         p = (p + 1) % 2
