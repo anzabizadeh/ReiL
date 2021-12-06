@@ -13,10 +13,11 @@ dictionary that contains instances of `Feature`.
 from __future__ import annotations
 
 import dataclasses
-from functools import cached_property
 import itertools
-from typing import (Any, Callable, Dict, Iterable, Literal, Optional,
-                    Tuple, Union)
+from copy import copy
+from functools import cached_property
+from typing import (Any, Callable, Dict, Iterable, Literal, Optional, Tuple,
+                    Union)
 
 MISSING = '__missing_feature__'
 
@@ -284,7 +285,7 @@ class FeatureGenerator:
             _value = value
 
         if _value == self.recent_value[0]:
-            return self.recent_value[1]
+            return copy(self.recent_value[1])
 
         if self.is_numerical:
             if _value == MISSING:
