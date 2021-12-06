@@ -43,6 +43,27 @@ class ExplorationStrategy(Protocol):
         return True
 
 
+class NoExploration:
+    '''
+    The base class for all exploration strategies.
+    '''
+    def explore(self, iteration: int = 0) -> bool:
+        '''
+        Return `True` if the `agent` needs to explore.
+
+        Arguments
+        ---------
+        iteration:
+            The current iteration number.
+
+        Returns
+        -------
+        :
+            `True` if the caller should explore, otherwise `False`.
+        '''
+        return False
+
+
 class ConstantEpsilonGreedy:
     '''
     An epsilon greedy object with constant epsilon.
