@@ -30,9 +30,9 @@ pytz
 ruamel.yaml
 scipy
 six
-tensorboard  # ==1.15.0
-tensorflow-gpu  # ==1.15.0
-tensorflow-estimator  # ==1.15.1
+tensorboard
+tensorflow-gpu
+tensorflow-estimator
 termcolor
 versioneer
 Werkzeug
