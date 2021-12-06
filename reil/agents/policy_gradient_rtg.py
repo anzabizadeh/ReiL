@@ -6,41 +6,32 @@ PolicyGradientRTG class
 A reward-to-go Policy Gradient `agent`.
 '''
 
-from typing import Any, List, Tuple, Union
+from typing import Any, Optional, Tuple
 
 import numpy as np
+import tensorflow as tf
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
-from reil.datatypes.buffers import Buffer
+from reil.datatypes.dataclasses import Index_FeatureArray
 from reil.datatypes.feature import FeatureArray
 from reil.learners import Learner
-from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
-                                               ExplorationStrategy)
-
-Feature_or_Tuple_of_Feature = Union[Tuple[FeatureArray, ...], FeatureArray]
+from reil.utils.exploration_strategies import NoExploration
 
 
-class PolicyGradientRTG(Agent[float]):
+class PolicyGradientRTG(Agent[int]):
     '''
     A reward to go Policy Gradient `agent`.
     '''
 
     def __init__(
             self,
-            learner: Learner[float],
-            buffer: Buffer[FeatureArray, float],
-            exploration_strategy: ExplorationStrategy,
+            learner: Learner[int],
             **kwargs: Any):
         '''
         Arguments
         ---------
         learner:
             the `Learner` object that does the learning.
-
-        exploration_strategy:
-            an `ExplorationStrategy` object that determines
-            whether the `action` should be exploratory or not for a given
-            `state` at a given `iteration`.
 
         discount_factor:
             by what factor should future rewards be discounted?
@@ -56,31 +47,15 @@ class PolicyGradientRTG(Agent[float]):
             to be chosen.
         '''
         super().__init__(
-            learner=learner, exploration_strategy=exploration_strategy,
+            learner=learner, exploration_strategy=NoExploration(),
             **kwargs)
-
-        # if method == 'forward' and not kwargs.get('default_actions'):
-        #     raise ValueError(
-        #         'forward method requires `default_actions` to be non-empty.')
-
-        self._buffer = buffer
-        self._buffer.setup(buffer_names=['X', 'Y'])
 
     @classmethod
     def _empty_instance(cls):  # type: ignore
-        return cls(
-            Learner._empty_instance(), Buffer(), ConstantEpsilonGreedy())
-
-    @staticmethod
-    def _reward_to_go(rews: List[float]):
-        n = len(rews)
-        rtgs = np.zeros_like(rews)  # type: ignore
-        for i in reversed(range(n)):
-            rtgs[i] = rews[i] + (rtgs[i+1] if i+1 < n else 0)
-        return rtgs
+        return cls(Learner._empty_instance())
 
     def _prepare_training(
-            self, history: History) -> TrainingData[float]:
+            self, history: History) -> TrainingData[int]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -102,10 +77,11 @@ class PolicyGradientRTG(Agent[float]):
         discount_factor = self._discount_factor
 
         for h in history[:-1]:
-            if h.state is None or h.action is None:
+            if h.state is None or (
+                    h.action is None and h.action_taken is None):
                 raise ValueError(f'state and action cannot be None.\n{h}')
 
-        if history[-1].action is None:
+        if history[-1].action_taken is None and history[-1].action is None:
             active_history = history[:-1]
         else:
             active_history = history
@@ -119,19 +95,65 @@ class PolicyGradientRTG(Agent[float]):
         rtg_list -= np.mean(rtg_list)  # type: ignore
         rtg_list /= np.std(rtg_list)  # type: ignore
 
-        for i in range(len(active_history)-2, -1, -1):
-            self._buffer.add({
-                'X': active_history[i].state,  # type: ignore
-                'Y': rtg_list[i]})
+        return (
+            [a.state for a in active_history[:-1]],  # type: ignore
+            [(a.action_taken or a.action).index  # type: ignore
+             for a in active_history[:-1]],
+            {'G': rtg_list[:-1]})
 
-        temp = self._buffer.pick()
+    def act(self,
+            state: FeatureArray,
+            subject_id: int,
+            actions: Optional[Tuple[FeatureArray, ...]] = None,
+            iteration: int = 0) -> Index_FeatureArray:
+        '''
+        Return an action based on the given state.
 
-        return temp['X'], temp['Y']  # type: ignore
+        Arguments
+        ---------
+        state:
+            the state for which the action should be returned.
+
+        subject_id:
+            the ID of the `subject` on which action should occur.
+
+        actions:
+            the set of possible actions to choose from.
+
+        iteration:
+            the iteration in which the agent is acting.
+
+        Raises
+        ------
+        ValueError
+            Subject with `subject_id` not found.
+
+        Returns
+        -------
+        :
+            the action
+        '''
+        if subject_id not in self._entity_list:
+            raise ValueError(f'Subject with ID={subject_id} not found.')
+
+        possible_actions = actions or self._default_actions
+
+        if self._training_trigger == 'none':
+            probs = self._learner.predict((state,))[0]
+            action_index = int(np.argmax(probs))
+
+            i_action = Index_FeatureArray(
+                action_index, possible_actions[action_index])
+        else:
+            i_action = self.best_actions(state, possible_actions)[0]
+
+        return i_action
 
     def best_actions(
             self,
             state: FeatureArray,
-            actions: Tuple[FeatureArray, ...]) -> Tuple[FeatureArray, ...]:
+            actions: Tuple[FeatureArray, ...]
+    ) -> Tuple[Index_FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -148,10 +170,12 @@ class PolicyGradientRTG(Agent[float]):
         :
             A list of best actions.
         '''
-        action_index = int(self._learner.predict((state,))[0])
-        return (actions[action_index],)
+        probs = self._learner.predict((state,))[0]
+        action_index = int(tf.random.categorical(  # type: ignore
+            logits=tf.math.log([probs]), num_samples=1))
+
+        return (Index_FeatureArray(action_index, actions[action_index]),)
 
     def reset(self) -> None:
         '''Resets the agent at the end of a learning iteration.'''
         super().reset()
-        self._buffer.reset()

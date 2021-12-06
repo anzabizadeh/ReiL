@@ -85,24 +85,18 @@ class DenseSoftMax(Dense_tf_2):
         layer in the output.
         '''
 
-        self._model = keras.models.Sequential()
-        self._model.add(  # type: ignore
-            keras.layers.Input(shape=(self._input_length,)))  # type: ignore
+        input_ = keras.Input(shape=(self._input_length,))  # type: ignore
 
+        layer = input_
         for i, v in enumerate(self._hidden_layer_sizes[:-1], 1):
-            self._model.add(keras.layers.Dense(  # type: ignore
-                v, activation='relu', name=f'layer_{i:0>2}'))
+            layer = keras.layers.Dense(  # type: ignore
+                v, activation='relu', name=f'layer_{i:0>2}')(layer)
 
-        self._model.add(  # type: ignore
-            keras.layers.Dense(
-                self._output_length, activation='relu')
-        )
+        output = keras.layers.Dense(
+            self._output_length, activation='softmax', name='output')(layer)
 
-        self._model.add(  # type: ignore
-            keras.layers.Softmax(name='output'))
-
+        self._model = keras.Model(inputs=input_, outputs=output)
         self._model.compile(  # type: ignore
-            loss='categorical_crossentropy',
             optimizer=keras.optimizers.Adam(
                 learning_rate=self._learning_rate.initial_lr))
 
@@ -127,9 +121,44 @@ class DenseSoftMax(Dense_tf_2):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        logits: np.array = self._model.predict(np.array(_X))  # type: ignore
-        result = (
-            float(tf.random.categorical(  # type: ignore
-                logits=logits, num_samples=1)),)
+        probs: np.array = self._model.predict(np.array(_X))  # type: ignore
 
-        return result
+        return probs  # type: ignore
+
+    def learn(
+            self, X: Tuple[FeatureArray, ...], Y: Tuple[int, ...],
+            **kwargs: Any
+            ) -> None:
+        '''
+        Learn using the training set `X` and `Y`.
+
+        Arguments
+        ---------
+        X:
+            A list of `FeatureArray` as inputs to the learning model.
+
+        Y:
+            A list of float labels for the learning model.
+        '''
+        _X: List[List[float]] = [x.normalized.flattened for x in X]
+        G = kwargs['G']
+        if not self._ann_ready:
+            self._input_length = len(_X[0])
+            self._generate_network()
+
+        with tf.GradientTape() as tape:
+            loss = 0
+            for idx, (g, state) in enumerate(zip(G, _X)):
+                state = tf.convert_to_tensor([state], dtype=tf.float32)
+                probs = self._model(state)
+                action_probs = tf.compat.v1.distributions.Categorical(
+                    probs=probs)
+                log_prob = action_probs.log_prob(Y[idx])
+
+                loss += -g * tf.squeeze(log_prob)
+
+        gradient = tape.gradient(
+            loss, self._model.trainable_variables)
+        # print(gradient)
+        self._model.optimizer.apply_gradients(
+            zip(gradient, self._model.trainable_variables))
