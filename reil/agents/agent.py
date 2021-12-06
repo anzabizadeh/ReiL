@@ -12,7 +12,7 @@ from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple,
 
 from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
-from reil.datatypes.dataclasses import Observation
+from reil.datatypes.dataclasses import Index_FeatureArray, Observation
 from reil.datatypes.feature import FeatureArray
 from reil.learners.learner import LabelType, Learner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
@@ -90,7 +90,7 @@ class Agent(AgentBase, Generic[LabelType]):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> FeatureArray:
+            iteration: int = 0) -> Index_FeatureArray:
         '''
         Return an action based on the given state.
 
@@ -126,12 +126,14 @@ class Agent(AgentBase, Generic[LabelType]):
             possible_actions = actions or self._default_actions
             action = self._break_tie(
                 possible_actions, self._tie_breaker)
+            i_action = Index_FeatureArray(
+                possible_actions.index(action), action)
         else:
-            action = super().act(
+            i_action = super().act(
                 state=state, subject_id=subject_id,
                 actions=actions, iteration=iteration)
 
-        return action
+        return i_action
 
     def reset(self):
         '''Reset the agent at the end of a learning iteration.'''
@@ -182,7 +184,7 @@ class Agent(AgentBase, Generic[LabelType]):
 
     def observe(  # noqa: C901
             self, subject_id: int, stat_name: Optional[str],
-    ) -> Generator[Union[FeatureArray, None], Dict[str, Any], None]:
+    ) -> Generator[Union[Index_FeatureArray, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
         Extends `AgentBase.observe`.

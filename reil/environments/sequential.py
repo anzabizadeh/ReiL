@@ -7,16 +7,14 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-import re
 from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
                     TypedDict, Union)
 
 import pandas as pd
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import Entity, InteractionProtocol
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.dataclasses import Index_FeatureArray, InteractionProtocol
 from reil.environments.environment import (EntityGenType, EntityType,
-                                           Environment, Plan)
+                                           Environment)
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 
@@ -32,7 +30,8 @@ class StatInfo(NamedTuple):
 
 class InteractArgs(TypedDict):
     agent_id: int
-    agent_observer: Generator[Union[FeatureArray, None], Dict[str, Any], None]
+    agent_observer: Generator[
+        Union[Index_FeatureArray, None], Dict[str, Any], None]
     subject_instance: Union[Subject, SubjectDemon]
     state_name: str
     action_name: str
@@ -455,7 +454,8 @@ class Sequential(Environment):
     #                     trajectory_name=None),
     #                 subject=Entity(
     #                     name='patient_validation', demon_name=demon,
-    #                     statistic_name='PTTR_exact', groupby=('sensitivity',),
+    #                     statistic_name='PTTR_exact',
+    #                     groupby=('sensitivity',),
     #                     aggregators=('mean', 'std'), trajectory_name=None),
     #                 state_name=f'patient_w_dosing_{hist}',
     #                 action_name=action, reward_name='no_reward',
@@ -467,7 +467,8 @@ class Sequential(Environment):
     #                     trajectory_name=None),
     #                 subject=Entity(
     #                     name='patient_test', demon_name=demon,
-    #                     statistic_name='PTTR_exact', groupby=('sensitivity',),
+    #                     statistic_name='PTTR_exact',
+    #                     groupby=('sensitivity',),
     #                     aggregators=('mean', 'std'), trajectory_name=None),
     #                 state_name=f'patient_w_dosing_{hist}',
     #                 action_name=action, reward_name='no_reward',
@@ -479,7 +480,8 @@ class Sequential(Environment):
     #                     trajectory_name=None),
     #                 subject=Entity(
     #                     name='patient_trajectory', demon_name=demon,
-    #                     statistic_name='PTTR_exact', groupby=('sensitivity',),
+    #                     statistic_name='PTTR_exact',
+    #                     groupby=('sensitivity',),
     #                     aggregators=('mean', 'std'),
     #                     trajectory_name='patient_w_full_dosing'),
     #                 state_name=f'patient_w_dosing_{hist}',

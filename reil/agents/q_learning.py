@@ -14,6 +14,7 @@ import numpy as np
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
+from reil.datatypes.dataclasses import Index_FeatureArray
 from reil.datatypes.feature import FeatureArray
 from reil.learners import Learner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
@@ -182,22 +183,23 @@ class QLearning(Agent[float]):
         discount_factor = self._discount_factor
 
         for h in history[:-1]:
-            if h.state is None or h.action is None:
+            if h.state is None or (
+                    h.action is None and h.action_taken is None):
                 raise ValueError(f'state and action cannot be None.\n{h}')
 
         # When history is one complete trajectory, the last observation
         # contains only the terminal state. In this case, we don't have an
         # action and a reward for the last observation, so we do not compute
         # its new Q value.
-        if history[-1].action is None:
+        if history[-1].action is None or history[-1].action_taken is None:
             active_history = history[:-1]
         else:
             active_history = history
 
         if self._method == 'forward':
             for i, h in enumerate(active_history):
-                state: FeatureArray = h.state  # type: ignore
-                action: FeatureArray = h.action  # type: ignore
+                state = h.state  # type: ignore
+                action = (h.action_taken or h.action).feature  # type: ignore
                 reward = h.reward or 0.0
 
                 try:
@@ -214,7 +216,9 @@ class QLearning(Agent[float]):
             q_list = [0.0] * len(active_history)
             for i in range(len(active_history)-2, -1, -1):
                 state = active_history[i].state  # type: ignore
-                action = active_history[i].action  # type: ignore
+                action = (
+                    active_history[i].action_taken or
+                    active_history[i].action).feature  # type: ignore
                 reward = active_history[i].reward or 0.0
                 q_list[i] = reward + discount_factor * q_list[i+1]
 
@@ -223,12 +227,13 @@ class QLearning(Agent[float]):
 
         temp = self._buffer.pick()
 
-        return temp['X'], temp['Y']  # type: ignore
+        return temp['X'], temp['Y'], {}  # type: ignore
 
     def best_actions(
             self,
             state: FeatureArray,
-            actions: Tuple[FeatureArray, ...]) -> Tuple[FeatureArray, ...]:
+            actions: Tuple[FeatureArray, ...]
+    ) -> Tuple[Index_FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -248,8 +253,8 @@ class QLearning(Agent[float]):
         q_values = self._q(state, actions)
         max_q: float = np.max(q_values)  # type: ignore
         result = tuple(
-            actions[i]  # type: ignore
-            for i in np.flatnonzero(q_values == max_q))  # type: ignore
+            Index_FeatureArray(i, actions[i])
+            for i in np.flatnonzero(q_values == max_q))
 
         return result
 

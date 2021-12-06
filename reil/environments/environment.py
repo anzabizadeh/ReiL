@@ -14,8 +14,7 @@ import pandas as pd
 from reil import stateful
 from reil.agents.agent_base import AgentBase
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import InteractionProtocol
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.dataclasses import Index_FeatureArray, InteractionProtocol
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 from reil.utils.instance_generator import InstanceGenerator
@@ -82,7 +81,7 @@ class Environment(stateful.Stateful):
         self._iterations: Dict[str, int] = defaultdict(int)
         self._agent_observers: Dict[
             Tuple[str, str],
-            Generator[Union[FeatureArray, None], Any, None]] = {}
+            Generator[Union[Index_FeatureArray, None], Any, None]] = {}
         self._plans: Dict[str, Any] = {}
         self._active_plan: Plan = Plan()
 
@@ -314,7 +313,8 @@ class Environment(stateful.Stateful):
     def interact(
             cls,
             agent_id: int,
-            agent_observer: Generator[Union[FeatureArray, None], Any, None],
+            agent_observer: Generator[
+                Union[Index_FeatureArray, None], Any, None],
             subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,
@@ -388,7 +388,8 @@ class Environment(stateful.Stateful):
     def interact_while(
             cls,
             agent_id: int,
-            agent_observer: Generator[Union[FeatureArray, None], Any, None],
+            agent_observer: Generator[
+                Union[Index_FeatureArray, None], Any, None],
             subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,

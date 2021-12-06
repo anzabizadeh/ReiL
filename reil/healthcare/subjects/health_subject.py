@@ -8,8 +8,8 @@ This `HealthSubject` class implements interaction with patients.
 
 from typing import Any, List, Optional, Tuple, Union
 
-from reil.datatypes.feature import (MISSING, Feature, FeatureArray,
-                                    FeatureGenerator)
+from reil.datatypes.dataclasses import Index_FeatureArray
+from reil.datatypes.feature import MISSING, Feature, FeatureGenerator
 from reil.healthcare.patient import Patient
 from reil.subjects.subject import Subject
 
@@ -124,8 +124,9 @@ class HealthSubject(Subject):
         return self._day >= self._max_day
 
     def _take_effect(
-            self, action: FeatureArray, _id: int = 0) -> FeatureArray:
-        action_temp = action.value
+            self, action: Index_FeatureArray, _id: int = 0
+    ) -> Index_FeatureArray:
+        action_temp = action.feature.value
         current_dose = float(action_temp['dose'])  # type: ignore
         current_interval = min(int(action_temp['interval']),  # type: ignore
                                self._max_day - self._day)

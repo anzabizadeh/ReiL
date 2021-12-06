@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional, Tuple
 from reil import stateful
 from reil.datatypes.components import ActionSet, Reward
 from reil.datatypes.feature import Feature, FeatureArray
+from reil.datatypes.dataclasses import Index_FeatureArray
 
 
 class Subject(stateful.Stateful):
@@ -87,7 +88,9 @@ class Subject(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    def take_effect(self, action: FeatureArray, _id: int = 0) -> FeatureArray:
+    def take_effect(
+            self, action: Index_FeatureArray, _id: int = 0
+    ) -> Index_FeatureArray:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
         the next state.
@@ -107,7 +110,9 @@ class Subject(stateful.Stateful):
         return taken_action
 
     @abstractmethod
-    def _take_effect(self, action: FeatureArray, _id: int = 0) -> FeatureArray:
+    def _take_effect(
+            self, action: Index_FeatureArray, _id: int = 0
+    ) -> Index_FeatureArray:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
         the next state.

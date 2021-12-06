@@ -14,6 +14,7 @@ from reil import reilbase
 from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
 from reil.datatypes.components import State, Statistic
+from reil.datatypes.dataclasses import Index_FeatureArray
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import FeatureArray
 
@@ -128,7 +129,7 @@ class AgentDemon(AgentBase):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> FeatureArray:
+            iteration: int = 0) -> Index_FeatureArray:
         '''
         Return an action based on the given state.
 

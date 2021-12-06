@@ -12,8 +12,7 @@ from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
 
 import pandas as pd
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import InteractionProtocol
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.dataclasses import Index_FeatureArray, InteractionProtocol
 from reil.environments.environment import (EntityGenType, EntityType,
                                            Environment)
 from reil.subjects.subject import Subject
@@ -31,7 +30,8 @@ class StatInfo(NamedTuple):
 
 class InteractArgs(TypedDict):
     agent_id: int
-    agent_observer: Generator[Union[FeatureArray, None], Dict[str, Any], None]
+    agent_observer: Generator[
+        Union[Index_FeatureArray, None], Dict[str, Any], None]
     subject_instance: Union[Subject, SubjectDemon]
     state_name: str
     action_name: str

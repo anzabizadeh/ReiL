@@ -48,11 +48,19 @@ class InteractionProtocol:
 
 
 @dataclasses.dataclass
+class Index_FeatureArray:
+    index: int
+    feature: FeatureArray
+
+
+@dataclasses.dataclass
 class Observation:
-    state: Optional[FeatureArray] = None  # the state received from the subject
-    action: Optional[FeatureArray] = None  # the action chosen by the agent
+    # the state received from the subject
+    state: Optional[FeatureArray] = None
+    # the action chosen by the agent
+    action: Optional[Index_FeatureArray] = None
     # the action taken by the subject
-    action_taken: Optional[FeatureArray] = None
+    action_taken: Optional[Index_FeatureArray] = None
     # the reward of taking the action at the state
     reward: Optional[float] = None
 

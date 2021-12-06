@@ -10,7 +10,7 @@ import random
 from typing import (Any, Dict, Generator, Literal, Optional, Tuple, TypeVar,
                     Union)
 
-from reil.datatypes.dataclasses import Observation, History
+from reil.datatypes.dataclasses import Index_FeatureArray, Observation, History
 from reil.datatypes.feature import FeatureArray
 from reil.stateful import Stateful
 
@@ -58,7 +58,7 @@ class AgentBase(Stateful):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> FeatureArray:
+            iteration: int = 0) -> Index_FeatureArray:
         '''
         Return an action based on the given state.
 
@@ -91,7 +91,8 @@ class AgentBase(Stateful):
 
     def best_actions(
             self, state: FeatureArray,
-            actions: Tuple[FeatureArray, ...]) -> Tuple[FeatureArray, ...]:
+            actions: Tuple[FeatureArray, ...]
+    ) -> Tuple[Index_FeatureArray, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -112,7 +113,7 @@ class AgentBase(Stateful):
 
     def observe(
             self, subject_id: int, stat_name: Optional[str]
-    ) -> Generator[Union[FeatureArray, None], Dict[str, Any], None]:
+    ) -> Generator[Union[Index_FeatureArray, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
 
