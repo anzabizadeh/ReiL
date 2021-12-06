@@ -38,7 +38,7 @@ state_definitions: Dict[str, DefComponents] = {
     'patient': (*patient_basic, *patient_extra),
     'patient_w_dosing': (
         *patient_basic, *patient_extra,
-        ('day', {}),
+        # ('day', {}),
         ('dose_history', {'length': -1}),
         ('INR_history', {'length': -1}),
         ('interval_history', {'length': -1})),
@@ -52,7 +52,7 @@ state_definitions: Dict[str, DefComponents] = {
     **{
         f'patient_w_dosing_{i:02}': (
             *patient_basic,
-            ('day', {}),
+            # ('day', {}),
             ('dose_history', {'length': i}),
             ('INR_history', {'length': i}),
             ('interval_history', {'length': i}))
@@ -67,11 +67,11 @@ state_definitions: Dict[str, DefComponents] = {
 
     'daily_INR': (('daily_INR_history', {'length': -1}),),
 
+    'recent_daily_INR': (('INR_within', {'length': 1}),),
+
     'Measured_INR_2': (
         ('INR_history', {'length': 2}),
         ('interval_history', {'length': 1})),
-
-    'INR_within_2': (('daily_INR_history', {'length': -1}),),
 }
 
 reward_sq_dist = reil_functions.NormalizedSquareDistance(
@@ -100,6 +100,21 @@ statistic_PTTR = reil_functions.PercentInRange(
     name='PTTR', y_var_name='daily_INR_history',
     length=-1, multiplier=1.0, retrospective=True, interpolate=False,
     acceptable_range=(2, 3), exclude_first=True)
+
+
+class MakeCallable:
+    def __init__(
+            self, values: Tuple[Any, ...] = (),
+            day_0_values: Tuple[Any, ...] = ()) -> None:
+        self._values = values
+        self._day_0_values = day_0_values or self._values
+
+    def __call__(
+            self, f: FeatureArray, *args: Any, **kwds: Any) -> Any:
+        if f['day'].value == 0:
+            return self._day_0_values
+
+        return self._values
 
 
 class Warfarin(HealthSubject):
@@ -209,7 +224,7 @@ class Warfarin(HealthSubject):
         #     ('interval_history', {'length': 1}))
 
         # self.state.add_definition(
-        #     'INR_within_2',
+        #     'recent_daily_INR',
         #     ('daily_INR_history', {'length': -1}))
 
     def _generate_reward_defs(self):
@@ -217,7 +232,7 @@ class Warfarin(HealthSubject):
 
         if 'sq_dist_exact' not in current_defs:
             self.reward.add_definition(
-                'sq_dist_exact', reward_sq_dist, 'INR_within_2')
+                'sq_dist_exact', reward_sq_dist, 'recent_daily_INR')
 
         if 'sq_dist_interpolation' not in current_defs:
             self.reward.add_definition(
@@ -226,7 +241,7 @@ class Warfarin(HealthSubject):
 
         if 'PTTR_exact' not in current_defs:
             self.reward.add_definition(
-                'PTTR_exact', reward_PTTR, 'INR_within_2')
+                'PTTR_exact', reward_PTTR, 'recent_daily_INR')
 
         if 'PTTR_interpolation' not in current_defs:
             self.reward.add_definition(
@@ -312,25 +327,34 @@ class Warfarin(HealthSubject):
         defs: Dict[str, Tuple[Callable[[Any], Tuple[FeatureArray, ...]], str]]
         defs = {
             **{
-                f'daily_{int(cap):02}':
-                    (lambda _: dose_int_fixed[cap, 1], 'day')  # type: ignore
-                for cap in caps},
-            **{
                 f'237_{int(cap):02}':
                     (functools.partial(_237, cap=cap), 'day')
                 for cap in caps},
+
             **{
-                f'free_{int(cap):02}':
-                    (lambda _: dose_int_free[cap], 'day')  # type: ignore
+                f'daily_{int(cap):02}': (
+                    MakeCallable(
+                        dose_int_fixed[max_cap, 1], dose_int_fixed[cap, 1]),
+                    'day')
                 for cap in caps},
             **{
-                f'semi_{int(cap):02}':
-                    (lambda _: dose_int_semi_free[cap], 'day')  # type: ignore
+                f'free_{int(cap):02}': (
+                    MakeCallable(
+                        dose_int_free[max_cap], dose_int_free[cap]),
+                    'day')
                 for cap in caps},
             **{
-                f'weekly_{int(cap):02}':
-                    (lambda _: dose_int_weekly[cap], 'day')  # type: ignore
-                for cap in caps}
+                f'semi_{int(cap):02}': (
+                    MakeCallable(
+                        dose_int_semi_free[max_cap], dose_int_semi_free[cap]),
+                    'day')
+                for cap in caps},
+            **{
+                f'weekly_{int(cap):02}': (
+                    MakeCallable(
+                        dose_int_weekly[max_cap], dose_int_weekly[cap]),
+                    'day')
+                for cap in caps},
         }
 
         current_defs = self.possible_actions.definitions
@@ -415,4 +439,5 @@ class Warfarin(HealthSubject):
             self, _id: int, length: int = 1, **kwargs: Any
     ) -> Feature:
         intervals = self._get_history('interval_history', length).value
-        return self._get_history('daily_INR', sum(intervals))  # type: ignore
+        return self._get_history(
+            'daily_INR_history', sum(intervals))  # type: ignore
