@@ -155,6 +155,9 @@ class AgentBase(Stateful):
                         state=state, subject_id=subject_id,
                         actions=actions, iteration=iteration)
 
+                    new_observation.action_taken = (
+                        yield new_observation.action)['action_taken']
+
                     new_observation.reward = (
                         yield new_observation.action)['reward']
 
