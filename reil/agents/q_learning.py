@@ -213,17 +213,19 @@ class QLearning(Agent[float]):
                     {'X': state + action, 'Y': new_q})
 
         else:  # backward
-            q_list = [0.0] * len(active_history)
-            for i in range(len(active_history)-2, -1, -1):
+            q_list = [0.0] * 2
+            for i in range(len(active_history)-1, -1, -1):
                 state = active_history[i].state  # type: ignore
                 action = (
                     active_history[i].action_taken or
                     active_history[i].action).feature  # type: ignore
                 reward = active_history[i].reward or 0.0
-                q_list[i] = reward + discount_factor * q_list[i+1]
+                q_list[0] = reward + discount_factor * q_list[1]
 
                 self._buffer.add(
-                    {'X': state + action, 'Y': q_list[i]})
+                    {'X': state + action, 'Y': q_list[0]})
+
+                q_list[1] = q_list[0]
 
         temp = self._buffer.pick()
 
