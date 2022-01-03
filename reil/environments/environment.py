@@ -370,7 +370,15 @@ class Environment(stateful.Stateful):
         for _ in range(times):
             reward = subject_instance.reward(
                 name=reward_name, _id=agent_id)
-            agent_observer.send(None if reward is None else {'reward': reward})
+            # When dealing with multiple agents, the first agent enables the
+            # reward. Hence, other agent observers cannot get `None` to start.
+            # In such cases, we have to manually feed the generator with a
+            # `None`.
+            try:
+                agent_observer.send(
+                    None if reward is None else {'reward': reward})
+            except TypeError:
+                agent_observer.send(None)
 
             state = subject_instance.state(name=state_name, _id=agent_id)
             possible_actions = subject_instance.possible_actions(
