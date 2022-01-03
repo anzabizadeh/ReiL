@@ -218,6 +218,7 @@ class Sequential(Environment):
 
                 elif unit == 'instance':
                     self.interact_while(**args)
+                    self.check_subject(subject_name)
 
                 elif unit == 'iteration':
                     # For iteration, simulate the current instance, then in
