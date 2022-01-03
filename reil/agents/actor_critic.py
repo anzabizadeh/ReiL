@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 '''
-PolicyGradientRTG class
-=======================
+ActorCritic class
+=================
 
-A reward-to-go Policy Gradient `agent`.
+An Actor-Critic Policy Gradient `agent`.
 '''
 
+import random
 from typing import Any, Optional, Tuple
 
 import numpy as np
@@ -18,14 +19,17 @@ from reil.learners import Learner
 from reil.utils.exploration_strategies import NoExploration
 
 
-class PolicyGradientRTG(Agent[int]):
+ACLabelType = Tuple[Tuple[int, ...], float]
+
+
+class ActorCritic(Agent[ACLabelType]):
     '''
     A reward to go Policy Gradient `agent`.
     '''
 
     def __init__(
             self,
-            learner: Learner[int],
+            learner: Learner[ACLabelType],
             **kwargs: Any):
         '''
         Arguments
@@ -86,20 +90,18 @@ class PolicyGradientRTG(Agent[int]):
         else:
             active_history = history
 
-        rtg_list = [0.0] * len(active_history)
-        for i in range(len(active_history)-2, -1, -1):
+        rtg_list = [0.0] * (len(active_history) + 1)
+        for i in range(len(active_history)-1, -1, -1):
             reward = active_history[i].reward or 0.0
             rtg_list[i] = reward + discount_factor * rtg_list[i+1]
 
-        rtg_list = np.array(rtg_list)  # type: ignore
-        rtg_list -= np.mean(rtg_list)  # type: ignore
-        rtg_list /= np.std(rtg_list)  # type: ignore
+        rtg_list = np.array(rtg_list[:-1])  # type: ignore
 
         return (
-            [a.state for a in active_history[:-1]],  # type: ignore
-            [(a.action_taken or a.action).index  # type: ignore
-             for a in active_history[:-1]],
-            {'G': rtg_list[:-1]})
+            [a.state for a in active_history],  # type: ignore
+            [((a.action_taken or a.action).index, g)  # type: ignore
+             for a, g in zip(active_history, rtg_list)],
+            {})
 
     def act(self,
             state: FeatureArray,
@@ -139,8 +141,8 @@ class PolicyGradientRTG(Agent[int]):
         possible_actions = actions or self._default_actions
 
         if self._training_trigger == 'none':
-            probs = self._learner.predict((state,))[0]
-            action_index = int(np.argmax(probs))
+            logits = self._learner.predict((state,))[0]
+            action_index = int(np.argmax(logits))  # type: ignore
 
             i_action = Index_FeatureArray(
                 action_index, possible_actions[action_index])
@@ -170,11 +172,17 @@ class PolicyGradientRTG(Agent[int]):
         :
             A list of best actions.
         '''
-        probs = self._learner.predict((state,))[0]
+        logits = self._learner.predict((state,))[0]
         action_index = int(tf.random.categorical(  # type: ignore
-            logits=tf.math.log([probs]), num_samples=1))
+            logits=logits, num_samples=1))
 
-        return (Index_FeatureArray(action_index, actions[action_index]),)
+        try:
+            action = Index_FeatureArray(action_index, actions[action_index])
+        except IndexError:
+            action_index: int = random.randrange(len(actions))
+            action = Index_FeatureArray(action_index, actions[action_index])
+
+        return (action,)
 
     def reset(self) -> None:
         '''Resets the agent at the end of a learning iteration.'''
