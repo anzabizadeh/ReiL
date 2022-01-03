@@ -10,6 +10,7 @@ import random
 from typing import Any, Optional, Tuple
 
 from reil.agents.agent_base import AgentBase
+from reil.datatypes.dataclasses import Index_FeatureArray
 from reil.datatypes.feature import FeatureArray
 
 
@@ -27,7 +28,7 @@ class RandomAgent(AgentBase):
             state: FeatureArray,
             subject_id: int,
             actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> FeatureArray:
+            iteration: int = 0) -> Index_FeatureArray:
         '''
         Return a random action.
 
@@ -47,4 +48,6 @@ class RandomAgent(AgentBase):
         :
             The action
         '''
-        return random.choice(actions or self._default_actions)
+        action_list = actions or self._default_actions
+        index = random.randrange(len(action_list))
+        return Index_FeatureArray(index, action_list[index])
