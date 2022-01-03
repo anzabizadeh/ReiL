@@ -188,7 +188,7 @@ class HealthSubject(Subject):
         return self._patient.feature_set[name]
 
     def _get_history(
-            self, list_name: str, length: int
+            self, list_name: str, length: int, backfill: bool = False
     ) -> Feature:
         if length == 0:
             raise ValueError(
@@ -227,40 +227,50 @@ class HealthSubject(Subject):
                 i1, i2 = length - index, 0
             else:
                 i1, i2 = 0, index-length
+            if backfill:
+                filler = _list[i2]
             result = [filler] * i1 + _list[i2:index]  # type: ignore
 
         return self.feature_gen_set[list_name](tuple(result))  # type: ignore
 
     def _sub_comp_dose_history(
-            self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature:
-        return self._get_history('dose_history', length)  # type: ignore
-
-    def _sub_comp_measurement_history(
-            self, _id: int, length: int = 1, **kwargs: Any
+            self, _id: int, length: int = 1, backfill: bool = False,
+            **kwargs: Any
     ) -> Feature:
         return self._get_history(  # type: ignore
-            f'{self._measurement_name}_history', length)
+            'dose_history', length, backfill)
+
+    def _sub_comp_measurement_history(
+            self, _id: int, length: int = 1, backfill: bool = True,
+            **kwargs: Any
+    ) -> Feature:
+        return self._get_history(  # type: ignore
+            f'{self._measurement_name}_history', length, backfill)
 
     def _sub_comp_interval_history(
-            self, _id: int, length: int = 1, **kwargs: Any
+            self, _id: int, length: int = 1, backfill: bool = False,
+            **kwargs: Any
     ) -> Feature:
-        return self._get_history('interval_history', length)  # type: ignore
+        return self._get_history(  # type: ignore
+            'interval_history', length, backfill)
 
     def _sub_comp_day(self, _id: int, **kwargs: Any) -> Feature:
         return self.feature_gen_set['day'](  # type: ignore
             value=self._day if 0 <= self._day < self._max_day else None)
 
     def _sub_comp_daily_dose_history(
-            self, _id: int, length: int = 1, **kwargs: Any
-    ) -> Feature:
-        return self._get_history('daily_dose_history', length)  # type: ignore
-
-    def _sub_comp_daily_measurement_history(
-            self, _id: int, length: int = 1, **kwargs: Any
+            self, _id: int, length: int = 1, backfill: bool = False,
+            **kwargs: Any
     ) -> Feature:
         return self._get_history(  # type: ignore
-            f'daily_{self._measurement_name}_history', length)
+            'daily_dose_history', length, backfill)
+
+    def _sub_comp_daily_measurement_history(
+            self, _id: int, length: int = 1, backfill: bool = False,
+            **kwargs: Any
+    ) -> Feature:
+        return self._get_history(  # type: ignore
+            f'daily_{self._measurement_name}_history', length, backfill)
 
     def __repr__(self) -> str:
         try:
