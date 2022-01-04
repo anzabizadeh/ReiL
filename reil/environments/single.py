@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 Single class
-==========================
+============
 
 This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
@@ -241,11 +241,14 @@ class Single(Environment):
             Attempt to call this method will normal subjects in the interaction
             sequence.
         '''
-        plan = self._active_plan.plan
-        if plan is None:
-            raise ValueError('No active plan!')
+        plan: Any = self._active_plan.plan
+        # if plan is None:
+        #     raise ValueError('No active plan!')
 
-        subject_name = plan.subject.name
+        try:
+            subject_name = plan.subject.name
+        except AttributeError:
+            raise ValueError('No active plan!')
 
         if subject_name not in self._instance_generators:
             raise TypeError(
@@ -267,12 +270,15 @@ class Single(Environment):
         Go over all `subjects`. If terminated, close related `agent_observers`,
         reset the `subject`, and create new `agent_observers`.
         '''
-        plan = self._active_plan.plan
-        if plan is None:
-            raise ValueError('No active plan!')
+        plan: Any = self._active_plan.plan
+        # if plan is None:
+        #     raise ValueError('No active plan!')
 
-        if subject_name != plan.subject.name:
-            return True
+        try:
+            if subject_name != plan.subject.name:
+                return True
+        except AttributeError:
+            raise ValueError('No active plan!')
 
         self.close_agent_observer(plan)
         success = self.reset_subject(subject_name)
@@ -284,11 +290,15 @@ class Single(Environment):
         '''
         Extends `Environment.reset_subject()`.
         '''
-        plan = self._active_plan.plan
-        if plan is None:
+        plan: Any = self._active_plan.plan
+        # if plan is None:
+        #     raise ValueError('No active plan!')
+
+        try:
+            agent_name = plan.agent.name
+        except AttributeError:
             raise ValueError('No active plan!')
 
-        agent_name = plan.agent.name
         subject_name = plan.subject.name
         _id = self._assignment_list[(agent_name, subject_name)][1]
         stat_name = plan.subject.statistic_name

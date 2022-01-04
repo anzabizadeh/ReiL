@@ -52,8 +52,8 @@ def random_normal(f: FeatureGenerator) -> float:
 def random_normal_truncated(f: FeatureGenerator) -> float:
     if f.randomized:
         return min(max(
-            np.random.normal(f.mean, f.stdev), f.lower),  # type: ignore
-            f.upper)
+            np.random.normal(
+                f.mean, f.stdev), f.lower), f.upper)  # type: ignore
 
     if f.mean is None:
         raise ValueError('mean should be a number.')
