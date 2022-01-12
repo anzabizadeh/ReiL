@@ -220,8 +220,8 @@ class FeatureGenerator:
     generator: Optional[
         Callable[[FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None
     allow_missing: bool = False
-    iterable: bool = dataclasses.field(
-        default=False, init=False, repr=False, compare=False)
+    count: Optional[int] = dataclasses.field(
+        default=None, init=False, repr=False, compare=False)
     recent_value: Tuple[Any, Feature] = dataclasses.field(
         default=(None, Feature('')), init=False, repr=False, compare=False)
 
@@ -336,12 +336,13 @@ class FeatureGenerator:
 
     def _process_categorical(self):
         cats = self.categories
-        allow_missing = self.allow_missing
+        allow_missing = int(self.allow_missing)
         if cats is None:
             return
 
-        allow_missing_offset = int(allow_missing)
-        cat_count = len(cats) - 1 + allow_missing_offset
+        self.__dict__['count'] = cat_count = len(cats)
+
+        cat_count = cat_count - 1 + allow_missing
         normalizer = {}
         for i, c in enumerate(cats[:-1]):
             temp = [0] * cat_count
@@ -349,7 +350,7 @@ class FeatureGenerator:
             normalizer[c] = tuple(temp)
 
         temp = [0] * cat_count
-        temp[-1] = allow_missing_offset
+        temp[-1] = allow_missing
         normalizer[cats[-1]] = tuple(temp)
 
         if allow_missing:
@@ -379,7 +380,7 @@ class FeatureGenerator:
             self.__dict__['normalizer'] = normalizer
 
             if (lower is not None and upper is not None and step is not None):
-                self.__dict__['iterable'] = True
+                self.__dict__['count'] = int((upper - lower) / step) + 1
 
     def _call_categorical(
             self, value: Union[Any, Tuple[Any, ...], MissingType]
@@ -449,7 +450,7 @@ class FeatureGenerator:
 
             normalized = normalizer(value)  # type: ignore
 
-            if self.iterable:
+            if self.count is not None:
                 _index = (value - lower) / self.step
                 index = int(_index)
                 if index != _index:
@@ -469,13 +470,12 @@ class FeatureGenerator:
             self, mask_dict: Optional[Dict[Any, Any]] = None,
             exclude_masked_values: bool = False) -> Iterator[Feature]:
         mask = mask_dict or {}
-        if not self.iterable:
+        if self.count is None:
             raise TypeError('Feature is not iterable.')
         if self.is_numerical:
             iterator = (
                 i * self.step  # type: ignore
-                for i in range(
-                    int((self.upper-self.lower)/self.step) + 1)  # type: ignore
+                for i in range(self.count)
             )
         else:
             iterator = self.categories or ()
@@ -494,13 +494,12 @@ class FeatureGenerator:
             self, mask_dict: Optional[Dict[Any, Any]] = None,
             exclude_masked_values: bool = False) -> Iterator[int]:
         mask = mask_dict or {}
-        if not self.iterable:
+        if self.count is None:
             raise TypeError('Feature is not iterable.')
         if self.is_numerical:
             iterator = {
                 i * self.step: i  # type: ignore
-                for i in range(
-                    int((self.upper-self.lower)/self.step + 1))  # type: ignore
+                for i in range(self.count)
             }
         else:
             iterator = {v: i for i, v in enumerate(self.categories or ())}
@@ -511,7 +510,7 @@ class FeatureGenerator:
         return (iterator[mask.get(v, v)] for v in iterator)
 
     def byindex(self, index: int) -> Feature:
-        if not self.iterable:
+        if self.count is None:
             raise TypeError('The feature is not iterable.')
         if self.lower is None:
             if self.categories is None:
@@ -792,7 +791,7 @@ class FeatureGeneratorSet:
             name: {} for name in temp
         }
 
-        self.iterable = all(g.iterable for g in temp.values())
+        self.count = tuple(g.count for g in temp.values())
 
     def __call__(
             self, value: Optional[Dict[str, Any]] = None) -> FeatureSet:
@@ -889,9 +888,10 @@ class FeatureGeneratorSet:
                     result = self.generate_indexes(
                         exclude_masked_values=exclude, split=split)
                 else:  # item == 'count'
-                    temp = self.generate_indexes(
-                        exclude_masked_values=exclude, split=True)
-                    result = tuple(len(tuple((x))) for x in temp)
+                    # temp = self.generate_indexes(
+                    #     exclude_masked_values=exclude, split=True)
+                    # result = tuple(len(tuple((x))) for x in temp)
+                    result = self.count
             elif parsed_query['command'] == 'choose':
                 exclude = parsed_query.get('exclude', False)
                 if parsed_query['item'] == 'feature':
@@ -906,17 +906,27 @@ class FeatureGeneratorSet:
             query = yield result
 
     def byindex(
-            self, index: Union[Tuple[int, ...], Dict[str, int]]) -> FeatureSet:
-        if not self.iterable:
+            self, index: Union[int, Tuple[int, ...], Dict[str, int]]
+    ) -> FeatureSet:
+        if [x for x in self.count if x is None]:
             raise TypeError('This FeatureGeneratorSet is not iterable.')
+        if isinstance(index, int):
+            gen = self.generate_all(exclude_masked_values=True)
+            for i, v in enumerate(gen):
+                if i == index:
+                    return v  # type: ignore
+            raise IndexError(f'Index out of range {index}.')
+
         if len(index) != len(self._generators):
             raise IndexError(
                 'Number of indexes should match the number of generators.\n'
                 f'{len(index)} != {len(self._generators)}')
-
-        _ind = index if isinstance(index, dict) else {
-            name: i
-            for name, i in zip(self._generators, index)}
+        elif isinstance(index, dict):
+            _ind = index
+        else:
+            _ind = {
+                name: i
+                for name, i in zip(self._generators, index)}
 
         temp = FeatureSet(
             g.byindex(_ind[name])
