@@ -25,9 +25,9 @@ InteractionProtocol:
     A datatype to specifies how an `agent` and a `subject`
     interact in an `environment`.
 
-FeatureArray:
+FeatureSet:
     The main datatype used to communicate `state`s, `action`s, and `reward`s,
-    between objects in `reil`. `FeatureArray` is basically a dictionary that
+    between objects in `reil`. `FeatureSet` is basically a dictionary that
     contains instances of `Feature`.
 
 Feature:
@@ -52,8 +52,9 @@ SecondayComponent:
     them.
 '''
 from . import buffers  # noqa: W601
-from .feature import Feature, FeatureArray, FeatureGenerator  # noqa: W601
-from .feature_array_dumper import FeatureArrayDumper  # noqa: W0611
+from .feature import (Feature, FeatureSet, FeatureGenerator,  # noqa: W601
+                      FeatureGeneratorSet, FeatureGeneratorType)
+from .feature_array_dumper import FeatureSetDumper  # noqa: W0611
 from .components import (ActionSet, Reward, State,  # noqa: W601
                          SecondayComponent, Statistic)
 from .dataclasses import (Entity, History, InteractionProtocol,  # noqa: W601

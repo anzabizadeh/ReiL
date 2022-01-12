@@ -5,10 +5,10 @@ import time
 from typing import Any, Dict, Optional, Tuple, Union
 
 import pandas as pd
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 
 
-class FeatureArrayDumper:
+class FeatureSetDumper:
     def __init__(
             self, filename: str,
             path: Union[str, pathlib.PurePath] = '.',
@@ -23,7 +23,7 @@ class FeatureArrayDumper:
                     f, header=True)
 
     def dump(
-            self, component: FeatureArray,
+            self, component: FeatureSet,
             additional_info: Optional[Dict[str, Any]] = None,
     ) -> None:
         '''Write stats to file.'''
@@ -40,7 +40,7 @@ class FeatureArrayDumper:
 
     @staticmethod
     def _dump(
-            component: FeatureArray,
+            component: FeatureSet,
             additional_info: Optional[Dict[str, Any]],
             filename: str, path: pathlib.PurePath) -> bool:
         '''Write stats to file.'''

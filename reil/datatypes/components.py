@@ -14,8 +14,8 @@ from typing import (Any, Callable, DefaultDict, Dict, Generic, List, Optional,
                     Tuple, TypeVar, Union)
 
 import pandas as pd
-from reil.datatypes.feature import FeatureArray
-from reil.datatypes.feature_array_dumper import FeatureArrayDumper
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
+from reil.datatypes.feature_array_dumper import FeatureSetDumper
 
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
 
@@ -46,8 +46,8 @@ class State:
             available_sub_components: Optional[
                 Dict[str, SubComponentInfo]] = None,
             default_definition: Optional[Callable[[
-                Optional[int]], FeatureArray]] = None,
-            dumper: Optional[FeatureArrayDumper] = None,
+                Optional[int]], FeatureSet]] = None,
+            dumper: Optional[FeatureSetDumper] = None,
             pickle_stripped: bool = False):
         '''
         Parameters
@@ -102,7 +102,7 @@ class State:
         self._available_sub_components = sub_components
 
     def set_default_definition(
-            self, default_definition: Callable[[Optional[int]], FeatureArray]
+            self, default_definition: Callable[[Optional[int]], FeatureSet]
     ) -> None:
         '''Add a new component definition.
 
@@ -110,7 +110,7 @@ class State:
         ----------
         default_definition:
             A function that can optionally accept `_id`, and returns a
-            `FeatureArray`.
+            `FeatureSet`.
         '''
         self._default = default_definition
 
@@ -168,7 +168,7 @@ class State:
             self._definitions[name].append(SubComponentInstance(
                 name=sub_comp_name, fn=fn, args=kwargs))
 
-    def default(self, _id: Optional[int] = None) -> FeatureArray:
+    def default(self, _id: Optional[int] = None) -> FeatureSet:
         '''
         Generate the default component definition.
 
@@ -187,7 +187,7 @@ class State:
 
         return self._default(_id)
 
-    def __call__(self, name: str, _id: Optional[int] = None) -> FeatureArray:
+    def __call__(self, name: str, _id: Optional[int] = None) -> FeatureSet:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -219,7 +219,7 @@ class State:
         if name not in self._definitions:
             raise ValueError(f'Definition {name} not found.')
 
-        return FeatureArray(d.fn(
+        return FeatureSet(d.fn(
             self.object_ref, _id=_id, **d.args)  # type: ignore
             for d in self._definitions[name])
 
@@ -433,17 +433,18 @@ class SecondayComponent(Generic[ComponentReturnType]):
             except AttributeError:
                 pass
 
-        if self._state is None:
-            raise ValueError(
-                'Primary component is not defined. '
-                'Use `set_state` to specify it.')
-
         try:
             d = self._definitions[name]
         except KeyError:
             raise ValueError(f'Definition {name} not found.')
 
-        p = self._state(name=d.args, _id=_id)
+        try:
+            p = self._state(  # type: ignore
+                name=d.args, _id=_id)
+        except AttributeError:
+            raise ValueError(
+                'Primary component is not defined. '
+                'Use `set_state` to specify it.')
 
         return d.fn(p)
 
@@ -469,7 +470,7 @@ class Statistic:
             name: str,
             state: Optional[State] = None,
             default_definition: Optional[Callable[[
-                Optional[int]], Tuple[FeatureArray, float]]] = None,
+                Optional[int]], Tuple[FeatureSet, float]]] = None,
             enabled: bool = True,
             pickle_stripped: bool = False):
         '''
@@ -499,9 +500,8 @@ class Statistic:
             str, SubComponentInstance[Tuple[str, str]]] = defaultdict(None)
 
         self._history: Dict[
-            int,
-            List[Tuple[FeatureArray, float]]] = DefaultDict(list)
-        self._history_none: List[Tuple[FeatureArray, float]] = []
+            int, List[Tuple[FeatureSet, float]]] = DefaultDict(list)
+        self._history_none: List[Tuple[FeatureSet, float]] = []
 
     @property
     def definitions(self):
@@ -545,14 +545,14 @@ class Statistic:
     def set_default_definition(
             self,
             default_definition: Callable[
-                [Optional[int]], Tuple[FeatureArray, float]]) -> None:
+                [Optional[int]], Tuple[FeatureSet, float]]) -> None:
         '''Add a new component definition.
 
         Parameters
         ----------
         default_definition:
             A function that can optionally accept `_id`, and returns a
-            `FeatureArray`.
+            `FeatureSet`.
         '''
         self._default = default_definition
 
@@ -606,7 +606,7 @@ class Statistic:
         self._definitions[name] = SubComponentInstance[Tuple[str, str]](
             name=name, fn=fn, args=(aggregation_component, stat_component))
 
-    def default(self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
+    def default(self, _id: Optional[int] = None) -> Tuple[FeatureSet, float]:
         '''
         Generate the default component definition.
 
@@ -629,7 +629,7 @@ class Statistic:
             self,
             name: str,
             _id: Optional[int] = None
-    ) -> Union[Tuple[FeatureArray, float], None]:
+    ) -> Union[Tuple[FeatureSet, float], None]:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -728,8 +728,8 @@ class Statistic:
 
         if reset_history:
             self._history: Dict[
-                int, List[Tuple[FeatureArray, float]]] = DefaultDict(list)
-            self._history_none: List[Tuple[FeatureArray, float]] = []
+                int, List[Tuple[FeatureSet, float]]] = DefaultDict(list)
+            self._history_none: List[Tuple[FeatureSet, float]] = []
 
         return result
 
@@ -744,5 +744,5 @@ class Statistic:
         return state
 
 
-ActionSet = SecondayComponent[Tuple[FeatureArray, ...]]
+ActionSet = SecondayComponent[FeatureGeneratorType]
 Reward = SecondayComponent[float]

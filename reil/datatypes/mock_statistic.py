@@ -5,7 +5,7 @@ from typing import (TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List,
 
 import pandas as pd
 from reil.datatypes.components import State
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 
 if TYPE_CHECKING:
     from reil.stateful import Stateful
@@ -28,7 +28,7 @@ class MockStatistic:
         self._obj = obj
         self._history: Dict[
             Optional[int],
-            List[Tuple[FeatureArray, float]]] = DefaultDict(list)
+            List[Tuple[FeatureSet, float]]] = DefaultDict(list)
 
     def set_object(self, obj: Stateful) -> None:
         self._obj = obj
@@ -53,14 +53,14 @@ class MockStatistic:
         return self._obj.statistic.add_definition(
             name, fn, stat_component, aggregation_component)
 
-    def default(self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
+    def default(self, _id: Optional[int] = None) -> Tuple[FeatureSet, float]:
         return self._obj.statistic.default(_id)
 
     def __call__(
             self,
             name: str,
             _id: Optional[int] = None
-    ) -> Union[Tuple[FeatureArray, float], None]:
+    ) -> Union[Tuple[FeatureSet, float], None]:
         return self._obj.statistic.__call__(name, _id)
 
     def append(
@@ -112,6 +112,6 @@ class MockStatistic:
         if reset_history:
             self._history: Dict[
                 Optional[int],
-                List[Tuple[FeatureArray, float]]] = DefaultDict(list)
+                List[Tuple[FeatureSet, float]]] = DefaultDict(list)
 
         return result

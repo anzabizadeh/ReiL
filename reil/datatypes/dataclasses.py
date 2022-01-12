@@ -9,7 +9,7 @@ new values. This datatype uses `Entity` to specify an `agent` or a `subject`.
 import dataclasses
 from typing import List, Literal, Optional, Tuple
 
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 
 
 @dataclasses.dataclass(frozen=True)
@@ -48,19 +48,13 @@ class InteractionProtocol:
 
 
 @dataclasses.dataclass
-class Index_FeatureArray:
-    index: int
-    feature: FeatureArray
-
-
-@dataclasses.dataclass
 class Observation:
     # the state received from the subject
-    state: Optional[FeatureArray] = None
+    state: Optional[FeatureSet] = None
     # the action chosen by the agent
-    action: Optional[Index_FeatureArray] = None
+    action: Optional[FeatureSet] = None
     # the action taken by the subject
-    action_taken: Optional[Index_FeatureArray] = None
+    action_taken: Optional[FeatureSet] = None
     # the reward of taking the action at the state
     reward: Optional[float] = None
 
