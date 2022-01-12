@@ -160,10 +160,9 @@ class TF2IOMixin(reilbase.ReilBase):
         if state['_ann_ready']:
             state['_serialized_model'] = SerializeTF().dump(state['_model'])
 
-        del state['_model']
-        del state['_callbacks']
-        if '_tensorboard' in state:
-            del state['_tensorboard']
+        for k in ('_model', '_callbacks', '_tensorboard'):
+            if k in state:
+                del state[k]
 
         return state
 

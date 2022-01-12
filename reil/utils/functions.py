@@ -11,7 +11,7 @@ import random
 from typing import Any, Callable, Iterable, List, Optional, Tuple, TypeVar
 
 import numpy as np
-from reil.datatypes.feature import FeatureArray, FeatureGenerator
+from reil.datatypes.feature import FeatureSet, FeatureGenerator
 from scipy.stats import lognorm  # type: ignore
 
 Categorical = TypeVar('Categorical')
@@ -124,8 +124,8 @@ def interpolate(start: float, end: float, steps: int) -> Iterable[float]:
 
 def generate_modifier(
         operation: Callable[[T], T],
-        condition: Optional[Callable[[FeatureArray], bool]] = None
-) -> Callable[[FeatureArray, T], T]:
+        condition: Optional[Callable[[FeatureSet], bool]] = None
+) -> Callable[[FeatureSet, T], T]:
     '''Generate a modifier function for states or actions
 
     Parameters
@@ -134,7 +134,7 @@ def generate_modifier(
         What should happen to the input.
 
     condition:
-        A function that accepts a state `FeatureArray`, and based on that
+        A function that accepts a state `FeatureSet`, and based on that
         determines if the `operation` should be applied to the input.
 
     Returns
@@ -145,13 +145,13 @@ def generate_modifier(
     '''
     if condition is None:
         def no_condition_modifier(
-                condition_state: FeatureArray, input: T) -> T:
+                condition_state: FeatureSet, input: T) -> T:
             return operation(input)
 
         return no_condition_modifier
     else:
         def modifier(
-                condition_state: FeatureArray, input: T) -> T:
+                condition_state: FeatureSet, input: T) -> T:
             if condition(condition_state):  # type: ignore
                 return operation(input)
 

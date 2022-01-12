@@ -14,7 +14,7 @@ import pathlib
 from typing import Any, Generic, Iterable, Optional, Tuple, TypeVar, Union
 
 from reil import reilbase, stateful
-from reil.datatypes.feature_array_dumper import FeatureArrayDumper
+from reil.datatypes.feature_array_dumper import FeatureSetDumper
 from reil.datatypes.mock_statistic import MockStatistic
 
 T = TypeVar('T', bound=stateful.Stateful)
@@ -40,7 +40,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             use_existing_instances: bool = True,
             save_path: Union[pathlib.PurePath, str] = '',
             filename_pattern: str = '{n:04}',
-            state_dumper: Optional[FeatureArrayDumper] = None,
+            state_dumper: Optional[FeatureSetDumper] = None,
             **kwargs: Any):
         '''
         Attributes
@@ -126,7 +126,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             use_existing_instances: bool = True,
             save_path: Union[pathlib.PurePath, str] = '',
             auto_rewind: bool = False,
-            state_dumper: Optional[FeatureArrayDumper] = None,
+            state_dumper: Optional[FeatureSetDumper] = None,
             **kwargs: Any):
         '''
         Attributes

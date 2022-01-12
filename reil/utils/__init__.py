@@ -21,7 +21,7 @@ Classes
 -------
 ActionGenerator:
     A class that accepts categorical and numerical components, and
-    generates lists of actions as `FeatureArray` objects.
+    generates lists of actions as `FeatureSet` objects.
 
 CategoricalComponent:
     A class used to define categorical parts of actions.

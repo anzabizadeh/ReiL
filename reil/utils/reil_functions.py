@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
 
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 from reil.utils.functions import in_range, interpolate, square_dist
 
 # SOME THOUGHTS!
@@ -38,7 +38,7 @@ class ReilFunction(Generic[TypeY, TypeX]):
         else:
             self._fn = self._retro_inter
 
-    def __call__(self, args: FeatureArray) -> float:
+    def __call__(self, args: FeatureSet) -> float:
         temp = args.value
         fn_args: Dict[str, Any] = {'y': temp[self.y_var_name]}
         if self.x_var_name:

@@ -23,7 +23,7 @@ class testFeature(unittest.TestCase):
         def midpoint(f: feature.Feature) -> float:
             return (f.lower + f.upper)/2  # type: ignore
 
-        numerical = feature.FeatureGenerator.numerical(
+        numerical = feature.FeatureGenerator.continuous(
             name='num', lower=lower,
             upper=upper, generator=midpoint, randomized=True)  # type: ignore
 
@@ -49,7 +49,7 @@ class testFeature(unittest.TestCase):
         self.assertEqual(rl_new.is_numerical, True)
 
     def test_add_numerical(self):
-        numericals = feature.FeatureGenerator.numerical(name='test')
+        numericals = feature.FeatureGenerator.continuous(name='test')
         rl_values = [numericals(v) for v in self._numerical_data]
 
         rl_new = sum(rl_values[1:], rl_values[0])
@@ -105,16 +105,16 @@ class testFeature(unittest.TestCase):
     def test_feature_array(self):
         categoricals = feature.FeatureGenerator.categorical(
             name='cats', categories=tuple(self._categorical_data))
-        numericals = feature.FeatureGenerator.numerical(
+        numericals = feature.FeatureGenerator.continuous(
             name='nums', lower=min(self._numerical_data),
             upper=max(self._numerical_data))
 
         with self.assertRaises(KeyError):
-            feature.FeatureArray(
+            feature.FeatureSet(
                 [categoricals(v) for v in self._categorical_data])
             # print(rl_array.categories)
 
-        reilarray = feature.FeatureArray([
+        reilarray = feature.FeatureSet([
             categoricals(self._categorical_data[0]),
             numericals(self._numerical_data[0]),
         ])
@@ -136,8 +136,8 @@ class testFeature(unittest.TestCase):
 
         self.assertEqual(
             reilarray,
-            feature.FeatureArray([categoricals(self._categorical_data[0])]) +
-            feature.FeatureArray([numericals(self._numerical_data[0])])
+            feature.FeatureSet([categoricals(self._categorical_data[0])]) +
+            feature.FeatureSet([numericals(self._numerical_data[0])])
             )
 
     def test_change_to_missing(self):
@@ -149,7 +149,7 @@ class testFeature(unittest.TestCase):
                 self._categorical_data[0])).normalized,
             tuple([0]*len(self._categorical_data)))
 
-        array = feature.FeatureArray(
+        array = feature.FeatureSet(
             feature.FeatureGenerator.categorical(
                 name=v, categories=tuple(self._categorical_data),
                 allow_missing=True)(v)

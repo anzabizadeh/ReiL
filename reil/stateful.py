@@ -8,7 +8,7 @@ The base class of all stateful classes in `reil` package.
 Methods
 -------
 state:
-    the state of the entity (`agent` or `subject`) as a FeatureArray. Different
+    the state of the entity (`agent` or `subject`) as a FeatureSet. Different
     state definitions can be introduced using `state.add_definition` method.
     _id is available, in case in the implementation, state is caller-dependent.
     (For example in games with partial map visibility).
@@ -40,8 +40,8 @@ from reil import reilbase
 from reil.datatypes.components import (State, Statistic,
                                        SubComponentInfo)
 from reil.datatypes.entity_register import EntityRegister
-from reil.datatypes.feature import Feature, FeatureArray
-from reil.datatypes.feature_array_dumper import FeatureArrayDumper
+from reil.datatypes.feature import Feature, FeatureSet, NoneFeature
+from reil.datatypes.feature_array_dumper import FeatureSetDumper
 
 
 class Stateful(reilbase.ReilBase):
@@ -54,7 +54,7 @@ class Stateful(reilbase.ReilBase):
             min_entity_count: int = 1,
             max_entity_count: int = -1,
             unique_entities: bool = True,
-            state_dumper: Optional[FeatureArrayDumper] = None,
+            state_dumper: Optional[FeatureSetDumper] = None,
             **kwargs: Any):
 
         super().__init__(**kwargs)
@@ -63,6 +63,10 @@ class Stateful(reilbase.ReilBase):
         self.state = State(
             self, sub_comp_list, self._default_state_definition,
             dumper=state_dumper, pickle_stripped=True)
+
+        if 'none' not in self.state._definitions:
+            self.state.add_definition('none', ('none', {}))
+
         self.statistic = Statistic(
             name='statistic', state=self.state,
             default_definition=self._default_statistic_definition,
@@ -74,15 +78,16 @@ class Stateful(reilbase.ReilBase):
             unique_entities=unique_entities)
 
     def _default_state_definition(
-            self, _id: Optional[int] = None) -> FeatureArray:
-        return FeatureArray(Feature(name='default_state'))
+            self, _id: Optional[int] = None) -> FeatureSet:
+        return FeatureSet(NoneFeature)
 
     def _default_statistic_definition(
-            self, _id: Optional[int] = None) -> Tuple[FeatureArray, float]:
+            self, _id: Optional[int] = None) -> Tuple[FeatureSet, float]:
         return (self._default_state_definition(_id), 0.0)
 
     def _generate_state_defs(self) -> None:
-        raise NotImplementedError
+        self.state.add_definition(
+            'none', ('none', {}))
 
     def _generate_statistic_defs(self) -> None:
         raise NotImplementedError
@@ -155,6 +160,11 @@ class Stateful(reilbase.ReilBase):
                 sub_comp_list[func_name[10:]] = (func, tuple(keywords))
 
         return sub_comp_list
+
+    def _sub_comp_none(
+            self, _id: int, **kwargs: Any
+    ) -> Feature:
+        return NoneFeature
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         '''

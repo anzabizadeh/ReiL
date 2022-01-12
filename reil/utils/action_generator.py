@@ -4,14 +4,14 @@ ActionGenerator class
 =====================
 
 Gets lists of categorical or numerical lists as components, and generates lists
-of `FeatureArray` objects using the product of these components.
+of `FeatureSet` objects using the product of these components.
 '''
 import dataclasses
 import itertools
 from typing import (Any, Dict, Generic, Iterator, Optional, Tuple, TypeVar,
                     Union)
 
-from reil.datatypes.feature import Feature, FeatureArray, FeatureGenerator
+from reil.datatypes.feature import Feature, FeatureSet, FeatureGenerator
 from reil.reilbase import ReilBase
 
 Categorical = TypeVar('Categorical')
@@ -54,7 +54,7 @@ class NumericalComponent(Generic[Numerical]):
         object.__setattr__(self, 'length', len(self.possible_values))
         object.__setattr__(
             self, 'feature_generator',
-            FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name=self.name, lower=self.lower, upper=self.upper))
 
     def generate(self, index: int) -> Iterator[Feature]:
@@ -66,7 +66,7 @@ class NumericalComponent(Generic[Numerical]):
 class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
     '''
     Gets lists of categorical or numerical lists as components, and generates
-    lists of `FeatureArray` objects using the product of these components.
+    lists of `FeatureSet` objects using the product of these components.
     '''
 
     def __init__(
@@ -180,14 +180,14 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
 
     def possible_actions(
             self,
-            state: Optional[FeatureArray] = None) -> Tuple[FeatureArray, ...]:
+            state: Optional[FeatureSet] = None) -> Tuple[FeatureSet, ...]:
         '''
         Generate and return a list of possible actions.
 
         In this implementation, an `index` keeps track of where on the list it
         is on each component, and each call of this method generates the
         product of component values and returns the result as a list of
-        `FeatureArray`. The `index` is incremented by 1 unit. The last list of
+        `FeatureSet`. The `index` is incremented by 1 unit. The last list of
         a component is used if it is exhausted.
 
         Arguments
@@ -236,7 +236,7 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
                 *[component.generate(self._index)
                   for component in self._components.values()])
             self._index += 1
-            result = self._recent_possible_actions = tuple(FeatureArray(a)
+            result = self._recent_possible_actions = tuple(FeatureSet(a)
                                                            for a in actions)
 
         return result
@@ -266,7 +266,7 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
     def reset(self) -> None:
         ''' Resets the generator.'''
         self._index: int = 0
-        self._recent_possible_actions: Tuple[FeatureArray, ...] = ()
+        self._recent_possible_actions: Tuple[FeatureSet, ...] = ()
 
 
 if __name__ == "__main__":

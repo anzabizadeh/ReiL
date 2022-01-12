@@ -1,13 +1,14 @@
-from logging import warning
 import math
 import random
-from typing import Callable, List, Literal
 import unittest
+from logging import warning
+from typing import Callable, List, Literal
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from reil.datatypes.feature import Feature, FeatureGenerator
+from reil.datatypes.feature import (Feature, FeatureGenerator,
+                                    FeatureGeneratorSet, FeatureSet)
 from reil.healthcare.mathematical_models import HambergPKPD
 from reil.utils.functions import (random_categorical, random_lognormal,
                                   random_normal_truncated, random_uniform)
@@ -50,14 +51,13 @@ class testHambergPKPD(unittest.TestCase):
                      (50.0, '*1/*3', 'G/A', 10.0, 4.35),
                      (50.0, '*3/*3', 'G/G', 10.0, 6.90)]}
 
-        other_features = {
-            'MTT_1': Feature(name='MTT_1', value=HambergPKPD._MTT_1),
-            'MTT_2': Feature(name='MTT_2', value=HambergPKPD._MTT_2),
-            'CL_S_cyp_1_1': Feature(
+        other_features = FeatureSet((
+            Feature(name='MTT_1', value=HambergPKPD._MTT_1),
+            Feature(name='MTT_2', value=HambergPKPD._MTT_2),
+            Feature(
                 name='CL_S_cyp_1_1', value=HambergPKPD._CL_s_1_1),
-            'V1': Feature(name='V1', value=HambergPKPD._V1),
-            'V2': Feature(name='V2', value=HambergPKPD._V2)
-        }
+            Feature(name='V1', value=HambergPKPD._V1),
+            Feature(name='V2', value=HambergPKPD._V2)))
 
         _, axes = plt.subplots(
             2, 2, figsize=(10, 10), sharex=True, sharey=True)
@@ -74,13 +74,13 @@ class testHambergPKPD(unittest.TestCase):
                 else:  # 'A/A'
                     v = HambergPKPD._EC_50_AA
 
-                other_features['EC_50'] = Feature(name='EC_50', value=v)
+                other_features.update(
+                    FeatureSet(Feature(name='EC_50', value=v)))
 
-                h.setup(
-                    age=Feature(name='age', value=age),
-                    CYP2C9=Feature(name='CYP2C9', value=cyp),
-                    VKORC1=Feature(name='VKORC1', value=vkor),
-                    **other_features)
+                h.setup(FeatureSet((
+                    Feature(name='age', value=age),
+                    Feature(name='CYP2C9', value=cyp),
+                    Feature(name='VKORC1', value=vkor))) + other_features)
                 h.run(
                     dose={d: dose for d in range(60)},
                     measurement_days=range(61))
@@ -199,14 +199,14 @@ class testHambergPKPD(unittest.TestCase):
             raise ValueError
 
         # VKORC1 and EC_50 are not important in Cs (They affect INR)
-        feature_gen_set = {
-            'age': FeatureGenerator.numerical(
+        feature_gen_set = FeatureGeneratorSet((
+            FeatureGenerator.continuous(
                 name='age',
                 **age_info,
                 generator=(random_uniform if data_source != 'Ravvaz'
                            else random_normal_truncated),
                 randomized=random_demographic),
-            'CYP2C9': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='CYP2C9',
                 categories=('*1/*1', '*1/*2', '*1/*3',
                             '*2/*2', '*2/*3', '*3/*3'),
@@ -214,7 +214,7 @@ class testHambergPKPD(unittest.TestCase):
                 generator=random_categorical,
                 randomized=random_demographic,
                 allow_missing=True),
-            'VKORC1': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='VKORC1',
                 categories=('G/G', 'G/A', 'A/A'),
                 **VKORC1_info,
@@ -222,43 +222,43 @@ class testHambergPKPD(unittest.TestCase):
                 randomized=random_demographic,
                 allow_missing=True),
 
-            'CL_S_cyp_1_1': FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name='CL_S_cyp_1_1',
                 mean=math.log(HambergPKPD._CL_s_1_1),
                 stdev=math.sqrt(HambergPKPD._omega_CL_s),
                 generator=random_gen,
                 randomized=random_parameters),
-            'MTT_1': FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name='MTT_1',
                 mean=math.log(HambergPKPD._MTT_1),
                 stdev=math.sqrt(HambergPKPD._omega_MTT_1),
                 generator=random_gen,
                 randomized=random_parameters),
-            'MTT_2': FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name='MTT_2',
                 mean=math.log(HambergPKPD._MTT_2),
                 stdev=math.sqrt(HambergPKPD._omega_MTT_2),
                 generator=random_gen,
                 randomized=random_parameters),
-            'V1': FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name='V1',
                 mean=math.log(HambergPKPD._V1),
                 stdev=math.sqrt(HambergPKPD._omega_V1),
                 generator=random_gen,
                 randomized=random_parameters),
-            'V2': FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name='V2',
                 mean=math.log(HambergPKPD._V2),
                 stdev=math.sqrt(HambergPKPD._omega_V2),
                 generator=random_gen,
-                randomized=random_parameters),
-        }
+                randomized=random_parameters))
+        )
 
         concentrations = []
         for i in range(n):
             h = HambergPKPD(
                 cache_size=days, randomized=random_pkpd)  # type: ignore
-            features = {key: value() for key, value in feature_gen_set.items()}
+            features = feature_gen_set()
             vkor = features['VKORC1'].value
             if vkor == 'G/G':
                 v = math.log(HambergPKPD._EC_50_GG)
@@ -267,14 +267,15 @@ class testHambergPKPD(unittest.TestCase):
             else:  # 'A/A'
                 v = math.log(HambergPKPD._EC_50_AA)
 
-            features['EC_50'] = FeatureGenerator.numerical(
+            features += FeatureGenerator.continuous(
                 name='EC_50',
                 mean=v,
                 stdev=HambergPKPD._omega_EC_50,
                 generator=random_gen,
                 randomized=random_parameters)()
 
-            h.setup(**features)
+            h.setup(features)
+
             INR_values = h.run(
                 dose={0: 10.0},
                 measurement_days=measurement_days if INR else [])['INR']

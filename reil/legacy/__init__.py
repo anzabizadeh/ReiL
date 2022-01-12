@@ -41,10 +41,10 @@ TicTacToe:
 FrozenLake:
     (disabled)
     A frozen lake with cracks in it! (uses legacy ValueSet instead of
-    FeatureArray)
+    FeatureSet)
 
 WindyGridworld:
     (disabled)
     A grid with displacement of `agent` (as if wind blows)
-    (uses legacy ValueSet instead of FeatureArray)
+    (uses legacy ValueSet instead of FeatureSet)
 '''

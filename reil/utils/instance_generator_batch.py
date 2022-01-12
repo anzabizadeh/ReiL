@@ -16,7 +16,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple, TypeVar, Union
 
 import dill as pickle
 from reil import stateful
-from reil.datatypes.feature_array_dumper import FeatureArrayDumper
+from reil.datatypes.feature_array_dumper import FeatureSetDumper
 from reil.pickler import PickleMe
 from reil.utils.instance_generator import InstanceGenerator
 
@@ -45,7 +45,7 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
             instance_name_pattern: str = '{n:04}',
             filename_pattern: str = '{n:04}',
             pre_generate_all: bool = False,
-            state_dumper: Optional[FeatureArrayDumper] = None,
+            state_dumper: Optional[FeatureSetDumper] = None,
             **kwargs: Any):
         '''
         Attributes
@@ -140,7 +140,7 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
             use_existing_instances: bool = True,
             save_path: Union[pathlib.PurePath, str] = '',
             auto_rewind: bool = False,
-            state_dumper: Optional[FeatureArrayDumper] = None,
+            state_dumper: Optional[FeatureSetDumper] = None,
             **kwargs: Any) -> InstanceGeneratorBatch[T]:
         raise NotImplementedError('Use `InstanceGenerator` instead.')
 

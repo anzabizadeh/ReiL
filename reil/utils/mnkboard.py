@@ -10,7 +10,7 @@ import math
 from typing import (Any, Dict, Generic, Iterator, List, Optional, Tuple,
                     TypeVar, Union, cast, overload)
 
-from reil.datatypes.feature import FeatureArray, FeatureGenerator
+from reil.datatypes.feature import FeatureSet, FeatureGenerator
 
 T = TypeVar('T')
 
@@ -323,8 +323,8 @@ class MNKBoard(Generic[T]):
 
     @property
     def board_state(self):
-        ''' Return the state of the board as a FeatureArray.'''
-        return FeatureArray(self._board_state_gen(tuple(self._board)))
+        ''' Return the state of the board as a FeatureSet.'''
+        return FeatureSet(self._board_state_gen(tuple(self._board)))
 
     def get_board(
             self, as_list: bool = True) -> Union[List[T], List[List[T]]]:
