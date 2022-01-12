@@ -14,7 +14,8 @@ import pandas as pd
 from reil import stateful
 from reil.agents.agent_base import AgentBase
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import Index_FeatureArray, InteractionProtocol
+from reil.datatypes.dataclasses import InteractionProtocol
+from reil.datatypes.feature import FeatureSet
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 from reil.utils.instance_generator import InstanceGenerator
@@ -81,7 +82,7 @@ class Environment(stateful.Stateful):
         self._iterations: Dict[str, int] = defaultdict(int)
         self._agent_observers: Dict[
             Tuple[str, str],
-            Generator[Union[Index_FeatureArray, None], Any, None]] = {}
+            Generator[Union[FeatureSet, None], Any, None]] = {}
         self._plans: Dict[str, Any] = {}
         self._active_plan: Plan = Plan()
 
@@ -314,7 +315,7 @@ class Environment(stateful.Stateful):
             cls,
             agent_id: int,
             agent_observer: Generator[
-                Union[Index_FeatureArray, None], Any, None],
+                Union[FeatureSet, None], Any, None],
             subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,
@@ -384,6 +385,7 @@ class Environment(stateful.Stateful):
             possible_actions = subject_instance.possible_actions(
                 name=action_name, _id=agent_id)
             if possible_actions:
+                next(possible_actions)
                 action = agent_observer.send(
                     {'state': state,
                      'actions': possible_actions,
@@ -391,13 +393,14 @@ class Environment(stateful.Stateful):
                 action_taken = subject_instance.take_effect(
                     action, agent_id)  # type: ignore
                 agent_observer.send({'action_taken': action_taken})
+                possible_actions.close()
 
     @classmethod
     def interact_while(
             cls,
             agent_id: int,
             agent_observer: Generator[
-                Union[Index_FeatureArray, None], Any, None],
+                Union[FeatureSet, None], Any, None],
             subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,

@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import Entity, InteractionProtocol
-from reil.datatypes.feature_array_dumper import FeatureArrayDumper
+from reil.datatypes.feature_array_dumper import FeatureSetDumper
 from reil.environments.single import Single
 from reil.environments.task import Task
 from reil.subjects.subject import Subject
@@ -20,7 +20,7 @@ class Trajectory:
             env_filename: str,
             env_path: Optional[Union[pathlib.Path, str]],
             parser: Optional[ConfigParser] = None,
-            state_dumper: Optional[FeatureArrayDumper] = None,
+            state_dumper: Optional[FeatureSetDumper] = None,
             agent_entity: Optional[Entity] = None,
             subject_entity: Optional[Entity] = None,
             demons: Optional[
@@ -44,7 +44,7 @@ class Trajectory:
             iteration: int,
             subject_list: Optional[List[str]] = None,
             subject_save_path: str = '.',
-            state_dumper: Optional[FeatureArrayDumper] = None,
+            state_dumper: Optional[FeatureSetDumper] = None,
             agent_entity: Optional[Entity] = None,
             subject_entity: Optional[Entity] = None,
             demons: Optional[

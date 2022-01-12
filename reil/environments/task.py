@@ -57,7 +57,12 @@ class Task:
         for agent, trigger in self._agent_training_triggers.items():
             env._agents[agent]._training_trigger = trigger
 
-        for protocol in env._active_plan.plan:
+        if not isinstance(env._active_plan.plan, (list, tuple)):
+            p = (env._active_plan.plan,)
+        else:
+            p = env._active_plan.plan
+
+        for protocol in p:
             env._iterations[protocol.subject.name] = iteration
 
         env.simulate_pass()
