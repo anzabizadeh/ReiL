@@ -8,26 +8,28 @@ healthcare.
 '''
 from typing import Any, Dict, Optional
 
-from reil.datatypes.feature import Feature, FeatureGenerator
+from reil.datatypes.feature import FeatureGeneratorSet, FeatureSet
 
 
 class HealthMathModel:
     '''
     The base class of all mathematical models in healthcare.
     '''
-    _parameter_generators: Dict[str, FeatureGenerator] = {}
+    _parameter_generators = FeatureGeneratorSet()
 
     @classmethod
     def generate(
             cls,
-            input_features: Optional[Dict[str, Feature]] = None,
-            **kwargs: Any) -> Dict[str, Feature]:
-        return {
-            k: fx(kwargs.get(k))
-            for k, fx in cls._parameter_generators.items()
-        }
+            input_features: Optional[FeatureSet] = None,
+            **kwargs: Any) -> FeatureSet:
+        if input_features:
+            temp = input_features.value
+            temp.update(kwargs)
+            return cls._parameter_generators(temp)
 
-    def setup(self, **arguments: Feature) -> None:
+        return cls._parameter_generators(None)
+
+    def setup(self, arguments: FeatureSet) -> None:
         '''
         Set up the model.
 

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# type: ignore
 '''
 HambergPKPD class
 =================
@@ -65,32 +66,32 @@ class HambergPKPD2010(HealthMathModel):
     _INR_max: Final = 20.0  # page 733
 
     _parameter_generators: Dict[str, FeatureGenerator] = {
-        'MTT_1': FeatureGenerator.numerical(
+        'MTT_1': FeatureGenerator.continuous(
             name='MTT_1',  # (hours) Hamberg PK/PD
             mean=math.log(_MTT_1),
             stdev=math.sqrt(_omega_MTT_1),
             generator=random_lognormal_truncated,
             randomized=True),
-        'MTT_2': FeatureGenerator.numerical(
+        'MTT_2': FeatureGenerator.continuous(
             name='MTT_2',  # (hours) Hamberg PK/PD
             # Hamberg et al. (2007) - Table 4
             mean=math.log(_MTT_2),
             stdev=math.sqrt(_omega_MTT_2),
             generator=random_lognormal_truncated,
             randomized=True),
-        'CL_S_cyp_1_1': FeatureGenerator.numerical(
+        'CL_S_cyp_1_1': FeatureGenerator.continuous(
             name='CL_S_cyp_1_1',  # (l/h) Hamberg PK/PD
             mean=math.log(_CL_s_1_1),
             stdev=math.sqrt(_omega_CL_s),
             generator=random_lognormal_truncated,
             randomized=True),
-        'V1': FeatureGenerator.numerical(
+        'V1': FeatureGenerator.continuous(
             name='V1',  # (L) Volume in central compartment
             mean=math.log(_V1),
             stdev=math.sqrt(_omega_V1),
             generator=random_lognormal_truncated,
             randomized=True),
-        'V2': FeatureGenerator.numerical(
+        'V2': FeatureGenerator.continuous(
             name='V2',  # (L) volume in peripheral compartment
             mean=math.log(_V2),
             stdev=math.sqrt(_omega_V2),

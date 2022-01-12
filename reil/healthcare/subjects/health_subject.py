@@ -8,8 +8,8 @@ This `HealthSubject` class implements interaction with patients.
 
 from typing import Any, List, Optional, Tuple, Union
 
-from reil.datatypes.dataclasses import Index_FeatureArray
-from reil.datatypes.feature import MISSING, Feature, FeatureGenerator
+from reil.datatypes.feature import (MISSING, Feature, FeatureGenerator,
+                                    FeatureGeneratorSet, FeatureSet)
 from reil.healthcare.patient import Patient
 from reil.subjects.subject import Subject
 
@@ -25,7 +25,9 @@ class HealthSubject(Subject):
             measurement_name: str,
             measurement_range: Tuple[float, float],
             dose_range: Tuple[float, float],
+            dose_step: float,
             interval_range: Tuple[int, int],
+            interval_step: int,
             max_day: int,
             **kwargs: Any):
         '''
@@ -62,32 +64,38 @@ class HealthSubject(Subject):
             return
 
         self._dose_range = dose_range
+        self._dose_step = dose_step
         self._interval_range = interval_range
+        self._interval_step = interval_step
         self._measurement_range = measurement_range
         self._measurement_name = measurement_name
 
         self._max_day = max_day
 
-        self.feature_gen_set = {
-            name: FeatureGenerator.numerical(
+        self.feature_gen_set = FeatureGeneratorSet(
+            FeatureGenerator.continuous(
                 name=name, lower=lower, upper=upper)
             for name, lower, upper in (
                 (f'{self._measurement_name}_history',
                  *self._measurement_range),
                 (f'daily_{self._measurement_name}_history',
-                 *self._measurement_range),
-                ('dose_history', *self._dose_range),
-                ('daily_dose_history', *self._dose_range),
-                ('interval_history', *self._interval_range),
-                ('dose', *self._dose_range),
-                ('interval', *self._interval_range),
-                # ('day', 0, self._max_day - 1)
+                 *self._measurement_range))
+        ) + FeatureGeneratorSet(
+            FeatureGenerator.discrete(
+                name=name, lower=lower, upper=upper, step=step)
+            for name, lower, upper, step in (
+                ('dose_history', *self._dose_range, self._dose_step),
+                ('daily_dose_history', *self._dose_range, self._dose_step),
+                ('interval_history', *self._interval_range,
+                    self._interval_step),
+                ('dose', *self._dose_range, self._dose_step),
+                ('interval', *self._interval_range, self._interval_step),
             )
-        }
-
-        self.feature_gen_set['day'] = FeatureGenerator.numerical(
+        ) + FeatureGenerator.discrete(
             name='day', lower=0, upper=self._max_day - 1,
-            generator=lambda _: None)  # type: ignore
+            generator=lambda _: None)
+
+        self.action_gen_set = FeatureGeneratorSet()
 
         HealthSubject._generate_state_defs(self)
 
@@ -124,9 +132,9 @@ class HealthSubject(Subject):
         return self._day >= self._max_day
 
     def _take_effect(
-            self, action: Index_FeatureArray, _id: int = 0
-    ) -> Index_FeatureArray:
-        action_temp = action.feature.value
+            self, action: FeatureSet, _id: int = 0
+    ) -> FeatureSet:
+        action_temp = action.value
         current_dose = float(action_temp['dose'])  # type: ignore
         current_interval = min(int(action_temp['interval']),  # type: ignore
                                self._max_day - self._day)
@@ -275,9 +283,9 @@ class HealthSubject(Subject):
     def __repr__(self) -> str:
         try:
             temp = ', '.join(''.join(
-                (str(k), ': ',
+                (v.name, ': ',
                  ('{:4.2f}' if v.is_numerical else '{}').format(v.value)))
-                for k, v in self._patient.feature_set.items())
+                for v in self._patient.feature_set)
         except (AttributeError, ValueError, KeyError):
             temp = ''
 

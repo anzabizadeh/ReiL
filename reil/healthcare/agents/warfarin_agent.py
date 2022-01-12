@@ -10,7 +10,8 @@ in Ravvaz et al (2017).
 from typing import Any, Literal, Optional, Tuple
 
 from reil.agents.agent_base import AgentBase
-from reil.datatypes.feature import FeatureArray, FeatureGenerator
+from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorType,
+                                    FeatureSet)
 from reil.healthcare.dosing_protocols.warfarin import (AAA, CAA, PGAA, PGPGA,
                                                        PGPGI)
 
@@ -46,16 +47,16 @@ class WarfarinAgent(AgentBase):
         elif study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
             self._protocol = PGPGA()
 
-        self._dose_gen = FeatureGenerator.numerical(
+        self._dose_gen = FeatureGenerator.continuous(
             name='dose', lower=dose_range[0], upper=dose_range[1])
-        self._interval_gen = FeatureGenerator.numerical(
+        self._interval_gen = FeatureGenerator.discrete(
             name='interval', lower=interval_range[0], upper=interval_range[1])
 
     def act(self,
-            state: FeatureArray,
+            state: FeatureSet,
             subject_id: int,
-            actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: Optional[int] = 0) -> FeatureArray:
+            actions: FeatureGeneratorType,
+            iteration: Optional[int] = 0) -> FeatureSet:
         '''
         Generate the dosing `action` based on the `state` and current dosing
         protocol.
@@ -86,7 +87,7 @@ class WarfarinAgent(AgentBase):
         if interval is None:
             raise ValueError(f'None duration received from {self._protocol}.')
 
-        return FeatureArray([
+        return FeatureSet([
             self._dose_gen(min(dose, self._dose_gen.upper or dose)),
             self._interval_gen(
                 min(interval, self._interval_gen.upper or interval))

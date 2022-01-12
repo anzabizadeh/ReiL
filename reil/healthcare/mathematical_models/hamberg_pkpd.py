@@ -11,11 +11,11 @@ from typing import (Any, Callable, Dict, Final, Iterable, List, NamedTuple,
                     NewType, Optional, Union)
 
 import numpy as np
-from reil.datatypes.feature import Feature, FeatureGenerator
+from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorSet,
+                                    FeatureSet)
 from reil.healthcare.mathematical_models.health_math_model import \
     HealthMathModel
 from reil.utils.functions import random_lognormal_truncated
-
 
 Day = NewType('Day', float)
 Hour = NewType('Hour', int)
@@ -74,39 +74,39 @@ class HambergPKPD(HealthMathModel):
     # Hamberg et al. (2007) - Misc.
     _INR_max: Final = 20.0  # page 538
 
-    _parameter_generators: Dict[str, FeatureGenerator] = {
-        'MTT_1': FeatureGenerator.numerical(
+    _parameter_generators = FeatureGeneratorSet((
+        FeatureGenerator.continuous(
             name='MTT_1',  # (hours) Hamberg PK/PD
             mean=math.log(_MTT_1),
             stdev=math.sqrt(_omega_MTT_1),
             generator=random_lognormal_truncated,
             randomized=True),
-        'MTT_2': FeatureGenerator.numerical(
+        FeatureGenerator.continuous(
             name='MTT_2',  # (hours) Hamberg PK/PD
             # Hamberg et al. (2007) - Table 4
             mean=math.log(_MTT_2),
             stdev=math.sqrt(_omega_MTT_2),
             generator=random_lognormal_truncated,
             randomized=True),
-        'CL_S_cyp_1_1': FeatureGenerator.numerical(
+        FeatureGenerator.continuous(
             name='CL_S_cyp_1_1',  # (l/h) Hamberg PK/PD
             mean=math.log(_CL_s_1_1),
             stdev=math.sqrt(_omega_CL_s),
             generator=random_lognormal_truncated,
             randomized=True),
-        'V1': FeatureGenerator.numerical(
+        FeatureGenerator.continuous(
             name='V1',  # (L) Volume in central compartment
             mean=math.log(_V1),
             stdev=math.sqrt(_omega_V1),
             generator=random_lognormal_truncated,
             randomized=True),
-        'V2': FeatureGenerator.numerical(
+        FeatureGenerator.continuous(
             name='V2',  # (L) volume in peripheral compartment
             mean=math.log(_V2),
             stdev=math.sqrt(_omega_V2),
             generator=random_lognormal_truncated,
             randomized=True),
-        }
+    ))
 
     # pre-computing to gain some speed boost!
     __log_EC_50_GG: Final[float] = math.log(_EC_50_GG)
@@ -135,8 +135,8 @@ class HambergPKPD(HealthMathModel):
     @classmethod
     def generate(
             cls,
-            input_features: Optional[Dict[str, Feature]] = None,
-            **kwargs: Any) -> Dict[str, Feature]:
+            input_features: Optional[FeatureSet] = None,
+            **kwargs: Any) -> FeatureSet:
 
         feature_set = super(HambergPKPD, cls).generate(
             input_features, **kwargs)
@@ -149,7 +149,7 @@ class HambergPKPD(HealthMathModel):
                     'EC_50 should be provided as a keyword argument.'
                 )
 
-            feature_set['EC_50'] = FeatureGenerator.numerical(
+            feature_set += FeatureGenerator.continuous(
                 name='EC_50',  # (mg/L) Hamberg PK/PD
                 mean=1.0,
                 stdev=HambergPKPD.__sqrt_omega_EC_50,
@@ -165,7 +165,7 @@ class HambergPKPD(HealthMathModel):
             else:  # 'A/A'
                 mean = HambergPKPD.__log_EC_50_AA
 
-            feature_set['EC_50'] = FeatureGenerator.numerical(
+            feature_set += FeatureGenerator.continuous(
                 name='EC_50',  # (mg/L) Hamberg PK/PD
                 mean=mean,
                 stdev=HambergPKPD.__sqrt_omega_EC_50,
@@ -174,7 +174,7 @@ class HambergPKPD(HealthMathModel):
 
         return feature_set
 
-    def setup(self, **arguments: Feature) -> None:
+    def setup(self, arguments: FeatureSet) -> None:
         '''
         Set up the model.
 
@@ -200,14 +200,16 @@ class HambergPKPD(HealthMathModel):
         # for patients, but Ravvaz fixed it to 1.
         self._baseINR = 1.0    # Ravvaz source code
 
-        age = float(arguments['age'].value)  # type: ignore
-        CYP2C9 = str(arguments['CYP2C9'].value)
-        MTT_1 = float(arguments['MTT_1'].value)  # type: ignore
-        MTT_2 = float(arguments['MTT_2'].value)  # type: ignore
-        V1 = float(arguments['V1'].value)  # type: ignore
-        V2 = float(arguments['V2'].value)  # type: ignore
-        EC_50 = float(arguments['EC_50'].value)  # type: ignore
-        CL_S_cyp_1_1 = float(arguments['CL_S_cyp_1_1'].value)  # type: ignore
+        args = arguments.value
+
+        age = float(args['age'])  # type: ignore
+        CYP2C9 = str(args['CYP2C9'])
+        MTT_1 = float(args['MTT_1'])  # type: ignore
+        MTT_2 = float(args['MTT_2'])  # type: ignore
+        V1 = float(args['V1'])  # type: ignore
+        V2 = float(args['V2'])  # type: ignore
+        EC_50 = float(args['EC_50'])  # type: ignore
+        CL_S_cyp_1_1 = float(args['CL_S_cyp_1_1'])  # type: ignore
 
         if CYP2C9 not in self._CL_s_genotypes:
             raise ValueError('The CYP2C9 genotype not recognized!')
