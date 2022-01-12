@@ -6,10 +6,10 @@ LRAgent class
 An agent that uses a given `scikitlearn` model, and parameter list, and
 specifies action using that.
 '''
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 from reil.agents.agent_base import AgentBase
-from reil.datatypes.feature import Feature, FeatureArray
+from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
 from sklearn.linear_model import LinearRegression
 
 
@@ -20,7 +20,7 @@ class LRAgent(AgentBase):
 
     def __init__(
             self,
-            default_actions: Tuple[FeatureArray, ...] = (),
+            default_actions: Tuple[FeatureSet, ...] = (),
             models: Dict[int, LinearRegression] = {0: LinearRegression()},
             feature_sequence: Tuple[str, ...] = (),
             value_extractor_fn: Callable[
@@ -32,10 +32,10 @@ class LRAgent(AgentBase):
         self._value_extractor_fn = value_extractor_fn
 
     def act(self,
-            state: FeatureArray,
+            state: FeatureSet,
             subject_id: int,
-            actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> FeatureArray:
+            actions: FeatureGeneratorType,
+            iteration: int = 0) -> FeatureSet:
         '''
         Return a random action.
 
@@ -69,10 +69,10 @@ class LRAgent(AgentBase):
         action_temp: float = self._models[
             subject_id].predict(X)  # type: ignore
 
-        possible_actions = actions or self._default_actions
+        possible_actions = actions
 
         # find the closest allowed action
-        actions_dict: Dict[float, FeatureArray] = {
+        actions_dict: Dict[float, FeatureSet] = {
             abs(a.value - action_temp): a  # type: ignore
             for a in possible_actions}
 

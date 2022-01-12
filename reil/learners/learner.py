@@ -9,7 +9,7 @@ from abc import abstractmethod
 from typing import Any, Protocol, Tuple, TypeVar
 
 from reil import reilbase
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 
@@ -23,14 +23,14 @@ class LearnerProtocol(Protocol[LabelType]):
     _learning_rate: LearningRateScheduler
 
     @abstractmethod
-    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[LabelType, ...]:
+    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[LabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the prediction model.
+            A list of `FeatureSet` as inputs to the prediction model.
 
         Returns
         -------
@@ -41,7 +41,7 @@ class LearnerProtocol(Protocol[LabelType]):
 
     @abstractmethod
     def learn(
-            self, X: Tuple[FeatureArray, ...], Y: Tuple[LabelType, ...],
+            self, X: Tuple[FeatureSet, ...], Y: Tuple[LabelType, ...],
             **kwargs: Any
     ) -> None:
         '''
@@ -50,7 +50,7 @@ class LearnerProtocol(Protocol[LabelType]):
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the learning model.
+            A list of `FeatureSet` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.

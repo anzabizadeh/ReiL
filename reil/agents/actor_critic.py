@@ -6,20 +6,18 @@ ActorCritic class
 An Actor-Critic Policy Gradient `agent`.
 '''
 
-import random
-from typing import Any, Optional, Tuple
+from typing import Any, Tuple
 
 import numpy as np
 import tensorflow as tf
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
-from reil.datatypes.dataclasses import Index_FeatureArray
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners import Learner
 from reil.utils.exploration_strategies import NoExploration
 
 
-ACLabelType = Tuple[Tuple[int, ...], float]
+ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
 
 class ActorCritic(Agent[ACLabelType]):
@@ -40,9 +38,6 @@ class ActorCritic(Agent[ACLabelType]):
         discount_factor:
             by what factor should future rewards be discounted?
 
-        default_actions:
-            a tuple of default actions.
-
         training_mode:
             whether the agent is in training mode or not.
 
@@ -52,6 +47,7 @@ class ActorCritic(Agent[ACLabelType]):
         '''
         super().__init__(
             learner=learner, exploration_strategy=NoExploration(),
+            variable_action_count=False,
             **kwargs)
 
     @classmethod
@@ -99,15 +95,17 @@ class ActorCritic(Agent[ACLabelType]):
 
         return (
             [a.state for a in active_history],  # type: ignore
-            [((a.action_taken or a.action).index, g)  # type: ignore
+            [(tuple(
+                (a.action_taken or a.action).index.values()),  # type: ignore
+              g)
              for a, g in zip(active_history, rtg_list)],
             {})
 
     def act(self,
-            state: FeatureArray,
+            state: FeatureSet,
             subject_id: int,
-            actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> Index_FeatureArray:
+            actions: FeatureGeneratorType,
+            iteration: int = 0) -> FeatureSet:
         '''
         Return an action based on the given state.
 
@@ -138,51 +136,17 @@ class ActorCritic(Agent[ACLabelType]):
         if subject_id not in self._entity_list:
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
-        possible_actions = actions or self._default_actions
-
-        if self._training_trigger == 'none':
-            logits = self._learner.predict((state,))[0]
-            action_index = int(np.argmax(logits))  # type: ignore
-
-            i_action = Index_FeatureArray(
-                action_index, possible_actions[action_index])
-        else:
-            i_action = self.best_actions(state, possible_actions)[0]
-
-        return i_action
-
-    def best_actions(
-            self,
-            state: FeatureArray,
-            actions: Tuple[FeatureArray, ...]
-    ) -> Tuple[Index_FeatureArray, ...]:
-        '''
-        Find the best `action`s for the given `state`.
-
-        Arguments
-        ---------
-        state:
-            The state for which the action should be returned.
-
-        actions:
-            The set of possible actions to choose from.
-
-        Returns
-        -------
-        :
-            A list of best actions.
-        '''
         logits = self._learner.predict((state,))[0]
-        action_index = int(tf.random.categorical(  # type: ignore
-            logits=logits, num_samples=1))
+        if self._training_trigger == 'none':
+            action_index = [int(np.argmax(lo)) for lo in logits]
+        else:
+            action_index = [
+                int(tf.random.categorical(logits=lo, num_samples=1))
+                for lo in logits]
 
-        try:
-            action = Index_FeatureArray(action_index, actions[action_index])
-        except IndexError:
-            action_index: int = random.randrange(len(actions))
-            action = Index_FeatureArray(action_index, actions[action_index])
+        action: FeatureSet = actions.send(f'lookup {action_index}')
 
-        return (action,)
+        return action
 
     def reset(self) -> None:
         '''Resets the agent at the end of a learning iteration.'''

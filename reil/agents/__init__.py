@@ -34,7 +34,7 @@ Types
 -----
 TrainingData
     a type alias for training data, consisting of a tuple of
-    `FeatureArray` for X matrix and a tuple of floats for Y vector.
+    `FeatureSet` for X matrix and a tuple of floats for Y vector.
 
 '''
 from .agent_base import AgentBase  # noqa: W601

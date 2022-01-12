@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 '''
-Feature, FeatureGenerator, FeatureArray classes
+Feature, FeatureGenerator, FeatureSet classes
 ===============================================
 
-`FeatureArray` is The main datatype used to communicate `state`s, `action`s,
-and `reward`s, between objects in `reil`. `FeatureArray` is basically a
+`FeatureSet` is The main datatype used to communicate `state`s, `action`s,
+and `reward`s, between objects in `reil`. `FeatureSet` is basically a
 dictionary that contains instances of `Feature`.
 `FeatureGenerator` allows for generating new `Feature` instances. It can
 `generate` a new value or turn an input into a `Feature`. It enforces
@@ -412,7 +412,7 @@ class FeatureGenerator(Generic[T]):
         return instance
 
 
-class FeatureArray:
+class FeatureSet:
     '''
     The main datatype used to communicate `state`s, `action`s, and `reward`s,
     between objects in `reil`.
@@ -501,10 +501,10 @@ class FeatureArray:
         Returns
         -------
         :
-            A `FeatureArray` of the normalized values of all the items in the
+            A `FeatureSet` of the normalized values of all the items in the
             instance, in the form of numerical `Feature`s.
         '''
-        return FeatureArray(
+        return FeatureSet(
             FeatureGenerator.numerical(name=name, lower=0, upper=1)
             (v.normalized)  # type: ignore
             for name, v in self._data.items())
@@ -526,17 +526,17 @@ class FeatureArray:
                 *[make_iterable(sublist) for sublist in self.value.values()]))
 
     def split(self):
-        """Split the `FeatureArray` into a list of `FeatureArray`s.
+        """Split the `FeatureSet` into a list of `FeatureSet`s.
 
         Returns
         -------
         :
-            All items in the instance as separate `FeatureArray` instances.
+            All items in the instance as separate `FeatureSet` instances.
         """
         if len(self) == 1:
             d = next(iter(self._data.values()))
             if not isinstance(d.value, (list, tuple)):
-                splitted_list = FeatureArray(d)
+                splitted_list = FeatureSet(d)
             else:
                 temp = d.as_dict
                 cls = type(d)
@@ -546,11 +546,11 @@ class FeatureArray:
                     del temp['is_numerical']
 
                 splitted_list = [
-                    FeatureArray(cls(value=v, **temp))
+                    FeatureSet(cls(value=v, **temp))
                     for v in value]
 
         else:
-            splitted_list = list(FeatureArray(v) for v in self._data.values())
+            splitted_list = list(FeatureSet(v) for v in self._data.values())
 
         return splitted_list
 
@@ -570,21 +570,21 @@ class FeatureArray:
         return isinstance(other, type(self)) and (self._data == other._data)
 
     def __add__(self, other: Any):
-        if not isinstance(other, FeatureArray):
-            new_data = FeatureArray(other)
+        if not isinstance(other, FeatureSet):
+            new_data = FeatureSet(other)
         else:
             new_data = other
 
-        # if not isinstance(new_data, FeatureArray):
+        # if not isinstance(new_data, FeatureSet):
         #     raise TypeError(
-        #         'Concatenation of type FeatureArray'
+        #         'Concatenation of type FeatureSet'
         #         f' and {type(other)} not implemented!')
 
         overlaps = set(new_data._data).intersection(self._data)
         if overlaps:
             raise ValueError(f'Objects already exist: {overlaps}.')
 
-        return FeatureArray(itertools.chain(
+        return FeatureSet(itertools.chain(
             self._data.values(), new_data._data.values()))
 
     def __neg__(self):
@@ -603,7 +603,7 @@ class FeatureArray:
                         f'upper: {upper}, '
                         f'negative value: {neg_value}')
 
-        return FeatureArray(temp)  # type: ignore
+        return FeatureSet(temp)  # type: ignore
 
     def __repr__(self):
         return f'[{super().__repr__()} -> {self._data}]'
@@ -632,7 +632,7 @@ def change_to_missing(feature: Feature[T]) -> Feature[T]:
 
 
 def change_array_to_missing(
-        features: FeatureArray, suppress_error: bool = True) -> FeatureArray:
+        features: FeatureSet, suppress_error: bool = True) -> FeatureSet:
     def try_to_change(feature: Feature[T]) -> Feature[T]:
         try:
             return change_to_missing(feature)
@@ -641,4 +641,4 @@ def change_array_to_missing(
                 return feature
             raise
 
-    return FeatureArray(try_to_change(f) for f in features)
+    return FeatureSet(try_to_change(f) for f in features)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
-DenseSoftMax class
-==================
+DenseActorCritic class
+======================
 
 The DenseSoftMax learner, comprised of a fully-connected with a softmax in the
 output layer.
@@ -11,14 +11,14 @@ from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 from reil.utils.tf_utils import TF2IOMixin
 from tensorflow import keras
 
-ACLabelType = Tuple[Tuple[int, ...], float]
+ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
 
 class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
@@ -33,7 +33,7 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
     def __init__(
             self,
             learning_rate: LearningRateScheduler,
-            output_length: int,
+            output_lengths: List[int],
             validation_split: float = 0.3,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
@@ -42,6 +42,9 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         '''
         Arguments
         ---------
+        output_lengths:
+            A list of the sizes of all categorical outputs.
+
         learning_rate:
             A `LearningRateScheduler` object that determines the learning rate
             based on iteration. If any scheduler other than constant is
@@ -77,7 +80,7 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         self._validation_split = validation_split
         self._hidden_layer_sizes = hidden_layer_sizes
         self._input_length = input_length
-        self._output_length = output_length
+        self._output_lengths = output_lengths
 
         self._tensorboard_path: Optional[pathlib.PurePath] = None
         if tensorboard_path is not None:
@@ -143,27 +146,30 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
             layer = keras.layers.Dense(  # type: ignore
                 v, activation='relu', name=f'layer_{i:0>2}')(layer)
 
-        actor_output = keras.layers.Dense(
-            self._output_length, activation='softmax', name='actor')(layer)
+        actor_outputs = [
+            keras.layers.Dense(
+                output_length, activation='softmax',
+                name=f'actor_{i:02}')(layer)
+            for i, output_length in enumerate(self._output_lengths)]
         critic_output = keras.layers.Dense(
             1, activation='sigmoid', name='critic')(layer)
 
         self._model = keras.Model(
-            inputs=input_, outputs=[actor_output, critic_output])
+            inputs=input_, outputs=[actor_outputs, critic_output])
         self._model.compile(  # type: ignore
             optimizer=keras.optimizers.Adam(
                 learning_rate=self._learning_rate.initial_lr))
 
         self._ann_ready = True
 
-    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[ACLabelType, ...]:
+    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[ACLabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the prediction model.
+            A list of `FeatureSet` as inputs to the prediction model.
 
         Returns
         -------
@@ -183,7 +189,7 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         return logits, val
 
     def learn(
-            self, X: Tuple[FeatureArray, ...], Y: Tuple[ACLabelType, ...],
+            self, X: Tuple[FeatureSet, ...], Y: Tuple[ACLabelType, ...],
             **kwargs: Any
             ) -> None:
         '''
@@ -192,7 +198,7 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the learning model.
+            A list of `FeatureSet` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.
@@ -201,7 +207,9 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         if len(_X.shape) == 1:
             _X = tf.expand_dims(_X, axis=0)
 
-        _Y, G = tuple(zip(*Y))
+        _Y: Tuple[Tuple[int, ...], ...]
+        G: Tuple[float, ...]
+        _Y, G = tuple(zip(*Y))  # type: ignore
 
         if not self._ann_ready:
             self._input_length = _X.shape[1]
@@ -220,14 +228,20 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
             advantage /= np.std(advantage) or 1.0  # type: ignore
 
             actor_loss = 0
-            for idx, (adv, p) in enumerate(zip(advantage, logits)):
-                action_probs = tf.compat.v1.distributions.Categorical(
-                    logits=p)
-                log_prob = action_probs.log_prob(_Y[idx])
+            for idx, temp in enumerate(zip(advantage, *logits)):
+                adv = temp[0]
+                ps = temp[1:]
+                y = _Y[idx]
+                for j, p in enumerate(ps):
+                    action_probs = tf.compat.v1.distributions.Categorical(
+                        logits=p)
+                    log_prob = action_probs.log_prob(y[j])
 
-                actor_loss += -adv * tf.squeeze(log_prob)
+                    actor_loss += -adv * tf.squeeze(log_prob)
 
-        # print(len(G), '\t', float(actor_loss), float(critic_loss))
+        # print(
+        #     len(G), '\t', float(actor_loss), float(critic_loss),
+        #     float(actor_loss + critic_loss))
 
         gradient = tape.gradient(
             critic_loss, self._model.trainable_variables)

@@ -10,7 +10,7 @@ from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
@@ -131,14 +131,14 @@ class Dense_tf_1(Learner[float]):
 
         self._ann_ready = True
 
-    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[float, ...]:
+    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the prediction model.
+            A list of `FeatureSet` as inputs to the prediction model.
 
         Returns
         -------
@@ -157,7 +157,7 @@ class Dense_tf_1(Learner[float]):
         return result  # type: ignore
 
     def learn(
-            self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...],
+            self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
             **kwargs: Any
             ) -> None:
         '''
@@ -166,7 +166,7 @@ class Dense_tf_1(Learner[float]):
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the learning model.
+            A list of `FeatureSet` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.
@@ -388,14 +388,14 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
 
         self._ann_ready = True
 
-    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[float, ...]:
+    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the prediction model.
+            A list of `FeatureSet` as inputs to the prediction model.
 
         Returns
         -------
@@ -412,7 +412,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
         return result  # type: ignore
 
     def learn(
-            self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...],
+            self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
             **kwargs: Any
             ) -> None:
         '''
@@ -421,7 +421,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the learning model.
+            A list of `FeatureSet` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.

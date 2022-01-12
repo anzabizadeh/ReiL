@@ -12,7 +12,7 @@ import dataclasses
 from typing import Any, Dict, Generic, Hashable, Tuple, TypeVar
 
 from reil.learners.learner import Learner
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 from reil.learners.learning_rate_schedulers import LearningRateScheduler
 
 T = TypeVar('T')
@@ -72,14 +72,14 @@ class QLookupTable(Learner[float]):
         # It creates entries as soon as they are looked up.
         self._table: LookupTable[float] = LookupTable()
 
-    def predict(self, X: Tuple[FeatureArray, ...]) -> Tuple[float, ...]:
+    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the prediction model.
+            A list of `FeatureSet` as inputs to the prediction model.
 
         Returns
         -------
@@ -96,7 +96,7 @@ class QLookupTable(Learner[float]):
         return result
 
     def learn(
-            self, X: Tuple[FeatureArray, ...], Y: Tuple[float, ...],
+            self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
             **kwargs: Any
             ) -> None:
         '''
@@ -105,7 +105,7 @@ class QLookupTable(Learner[float]):
         Arguments
         ---------
         X:
-            A list of `FeatureArray` as inputs to the learning model.
+            A list of `FeatureSet` as inputs to the learning model.
 
         Y:
             A list of float labels for the learning model.

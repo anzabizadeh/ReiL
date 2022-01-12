@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from reil.agents.q_learning import QLearning
 from reil.datatypes.buffers import VanillaExperienceReplay
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 from reil.learners import Dense
 from reil.utils.exploration_strategies import ExplorationStrategy
 
@@ -23,7 +23,7 @@ class DeepQLearning(QLearning):
     def __init__(
             self,
             learner: Dense,
-            buffer: VanillaExperienceReplay[FeatureArray, float],
+            buffer: VanillaExperienceReplay[FeatureSet, float],
             exploration_strategy: ExplorationStrategy,
             method: Literal['forward', 'backward'] = 'backward',
             **kwargs: Any):

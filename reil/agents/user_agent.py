@@ -5,10 +5,10 @@ UserAgent class
 
 An agent that prints the state and asks the user for action.
 '''
-from typing import Any, Optional, Tuple
+from typing import Any, Tuple
 
 from reil.agents.agent_base import AgentBase
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 
 
 class UserAgent(AgentBase):
@@ -18,15 +18,15 @@ class UserAgent(AgentBase):
 
     def __init__(
             self,
-            default_actions: Tuple[FeatureArray, ...] = (),
+            default_actions: Tuple[FeatureSet, ...] = (),
             **kwargs: Any):
         super().__init__(default_actions=default_actions, **kwargs)
 
     def act(self,
-            state: FeatureArray,
+            state: FeatureSet,
             subject_id: int,
-            actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> FeatureArray:
+            actions: FeatureGeneratorType,
+            iteration: int = 0) -> FeatureSet:
         '''
         Return a random action.
 
@@ -46,7 +46,10 @@ class UserAgent(AgentBase):
         :
             The action
         '''
-        possible_actions = actions or self._default_actions
+        query = (
+            'select feature exclude' if self._variable_action_count
+            else 'select feature')
+        possible_actions = tuple(actions.send(query))
 
         action = None
         while action is None:
@@ -54,7 +57,6 @@ class UserAgent(AgentBase):
                 print(f'{i}. {a.value}')  # type: ignore
             action = int(input(
                 'Choose action number for this state:'
-                f'{state.value}')  # type: ignore
-                )
+                f'{state.value}'))  # type: ignore
 
         return possible_actions[action]

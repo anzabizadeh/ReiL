@@ -8,19 +8,18 @@ A Q-learning `agent`.
 
 '''
 
-from typing import Any, Literal, Optional, Tuple, Union
+from typing import Any, Literal, Tuple, Union
 
 import numpy as np
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
-from reil.datatypes.dataclasses import Index_FeatureArray
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureSet
 from reil.learners import Learner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
-Feature_or_Tuple_of_Feature = Union[Tuple[FeatureArray, ...], FeatureArray]
+Feature_or_Tuple_of_Feature = Union[Tuple[FeatureSet, ...], FeatureSet]
 
 
 class QLearning(Agent[float]):
@@ -31,9 +30,10 @@ class QLearning(Agent[float]):
     def __init__(
             self,
             learner: Learner[float],
-            buffer: Buffer[FeatureArray, float],
+            buffer: Buffer[FeatureSet, float],
             exploration_strategy: ExplorationStrategy,
             method: Literal['forward', 'backward'] = 'backward',
+            default_actions: Tuple[FeatureSet, ...] = (),
             **kwargs: Any):
         '''
         Arguments
@@ -61,6 +61,7 @@ class QLearning(Agent[float]):
         '''
         super().__init__(
             learner=learner, exploration_strategy=exploration_strategy,
+            variable_action_count=True,
             **kwargs)
 
         self._method: Literal['forward', 'backward'] = method
@@ -70,10 +71,11 @@ class QLearning(Agent[float]):
                 'either "forward" or "backward". Will use "backward".')
             self._method = 'backward'
 
-        if method == 'forward' and not kwargs.get('default_actions'):
+        if method == 'forward' and not default_actions:
             raise ValueError(
                 'forward method requires `default_actions` to be non-empty.')
 
+        self._default_actions = default_actions
         self._buffer = buffer
         self._buffer.setup(buffer_names=['X', 'Y'])
 
@@ -82,10 +84,9 @@ class QLearning(Agent[float]):
         return cls(
             Learner._empty_instance(), Buffer(), ConstantEpsilonGreedy())
 
-    def _q(self,
-           state: Feature_or_Tuple_of_Feature,
-           action: Optional[Feature_or_Tuple_of_Feature] = None
-           ) -> Tuple[float, ...]:
+    def _q(
+            self, state: Feature_or_Tuple_of_Feature,
+            action: Feature_or_Tuple_of_Feature) -> Tuple[float, ...]:
         '''
         Return the Q-value of `state` `action` pairs.
 
@@ -107,14 +108,14 @@ class QLearning(Agent[float]):
 
         :meta public:
         '''
-        if isinstance(action, FeatureArray):
+        if isinstance(action, FeatureSet):
             action_list = (action,)
             len_action = 1
         else:
-            action_list = action or self._default_actions
+            action_list = action
             len_action = len(action_list)
 
-        if isinstance(state, FeatureArray):
+        if isinstance(state, FeatureSet):
             state_list = [state] * len_action
             len_state = len_action
         else:
@@ -150,7 +151,7 @@ class QLearning(Agent[float]):
         :meta public:
         '''
         try:
-            q_values = self._q(state)
+            q_values = self._q(state, self._default_actions)
             max_q: float = np.max(q_values)  # type: ignore
         except ValueError:
             max_q = 0.0
@@ -175,9 +176,9 @@ class QLearning(Agent[float]):
 
         :meta public:
         '''
-        state: FeatureArray
-        action: FeatureArray
-        next_state: FeatureArray
+        state: FeatureSet
+        action: FeatureSet
+        next_state: FeatureSet
         reward: float
 
         discount_factor = self._discount_factor
@@ -218,7 +219,7 @@ class QLearning(Agent[float]):
                 state = active_history[i].state  # type: ignore
                 action = (
                     active_history[i].action_taken or
-                    active_history[i].action).feature  # type: ignore
+                    active_history[i].action)  # type: ignore
                 reward = active_history[i].reward or 0.0
                 q_list[0] = reward + discount_factor * q_list[1]
 
@@ -233,9 +234,9 @@ class QLearning(Agent[float]):
 
     def best_actions(
             self,
-            state: FeatureArray,
-            actions: Tuple[FeatureArray, ...]
-    ) -> Tuple[Index_FeatureArray, ...]:
+            state: FeatureSet,
+            actions: Tuple[FeatureSet, ...]
+    ) -> Tuple[FeatureSet, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -255,7 +256,7 @@ class QLearning(Agent[float]):
         q_values = self._q(state, actions)
         max_q: float = np.max(q_values)  # type: ignore
         result = tuple(
-            Index_FeatureArray(i, actions[i])
+            actions[i]
             for i in np.flatnonzero(q_values == max_q))
 
         return result

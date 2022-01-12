@@ -12,14 +12,14 @@ from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple,
 
 from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
-from reil.datatypes.dataclasses import Index_FeatureArray, Observation
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.dataclasses import Observation
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.learner import LabelType, Learner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
 TrainingData = Tuple[
-    Tuple[FeatureArray, ...], Tuple[LabelType, ...], Dict[str, Any]]
+    Tuple[FeatureSet, ...], Tuple[LabelType, ...], Dict[str, Any]]
 
 
 class Agent(AgentBase, Generic[LabelType]):
@@ -32,7 +32,6 @@ class Agent(AgentBase, Generic[LabelType]):
             learner: Learner[LabelType],
             exploration_strategy: ExplorationStrategy,
             discount_factor: float = 1.0,
-            default_actions: Tuple[FeatureArray, ...] = (),
             tie_breaker: Literal['first', 'last', 'random'] = 'random',
             training_trigger: Literal[
                 'none', 'termination',
@@ -52,9 +51,6 @@ class Agent(AgentBase, Generic[LabelType]):
         discount_factor:
             by what factor should future rewards be discounted?
 
-        default_actions:
-            a tuple of default actions.
-
         tie_breaker:
             how to choose the `action` if more than one is candidate
             to be chosen.
@@ -69,7 +65,7 @@ class Agent(AgentBase, Generic[LabelType]):
         '''
         self._tie_breaker: Literal['first', 'last', 'random']
 
-        super().__init__(default_actions, tie_breaker, **kwargs)
+        super().__init__(tie_breaker, **kwargs)
 
         self._learner: Learner[LabelType] = learner
         if not 0.0 <= discount_factor <= 1.0:
@@ -87,10 +83,10 @@ class Agent(AgentBase, Generic[LabelType]):
         return cls(Learner._empty_instance(), ConstantEpsilonGreedy())
 
     def act(self,
-            state: FeatureArray,
+            state: FeatureSet,
             subject_id: int,
-            actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> Index_FeatureArray:
+            actions: FeatureGeneratorType,
+            iteration: int = 0) -> FeatureSet:
         '''
         Return an action based on the given state.
 
@@ -123,17 +119,13 @@ class Agent(AgentBase, Generic[LabelType]):
 
         if (self._training_trigger != 'none' and
                 self._exploration_strategy.explore(iteration)):
-            possible_actions = actions or self._default_actions
-            action = self._break_tie(
-                possible_actions, self._tie_breaker)
-            i_action = Index_FeatureArray(
-                possible_actions.index(action), action)
+            action = actions.send('choose feature exclude')
         else:
-            i_action = super().act(
+            action = super().act(
                 state=state, subject_id=subject_id,
                 actions=actions, iteration=iteration)
 
-        return i_action
+        return action
 
     def reset(self):
         '''Reset the agent at the end of a learning iteration.'''
@@ -184,7 +176,7 @@ class Agent(AgentBase, Generic[LabelType]):
 
     def observe(  # noqa: C901
             self, subject_id: int, stat_name: Optional[str],
-    ) -> Generator[Union[Index_FeatureArray, None], Dict[str, Any], None]:
+    ) -> Generator[Union[FeatureSet, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
         Extends `AgentBase.observe`.
@@ -223,8 +215,8 @@ class Agent(AgentBase, Generic[LabelType]):
             try:
                 new_observation = Observation()
                 temp: Dict[str, Any] = yield
-                state: FeatureArray = temp['state']
-                actions: Tuple[FeatureArray, ...] = temp['actions']
+                state: FeatureSet = temp['state']
+                actions: FeatureGeneratorType = temp['actions']
                 iteration: int = temp['iteration']
 
                 new_observation.state = state

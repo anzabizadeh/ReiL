@@ -10,8 +10,8 @@ import random
 from typing import (Any, Dict, Generator, Literal, Optional, Tuple, TypeVar,
                     Union)
 
-from reil.datatypes.dataclasses import Index_FeatureArray, Observation, History
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.dataclasses import Observation, History
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.stateful import Stateful
 
 T = TypeVar('T')
@@ -25,8 +25,8 @@ class AgentBase(Stateful):
 
     def __init__(
             self,
-            default_actions: Tuple[FeatureArray, ...] = (),
             tie_breaker: Literal['first', 'last', 'random'] = 'random',
+            variable_action_count: bool = True,
             **kwargs: Any):
         '''
         Arguments
@@ -38,6 +38,12 @@ class AgentBase(Stateful):
             How to choose the `action` if more than one is candidate
             to be chosen.
 
+        variable_action_count:
+            Does this `agent` can accept a variable number of `actions`? For
+            Q-learning, for example, the number of actions can vary at each
+            decision point. For Policy Gradient methods, however, the number
+            of actions to choose from should be fixed.
+
         Raises
         ------
         ValueError:
@@ -45,7 +51,8 @@ class AgentBase(Stateful):
         '''
         super().__init__(**kwargs)
 
-        self._default_actions = default_actions
+        self._variable_action_count = variable_action_count
+
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward'] = 'none'
 
@@ -55,10 +62,10 @@ class AgentBase(Stateful):
         self._tie_breaker: Literal['first', 'last', 'random'] = tie_breaker
 
     def act(self,
-            state: FeatureArray,
+            state: FeatureSet,
             subject_id: int,
-            actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> Index_FeatureArray:
+            actions: FeatureGeneratorType,
+            iteration: int = 0) -> FeatureSet:
         '''
         Return an action based on the given state.
 
@@ -78,9 +85,15 @@ class AgentBase(Stateful):
         :
             The action
         '''
-        possible_actions = actions or self._default_actions
+        query = (
+            'select feature exclude' if self._variable_action_count
+            else 'select feature')
+        possible_actions = tuple(actions.send(query))
 
-        result = self.best_actions(state, possible_actions)
+        try:
+            result = self.best_actions(state, possible_actions)
+        except NotImplementedError:
+            result = possible_actions
 
         if len(result) > 1:
             action = self._break_tie(result, self._tie_breaker)
@@ -90,9 +103,9 @@ class AgentBase(Stateful):
         return action
 
     def best_actions(
-            self, state: FeatureArray,
-            actions: Tuple[FeatureArray, ...]
-    ) -> Tuple[Index_FeatureArray, ...]:
+            self, state: FeatureSet,
+            actions: Tuple[FeatureSet, ...]
+    ) -> Tuple[FeatureSet, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -113,7 +126,7 @@ class AgentBase(Stateful):
 
     def observe(
             self, subject_id: int, stat_name: Optional[str]
-    ) -> Generator[Union[Index_FeatureArray, None], Dict[str, Any], None]:
+    ) -> Generator[Union[FeatureSet, None], Dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
 
@@ -145,8 +158,8 @@ class AgentBase(Stateful):
             try:
                 new_observation = Observation()
                 temp: Dict[str, Any] = yield
-                state: FeatureArray = temp['state']
-                actions: Tuple[FeatureArray, ...] = temp['actions']
+                state: FeatureSet = temp['state']
+                actions: FeatureGeneratorType = temp['actions']
                 iteration: int = temp['iteration']
 
                 new_observation.state = state

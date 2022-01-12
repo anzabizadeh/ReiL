@@ -8,15 +8,14 @@ AgentDemon class
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Callable, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 from reil import reilbase
 from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
 from reil.datatypes.components import State, Statistic
-from reil.datatypes.dataclasses import Index_FeatureArray
 from reil.datatypes.entity_register import EntityRegister
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 
 
 class AgentDemon(AgentBase):
@@ -29,7 +28,7 @@ class AgentDemon(AgentBase):
     def __init__(
             self,
             sub_agent: AgentBase,
-            condition_fn: Callable[[FeatureArray, int], bool],
+            condition_fn: Callable[[FeatureSet, int], bool],
             main_agent: Optional[AgentBase] = None,
             **kwargs: Any):
         '''
@@ -126,10 +125,10 @@ class AgentDemon(AgentBase):
         self._sub_agent.reset()
 
     def act(self,
-            state: FeatureArray,
+            state: FeatureSet,
             subject_id: int,
-            actions: Optional[Tuple[FeatureArray, ...]] = None,
-            iteration: int = 0) -> Index_FeatureArray:
+            actions: FeatureGeneratorType,
+            iteration: int = 0) -> FeatureSet:
         '''
         Return an action based on the given state.
 
