@@ -7,14 +7,12 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 '''
 
 import functools
-import itertools
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
-from reil.datatypes.feature import Feature, FeatureArray
+from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
 from reil.healthcare.patient import Patient
 from reil.healthcare.subjects.health_subject import HealthSubject
 from reil.utils import reil_functions
-
 
 DefComponents = Tuple[Tuple[str, Dict[str, Any]], ...]
 
@@ -110,7 +108,7 @@ class MakeCallable:
         self._day_0_values = day_0_values or self._values
 
     def __call__(
-            self, f: FeatureArray, *args: Any, **kwds: Any) -> Any:
+            self, f: FeatureSet, *args: Any, **kwds: Any) -> Any:
         if f['day'].value == 0:
             return self._day_0_values
 
@@ -127,7 +125,9 @@ class Warfarin(HealthSubject):
             patient: Patient,
             INR_range: Tuple[float, float] = (0.0, 15.0),
             dose_range: Tuple[float, float] = (0.0, 15.0),
+            dose_step: float = 0.5,
             interval_range: Tuple[int, int] = (1, 28),
+            interval_step: int = 1,
             max_day: int = 90,
             **kwargs: Any):
         '''
@@ -157,9 +157,14 @@ class Warfarin(HealthSubject):
             measurement_name='INR',
             measurement_range=INR_range,
             dose_range=dose_range,
+            dose_step=dose_step,
             interval_range=interval_range,
+            interval_step=interval_step,
             max_day=max_day,
             **kwargs)
+
+        self.action_gen_set += self.feature_gen_set['dose']
+        self.action_gen_set += self.feature_gen_set['interval']
 
         Warfarin._generate_state_defs(self)
         Warfarin._generate_action_defs(self)
@@ -171,61 +176,6 @@ class Warfarin(HealthSubject):
         for name, args in state_definitions.items():
             if name not in current_defs:
                 self.state.add_definition(name, *args)
-
-        # self.state.add_definition(
-        #     'age', ('age', {}))
-
-        # self.state.add_definition(
-        #     'patient_basic', *patient_basic)
-
-        # self.state.add_definition(
-        #     'patient', *patient_basic, *patient_extra)
-
-        # self.state.add_definition(
-        #     'patient_w_dosing',
-        #     *patient_basic, *patient_extra,
-        #     ('day', {}),
-        #     ('dose_history', {'length': -1}),
-        #     ('INR_history', {'length': -1}),
-        #     ('interval_history', {'length': -1}))
-
-        # self.state.add_definition(
-        #     'patient_for_baseline',
-        #     *patient_basic, *patient_extra,
-        #     ('day', {}),
-        #     ('dose_history', {'length': 4}),
-        #     ('INR_history', {'length': 4}),
-        #     ('interval_history', {'length': 4}))
-
-        # for i in range(1, 10):
-        #     self.state.add_definition(
-        #         f'patient_w_dosing_{i:02}',
-        #         *patient_basic,
-        #         ('day', {}),
-        #         ('dose_history', {'length': i}),
-        #         ('INR_history', {'length': i}),
-        #         ('interval_history', {'length': i}))
-
-        # self.state.add_definition(
-        #     'patient_w_full_dosing',
-        #     *patient_basic, *patient_extra,
-        #     ('day', {}),
-        #     ('daily_dose_history', {'length': -1}),
-        #     ('daily_INR_history', {'length': -1}),
-        #     ('interval_history', {'length': -1}))
-
-        # self.state.add_definition(
-        #     'daily_INR',
-        #     ('daily_INR_history', {'length': -1}))
-
-        # self.state.add_definition(
-        #     'Measured_INR_2',
-        #     ('INR_history', {'length': 2}),
-        #     ('interval_history', {'length': 1}))
-
-        # self.state.add_definition(
-        #     'recent_daily_INR',
-        #     ('daily_INR_history', {'length': -1}))
 
     def _generate_reward_defs(self):
         current_defs = self.reward.definitions
@@ -259,125 +209,175 @@ class Warfarin(HealthSubject):
                 'PTTR_exact', statistic_PTTR,
                 'daily_INR', 'patient_w_sensitivity')
 
-    def _generate_action_defs(self):
-        dose_gen = self.feature_gen_set['dose']
-        interval_gen = self.feature_gen_set['interval']
+    def _generate_action_defs(self):  # noqa: C901
+        current_action_definitions = self.possible_actions.definitions
 
-        def _actions(
-                dose_values: Iterable[float], interval_values: Iterable[int]):
-            actions = itertools.product(
-                (dose_gen(vi)
-                 for vi in dose_values),
-                (interval_gen(vi)
-                 for vi in interval_values)
-            )
+        def _generate(
+                feature: FeatureSet,
+                ops: Tuple[Callable[[FeatureSet], bool], ...],
+                dose_masks: Tuple[Dict[float, float], ...],
+                interval_masks: Tuple[Dict[int, int], ...]
+        ) -> FeatureGeneratorType:
+            self.action_gen_set.unmask('dose')
+            self.action_gen_set.unmask('interval')
+            for op, d_mask, i_mask in zip(ops, dose_masks, interval_masks):
+                if op(feature):
+                    self.action_gen_set.mask('dose', d_mask)
+                    self.action_gen_set.mask('interval', i_mask)
 
-            return tuple(FeatureArray(a) for a in actions)
+                    return self.action_gen_set.make_generator()
+
+            self.action_gen_set.mask('dose', dose_masks[-1])
+            self.action_gen_set.mask('interval', interval_masks[-1])
+
+            return self.action_gen_set.make_generator()
 
         caps = tuple(
             i for i in (5.0, 10.0, 15.0)
             if self._dose_range[0] <= i <= self._dose_range[1])
-        dose = {
-            cap: tuple(self.generate_dose_values(0.0, cap, 0.5))
-            for cap in caps}
-
-        int_fixed = {
-            i: (i,) for i in (1, 2, 3, 7)
-            if self._interval_range[0] <= i <= self._interval_range[1]}
-        int_free = tuple(range(
-            self._interval_range[0], self._interval_range[1] + 1))
-        int_semi_free = tuple(
-            i for i in (1, 2, 3, 7, 14, 21, 28)
-            if self._interval_range[0] <= i <= self._interval_range[1])
-        int_weekly = tuple(
-            i for i in (7, 14, 21, 28)
-            if self._interval_range[0] <= i <= self._interval_range[1])
-
-        dose_int_fixed = {
-            (d[0], i[0]): _actions(d[1], i[1])
-            for d, i in itertools.product(
-                dose.items(), int_fixed.items())
-        }
-
-        dose_int_free = {
-            k: _actions(v, int_free)
-            for k, v in dose.items()}
-
-        dose_int_semi_free = {
-            k: _actions(v, int_semi_free)
-            for k, v in dose.items()}
-
-        dose_int_weekly = {
-            k: _actions(v, int_weekly)
-            for k, v in dose.items()}
-
         max_cap = min(caps[-1], self._dose_range[1])
 
-        def _237(f: FeatureArray, cap: float):
-            day: int = f['day'].value  # type: ignore
-            if day == 0:
-                return dose_int_fixed[cap, 2]
-            elif day == 2:
-                return dose_int_fixed[max_cap, 3]
-            elif day >= 5:
-                return dose_int_fixed[max_cap, 7]
-            else:
-                raise ValueError(f'Wrong day: {day}.')
+        dose = {
+            cap: {
+                d: cap
+                for d in self.generate_dose_values(0.0, cap, 0.5)
+                if d > cap}
+            for cap in caps}
 
-        defs: Dict[str, Tuple[Callable[[Any], Tuple[FeatureArray, ...]], str]]
-        defs = {
-            **{
-                f'237_{int(cap):02}':
-                    (functools.partial(_237, cap=cap), 'day')
-                for cap in caps},
+        min_interval, max_interval = self._interval_range
+        int_fixed = {
+            d: {
+                i: d
+                for i in range(
+                    min_interval, max_interval + 1, self._interval_step)
+                if i != d}
+            for d in (1, 2, 3, 7)}
+        int_semi_free = {
+            i: min_interval
+            for i in range(min_interval, max_interval + 1, self._interval_step)
+            if i not in (1, 2, 3, 7, 14, 21, 28)}
+        int_weekly = {
+            i: min_interval
+            for i in range(min_interval, max_interval + 1, self._interval_step)
+            if i not in (7, 14, 21, 28)}
 
-            **{
-                f'daily_{int(cap):02}': (
-                    MakeCallable(
-                        dose_int_fixed[max_cap, 1], dose_int_fixed[cap, 1]),
+        for cap in caps[:-1]:
+            name = f'237_{int(cap):02}'
+            if name not in current_action_definitions:
+                self.possible_actions.add_definition(
+                    name, functools.partial(
+                        _generate,
+                        ops=(
+                            lambda f: f['day'].value >= 5,
+                            lambda f: f['day'].value == 2,
+                            lambda f: f['day'].value == 0),
+                        dose_masks=(
+                            dose[max_cap], dose[max_cap], dose[cap]
+                        ),
+                        interval_masks=(
+                            int_fixed[7], int_fixed[3], int_fixed[2])),
                     'day')
-                for cap in caps},
-            **{
-                f'free_{int(cap):02}': (
-                    MakeCallable(
-                        dose_int_free[max_cap], dose_int_free[cap]),
+
+            name = f'daily_{int(cap):02}'
+            if name not in current_action_definitions:
+                self.possible_actions.add_definition(
+                    name, functools.partial(
+                        _generate,
+                        ops=(lambda f: f['day'].value > 0,),
+                        dose_masks=(dose[max_cap], dose[cap]),
+                        interval_masks=(int_fixed[1], int_fixed[1])),
                     'day')
-                for cap in caps},
-            **{
-                f'semi_{int(cap):02}': (
-                    MakeCallable(
-                        dose_int_semi_free[max_cap], dose_int_semi_free[cap]),
+
+            name = f'free_{int(cap):02}'
+            if name not in current_action_definitions:
+                self.possible_actions.add_definition(
+                    name, functools.partial(
+                        _generate,
+                        ops=(lambda f: f['day'].value > 0,),
+                        dose_masks=(dose[max_cap], dose[cap]),
+                        interval_masks=({}, {})),
                     'day')
-                for cap in caps},
-            **{
-                f'weekly_{int(cap):02}': (
-                    MakeCallable(
-                        dose_int_weekly[max_cap], dose_int_weekly[cap]),
+
+            name = f'semi_{int(cap):02}'
+            if name not in current_action_definitions:
+                self.possible_actions.add_definition(
+                    name, functools.partial(
+                        _generate,
+                        ops=(lambda f: f['day'].value > 0,),
+                        dose_masks=(dose[max_cap], dose[cap]),
+                        interval_masks=(int_semi_free, int_semi_free)),
                     'day')
-                for cap in caps},
-        }
 
-        current_defs = self.possible_actions.definitions
-        for name, args in defs.items():
-            if name not in current_defs:
-                self.possible_actions.add_definition(name, *args)
+            name = f'weekly_{int(cap):02}'
+            if name not in current_action_definitions:
+                self.possible_actions.add_definition(
+                    name, functools.partial(
+                        _generate,
+                        ops=(lambda f: f['day'].value > 0,),
+                        dose_masks=(dose[max_cap], dose[cap]),
+                        interval_masks=(int_weekly, int_weekly)),
+                    'day')
 
-            # self.possible_actions.add_definition(
-            #     f'237_{int(cap):02}',
-            #     functools.partial(_237, cap=cap), 'day')
+        name = f'237_15'
+        if name not in current_action_definitions:
+            self.possible_actions.add_definition(
+                name, functools.partial(
+                    _generate,
+                    ops=(
+                        lambda f: f['day'].value >= 5,
+                        lambda f: f['day'].value == 2,
+                        lambda f: f['day'].value == 0),
+                    dose_masks=(
+                        dose[max_cap], dose[max_cap], dose[max_cap]
+                    ),
+                    interval_masks=(
+                        int_fixed[7], int_fixed[3], int_fixed[2])),
+                'day')
 
-            # self.possible_actions.add_definition(
-            #     f'free_{int(cap):02}',
-            #     lambda _: dose_int_free[cap], 'day')
+        name = f'daily_15'
+        if name not in current_action_definitions:
+            self.possible_actions.add_definition(
+                name, functools.partial(
+                    _generate,
+                    ops=(),
+                    dose_masks=(dose[max_cap],),
+                    interval_masks=(int_fixed[1],)),
+                'day')
 
-            # self.possible_actions.add_definition(
-            #     f'weekly_{int(cap):02}',
-            #     lambda _: dose_int_weekly[cap], 'day')
+        name = f'free_15'
+        if name not in current_action_definitions:
+            self.possible_actions.add_definition(
+                name, functools.partial(
+                    _generate,
+                    ops=(),
+                    dose_masks=(dose[max_cap],),
+                    interval_masks=({},)),
+                'day')
+
+        name = f'semi_15'
+        if name not in current_action_definitions:
+            self.possible_actions.add_definition(
+                name, functools.partial(
+                    _generate,
+                    ops=(),
+                    dose_masks=(dose[max_cap],),
+                    interval_masks=(int_semi_free,)),
+                'day')
+
+        name = f'weekly_15'
+        if name not in current_action_definitions:
+            self.possible_actions.add_definition(
+                name, functools.partial(
+                    _generate,
+                    ops=(lambda f: f['day'].value > 0,),
+                    dose_masks=(dose[max_cap],),
+                    interval_masks=(int_weekly,)),
+                'day')
 
     def _default_state_definition(
-            self, _id: Optional[int] = None) -> FeatureArray:
+            self, _id: Optional[int] = None) -> FeatureSet:
         patient_features = self._patient.feature_set
-        return FeatureArray([
+        return FeatureSet([
             patient_features['age'],
             patient_features['CYP2C9'],
             patient_features['VKORC1']])
