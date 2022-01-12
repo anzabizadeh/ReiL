@@ -260,12 +260,15 @@ class Sequential(Environment):
             Attempt to call this method will normal subjects in the interaction
             sequence.
         '''
-        plan = self._active_plan.plan
-        if plan is None:
-            raise ValueError('No active plan!')
+        plan: Any = self._active_plan.plan
+        # if plan is None:
+        #     raise ValueError('No active plan!')
 
-        subjects_in_use = set(
-            s.subject.name for s in plan)
+        try:
+            subjects_in_use = set(
+                s.subject.name for s in plan)
+        except AttributeError:
+            raise ValueError('No active plan!')
         no_generators = subjects_in_use.difference(self._instance_generators)
         if no_generators:
             raise TypeError(
@@ -291,13 +294,16 @@ class Sequential(Environment):
         Go over all `subjects`. If terminated, close related `agent_observers`,
         reset the `subject`, and create new `agent_observers`.
         '''
-        plan = self._active_plan.plan
-        if plan is None:
-            raise ValueError('No active plan!')
+        plan: Any = self._active_plan.plan
+        # if plan is None:
+        #     raise ValueError('No active plan!')
 
-        affected_protocols = list(
-            p for p in plan
-            if p.subject.name == subject_name)
+        try:
+            affected_protocols = list(
+                p for p in plan
+                if p.subject.name == subject_name)
+        except AttributeError:
+            raise ValueError('No active plan!')
 
         success: bool = True
         if affected_protocols:
@@ -315,16 +321,19 @@ class Sequential(Environment):
         '''
         Extends `Environment.reset_subject()`.
         '''
-        plan = self._active_plan.plan
-        if plan is None:
-            raise ValueError('No active plan!')
+        plan: Any = self._active_plan.plan
+        # if plan is None:
+        #     raise ValueError('No active plan!')
 
-        entities = set(
-            (p.subject.statistic_name,
-             self._assignment_list[(p.agent.name, p.subject.name)][1])
-            for p in plan
-            if p.subject.name == subject_name and
-            p.subject.statistic_name is not None)
+        try:
+            entities = set((
+                p.subject.statistic_name,
+                self._assignment_list[(p.agent.name, p.subject.name)][1])
+                for p in plan
+                if p.subject.name == subject_name and
+                p.subject.statistic_name is not None)
+        except AttributeError:
+            raise ValueError('No active plan!')
 
         for e in entities:
             self._instance_generators.get(
@@ -424,84 +433,3 @@ class Sequential(Environment):
             for e in entities}
 
         return result
-
-    # def __setstate__(self, state: Dict[str, Any]) -> None:
-    #     if '_plans' not in state:
-    #         name = state['_name']
-    #         temp = re.findall(r'^\D*(\d*)_(\d{3}_\d{2})(.*)_10k$', name)[0]
-    #         hist = temp[0]
-    #         action = temp[1]
-    #         if temp[2]:
-    #             demon = temp[2][1:]
-    #         else:
-    #             demon = None
-
-    #         state['_plans'] = {
-    #             'training': InteractionProtocol(
-    #                 agent=Entity(
-    #                     name='protocol', demon_name=None,
-    #                     statistic_name=None, groupby=None, aggregators=None,
-    #                     trajectory_name=None),
-    #                 subject=Entity(
-    #                     name='patient_training', demon_name=demon,
-    #                     statistic_name=None, groupby=None, aggregators=None,
-    #                     trajectory_name=None),
-    #                 state_name=f'patient_w_dosing_{hist}',
-    #                 action_name=action, reward_name='sq_dist_exact',
-    #                 n=100, unit='iteration'),
-    #             'validation': InteractionProtocol(
-    #                 agent=Entity(
-    #                     name='protocol', demon_name=None,
-    #                     statistic_name=None, groupby=None, aggregators=None,
-    #                     trajectory_name=None),
-    #                 subject=Entity(
-    #                     name='patient_validation', demon_name=demon,
-    #                     statistic_name='PTTR_exact',
-    #                     groupby=('sensitivity',),
-    #                     aggregators=('mean', 'std'), trajectory_name=None),
-    #                 state_name=f'patient_w_dosing_{hist}',
-    #                 action_name=action, reward_name='no_reward',
-    #                 n=1, unit='iteration'),
-    #             'test': InteractionProtocol(
-    #                 agent=Entity(
-    #                     name='protocol', demon_name=None,
-    #                     statistic_name=None, groupby=None, aggregators=None,
-    #                     trajectory_name=None),
-    #                 subject=Entity(
-    #                     name='patient_test', demon_name=demon,
-    #                     statistic_name='PTTR_exact',
-    #                     groupby=('sensitivity',),
-    #                     aggregators=('mean', 'std'), trajectory_name=None),
-    #                 state_name=f'patient_w_dosing_{hist}',
-    #                 action_name=action, reward_name='no_reward',
-    #                 n=1, unit='iteration'),
-    #             'trajectory': InteractionProtocol(
-    #                 agent=Entity(
-    #                     name='protocol', demon_name=None,
-    #                     statistic_name=None, groupby=None, aggregators=None,
-    #                     trajectory_name=None),
-    #                 subject=Entity(
-    #                     name='patient_trajectory', demon_name=demon,
-    #                     statistic_name='PTTR_exact',
-    #                     groupby=('sensitivity',),
-    #                     aggregators=('mean', 'std'),
-    #                     trajectory_name='patient_w_full_dosing'),
-    #                 state_name=f'patient_w_dosing_{hist}',
-    #                 action_name=action, reward_name='no_reward',
-    #                 n=1, unit='iteration')
-    #         }
-
-    #     if '_active_plan' not in state:
-    #         state['_active_plan'] = Plan()
-
-    #     if state.get('_interaction_sequence'):
-    #         state['_plans'].update({  # type: ignore
-    #             'interaction_sequence': state['_interaction_sequence']})
-
-    #     if '_interaction_sequence' in state:
-    #         del state['_interaction_sequence']
-
-    #     if state['_agent_observers'] is None:
-    #         state['_agent_observers'] = {}
-
-    #     super().__setstate__(state)
