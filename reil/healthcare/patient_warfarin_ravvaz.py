@@ -25,7 +25,7 @@ Features included in this model are:
 '''
 from typing import Any
 
-from reil.datatypes.feature import FeatureGenerator
+from reil.datatypes.feature import FeatureGenerator, FeatureGeneratorSet
 from reil.healthcare.patient import Patient
 from reil.healthcare.mathematical_models import HealthMathModel
 from reil.utils.functions import random_categorical, random_normal_truncated
@@ -53,54 +53,54 @@ class PatientWarfarinRavvaz(Patient):
             can be determined. For example, if "age" is one of the features,
             age=40.0 will set the initial age to 40.0.
         '''
-        self.feature_gen_set = {
-            'age': FeatureGenerator.numerical(
+        self.feature_gen_set = FeatureGeneratorSet((
+            FeatureGenerator.continuous(
                 name='age',  # (years) Aurora population
                 lower=18.0, upper=150.0, mean=67.30, stdev=13.43,
                 generator=random_normal_truncated,
                 randomized=randomized),
-            'weight': FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name='weight',  # (lb) Aurora population
                 lower=70.0, upper=500.0, mean=199.24, stdev=54.71,
                 generator=random_normal_truncated,
                 randomized=randomized),
-            'height': FeatureGenerator.numerical(
+            FeatureGenerator.continuous(
                 name='height',  # (in) Aurora population
                 lower=45.0, upper=85.0, mean=66.78, stdev=4.31,
                 generator=random_normal_truncated,
                 randomized=randomized),
-            'gender': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='gender',  # Aurora population
                 categories=('Female', 'Male'),
                 probabilities=(0.5314, 0.4686),
                 generator=random_categorical,
                 randomized=randomized),
-            'race': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='race',  # Aurora Avatar Population
                 categories=('White', 'Black', 'Asian',
                             'American Indian', 'Pacific Islander'),
                 probabilities=(0.9522, 0.0419, 0.0040, 0.0018, 1e-4),
                 generator=random_categorical,
                 randomized=randomized),
-            'tobaco': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='tobaco',  # Aurora Avatar Population
                 categories=('No', 'Yes'),
                 probabilities=(0.9067, 0.0933),
                 generator=random_categorical,
                 randomized=randomized),
-            'amiodarone': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='amiodarone',  # Aurora Avatar Population
                 categories=('No', 'Yes'),
                 probabilities=(0.8849, 0.1151),
                 generator=random_categorical,
                 randomized=randomized),
-            'fluvastatin': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='fluvastatin',  # Aurora Avatar Population
                 categories=('No', 'Yes'),
                 probabilities=(0.9998, 0.0002),
                 generator=random_categorical,
                 randomized=randomized),
-            'CYP2C9': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='CYP2C9',  # Aurora Avatar Population
                 categories=('*1/*1', '*1/*2', '*1/*3',
                             '*2/*2', '*2/*3', '*3/*3'),
@@ -108,7 +108,7 @@ class PatientWarfarinRavvaz(Patient):
                 generator=random_categorical,
                 randomized=randomized,
                 allow_missing=allow_missing_genotypes),
-            'VKORC1': FeatureGenerator.categorical(
+            FeatureGenerator.categorical(
                 name='VKORC1',  # Aurora Avatar Population
                 categories=('G/G', 'G/A', 'A/A'),
                 probabilities=(0.3837, 0.4418, 0.1745),
@@ -121,7 +121,7 @@ class PatientWarfarinRavvaz(Patient):
             #     categories=('normal', 'sensitive', 'highly sensitive'),
             #     generator=lambda f: f.value,
             #     randomized=randomized)
-        }
+        ))
 
         self._sensitivity_gen = FeatureGenerator.categorical(
             name='sensitivity',
@@ -156,4 +156,4 @@ class PatientWarfarinRavvaz(Patient):
             raise ValueError(
                 f'Unknown CYP2C9 and VKORC1 combination: {combo}.')
 
-        self.feature_set['sensitivity'] = self._sensitivity_gen(s)
+        self.feature_set += self._sensitivity_gen(s)

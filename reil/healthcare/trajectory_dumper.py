@@ -4,14 +4,14 @@ import pathlib
 import re
 from typing import Any, Dict, List, Optional
 import pandas as pd
-from reil.datatypes.feature import FeatureArray
-from reil.datatypes.feature_array_dumper import FeatureArrayDumper
+from reil.datatypes.feature import FeatureSet
+from reil.datatypes.feature_array_dumper import FeatureSetDumper
 
 
-class TrajectoryDumper(FeatureArrayDumper):
+class TrajectoryDumper(FeatureSetDumper):
     @staticmethod
     def _dump(
-            component: FeatureArray,
+            component: FeatureSet,
             additional_info: Optional[Dict[str, Any]],
             filename: str, path: pathlib.PurePath) -> bool:
         '''Write stats to file.'''
