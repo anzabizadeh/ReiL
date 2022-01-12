@@ -7,12 +7,11 @@ This `subject` class is the base class of all subject classes.
 '''
 
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from reil import stateful
 from reil.datatypes.components import ActionSet, Reward
-from reil.datatypes.feature import Feature, FeatureArray
-from reil.datatypes.dataclasses import Index_FeatureArray
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 
 
 class Subject(stateful.Stateful):
@@ -56,8 +55,8 @@ class Subject(stateful.Stateful):
         return 0.0
 
     def _default_action_definition(
-            self, _id: Optional[int] = None) -> Tuple[FeatureArray, ...]:
-        return (FeatureArray(Feature(name='default_action')),)
+            self, _id: Optional[int] = None) -> FeatureGeneratorType:
+        raise NotImplementedError
 
     def _generate_reward_defs(self) -> None:
         if 'no_reward' not in self.reward.definitions:
@@ -89,8 +88,8 @@ class Subject(stateful.Stateful):
         raise NotImplementedError
 
     def take_effect(
-            self, action: Index_FeatureArray, _id: int = 0
-    ) -> Index_FeatureArray:
+            self, action: FeatureSet, _id: int = 0
+    ) -> FeatureSet:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
         the next state.
@@ -111,8 +110,8 @@ class Subject(stateful.Stateful):
 
     @abstractmethod
     def _take_effect(
-            self, action: Index_FeatureArray, _id: int = 0
-    ) -> Index_FeatureArray:
+            self, action: FeatureSet, _id: int = 0
+    ) -> FeatureSet:
         '''
         Receive an `action` from `agent` with ID=`_id` and transition to
         the next state.

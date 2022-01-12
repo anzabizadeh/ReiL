@@ -8,21 +8,21 @@ SubjectDemon class
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Callable, Generic, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Generic, Optional, TypeVar, Union
 
 from reil.datatypes.components import Reward, Statistic
-from reil.datatypes.feature import FeatureArray
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.reilbase import ReilBase
 from reil.subjects.subject import Subject
 
-T = TypeVar('T', FeatureArray, Tuple[FeatureArray, ...])
+T = TypeVar('T', FeatureSet, FeatureGeneratorType)
 
 
 @dataclasses.dataclass
 class Modifier(Generic[T]):
     name: str
     cond_state_def: Optional[str]
-    condition_fn: Optional[Callable[[FeatureArray], bool]]
+    condition_fn: Optional[Callable[[FeatureSet], bool]]
     modifier_fn: Callable[[T], T]
 
     def __post_init__(self):
@@ -44,8 +44,8 @@ class SubjectDemon(ReilBase):
             self,
             subject: Optional[Subject] = None,
             action_modifier: Optional[
-                Modifier[Tuple[FeatureArray, ...]]] = None,
-            state_modifier: Optional[Modifier[FeatureArray]] = None,
+                Modifier[FeatureGeneratorType]] = None,
+            state_modifier: Optional[Modifier[FeatureSet]] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -88,7 +88,7 @@ class SubjectDemon(ReilBase):
 
     def state(
             self, name: str,
-            _id: Optional[int] = None) -> FeatureArray:
+            _id: Optional[int] = None) -> FeatureSet:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -124,7 +124,7 @@ class SubjectDemon(ReilBase):
     def possible_actions(
             self, name: str,
             _id: Optional[int] = None
-    ) -> Union[Tuple[FeatureArray, ...], None]:
+    ) -> Union[FeatureGeneratorType, None]:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -147,16 +147,16 @@ class SubjectDemon(ReilBase):
         ValueError
             Definition not found.
         '''
-        original_set = self._subject.possible_actions(name, _id)
+        original_gen = self._subject.possible_actions(name, _id)
         modifier = self._action_modifier
-        if (original_set is not None and
+        if (original_gen is not None and
             modifier is not None and
             (modifier.condition_fn is None
                 or modifier.condition_fn(self._subject.state(
                     modifier.cond_state_def, _id)))):  # type: ignore
-            return modifier.modifier_fn(original_set)
+            return modifier.modifier_fn(original_gen)
 
-        return original_set
+        return original_gen
 
     # def load(
     #         self, filename: str,

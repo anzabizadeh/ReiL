@@ -7,11 +7,11 @@ This class emulates mnk game.
 '''
 
 
-import random
-from typing import Any, Dict, List, Optional, Tuple, Union
-from reil.datatypes.dataclasses import Index_FeatureArray
+from typing import Any, Dict, List, Optional, Union
 
-from reil.datatypes.feature import Feature, FeatureArray, FeatureGenerator
+from reil.datatypes.feature import (Feature, FeatureGenerator,
+                                    FeatureGeneratorSet, FeatureGeneratorType,
+                                    FeatureSet)
 from reil.subjects.subject import Subject
 from reil.utils.mnkboard import MNKBoard
 
@@ -51,8 +51,8 @@ class MNKGame(MNKBoard, Subject):
                           can_recapture=False, **kwargs)
         self._board_gen = FeatureGenerator.categorical(
             name='board', categories=('X', 'O', ' '))
-        self._action_gen = FeatureGenerator.numerical(
-            name='square', lower=0, upper=len(self._board)-1)
+        self._action_gen = FeatureGeneratorSet(FeatureGenerator.discrete(
+            name='square', lower=0, upper=len(self._board)-1))
         self.state.add_definition(
             'board', ('board', {}))
         self.possible_actions.add_definition(
@@ -62,14 +62,21 @@ class MNKGame(MNKBoard, Subject):
         return self._board_status is not None
 
     def _actions(
-            self, board: Feature) -> Tuple[FeatureArray, ...]:
-        return tuple(
-            FeatureArray(self._action_gen(i))
-            for i, v in enumerate(board.value['board'])  # type: ignore
-            if v == ' ')
+            self, board: Feature) -> FeatureGeneratorType:
+        _board: str = board.value['board']  # type: ignore
+        gen = self._action_gen
+        gen.unmask('square')
+        one_empty = _board.index(' ')
+        gen.mask(
+            'square', {
+                i: one_empty
+                for i, v in enumerate(_board)
+                if v != ' '})
+
+        return gen.make_generator()
 
     def _take_effect(
-            self, action: Index_FeatureArray, _id: int) -> Index_FeatureArray:
+            self, action: FeatureSet, _id: int) -> FeatureSet:
         '''
         Set a piece for the given player on the board.
 
@@ -82,7 +89,7 @@ class MNKGame(MNKBoard, Subject):
             ID of the player who sets the piece.
         '''
         self.set_piece(
-            _id, index=int(action.feature['square'].value))  # type: ignore
+            _id, index=int(action['square'].value))  # type: ignore
 
         return action
 
@@ -269,13 +276,14 @@ if __name__ == '__main__':
     while not board.is_terminated():
         current_player = ['P1', 'P2'][p]
         print(p, current_player)
-        actions = board.possible_actions(
-            'square', player[current_player]) or ()
-        index = random.randrange(0, len(actions))
-        board.take_effect(
-            Index_FeatureArray(index, actions[index]),
-            player[current_player])
-        print(f'{board}\n',
-              board.reward('default', player['P1']),
-              board.reward('default', player['P2']))
-        p = (p + 1) % 2
+        actions_gen = board.possible_actions(
+            'square', player[current_player])
+        if actions_gen:
+            next(actions_gen)
+            action = actions_gen.send('choose feature exclusive')
+            board.take_effect(action, player[current_player])
+            print(
+                f'{board}\n',
+                board.reward('default', player['P1']),
+                board.reward('default', player['P2']))
+            p = (p + 1) % 2

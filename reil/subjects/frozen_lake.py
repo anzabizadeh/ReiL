@@ -14,8 +14,9 @@ the goal. Some locations are holes.
 from random import choice
 from typing import Any, List, Optional, Tuple
 
-from reil.datatypes.dataclasses import Index_FeatureArray
-from reil.datatypes.feature import Feature, FeatureArray, FeatureGenerator
+from reil.datatypes.feature import (Feature, FeatureGenerator,
+                                    FeatureGeneratorSet, FeatureGeneratorType,
+                                    FeatureSet)
 from reil.subjects.subject import Subject
 from reil.utils.mnkboard import MNKBoard
 
@@ -81,11 +82,11 @@ class FrozenLake(MNKBoard, Subject):
             'F': (0.6,),
             'H': (0.0,),
             'P': (0.4,)}
-        self._action_gen = FeatureGenerator.categorical(
-            name='move', categories=moves)
-        self._default_actions = tuple(
-            FeatureArray(self._action_gen(m))
-            for m in moves)
+
+        self._action_gen = FeatureGeneratorSet(FeatureGenerator.categorical(
+            name='move', categories=moves))
+
+        self._default_actions = tuple(self._action_gen.generate_all())
 
         self.state.add_definition(
             'full_map', ('full_map', {}))
@@ -102,8 +103,8 @@ class FrozenLake(MNKBoard, Subject):
         col = _map[row].index(element)
         return (row, col)
 
-    def _actions(self, board: Feature) -> Tuple[FeatureArray, ...]:
-        return self._default_actions
+    def _actions(self, board: Feature) -> FeatureGeneratorType:
+        return self._action_gen.make_generator()
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''Return True if the player get to the goal or falls into a hole.'''
@@ -123,7 +124,7 @@ class FrozenLake(MNKBoard, Subject):
         return -0.1
 
     def _take_effect(
-            self, action: Index_FeatureArray, _id: int) -> Index_FeatureArray:
+            self, action: FeatureSet, _id: int) -> FeatureSet:
         '''
         Move according to the action.
 
@@ -138,7 +139,7 @@ class FrozenLake(MNKBoard, Subject):
         max_column = self._dim[1] - 1
         MNKBoard.clear_square(self, row=row, column=column)
 
-        a = action.feature['move'].value
+        a = action['move'].value
         temp = (
             row - (a in ['U', 'UR', 'UL']) + (a in ['D', 'DR', 'DL']),
             column - (a in ['L', 'UL', 'DL']) + (a in ['R', 'UR', 'DR'])
@@ -210,8 +211,10 @@ if __name__ == '__main__':
     board = FrozenLake()
     _ = board.register('P1')
     while board.reward('default') != 1:
-        my_action = Index_FeatureArray(
-            0, choice(board.possible_actions('moves')))  # type: ignore
+        action_gen: FeatureGeneratorType = \
+            board.possible_actions('moves')  # type: ignore
+        next(action_gen)
+        my_action = choice(tuple(action_gen.send('return feature')))
         board.take_effect(my_action, 1)
-        print(my_action.feature.value)
+        print(my_action.value)
         print(f'{board}')

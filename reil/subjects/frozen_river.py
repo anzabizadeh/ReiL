@@ -12,10 +12,11 @@ until you reach the goal. There are holes that you should avoid.
 '''
 
 from random import choice
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from reil.datatypes.dataclasses import Index_FeatureArray
-from reil.datatypes.feature import Feature, FeatureArray, FeatureGenerator
+from reil.datatypes.feature import (Feature, FeatureGenerator,
+                                    FeatureGeneratorSet, FeatureGeneratorType,
+                                    FeatureSet)
 from reil.subjects.subject import Subject
 
 
@@ -63,7 +64,8 @@ class FrozenRiver(Subject):
             'R2': 2,
             'R3': 3,
             'L1': -1,
-            'L2': -2}
+            'L2': -2,
+            'L3': -3}
 
         Subject.__init__(self, max_entity_count=1, **kwargs)
         self._terminate_on_hole = terminate_on_hole
@@ -82,14 +84,17 @@ class FrozenRiver(Subject):
             'F': (0.6,),
             'H': (0.0,),
             'P': (0.4,)}
-        self._action_gen = FeatureGenerator.categorical(
-            name='move', categories=tuple(self._default_actions_values))
-        self._default_actions = tuple(
-            FeatureArray(self._action_gen(m))
-            for m in self._default_actions_values)
-        self._default_actions_dict = {
-            action.value['move']: Index_FeatureArray(i, action)
-            for i, action in enumerate(self._default_actions)
+        self._action_gen = FeatureGeneratorSet(FeatureGenerator.categorical(
+            name='move', categories=tuple(self._default_actions_values)))
+        self._action_gen_2 = FeatureGeneratorSet((
+            FeatureGenerator.categorical(
+                name='direction', categories=('N', 'R', 'L')),
+            FeatureGenerator.discrete(
+                name='steps', lower=0, upper=3, step=1)))
+
+        self._default_actions_dict: Dict[str, FeatureSet] = {  # type: ignore
+            action.value['move']: action  # type: ignore
+            for action in self._action_gen.generate_all()
         }
 
         self.state.add_definition(
@@ -103,12 +108,39 @@ class FrozenRiver(Subject):
                 ('neighborhood', {'before': before, 'after': after}))
 
         self.possible_actions.add_definition(
-            'moves', self._actions, 'neighbor01')
+            'moves', self._actions, 'full_map')
+
+        self.possible_actions.add_definition(
+            '2part', self._actions_2, 'full_map')
 
         self.reset()
 
-    def _actions(self, board: Feature) -> Tuple[FeatureArray, ...]:
-        return self._default_actions
+    def _actions(self, board: FeatureSet) -> FeatureGeneratorType:
+        index = board['board'].value.index('P')  # type: ignore
+        goal = self._goal
+
+        self._action_gen.unmask('move')
+
+        if index == 0:
+            self._action_gen.mask('move', {'L1': 'N0', 'L2': 'N0'})
+        elif index == 1:
+            self._action_gen.mask('move', {'L2': 'N0'})
+        elif goal - index == 1:
+            self._action_gen.mask('move', {'R2': 'N0', 'R3': 'N0'})
+        elif goal - index == 2:
+            self._action_gen.mask('move', {'R3': 'N0'})
+
+        return self._action_gen.make_generator()
+
+    def _actions_2(self, board: FeatureSet) -> FeatureGeneratorType:
+        index = board['board'].value.index('P')  # type: ignore
+
+        self._action_gen_2.unmask('direction')
+
+        if index == 0:
+            self._action_gen_2.mask('direction', {'L': 'N'})
+
+        return self._action_gen_2.make_generator()
 
     def is_terminated(self, _id: Optional[int] = None) -> bool:
         '''Return True if the player get to the goal or falls into a hole.'''
@@ -130,7 +162,7 @@ class FrozenRiver(Subject):
         return -(self._goal - self._player_loc)
 
     def _take_effect(
-            self, action: Index_FeatureArray, _id: int) -> Index_FeatureArray:
+            self, action: FeatureSet, _id: int) -> FeatureSet:
         '''
         Move according to the action.
 
@@ -140,24 +172,39 @@ class FrozenRiver(Subject):
             action: the location in which the piece is set. Can be either
             in index format or row column format.
         '''
-        a: str = action.feature['move'].value  # type: ignore
-        direction = a[0]
+        self._move_counter += 1
+
+        try:
+            a: str = action['move'].value  # type: ignore
+            direction = a[0]
+            steps: int = int(a[1:])
+            no_action = self._default_actions_dict['N0']
+            return_action = action
+        except KeyError:
+            no_action = self._action_gen_2(
+                dict(direction='N', steps=0))
+            direction: str = action['direction'].value  # type: ignore
+            steps: int = action['steps'].value  # type: ignore
+            if direction == 'N' or steps == 0:
+                return no_action
+            a = direction + str(steps)
+            return_action = self._action_gen_2(
+                dict(direction=direction, steps=steps))
+
         loc = self._player_loc
         self._previous_loc = loc
 
-        self._move_counter += 1
-
-        if direction == 'L' and loc - int(a[1:]) < 0:
-            return self._default_actions_dict['N0']
-        if direction == 'R' and loc + int(a[1:]) > self._goal:
-            return self._default_actions_dict['N0']
+        if direction == 'L' and loc - steps < 0:
+            return no_action
+        if direction == 'R' and loc + steps > self._goal:
+            return no_action
 
         self._player_loc += self._default_actions_values[a]
         if (not self._terminate_on_hole and
                 self._board[self._player_loc] == 'H'):
             self._player_loc = 0
 
-        return action
+        return return_action
 
     def reset(self):
         '''Clear the board and update board_status.'''
@@ -219,11 +266,17 @@ class FrozenRiver(Subject):
 
 
 if __name__ == '__main__':
-    board = FrozenRiver()
+    board = FrozenRiver(map_size=10)
     _ = board.register('P1')
     while not board.is_terminated():
-        my_action = Index_FeatureArray(
-            0, choice(board.possible_actions('moves')))  # type: ignore
+        print(f'{board}', end='\t')
+        actions: FeatureGeneratorType = \
+            board.possible_actions('moves')  # type: ignore
+        next(actions)
+        all_actions = tuple(actions.send('return feature'))
+        my_action = choice(all_actions)  # type: ignore
+        print(actions.send('choose feature'))
         board.take_effect(my_action, 1)
-        print(my_action.feature.value)
-        print(f'{board}')
+        print(my_action.value['move'], end='\t')
+        print([a.value['move'] for a in all_actions])
+        actions.close()
