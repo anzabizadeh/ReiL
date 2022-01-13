@@ -6,7 +6,7 @@ Learner class
 The base class for all `learner` classes.
 '''
 from abc import abstractmethod
-from typing import Any, Protocol, Tuple, TypeVar
+from typing import Any, Protocol, Tuple, TypeVar, Union
 
 from reil import reilbase
 from reil.datatypes.feature import FeatureSet
@@ -63,7 +63,8 @@ class Learner(reilbase.ReilBase, LearnerProtocol[LabelType]):
     The base class for all `learner` classes.
     '''
     def __init__(
-            self, learning_rate: LearningRateScheduler, **kwargs: Any) -> None:
+            self, learning_rate: Union[float, LearningRateScheduler],
+            **kwargs: Any) -> None:
         '''
         Arguments
         ---------
@@ -74,7 +75,10 @@ class Learner(reilbase.ReilBase, LearnerProtocol[LabelType]):
             determine the learning rate at each iteration.
         '''
         super().__init__(**kwargs)
-        self._learning_rate = learning_rate
+        if isinstance(learning_rate, float):
+            self._learning_rate = ConstantLearningRate(learning_rate)
+        else:
+            self._learning_rate = learning_rate
 
     @classmethod
     def _empty_instance(cls):

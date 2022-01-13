@@ -32,7 +32,7 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
 
     def __init__(
             self,
-            learning_rate: LearningRateScheduler,
+            learning_rate: Union[float, LearningRateScheduler],
             output_lengths: List[int],
             validation_split: float = 0.3,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
@@ -181,17 +181,55 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        logits, val = self._model.predict(np.array(_X))  # type: ignore
+        logits, val = self._model(np.array(_X))  # type: ignore
 
         # logits = self._actor.predict(np.array(_X))  # type: ignore
         # val = self._critic.predict(np.array(_X))  # type: ignore
 
         return logits, val
 
+    @staticmethod
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None], dtype=tf.float32)))
+    def _critic_loss(values: tf.Tensor, G: tf.Tensor) -> tf.Tensor:
+        print('tracing critic')
+        return tf.keras.losses.mean_squared_error(
+            y_true=G, y_pred=values)
+
+    @staticmethod
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None], dtype=tf.float32)))
+    def _advantage(values: tf.Tensor, G: tf.Tensor) -> tf.Tensor:
+        print('tracing advantage')
+        advantage = tf.subtract(G, values)
+        advantage -= tf.math.reduce_mean(advantage)
+        std = tf.math.reduce_std(advantage)
+        return tf.cond(  # type: ignore
+            tf.equal(std, 0.0), lambda: advantage, lambda: advantage/std)
+
+    @staticmethod
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None], dtype=tf.float32),
+            tf.TensorSpec(shape=[], dtype=tf.int32),
+            tf.TensorSpec(shape=[], dtype=tf.float32)))
+    def _actor_loss(
+            logits: tf.Tensor, y: tf.Tensor,
+            advantage: tf.Tensor) -> tf.Tensor:
+        print('tracing actor')
+        action_probs = tf.compat.v1.distributions.Categorical(
+            logits=logits)
+        log_prob = action_probs.log_prob(y)
+
+        return tf.negative(advantage * tf.squeeze(log_prob))  # type: ignore
+
     def learn(
             self, X: Tuple[FeatureSet, ...], Y: Tuple[ACLabelType, ...],
-            **kwargs: Any
-            ) -> None:
+            **kwargs: Any) -> None:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -207,41 +245,29 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         if len(_X.shape) == 1:
             _X = tf.expand_dims(_X, axis=0)
 
-        _Y: Tuple[Tuple[int, ...], ...]
-        G: Tuple[float, ...]
-        _Y, G = tuple(zip(*Y))  # type: ignore
+        Y_temp, G_temp = tuple(zip(*Y))
+        G = tf.convert_to_tensor(G_temp, dtype=tf.float32)
+        _Y: tf.Tensor = tf.convert_to_tensor(Y_temp)
 
         if not self._ann_ready:
             self._input_length = _X.shape[1]
             self._generate_network()
 
         with tf.GradientTape(persistent=True) as tape:
-            logits, values = self._model(tf.squeeze(_X))  # type: ignore
+            logits, values = self._model(tf.squeeze(_X))
+            values: tf.Tensor = tf.squeeze(values)
 
-            values = tf.squeeze(values)
+            critic_loss = tf.Variable(DenseActorCritic._critic_loss(values, G))
 
-            critic_loss = tf.keras.losses.mean_squared_error(
-                y_true=G, y_pred=values)
+            advantage = DenseActorCritic._advantage(values, G)
 
-            advantage = G - values
-            advantage -= np.mean(advantage)  # type: ignore
-            advantage /= np.std(advantage) or 1.0  # type: ignore
-
-            actor_loss = 0
+            actor_loss = tf.Variable(0.0)
             for idx, temp in enumerate(zip(advantage, *logits)):
                 adv = temp[0]
                 ps = temp[1:]
-                y = _Y[idx]
+                y = _Y[idx]  # type: ignore
                 for j, p in enumerate(ps):
-                    action_probs = tf.compat.v1.distributions.Categorical(
-                        logits=p)
-                    log_prob = action_probs.log_prob(y[j])
-
-                    actor_loss += -adv * tf.squeeze(log_prob)
-
-        # print(
-        #     len(G), '\t', float(actor_loss), float(critic_loss),
-        #     float(actor_loss + critic_loss))
+                    actor_loss += DenseActorCritic._actor_loss(p, y[j], adv)
 
         gradient = tape.gradient(
             critic_loss, self._model.trainable_variables)
@@ -255,33 +281,84 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         self._model.optimizer.apply_gradients(
             zip(gradient, self._model.trainable_variables))
 
-        # with tf.GradientTape() as tape:
-        #     values = tf.squeeze(self._critic(_X))
+        # with tf.GradientTape(persistent=True) as tape:
+        #     logits, values = self._model(tf.squeeze(_X))  # type: ignore
+
+        #     values = tf.squeeze(values)
 
         #     critic_loss = tf.keras.losses.mean_squared_error(
         #         y_true=G, y_pred=values)
-
-        # gradient = tape.gradient(
-        #     critic_loss, self._critic.trainable_variables)
-        # self._critic.optimizer.apply_gradients(
-        #     zip(gradient, self._critic.trainable_variables))
-
-        # with tf.GradientTape() as tape:
-        #     logits = self._actor(_X)
 
         #     advantage = G - values
         #     advantage -= np.mean(advantage)  # type: ignore
         #     advantage /= np.std(advantage) or 1.0  # type: ignore
 
         #     actor_loss = 0
-        #     for idx, (adv, p) in enumerate(zip(advantage, logits)):
-        #         action_probs = tf.compat.v1.distributions.Categorical(
-        #             logits=p)
-        #         log_prob = action_probs.log_prob(_Y[idx])
+        #     for idx in range(logits[0].shape[0]):
+        #         adv = advantage[idx]
+        #         ps = [lo[idx] for lo in logits]
+        #         y = _Y[idx]
+        #         for j, p in enumerate(ps):
+        #             action_probs = tf.compat.v1.distributions.Categorical(
+        #                 logits=p)
+        #             log_prob = action_probs.log_prob(y[j])
 
-        #         actor_loss += -adv * tf.squeeze(log_prob)
+        #             actor_loss += -adv * tf.squeeze(log_prob)
+
+        #     # for idx, temp in enumerate(zip(advantage, *logits)):
+        #     #     adv = temp[0]
+        #     #     ps = temp[1:]
+        #     #     y = _Y[idx]
+        #     #     for j, p in enumerate(ps):
+        #     #         action_probs = tf.compat.v1.distributions.Categorical(
+        #     #             logits=p)
+        #     #         log_prob = action_probs.log_prob(y[j])
+
+        #     #         actor_loss += -adv * tf.squeeze(log_prob)
+
+        print(
+            len(G), '\t', float(actor_loss), float(critic_loss),
+            float(actor_loss + critic_loss))
 
         # gradient = tape.gradient(
-        #     actor_loss, self._actor.trainable_variables)
-        # self._actor.optimizer.apply_gradients(
-        #     zip(gradient, self._actor.trainable_variables))
+        #     critic_loss, self._model.trainable_variables)
+        # self._model.optimizer.apply_gradients(
+        #     (grad, var)
+        #     for (grad, var) in zip(gradient, self._model.trainable_variables)
+        #     if grad is not None)
+
+        # gradient = tape.gradient(
+        #     actor_loss, self._model.trainable_variables)
+        # self._model.optimizer.apply_gradients(
+        #     zip(gradient, self._model.trainable_variables))
+
+        # # with tf.GradientTape() as tape:
+        # #     values = tf.squeeze(self._critic(_X))
+
+        # #     critic_loss = tf.keras.losses.mean_squared_error(
+        # #         y_true=G, y_pred=values)
+
+        # # gradient = tape.gradient(
+        # #     critic_loss, self._critic.trainable_variables)
+        # # self._critic.optimizer.apply_gradients(
+        # #     zip(gradient, self._critic.trainable_variables))
+
+        # # with tf.GradientTape() as tape:
+        # #     logits = self._actor(_X)
+
+        # #     advantage = G - values
+        # #     advantage -= np.mean(advantage)  # type: ignore
+        # #     advantage /= np.std(advantage) or 1.0  # type: ignore
+
+        # #     actor_loss = 0
+        # #     for idx, (adv, p) in enumerate(zip(advantage, logits)):
+        # #         action_probs = tf.compat.v1.distributions.Categorical(
+        # #             logits=p)
+        # #         log_prob = action_probs.log_prob(_Y[idx])
+
+        # #         actor_loss += -adv * tf.squeeze(log_prob)
+
+        # # gradient = tape.gradient(
+        # #     actor_loss, self._actor.trainable_variables)
+        # # self._actor.optimizer.apply_gradients(
+        # #     zip(gradient, self._actor.trainable_variables))
