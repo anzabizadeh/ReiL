@@ -9,11 +9,12 @@ type of inputs to be `TableEntry`.
 `QLookupTable` is a lookup table for `Q-learning`.
 '''
 import dataclasses
-from typing import Any, Dict, Generic, Hashable, Tuple, TypeVar
+from typing import Any, Dict, Generic, Hashable, Tuple, TypeVar, Union
 
-from reil.learners.learner import Learner
 from reil.datatypes.feature import FeatureSet
-from reil.learners.learning_rate_schedulers import LearningRateScheduler
+from reil.learners.learner import Learner
+from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
+                                                    LearningRateScheduler)
 
 T = TypeVar('T')
 
@@ -46,7 +47,7 @@ class QLookupTable(Learner[float]):
     '''
     def __init__(
             self,
-            learning_rate: LearningRateScheduler,
+            learning_rate: Union[float, LearningRateScheduler],
             initial_estimate: float = 0.0,
             minimum_visits: int = 0) -> None:
         '''
@@ -65,7 +66,10 @@ class QLookupTable(Learner[float]):
         `minimum_visits`, the computed estimate is returned. For any less
         visited `x`, `initial_estimate` will be returned.
         '''
-        self._learning_rate = learning_rate
+        if isinstance(learning_rate, float):
+            self._learning_rate = ConstantLearningRate(learning_rate)
+        else:
+            self._learning_rate = learning_rate
         self._initial_estimate = initial_estimate
         self._minimum_visits = minimum_visits
         # defaultdict is not efficient.

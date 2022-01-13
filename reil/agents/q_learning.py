@@ -31,7 +31,7 @@ class QLearning(Agent[float]):
             self,
             learner: Learner[float],
             buffer: Buffer[FeatureSet, float],
-            exploration_strategy: ExplorationStrategy,
+            exploration_strategy: Union[float, ExplorationStrategy],
             method: Literal['forward', 'backward'] = 'backward',
             default_actions: Tuple[FeatureSet, ...] = (),
             **kwargs: Any):

@@ -30,7 +30,7 @@ class Agent(AgentBase, Generic[LabelType]):
     def __init__(
             self,
             learner: Learner[LabelType],
-            exploration_strategy: ExplorationStrategy,
+            exploration_strategy: Union[float, ExplorationStrategy],
             discount_factor: float = 1.0,
             tie_breaker: Literal['first', 'last', 'random'] = 'random',
             training_trigger: Literal[
@@ -73,7 +73,12 @@ class Agent(AgentBase, Generic[LabelType]):
                 f'{self.__class__.__qualname__} discount_factor should be in'
                 f' [0.0, 1.0]. Got {discount_factor}. Set to 1.0.')
         self._discount_factor = min(discount_factor, 1.0)
-        self._exploration_strategy = exploration_strategy
+        if isinstance(exploration_strategy, float):
+            self._exploration_strategy = ConstantEpsilonGreedy(
+                exploration_strategy)
+        else:
+            self._exploration_strategy = exploration_strategy
+
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward'
             ] = training_trigger
@@ -119,7 +124,7 @@ class Agent(AgentBase, Generic[LabelType]):
 
         if (self._training_trigger != 'none' and
                 self._exploration_strategy.explore(iteration)):
-            action = actions.send('choose feature exclude')
+            action = actions.send('choose feature exclusive')
         else:
             action = super().act(
                 state=state, subject_id=subject_id,
