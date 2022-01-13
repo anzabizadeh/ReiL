@@ -46,4 +46,4 @@ class RandomAgent(AgentBase):
         :
             The action
         '''
-        return actions.send('choose feature exclude')
+        return actions.send('choose feature exclusive')

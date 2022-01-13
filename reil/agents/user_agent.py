@@ -47,8 +47,8 @@ class UserAgent(AgentBase):
             The action
         '''
         query = (
-            'select feature exclude' if self._variable_action_count
-            else 'select feature')
+            'return feature exclusive' if self._variable_action_count
+            else 'return feature')
         possible_actions = tuple(actions.send(query))
 
         action = None
