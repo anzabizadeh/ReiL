@@ -28,7 +28,7 @@ class Dense_tf_1(Learner[float]):
 
     def __init__(
             self,
-            learning_rate: LearningRateScheduler,
+            learning_rate: Union[float, LearningRateScheduler],
             validation_split: float = 0.3,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
@@ -295,7 +295,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
 
     def __init__(
             self,
-            learning_rate: LearningRateScheduler,
+            learning_rate: Union[float, LearningRateScheduler],
             validation_split: float = 0.3,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
@@ -407,7 +407,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        result = self._model.predict(np.array(_X))  # type: ignore
+        result = self._model(tf.convert_to_tensor(_X))
 
         return result  # type: ignore
 
@@ -432,7 +432,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
             self._generate_network()
 
         self._model.fit(  # type: ignore
-            np.array(_X), np.array(Y),  # type: ignore
+            tf.convert_to_tensor(_X), tf.convert_to_tensor(Y),  # type: ignore
             initial_epoch=self._iteration, epochs=self._iteration+1,
             callbacks=self._callbacks,
             validation_split=self._validation_split,

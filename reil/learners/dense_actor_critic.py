@@ -267,7 +267,8 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
                 ps = temp[1:]
                 y = _Y[idx]  # type: ignore
                 for j, p in enumerate(ps):
-                    actor_loss += DenseActorCritic._actor_loss(p, y[j], adv)
+                    actor_loss.assign_add(
+                        DenseActorCritic._actor_loss(p, y[j], adv))
 
         gradient = tape.gradient(
             critic_loss, self._model.trainable_variables)
@@ -279,7 +280,9 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
         gradient = tape.gradient(
             actor_loss, self._model.trainable_variables)
         self._model.optimizer.apply_gradients(
-            zip(gradient, self._model.trainable_variables))
+            (grad, var)
+            for (grad, var) in zip(gradient, self._model.trainable_variables)
+            if grad is not None)
 
         # with tf.GradientTape(persistent=True) as tape:
         #     logits, values = self._model(tf.squeeze(_X))  # type: ignore
@@ -316,9 +319,9 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
 
         #     #         actor_loss += -adv * tf.squeeze(log_prob)
 
-        print(
-            len(G), '\t', float(actor_loss), float(critic_loss),
-            float(actor_loss + critic_loss))
+        # print(
+        #     len(G), '\t', float(actor_loss), float(critic_loss),
+        #     float(actor_loss + critic_loss))
 
         # gradient = tape.gradient(
         #     critic_loss, self._model.trainable_variables)
