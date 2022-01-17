@@ -152,7 +152,7 @@ class Dense_tf_1(Learner[float]):
 
         with self._session.as_default():  # type: ignore
             with self._graph.as_default():
-                result = self._model.predict(np.array(_X))  # type: ignore
+                result = self._model(tf.convert_to_tensor(_X))  # type: ignore
 
         return result  # type: ignore
 
