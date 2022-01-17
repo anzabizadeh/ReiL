@@ -9,7 +9,6 @@ output layer.
 import pathlib
 from typing import Any, List, Optional, Tuple, Union
 
-import numpy as np
 import tensorflow as tf
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
@@ -181,51 +180,66 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        logits, val = self._model(np.array(_X))  # type: ignore
+        logits, val = self._model(tf.convert_to_tensor(_X))
 
         # logits = self._actor.predict(np.array(_X))  # type: ignore
         # val = self._critic.predict(np.array(_X))  # type: ignore
 
         return logits, val
 
-    @staticmethod
     @tf.function(
         input_signature=(
-            tf.TensorSpec(shape=[None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None], dtype=tf.int32),
             tf.TensorSpec(shape=[None], dtype=tf.float32)))
-    def _critic_loss(values: tf.Tensor, G: tf.Tensor) -> tf.Tensor:
-        print('tracing critic')
-        return tf.keras.losses.mean_squared_error(
-            y_true=G, y_pred=values)
+    def _learn(
+            self, X: tf.Tensor, Y: tf.Tensor, G: tf.Tensor):
+        print('tracing _learn')
+        with tf.GradientTape(persistent=True) as tape:
+            logits, values = self._model(tf.squeeze(X))
+            values: tf.Tensor = tf.squeeze(values)
 
-    @staticmethod
-    @tf.function(
-        input_signature=(
-            tf.TensorSpec(shape=[None], dtype=tf.float32),
-            tf.TensorSpec(shape=[None], dtype=tf.float32)))
-    def _advantage(values: tf.Tensor, G: tf.Tensor) -> tf.Tensor:
-        print('tracing advantage')
-        advantage = tf.subtract(G, values)
-        advantage -= tf.math.reduce_mean(advantage)
-        std = tf.math.reduce_std(advantage)
-        return tf.cond(  # type: ignore
-            tf.equal(std, 0.0), lambda: advantage, lambda: advantage/std)
+            critic_loss = tf.keras.losses.mean_squared_error(
+                y_true=G, y_pred=values)
 
-    @staticmethod
-    @tf.function(
-        input_signature=(
-            tf.TensorSpec(shape=[None], dtype=tf.float32),
-            tf.TensorSpec(shape=[], dtype=tf.int32),
-            tf.TensorSpec(shape=[], dtype=tf.float32)))
-    def _actor_loss(
-            logits: tf.Tensor, y: tf.Tensor,
-            advantage: tf.Tensor) -> tf.Tensor:
-        print('tracing actor')
-        action_probs = tf.compat.v1.distributions.Categorical(
-            logits=logits)
-        log_prob = action_probs.log_prob(y)
+            advantage = tf.subtract(G, values)
+            advantage -= tf.math.reduce_mean(advantage)
+            std = tf.math.reduce_std(advantage)
+            advantage = tf.cond(
+                tf.equal(std, 0.0), lambda: advantage, lambda: advantage/std)
 
-        return tf.negative(advantage * tf.squeeze(log_prob))  # type: ignore
+            advantage = tf.data.Dataset.from_tensor_slices(advantage)
+
+            logits_concat = tf.concat(logits, axis=1)
+            logits_ds = tf.data.Dataset.from_tensor_slices(logits_concat)
+            Y_ds = tf.data.Dataset.from_tensor_slices(Y)
+
+            actor_loss = tf.Variable(0.0)
+            for temp in tf.data.Dataset.zip((advantage, Y_ds, logits_ds)):
+                adv = temp[0]
+                y = tf.data.Dataset.from_tensor_slices(temp[1])
+                ps = tf.data.Dataset.from_tensor_slices(
+                    tf.RaggedTensor.from_row_lengths(
+                        values=temp[2], row_lengths=self._output_lengths))
+                for _y, p in tf.data.Dataset.zip((y, ps)):
+                    action_probs = tf.compat.v1.distributions.Categorical(
+                        logits=p)
+                    log_prob = action_probs.log_prob(_y)
+                    actor_loss.assign_sub(adv * tf.squeeze(log_prob))
+
+        gradient = tape.gradient(
+            critic_loss, self._model.trainable_variables)
+        self._model.optimizer.apply_gradients(
+            (grad, var)
+            for (grad, var) in zip(gradient, self._model.trainable_variables)
+            if grad is not None)
+
+        gradient = tape.gradient(
+            actor_loss, self._model.trainable_variables)
+        self._model.optimizer.apply_gradients(
+            (grad, var)
+            for (grad, var) in zip(gradient, self._model.trainable_variables)
+            if grad is not None)
 
     def learn(
             self, X: Tuple[FeatureSet, ...], Y: Tuple[ACLabelType, ...],
@@ -253,37 +267,46 @@ class DenseActorCritic(Learner[ACLabelType], TF2IOMixin):
             self._input_length = _X.shape[1]
             self._generate_network()
 
-        with tf.GradientTape(persistent=True) as tape:
-            logits, values = self._model(tf.squeeze(_X))
-            values: tf.Tensor = tf.squeeze(values)
+        self._learn(_X, _Y, G)
 
-            critic_loss = tf.Variable(DenseActorCritic._critic_loss(values, G))
+        # with tf.GradientTape(persistent=True) as tape:
+        #     logits, values = self._model(tf.squeeze(_X))
+        #     values: tf.Tensor = tf.squeeze(values)
 
-            advantage = DenseActorCritic._advantage(values, G)
+        #     critic_loss = tf.Variable(DenseActorCritic._critic_loss(values, G))
 
-            actor_loss = tf.Variable(0.0)
-            for idx, temp in enumerate(zip(advantage, *logits)):
-                adv = temp[0]
-                ps = temp[1:]
-                y = _Y[idx]  # type: ignore
-                for j, p in enumerate(ps):
-                    actor_loss.assign_add(
-                        DenseActorCritic._actor_loss(p, y[j], adv))
+        #     advantage = DenseActorCritic._advantage(values, G)
 
-        gradient = tape.gradient(
-            critic_loss, self._model.trainable_variables)
-        self._model.optimizer.apply_gradients(
-            (grad, var)
-            for (grad, var) in zip(gradient, self._model.trainable_variables)
-            if grad is not None)
+        #     actor_loss = tf.Variable(0.0)
+        #     for temp in tf.data.Dataset.zip((tf.data.Dataset.from_tensor_slices(advantage), tf.data.Dataset.from_tensor_slices(_Y), *(tf.data.Dataset.from_tensor_slices(lo) for lo in logits))):
+        #         adv = temp[0]
+        #         y = temp[1]
+        #         ps = temp[2:]
+        #         # y = _Y[idx]  # type: ignore
+        #         for j, p in enumerate(ps):
+        #             actor_loss.assign_add(
+        #                 DenseActorCritic._actor_loss(p, y[j], adv))
 
-        gradient = tape.gradient(
-            actor_loss, self._model.trainable_variables)
-        self._model.optimizer.apply_gradients(
-            (grad, var)
-            for (grad, var) in zip(gradient, self._model.trainable_variables)
-            if grad is not None)
+        # gradient = tape.gradient(
+        #     critic_loss, self._model.trainable_variables)
+        # self._model.optimizer.apply_gradients(
+        #     (grad, var)
+        #     for (grad, var) in zip(gradient, self._model.trainable_variables)
+        #     if grad is not None)
 
+        # gradient = tape.gradient(
+        #     actor_loss, self._model.trainable_variables)
+        # self._model.optimizer.apply_gradients(
+        #     (grad, var)
+        #     for (grad, var) in zip(gradient, self._model.trainable_variables)
+        #     if grad is not None)
+
+
+
+
+
+
+        # -----------------------------------------
         # with tf.GradientTape(persistent=True) as tape:
         #     logits, values = self._model(tf.squeeze(_X))  # type: ignore
 
