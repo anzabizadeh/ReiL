@@ -473,9 +473,12 @@ class FeatureGenerator:
         if self.count is None:
             raise TypeError('Feature is not iterable.')
         if self.is_numerical:
+            lower = self.lower
+            step = self.step
+            count = self.count
             iterator = (
-                i * self.step  # type: ignore
-                for i in range(self.count)
+                lower + i * step  # type: ignore
+                for i in range(count)
             )
         else:
             iterator = self.categories or ()
