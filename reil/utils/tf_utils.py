@@ -4,6 +4,7 @@ import pathlib
 import random
 from typing import Any, Dict, List, Optional, Union
 
+import tensorflow as tf
 from reil import reilbase
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
@@ -72,11 +73,14 @@ class SerializeTF:
 
 
 class TF2IOMixin(reilbase.ReilBase):
-    def __init__(self):
+    def __init__(
+            self, models: List[str], **kwargs):
+        super().__init__(**kwargs)
+        self._no_model: bool
+        self._models = models
         self._callbacks: List[Any]
         self._learning_rate: LearningRateScheduler
         self._tensorboard_path: Optional[pathlib.PurePath]
-        self._ann_ready: bool
 
     def save(
             self,
@@ -106,12 +110,13 @@ class TF2IOMixin(reilbase.ReilBase):
         '''
         _path = super().save(filename, path)
 
-        try:
-            self._model.save(pathlib.Path(  # type: ignore
-                _path.parent, f'{_path.stem}.tf').resolve())
-        except ValueError:
-            self._logger.warning(
-                'Model is not compiled. Skipped saving the model.')
+        for model in self._models:
+            try:
+                self.__dict__[model].save(pathlib.Path(  # type: ignore
+                    _path.parent, f'{_path.stem}_{model}.tf').resolve())
+            except ValueError:
+                self._logger.warning(
+                    f'{model} is not compiled. Skipped saving the model.')
 
         return _path
 
@@ -138,11 +143,12 @@ class TF2IOMixin(reilbase.ReilBase):
         super().load(filename, path)
 
         _path = path or '.'
-        if self._ann_ready:
-            self._model = keras.models.load_model(  # type: ignore
-                pathlib.Path(_path, f'{filename}.tf').resolve())
+        if self._no_model:
+            self._model = keras.Model()
         else:
-            self._model = keras.models.Sequential()
+            for model in self._models:
+                self.__dict__[model] = keras.models.load_model(  # type: ignore
+                    pathlib.Path(_path, f'{filename}_{model}.tf').resolve())
 
         if self._tensorboard_path is not None:
             self._tensorboard = keras.callbacks.TensorBoard(
@@ -157,21 +163,26 @@ class TF2IOMixin(reilbase.ReilBase):
 
     def __getstate__(self):
         state = super().__getstate__()
-        if state['_ann_ready']:
-            state['_serialized_model'] = SerializeTF().dump(state['_model'])
+        if not state['_no_model']:
+            for model in self._models:
+                state[f'_serialized_{model}'] = SerializeTF().dump(
+                    state[model])
 
-        for k in ('_model', '_callbacks', '_tensorboard'):
+        for k in self._models + ['_callbacks', '_tensorboard']:
             if k in state:
                 del state[k]
 
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        if state['_ann_ready']:
-            self._model = SerializeTF().load(state['_serialized_model'])
-            del state['_serialized_model']
+        if state['_no_model']:
+            for model in state['_models']:
+                self.__dict__[model] = keras.Model()
         else:
-            self._model = keras.models.Sequential()
+            for model in state['_models']:
+                self.__dict__[model] = SerializeTF().load(
+                    state[f'_serialized_{model}'])
+            del state[f'_serialized_{model}']
 
         self.__dict__.update(state)
 
@@ -188,3 +199,85 @@ class TF2IOMixin(reilbase.ReilBase):
                 keras.callbacks.LearningRateScheduler(
                     self._learning_rate.new_rate, verbose=0)
             self._callbacks.append(learning_rate_scheduler)
+
+
+class BroadcastAndConcatLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(trainable=False, dynamic=True, **kwargs)
+
+    @staticmethod
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, None], name='x'),
+            tf.TensorSpec(shape=[None, None], name='y')))
+        # experimental_compile=True)
+    def _broadcast_and_concat(x: tf.Tensor, y: tf.Tensor):
+        dim_x = tf.shape(x)
+        dim_y = tf.shape(y)
+        if tf.equal(dim_x[0], dim_y[0]):
+            return tf.concat([x, y], axis=1)
+        elif tf.equal(dim_x[0], 1):
+            return tf.concat(
+                [tf.broadcast_to(x, (dim_y[0], dim_x[1])), y], axis=1)
+        elif tf.equal(dim_y[0], 1):
+            return tf.concat([
+                x, tf.broadcast_to(y, (dim_x[0], dim_y[1]))], axis=1)
+        else:
+            return tf.convert_to_tensor([])
+        # raise ValueError(
+        #     'Dimensions should be of the same'
+        #     ' or all but one should be of size one.')
+
+    def call(self, x: List[tf.Tensor]):
+        return self._broadcast_and_concat(x[0], x[1])
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape([None, sum(shape[1] for shape in input_shape)])
+
+    def count_params(self):
+        return 0
+
+    def get_config(self):
+        return super().get_config()
+
+
+class ArgMaxLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(trainable=False, dynamic=True, **kwargs)
+
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, None]),))
+        # experimental_compile=True)
+    def call(self, x: tf.Tensor):
+        return tf.argmax(x)
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape([1])
+
+    def count_params(self):
+        return 0
+
+    def get_config(self):
+        return super().get_config()
+
+
+class MaxLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(trainable=False, dynamic=True, **kwargs)
+
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, 1]),))
+        # experimental_compile=True)
+    def call(self, x: tf.Tensor):
+        return tf.reduce_max(x)
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape([1])
+
+    def count_params(self):
+        return 0
+
+    def get_config(self):
+        return super().get_config()
