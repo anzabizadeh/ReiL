@@ -882,27 +882,27 @@ class FeatureGeneratorSet:
             result = None
             if parsed_query['command'] == 'return':
                 item = parsed_query['item']
-                exclude = parsed_query.get('exclude', False)
+                exclusive = parsed_query.get('exclusive', False)
                 split = parsed_query.get('split', False)
                 if item == 'feature':
                     result = self.generate_all(
-                        exclude_masked_values=exclude, split=split)
+                        exclude_masked_values=exclusive, split=split)
                 elif item == 'index':
                     result = self.generate_indexes(
-                        exclude_masked_values=exclude, split=split)
+                        exclude_masked_values=exclusive, split=split)
                 else:  # item == 'count'
                     # temp = self.generate_indexes(
-                    #     exclude_masked_values=exclude, split=True)
+                    #     exclude_masked_values=exclusive, split=True)
                     # result = tuple(len(tuple((x))) for x in temp)
                     result = self.count
             elif parsed_query['command'] == 'choose':
-                exclude = parsed_query.get('exclude', False)
+                exclusive = parsed_query.get('exclusive', False)
                 if parsed_query['item'] == 'feature':
                     result = random.choice(list(self.generate_all(
-                        exclude_masked_values=exclude)))
+                        exclude_masked_values=exclusive)))
                 else:  # parsed_query['command'] == 'index'
                     result = random.choice(list(self.generate_indexes(
-                        exclude_masked_values=exclude)))
+                        exclude_masked_values=exclusive)))
             else:  # parsed_query['command'] == 'lookup'
                 result = self.byindex(parsed_query['index'])
 
