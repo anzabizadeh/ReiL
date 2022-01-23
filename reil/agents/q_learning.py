@@ -22,14 +22,14 @@ from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
 Feature_or_Tuple_of_Feature = Union[Tuple[FeatureSet, ...], FeatureSet]
 
 
-class QLearning(Agent[float]):
+class QLearning(Agent[FeatureSet, float]):
     '''
     A Q-learning `agent`.
     '''
 
     def __init__(
             self,
-            learner: Learner[float],
+            learner: Learner[FeatureSet, float],
             buffer: Buffer[FeatureSet, float],
             exploration_strategy: Union[float, ExplorationStrategy],
             method: Literal['forward', 'backward'] = 'backward',
@@ -159,7 +159,7 @@ class QLearning(Agent[float]):
         return max_q
 
     def _prepare_training(
-            self, history: History) -> TrainingData[float]:
+            self, history: History) -> TrainingData[FeatureSet, float]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.

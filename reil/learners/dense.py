@@ -18,7 +18,7 @@ from reil.utils.tf_utils import TF2IOMixin
 from tensorflow import keras
 
 
-class Dense_tf_1(Learner[float]):
+class Dense_tf_1(Learner[FeatureSet, float]):
     '''
     The Dense learner.
 
@@ -101,7 +101,7 @@ class Dense_tf_1(Learner[float]):
                         self._learning_rate.new_rate, verbose=0)
                 self._callbacks.append(learning_rate_scheduler)
 
-        self._ann_ready: bool = False
+        self._no_model: bool = True
         if self._input_length is not None:
             self._generate_network()
 
@@ -129,7 +129,7 @@ class Dense_tf_1(Learner[float]):
                 optimizer=keras.optimizers.Adam(
                     learning_rate=self._learning_rate.initial_lr), loss='mae')
 
-        self._ann_ready = True
+        self._no_model = False
 
     def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
         '''
@@ -146,7 +146,7 @@ class Dense_tf_1(Learner[float]):
             The predicted `y`.
         '''
         _X: List[List[Any]] = [x.normalized.flattened for x in X]
-        if not self._ann_ready:
+        if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()
 
@@ -172,7 +172,7 @@ class Dense_tf_1(Learner[float]):
             A list of float labels for the learning model.
         '''
         _X: List[List[Any]] = [x.normalized.flattened for x in X]
-        if not self._ann_ready:
+        if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()
 
@@ -258,7 +258,7 @@ class Dense_tf_1(Learner[float]):
         with self._graph.as_default():
             self._session = keras.backend.get_session()  # type: ignore
 
-            if self._ann_ready:
+            if self._no_model:
                 self._model = keras.models.load_model(  # type: ignore
                     pathlib.Path(
                         _path, f'{filename}.tf').resolve())
@@ -285,7 +285,7 @@ class Dense_tf_1(Learner[float]):
         return state
 
 
-class Dense_tf_2(Learner[float], TF2IOMixin):
+class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
     '''
     The Dense learner.
 
@@ -331,7 +331,8 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
             Validation split not in the range of (0.0, 1.0).
         '''
 
-        super().__init__(learning_rate=learning_rate, **kwargs)
+        super().__init__(
+            models=['_model'], learning_rate=learning_rate, **kwargs)
 
         self._iteration: int = 0
 
@@ -361,7 +362,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
                     self._learning_rate.new_rate, verbose=0)
             self._callbacks.append(learning_rate_scheduler)
 
-        self._ann_ready: bool = False
+        self._no_model: bool = True
         if self._input_length is not None:
             self._generate_network()
 
@@ -386,7 +387,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
             optimizer=keras.optimizers.Adam(
                 learning_rate=self._learning_rate.initial_lr), loss='mae')
 
-        self._ann_ready = True
+        self._no_model = False
 
     def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
         '''
@@ -403,7 +404,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
             The predicted `y`.
         '''
         _X: List[List[float]] = [x.normalized.flattened for x in X]
-        if not self._ann_ready:
+        if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()
 
@@ -427,7 +428,7 @@ class Dense_tf_2(Learner[float], TF2IOMixin):
             A list of float labels for the learning model.
         '''
         _X: List[List[float]] = [x.normalized.flattened for x in X]
-        if not self._ann_ready:
+        if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()
 

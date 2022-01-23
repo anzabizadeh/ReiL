@@ -14,16 +14,17 @@ from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 
 LabelType = TypeVar('LabelType')
+InputType = TypeVar('InputType', contravariant=True)
 
 
-class LearnerProtocol(Protocol[LabelType]):
+class LearnerProtocol(Protocol[InputType, LabelType]):
     '''
     The base class for all `learner` classes.
     '''
     _learning_rate: LearningRateScheduler
 
     @abstractmethod
-    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[LabelType, ...]:
+    def predict(self, X: Tuple[InputType, ...]) -> Tuple[LabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -41,7 +42,7 @@ class LearnerProtocol(Protocol[LabelType]):
 
     @abstractmethod
     def learn(
-            self, X: Tuple[FeatureSet, ...], Y: Tuple[LabelType, ...],
+            self, X: Tuple[InputType, ...], Y: Tuple[LabelType, ...],
             **kwargs: Any
     ) -> None:
         '''
@@ -58,7 +59,7 @@ class LearnerProtocol(Protocol[LabelType]):
         raise NotImplementedError
 
 
-class Learner(reilbase.ReilBase, LearnerProtocol[LabelType]):
+class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
     '''
     The base class for all `learner` classes.
     '''
@@ -82,4 +83,4 @@ class Learner(reilbase.ReilBase, LearnerProtocol[LabelType]):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(learning_rate=ConstantLearningRate(0.0))
+        return cls(learning_rate=0.0)

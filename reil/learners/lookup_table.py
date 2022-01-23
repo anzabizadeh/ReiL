@@ -39,7 +39,7 @@ class LookupTable(Dict[Any, TableEntry[T]]):
             raise TypeError('item should be of type TableEntry.')
 
 
-class QLookupTable(Learner[float]):
+class QLookupTable(Learner[FeatureSet, float]):
     '''
     A Q-learning lookup table class.
 

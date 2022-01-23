@@ -19,7 +19,7 @@ class Session:
     def __init__(
             self, name: str, path: Union[pathlib.PurePath, str],
             main_task: Task,
-            agents: Dict[str, Union[Agent[Any], str]],
+            agents: Dict[str, Union[Agent[Any, Any], str]],
             subjects: Dict[str, Union[Subject, str]],
             plans: Dict[str, Any],
             demons: Optional[Dict[

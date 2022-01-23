@@ -7,7 +7,7 @@ This `agent` class is the base class of all agent classes that can learn from
 `history`.
 '''
 
-from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple,
+from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple, TypeVar,
                     Union)
 
 from reil.agents.agent_base import AgentBase
@@ -18,18 +18,19 @@ from reil.learners.learner import LabelType, Learner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
+InputType = TypeVar('InputType')
 TrainingData = Tuple[
-    Tuple[FeatureSet, ...], Tuple[LabelType, ...], Dict[str, Any]]
+    Tuple[InputType, ...], Tuple[LabelType, ...], Dict[str, Any]]
 
 
-class Agent(AgentBase, Generic[LabelType]):
+class Agent(AgentBase, Generic[InputType, LabelType]):
     '''
     The base class of all agent classes that learn from history.
     '''
 
     def __init__(
             self,
-            learner: Learner[LabelType],
+            learner: Learner[InputType, LabelType],
             exploration_strategy: Union[float, ExplorationStrategy],
             discount_factor: float = 1.0,
             tie_breaker: Literal['first', 'last', 'random'] = 'random',
@@ -67,7 +68,7 @@ class Agent(AgentBase, Generic[LabelType]):
 
         super().__init__(tie_breaker, **kwargs)
 
-        self._learner: Learner[LabelType] = learner
+        self._learner: Learner[InputType, LabelType] = learner
         if not 0.0 <= discount_factor <= 1.0:
             self._logger.warning(
                 f'{self.__class__.__qualname__} discount_factor should be in'
@@ -138,7 +139,7 @@ class Agent(AgentBase, Generic[LabelType]):
         if self._training_trigger != 'none':
             self._learner.reset()
 
-    def _prepare_training(self, history: History) -> TrainingData[LabelType]:
+    def _prepare_training(self, history: History) -> TrainingData[InputType, LabelType]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -176,7 +177,7 @@ class Agent(AgentBase, Generic[LabelType]):
             training_data = self._prepare_training(history)
 
         X, Y, kwargs = training_data
-        if X:
+        if Y:
             self._learner.learn(X, Y, **kwargs)
 
     def observe(  # noqa: C901

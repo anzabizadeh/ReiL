@@ -20,14 +20,14 @@ from reil.utils.exploration_strategies import NoExploration
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
 
-class ActorCritic(Agent[ACLabelType]):
+class ActorCritic(Agent[FeatureSet, ACLabelType]):
     '''
     A reward to go Policy Gradient `agent`.
     '''
 
     def __init__(
             self,
-            learner: Learner[ACLabelType],
+            learner: Learner[FeatureSet, ACLabelType],
             **kwargs: Any):
         '''
         Arguments
@@ -55,7 +55,7 @@ class ActorCritic(Agent[ACLabelType]):
         return cls(Learner._empty_instance())
 
     def _prepare_training(
-            self, history: History) -> TrainingData[int]:
+            self, history: History) -> TrainingData[FeatureSet, int]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
