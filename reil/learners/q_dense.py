@@ -6,7 +6,7 @@ Dense class
 The Dense learner.
 '''
 import pathlib
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import tensorflow as tf
 from reil.datatypes.feature import FeatureSet
@@ -66,7 +66,7 @@ class QDense(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
         '''
 
         super().__init__(
-            models=['_model', '_max', '_argmax'],
+            models=['_model'],
             learning_rate=learning_rate, **kwargs)
 
         self._iteration: int = 0
@@ -140,7 +140,8 @@ class QDense(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
         return tf.convert_to_tensor([x.normalized.flattened for x in data])
 
     def argmax(
-            self, states: Tuple[FeatureSet, ...], actions: Tuple[FeatureSet, ...]) -> Tuple[FeatureSet, FeatureSet]:
+            self, states: Tuple[FeatureSet, ...],
+            actions: Tuple[FeatureSet, ...]) -> Tuple[FeatureSet, FeatureSet]:
         _X = [self._to_tensor(states), self._to_tensor(actions)]
         if self._no_model:
             self._input_lengths = tuple(x.shape[1] for x in _X)
@@ -160,7 +161,8 @@ class QDense(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
         return state, action
 
     def max(
-            self, states: Tuple[FeatureSet, ...], actions: Tuple[FeatureSet, ...]) -> float:
+            self, states: Tuple[FeatureSet, ...],
+            actions: Tuple[FeatureSet, ...]) -> float:
         result = self._max([self._to_tensor(states), self._to_tensor(actions)])
 
         return result
@@ -202,6 +204,25 @@ class QDense(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
         reset the learner.
         '''
         self._iteration += 1
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        state['_max'] = None
+        state['_argmax'] = None
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+
+        if not self._no_model:
+            inputs = self._model.inputs
+            output = self._model.output
+
+            max_layer = MaxLayer(name='max')(output)
+            argmax = ArgMaxLayer(name='argmax')(output)
+
+            self._max = keras.Model(inputs, max_layer, name='max_Q')
+            self._argmax = keras.Model(inputs, argmax, name='argmax_Q')
 
 
 if tf.__version__[0] == '1':  # type: ignore
