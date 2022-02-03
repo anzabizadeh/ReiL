@@ -100,21 +100,6 @@ statistic_PTTR = reil_functions.PercentInRange(
     acceptable_range=(2, 3), exclude_first=True)
 
 
-class MakeCallable:
-    def __init__(
-            self, values: Tuple[Any, ...] = (),
-            day_0_values: Tuple[Any, ...] = ()) -> None:
-        self._values = values
-        self._day_0_values = day_0_values or self._values
-
-    def __call__(
-            self, f: FeatureSet, *args: Any, **kwds: Any) -> Any:
-        if f['day'].value == 0:
-            return self._day_0_values
-
-        return self._values
-
-
 class Warfarin(HealthSubject):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model.
