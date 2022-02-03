@@ -7,9 +7,10 @@ from typing import Callable, List, Literal
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import tensorflow as tf
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
-from reil.healthcare.mathematical_models import HambergPKPD
+from reil.healthcare.mathematical_models.hamberg_pkpd_tf import HambergPKPD
 from reil.utils.functions import (random_categorical, random_lognormal,
                                   random_normal_truncated, random_uniform)
 
@@ -35,21 +36,21 @@ class testHambergPKPD(unittest.TestCase):
         # We only measure INR daily, hence the smooth lines.
         patients = {
             (0, 0): [(50.0, '*1/*1', 'G/G', 10.0, 2.41),
-                     (50.0, '*1/*2', 'G/G', 10.0, 3.00),
-                     (50.0, '*1/*3', 'G/G', 10.0, 3.42),
-                     (50.0, '*2/*2', 'G/G', 10.0, 5.03),
-                     (50.0, '*2/*3', 'G/G', 10.0, 4.73),
-                     (50.0, '*3/*3', 'G/G', 10.0, 6.90)],
+                        (50.0, '*1/*2', 'G/G', 10.0, 3.00),
+                        (50.0, '*1/*3', 'G/G', 10.0, 3.42),
+                        (50.0, '*2/*2', 'G/G', 10.0, 5.03),
+                        (50.0, '*2/*3', 'G/G', 10.0, 4.73),
+                        (50.0, '*3/*3', 'G/G', 10.0, 6.90)],
             (0, 1): [(50.0, '*1/*1', 'G/G', 10.0, 2.41),
-                     (50.0, '*1/*1', 'G/A', 10.0, 3.05),
-                     (50.0, '*1/*1', 'A/A', 10.0, 3.66)],
+                        (50.0, '*1/*1', 'G/A', 10.0, 3.05),
+                        (50.0, '*1/*1', 'A/A', 10.0, 3.66)],
             (1, 0): [(50.0, '*1/*1', 'G/G', 10.0, 2.41),
-                     (70.0, '*1/*1', 'G/G', 10.0, 2.65),
-                     (90.0, '*1/*1', 'G/G', 10.0, 2.97)],
+                        (70.0, '*1/*1', 'G/G', 10.0, 2.65),
+                        (90.0, '*1/*1', 'G/G', 10.0, 2.97)],
             (1, 1): [(50.0, '*1/*1', 'G/G', 10.0, 2.41),
-                     (50.0, '*1/*1', 'A/A', 10.0, 3.66),
-                     (50.0, '*1/*3', 'G/A', 10.0, 4.35),
-                     (50.0, '*3/*3', 'G/G', 10.0, 6.90)]}
+                        (50.0, '*1/*1', 'A/A', 10.0, 3.66),
+                        (50.0, '*1/*3', 'G/A', 10.0, 4.35),
+                        (50.0, '*3/*3', 'G/G', 10.0, 6.90)]}
 
         other_features = FeatureSet((
             Feature(name='MTT_1', value=HambergPKPD._MTT_1),
@@ -62,7 +63,7 @@ class testHambergPKPD(unittest.TestCase):
         _, axes = plt.subplots(
             2, 2, figsize=(10, 10), sharex=True, sharey=True)
 
-        h = HambergPKPD(cache_size=60, randomized=False)  # type: ignore
+        h = HambergPKPD(cache_size=61, randomized=False)
         errors: str = ''
         for (i, j), info in patients.items():
             for age, cyp, vkor, dose, inr in info:
@@ -84,13 +85,13 @@ class testHambergPKPD(unittest.TestCase):
                     dose={d: dose for d in range(60)},
                     measurement_days=range(61))
                 try:
-                    self.assertAlmostEqual(
-                        h._computed_INRs[60], inr, 2)  # type: ignore
+                    tf.debugging.assert_near(
+                        h._computed_INRs[60], inr, atol=0.01)
                 except AssertionError as e:
                     errors += f'\n({age:4.2f}, {cyp}, {vkor})\t{e}'
 
                 sns.lineplot(  # type: ignore
-                    data=h._computed_INRs, ax=axes[i][j])
+                    data={k: v.numpy() for k, v in h._computed_INRs.items()}, ax=axes[i][j])
                 axes[i][j].set_ylabel('INR', fontsize=12)
                 axes[i][j].set_ylim((0, 8))
                 axes[i][j].set_xlim((0, 59))
@@ -100,7 +101,7 @@ class testHambergPKPD(unittest.TestCase):
                     axes[i][j].axhline(x, ls='--')
 
         plt.tight_layout()
-        plt.savefig('replicated_Hamberg_et_al_2007_Fig_3.png')
+        plt.savefig('tf_replicated_Hamberg_et_al_2007_Fig_3.png')
         plt.close()
         if errors:
             raise AssertionError(errors)
@@ -127,7 +128,7 @@ class testHambergPKPD(unittest.TestCase):
         ax.set_ylim((0.0, 0.8))
         ax.set_xlabel('Time (h)')
         ax.set_ylabel('Concentration (mg/l)')
-        plt.savefig('replicated_Hamberg_et_al_2007_Fig_4a.png')
+        plt.savefig('tf_replicated_Hamberg_et_al_2007_Fig_4a.png')
         plt.close()
 
     def test_replicate_fig_4c(self) -> None:
@@ -158,7 +159,7 @@ class testHambergPKPD(unittest.TestCase):
         ax.set_ylim((0.8, 2.0))
         ax.set_xlabel('Time (h)')
         ax.set_ylabel('INR')
-        plt.savefig('replicated_Hamberg_et_al_2007_Fig_4c.png')
+        plt.savefig('tf_replicated_Hamberg_et_al_2007_Fig_4c.png')
         plt.close()
 
     @staticmethod
@@ -206,7 +207,7 @@ class testHambergPKPD(unittest.TestCase):
                 name='age',
                 **age_info,
                 generator=(random_uniform if data_source != 'Ravvaz'
-                           else random_normal_truncated),
+                            else random_normal_truncated),
                 randomized=random_demographic),
             FeatureGenerator.categorical(
                 name='CYP2C9',
@@ -283,12 +284,13 @@ class testHambergPKPD(unittest.TestCase):
                 measurement_days=measurement_days if INR else [])['INR']
             if not INR:
                 INR_values = [0.0] * len(measurement_days)
-            # sns.lineplot(y=h._total_cs, x=range(len(h._total_cs)))
+            # sns.lineplot(y=h._total_cs.numpy(), x=range(h._total_cs.shape[0]))
+            # plt.show()
             concentrations.extend([  # type: ignore
                 (i, t * 24,
-                 h._total_cs[int(t * 24)]
-                 * h._err_list[int(t * 24)],  # type: ignore
-                 INR_values[j], (random.random() - 0.5) * 2)
+                    h._total_cs[int(t * 24)].numpy()
+                    * h._err_list[int(t * 24)].numpy(),  # type: ignore
+                    INR_values[j], (random.random() - 0.5) * 2)
                 for j, t in enumerate(measurement_days)])
         data = pd.DataFrame(
             concentrations, columns=['run', 't', 'Cs', 'INR', 'x_jitter'])
