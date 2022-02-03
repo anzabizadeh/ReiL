@@ -209,7 +209,7 @@ class HambergPKPD2010(HealthMathModel):
             A dictionary with keyword "INR" and a list of doses for the
             specified days.
         '''
-        self.dose = inputs.get('dose', {})
+        self.prescribe(inputs.get('dose', {}))
 
         if days := inputs.get('measurement_days'):
             return {'INR': self.INR(days)}
@@ -229,8 +229,7 @@ class HambergPKPD2010(HealthMathModel):
         return {t: info.dose
                 for t, info in self._dose_records.items()}
 
-    @dose.setter
-    def dose(self, dose: Dict[Day, float]) -> None:
+    def prescribe(self, dose: Dict[Day, float]) -> None:
         '''
         Add warfarin doses at the specified days.
 
