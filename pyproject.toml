@@ -52,6 +52,7 @@ tensorflow-probability = "0.12.2"
 [tool.poetry.dev-dependencies]
 pylint = "2.10.2"
 pylama = "^8.3.7"
+seaborn = "^0.11.2"
 
 
 [build-system]
