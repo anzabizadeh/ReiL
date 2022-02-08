@@ -29,8 +29,7 @@ class ReilBase:
             logger_level: Optional[int] = None,
             logger_filename: Optional[str] = None,
             persistent_attributes: Optional[List[str]] = None,
-            save_zipped: bool = False,
-            **kwargs: Any):
+            save_zipped: bool = False):
         '''
         Arguments
         ---------
@@ -70,17 +69,6 @@ class ReilBase:
             >>> instance.load('another_instance')
             >>> instance._name
             my_instance
-
-        kwargs:
-            Any other attributes to set for the object.
-            Note that `ReilBase` accepts any attribute and adds an
-            underscore before its name.
-
-            Example
-            -------
-            >>> instance = ReilBase(name='my_instance', my_attr='test')
-            >>> instance._my_attr
-            test
         '''
         self._name = name or self.__class__.__qualname__.lower()
         self._path = pathlib.PurePath(path or '.')
@@ -95,8 +83,6 @@ class ReilBase:
             logger_level=logger_level,
             logger_filename=logger_filename
         )
-
-        self.set_params(**kwargs)
 
     @classmethod
     def _empty_instance(cls):
@@ -128,18 +114,6 @@ class ReilBase:
         instance.load(filename=filename, path=path)
 
         return instance
-
-    def set_params(self, **params: Dict[str, Any]) -> None:
-        '''
-        set parameters to values.
-
-        Arguments
-        ---------
-        params:
-            A dictionary containing parameter names and their values.
-        '''
-        for key, value in params.items():
-            self.__dict__[f'_{key}'] = value
 
     def load(
             self, filename: str,
