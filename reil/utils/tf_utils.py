@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import pathlib
 import random
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import tensorflow as tf
 from reil import reilbase
+from reil.datatypes.feature import FeatureSet
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 from tensorflow import keras
@@ -81,6 +82,10 @@ class TF2IOMixin(reilbase.ReilBase):
         self._callbacks: List[Any]
         self._learning_rate: LearningRateScheduler
         self._tensorboard_path: Optional[pathlib.PurePath]
+
+    @staticmethod
+    def convert_to_tensor(data: Tuple[FeatureSet, ...]) -> tf.Tensor:
+        return tf.convert_to_tensor([x.normalized.flattened for x in data])
 
     def save(
             self,
