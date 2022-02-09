@@ -86,19 +86,20 @@ class ActorCritic(Agent[FeatureSet, ACLabelType]):
         else:
             active_history = history
 
-        rtg_list = [0.0] * (len(active_history) + 1)
-        for i in range(len(active_history)-1, -1, -1):
+        _len = len(active_history)
+        returns = [0.0] * (_len + 1)
+        for i in range(_len-1, -1, -1):
             reward = active_history[i].reward or 0.0
-            rtg_list[i] = reward + discount_factor * rtg_list[i+1]
+            returns[i] = reward + discount_factor * returns[i+1]
 
-        rtg_list = np.array(rtg_list[:-1])  # type: ignore
+        returns = np.array(returns[:-1])  # type: ignore
 
         return (
             [a.state for a in active_history],  # type: ignore
             [(tuple(
                 (a.action_taken or a.action).index.values()),  # type: ignore
               g)
-             for a, g in zip(active_history, rtg_list)],
+             for a, g in zip(active_history, returns)],
             {})
 
     def act(self,
@@ -136,13 +137,14 @@ class ActorCritic(Agent[FeatureSet, ACLabelType]):
         if subject_id not in self._entity_list:
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
-        logits = self._learner.predict((state,))[0]
-        if self._training_trigger == 'none':
-            action_index = [int(np.argmax(lo)) for lo in logits]
-        else:
+        training_mode = self._training_trigger != 'none'
+        logits = self._learner.predict((state,), training=training_mode)[0]
+        if training_mode:
             action_index = [
                 int(tf.random.categorical(logits=lo, num_samples=1))
                 for lo in logits]
+        else:
+            action_index = [int(np.argmax(lo)) for lo in logits]
 
         action: FeatureSet = actions.send(f'lookup {action_index}')
 
