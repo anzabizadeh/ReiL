@@ -12,7 +12,7 @@ from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
 from reil.datatypes.feature import FeatureSet
-from reil.learners.q_dense import QDense
+from reil.learners.q_learner import QLearner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
@@ -26,7 +26,7 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
 
     def __init__(
             self,
-            learner: QDense,
+            learner: QLearner,
             buffer: Buffer[FeatureSet, float],
             exploration_strategy: Union[float, ExplorationStrategy],
             method: Literal['forward', 'backward'] = 'backward',
@@ -60,7 +60,7 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
             learner=learner, exploration_strategy=exploration_strategy,
             variable_action_count=True,
             **kwargs)
-        self._learner: QDense
+        self._learner: QLearner
 
         self._method: Literal['forward', 'backward'] = method
         if method not in ('backward', 'forward'):
@@ -80,7 +80,7 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
     @classmethod
     def _empty_instance(cls):  # type: ignore
         return cls(
-            QDense._empty_instance(), Buffer(), ConstantEpsilonGreedy())
+            QLearner._empty_instance(), Buffer(), ConstantEpsilonGreedy())
 
     def _q(
             self, states: Tuple[FeatureSet, ...],
