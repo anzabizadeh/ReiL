@@ -159,7 +159,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         '''
         raise NotImplementedError
 
-    def learn(self, history: History) -> None:
+    def learn(self, history: History) -> Dict[str, float]:
         '''
         Learn using history.
 
@@ -178,7 +178,9 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
         X, Y, kwargs = training_data
         if Y:
-            self._learner.learn(X, Y, **kwargs)
+            return self._learner.learn(X, Y, **kwargs)
+
+        return {}
 
     def observe(  # noqa: C901
             self, subject_id: int, stat_name: Optional[str],
