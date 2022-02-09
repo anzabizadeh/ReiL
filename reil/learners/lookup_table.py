@@ -9,7 +9,7 @@ type of inputs to be `TableEntry`.
 `QLookupTable` is a lookup table for `Q-learning`.
 '''
 import dataclasses
-from typing import Any, Dict, Generic, Hashable, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, Hashable, Optional, Tuple, TypeVar, Union
 
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
@@ -76,7 +76,9 @@ class QLookupTable(Learner[FeatureSet, float]):
         # It creates entries as soon as they are looked up.
         self._table: LookupTable[float] = LookupTable()
 
-    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
+    def predict(
+            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
+    ) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -84,6 +86,9 @@ class QLookupTable(Learner[FeatureSet, float]):
         ---------
         X:
             A list of `FeatureSet` as inputs to the prediction model.
+
+        training:
+            Whether the learner is in training mode. (Default = None)
 
         Returns
         -------
@@ -101,8 +106,7 @@ class QLookupTable(Learner[FeatureSet, float]):
 
     def learn(
             self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
-            **kwargs: Any
-            ) -> None:
+            ) -> Dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -121,6 +125,8 @@ class QLookupTable(Learner[FeatureSet, float]):
             self._table[Xi].value += self._learning_rate.initial_lr * \
                 (Y[i] - self._table[Xi].value)
             self._table[Xi].N += 1
+
+        return {}
 
     # def load(self, filename: str,
     #          path: Optional[Union[str, pathlib.PurePath]] = None) -> None:

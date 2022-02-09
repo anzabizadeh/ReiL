@@ -6,7 +6,7 @@ Learner class
 The base class for all `learner` classes.
 '''
 from abc import abstractmethod
-from typing import Any, Protocol, Tuple, TypeVar, Union
+from typing import Any, Dict, Optional, Protocol, Tuple, TypeVar, Union
 
 from reil import reilbase
 from reil.datatypes.feature import FeatureSet
@@ -24,7 +24,9 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
     _learning_rate: LearningRateScheduler
 
     @abstractmethod
-    def predict(self, X: Tuple[InputType, ...]) -> Tuple[LabelType, ...]:
+    def predict(
+            self, X: Tuple[InputType, ...], training: Optional[bool] = None
+    ) -> Tuple[LabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -32,6 +34,9 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
         ---------
         X:
             A list of `FeatureSet` as inputs to the prediction model.
+
+        training:
+            Whether the learner is in training mode. (Default = None)
 
         Returns
         -------
@@ -43,8 +48,7 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
     @abstractmethod
     def learn(
             self, X: Tuple[InputType, ...], Y: Tuple[LabelType, ...],
-            **kwargs: Any
-    ) -> None:
+    ) -> Dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -55,6 +59,11 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
 
         Y:
             A list of float labels for the learning model.
+
+        Returns
+        -------
+        :
+            A dict of metrics.
         '''
         raise NotImplementedError
 
@@ -64,7 +73,8 @@ class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
     The base class for all `learner` classes.
     '''
     def __init__(
-            self, learning_rate: Union[float, LearningRateScheduler],
+            self, learning_rate: Optional[Union[
+                float, LearningRateScheduler]] = None,
             **kwargs: Any) -> None:
         '''
         Arguments
@@ -76,10 +86,11 @@ class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
             determine the learning rate at each iteration.
         '''
         super().__init__(**kwargs)
-        if isinstance(learning_rate, float):
-            self._learning_rate = ConstantLearningRate(learning_rate)
-        else:
-            self._learning_rate = learning_rate
+        if learning_rate:
+            if isinstance(learning_rate, float):
+                self._learning_rate = ConstantLearningRate(learning_rate)
+            else:
+                self._learning_rate = learning_rate
 
     @classmethod
     def _empty_instance(cls):

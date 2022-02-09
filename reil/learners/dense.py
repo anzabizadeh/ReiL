@@ -6,7 +6,7 @@ Dense class
 The Dense learner.
 '''
 import pathlib
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -131,7 +131,9 @@ class Dense_tf_1(Learner[FeatureSet, float]):
 
         self._no_model = False
 
-    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
+    def predict(
+            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
+    ) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -139,6 +141,9 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         ---------
         X:
             A list of `FeatureSet` as inputs to the prediction model.
+
+        training:
+            Whether the learner is in training mode. (Default = None)
 
         Returns
         -------
@@ -152,14 +157,14 @@ class Dense_tf_1(Learner[FeatureSet, float]):
 
         with self._session.as_default():  # type: ignore
             with self._graph.as_default():
-                result = self._model(tf.convert_to_tensor(_X))  # type: ignore
+                result = self._model(
+                    tf.convert_to_tensor(_X), training=training)
 
         return result  # type: ignore
 
     def learn(
-            self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
-            **kwargs: Any
-            ) -> None:
+            self, X: Tuple[FeatureSet, ...],
+            Y: Tuple[float, ...]) -> Dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -178,7 +183,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
 
         with self._session.as_default():  # type: ignore
             with self._graph.as_default():
-                self._model.fit(  # type: ignore
+                return self._model.fit(  # type: ignore
                     np.array(_X), np.array(Y),  # type: ignore
                     initial_epoch=self._iteration, epochs=self._iteration+1,
                     callbacks=self._callbacks,
@@ -389,7 +394,9 @@ class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
 
         self._no_model = False
 
-    def predict(self, X: Tuple[FeatureSet, ...]) -> Tuple[float, ...]:
+    def predict(
+            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
+    ) -> Tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -397,6 +404,9 @@ class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
         ---------
         X:
             A list of `FeatureSet` as inputs to the prediction model.
+
+        training:
+            Whether the learner is in training mode. (Default = None)
 
         Returns
         -------
@@ -408,14 +418,13 @@ class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        result = self._model(tf.convert_to_tensor(_X))
+        result = self._model(tf.convert_to_tensor(_X), training=training)
 
         return result  # type: ignore
 
     def learn(
-            self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
-            **kwargs: Any
-            ) -> None:
+            self, X: Tuple[FeatureSet, ...],
+            Y: Tuple[float, ...]) -> Dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -432,7 +441,7 @@ class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
             self._input_length = len(_X[0])
             self._generate_network()
 
-        self._model.fit(  # type: ignore
+        return self._model.fit(  # type: ignore
             tf.convert_to_tensor(_X), tf.convert_to_tensor(Y),  # type: ignore
             initial_epoch=self._iteration, epochs=self._iteration+1,
             callbacks=self._callbacks,
