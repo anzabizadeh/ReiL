@@ -57,7 +57,7 @@ class HealthSubject(Subject):
             Maximum duration of each trial.
         '''
 
-        super().__init__(max_agent_count=1, **kwargs)
+        super().__init__(max_entity_count=1, **kwargs)
 
         self._patient = patient
         if not self._patient:

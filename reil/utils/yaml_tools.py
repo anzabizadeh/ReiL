@@ -2,8 +2,8 @@ import importlib
 import pathlib
 from typing import Any, Dict, Optional, Tuple, Union
 
-from ruamel.yaml import YAML
 import reil
+from ruamel.yaml import YAML
 
 Parsable = Union[Dict[str, Any], Any]
 
