@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
+import tensorflow.keras.optimizers.schedules as k_sch
 import tensorflow_probability as tfp
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
@@ -25,12 +26,14 @@ huber_loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
 eps = np.finfo(np.float32).eps.item()
 
 
+@keras.utils.register_keras_serializable(
+    package='reil.learners.actor_critic_learner')
 class DeepActorCriticModel(keras.Model):
     def __init__(
             self,
             output_lengths: List[int],
             learning_rate: Union[
-                float, keras.optimizers.schedules.LearningRateSchedule],
+                float, k_sch.LearningRateSchedule],
             shared_layer_sizes: Tuple[int, ...],
             actor_layer_sizes: Tuple[int, ...] = (),
             critic_layer_sizes: Tuple[int, ...] = (),
@@ -47,26 +50,37 @@ class DeepActorCriticModel(keras.Model):
         self._entropy_loss_coef = entropy_loss_coef
         self._learning_rate = learning_rate
 
-        self._metrics = {
-            'actor_loss': tf.keras.metrics.Mean(
-                'actor_loss', dtype=tf.float32),
-            'critic_loss': tf.keras.metrics.Mean(
-                'critic_loss', dtype=tf.float32),
-            'entropy_loss': tf.keras.metrics.Mean(
-                'entropy_loss', dtype=tf.float32),
-            'total_loss': tf.keras.metrics.Mean(
-                'total_loss', dtype=tf.float32),
-            'actor_accuracy': tf.keras.metrics.SparseCategoricalAccuracy(
-                    'actor_accuracy', dtype=tf.float32),
-            'return': tf.keras.metrics.Mean(
-                'return', dtype=tf.float32)
-            }
+        self._actor_loss = tf.keras.metrics.Mean(
+            'actor_loss', dtype=tf.float32)
+        self._critic_loss = tf.keras.metrics.Mean(
+            'critic_loss', dtype=tf.float32)
+        self._entropy_loss = tf.keras.metrics.Mean(
+            'entropy_loss', dtype=tf.float32)
+        self._total_loss = tf.keras.metrics.Mean(
+            'total_loss', dtype=tf.float32)
+        self._actor_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+            'actor_accuracy', dtype=tf.float32)
+        self._return = tf.keras.metrics.Mean(
+            'return', dtype=tf.float32)
 
-    @property
-    def metrics(self):
-        return list(self._metrics.values())
+    # @property
+    # def metrics(self):
+    #     return [
+    #         self._actor_accuracy,
+    #         self._return
+    #     ]
+
+    # @property
+    # def losses(self):
+    #     return [
+    #         self._actor_loss,
+    #         self._critic_loss,
+    #         self._entropy_loss,
+    #         self._total_loss
+    #     ]
 
     def build(self, input_shape: Tuple[int, ...]):
+        self._input_shape = [None, *input_shape[1:]]
         self._shared = [
             keras.layers.Dense(v, activation='relu', name=f'shared_{i+2:0>2}')
             for i, v in enumerate(self._shared_layer_sizes, 1)]
@@ -89,11 +103,45 @@ class DeepActorCriticModel(keras.Model):
 
         self._critic_output = keras.layers.Dense(1, name='critic_output')
 
-        self.optimizer = keras.optimizers.Adam(
+        self.compile(optimizer=keras.optimizers.Adam(
+            learning_rate=self._learning_rate))
+
+    def get_config(self):
+        config: Dict[str, Any] = dict(
+            output_lengths=self._output_lengths,
+            shared_layer_sizes=self._shared_layer_sizes,
+            actor_layer_sizes=self._actor_layer_sizes,
+            critic_layer_sizes=self._critic_layer_sizes,
+            critic_loss_coef=self._critic_loss_coef,
+            entropy_loss_coef=self._entropy_loss_coef,
             learning_rate=self._learning_rate)
 
+        if isinstance(
+                self._learning_rate, k_sch.LearningRateSchedule):
+            config.update(
+                {'learning_rate': k_sch.serialize(self._learning_rate)})
+
+        return config
+
+    @classmethod
+    def from_config(cls, config, custom_objects=None):
+        if 'learning_rate' in config:
+            if isinstance(config['learning_rate'], dict):
+                config['learning_rate'] = k_sch.deserialize(
+                    config['learning_rate'], custom_objects=custom_objects)
+        return cls(**config)
+
+    # Keras cannot save the trace of this tf.function.
+    # Also, it seems that Keras calls this inside a tf.function, so no need
+    # to do it manually.
+    # The line x.set_shape(...) is to make sure tf.function can trace
+    # correctly.
+    # @tf.function(
+    #     input_signature=(
+    #         tf.TensorSpec(shape=[None, None]), tf.TensorSpec(shape=[])))
     def call(self, inputs, training=None):
         x = inputs
+        x.set_shape(self._input_shape)
         for layer in self._shared:
             x = layer(x, training=training)
 
@@ -131,13 +179,13 @@ class DeepActorCriticModel(keras.Model):
             name='normalized_returns')
 
         with tf.GradientTape() as tape:
-            logits, values = self.call(
-                tf.squeeze(x, name='x'), training=True)
+            logits, values = self(tf.squeeze(x, name='x'), training=True)
             logits_concat = tf.concat(logits, axis=1, name='all_logits')
             values: tf.Tensor = tf.squeeze(values, name='values')
 
             if self._entropy_loss_coef:
-                entropy_loss = self._entropy_loss_coef * tf.reduce_sum(logits_concat * tf.math.exp(logits_concat))
+                entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
+                    logits_concat * tf.math.exp(logits_concat))
             else:
                 entropy_loss = 0.0
 
@@ -160,22 +208,21 @@ class DeepActorCriticModel(keras.Model):
                 _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
                 actor_loss += _loss
 
-                self._metrics['actor_accuracy'].update_state(
-                    y_slice, logits_slice)
+                self._actor_accuracy.update_state(y_slice, logits_slice)
 
             total_loss = actor_loss + critic_loss + entropy_loss
 
-            self._metrics['actor_loss'].update_state(actor_loss)
-            self._metrics['critic_loss'].update_state(critic_loss)
-            self._metrics['entropy_loss'].update_state(entropy_loss)
-            self._metrics['total_loss'].update_state(total_loss)
+            self._actor_loss.update_state(actor_loss)
+            self._critic_loss.update_state(critic_loss)
+            self._entropy_loss.update_state(entropy_loss)
+            self._total_loss.update_state(total_loss)
  
         return tape.gradient(total_loss, self.trainable_variables)
 
     def train_step(self, data):
         x, y, returns = data
 
-        self._metrics['return'].update_state(returns[0])
+        self._return.update_state(returns[0])
 
         gradient = self._gradients(x, y, returns)
 
@@ -195,8 +242,9 @@ class DeepActorCriticModel(keras.Model):
 
         self.optimizer.apply_gradients(zip(gradient, self.trainable_variables))
 
-        metrics = {
-            name: metric.result() for name, metric in self._metrics.items()}
+        metrics = {metric.name: metric.result() for metric in self.metrics}
+
+        metrics.update({loss.name: loss.result() for loss in self.losses})
 
         return metrics
 
@@ -229,22 +277,22 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
             Validation split not in the range of (0.0, 1.0).
         '''
 
-        super().__init__(models=['_model'], **kwargs)
+        super().__init__(models={'_model': type(model)}, **kwargs)
 
         self._model = model
 
         self._iteration = 0
 
         self._tensorboard_path: Optional[pathlib.PurePath] = None
-        self._tensorboard_filename = tensorboard_filename
         if (tensorboard_path or tensorboard_filename) is not None:
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             self._tensorboard_path = pathlib.PurePath(
                 tensorboard_path or './logs')
-            filename = current_time + (f'-{tensorboard_filename}' or '')
+            self._tensorboard_filename = current_time + (
+                f'-{tensorboard_filename}' or '')
             self._train_summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                str(self._tensorboard_path / filename))
+                str(self._tensorboard_path / self._tensorboard_filename))
 
     def predict(
             self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
@@ -291,10 +339,24 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
 
         metrics = self._model.train_step((_X, _Y, G))
 
-        with self._train_summary_writer.as_default():
-            for name, value in metrics.items():
-                tf.summary.scalar(name, value, step=self._iteration)
+        if self._train_summary_writer:
+            with self._train_summary_writer.as_default(step=self._iteration):
+                for name, value in metrics.items():
+                    tf.summary.scalar(name, value)
 
         self._iteration += 1
 
         return metrics
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        state['_train_summary_writer'] = None
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+
+        if self._tensorboard_path:
+            self._train_summary_writer = \
+                tf.summary.create_file_writer(  # type: ignore
+                str(self._tensorboard_path / self._tensorboard_filename))

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import random
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import tensorflow as tf
 from reil import reilbase
@@ -13,28 +13,38 @@ from tensorflow import keras
 
 
 class SerializeTF:
-    def __init__(self, temp_path: Union[str, pathlib.PurePath] = '.') -> None:
+    def __init__(
+            self, cls: Optional[Type[keras.Model]] = None,
+            temp_path: Union[str, pathlib.PurePath] = '.') -> None:
+        self.cls = cls
         self._temp_path = (
             pathlib.PurePath(temp_path) /
             '{n:06}'.format(n=random.randint(1, 1000000)))
 
     def dump(self, model: keras.Model) -> Dict[str, List[Any]]:
         path = pathlib.Path(self._temp_path)
-        model.save(path)  # type: ignore
-        result = self.traverse(path)
-        self.__remove_dir(path)
-        path.rmdir()
+        try:
+            model.save(path)  # type: ignore
+            result = self.traverse(path)
+            self.__remove_dir(path)
+            path.rmdir()
+        except ValueError:  # model is not compiled.
+            result = model.get_config()
 
         return result
 
     def load(self, data: Dict[str, List[Any]]) -> keras.Model:
         path = pathlib.Path(self._temp_path)
-        self.generate(path, data)
-        sub_folder = next(iter(data))
+        try:
+            self.generate(path, data)
+            sub_folder = next(iter(data))
 
-        model = keras.models.load_model(path / sub_folder)  # type: ignore
-        self.__remove_dir(path)
-        path.rmdir()
+            model = keras.models.load_model(path / sub_folder)
+            self.__remove_dir(path)
+            path.rmdir()
+        except AttributeError:  # model not compiled.
+            cls = self.cls or keras.models.Model
+            model = cls.from_config(data)
 
         return model  # type: ignore
 
@@ -75,7 +85,7 @@ class SerializeTF:
 
 class TF2IOMixin(reilbase.ReilBase):
     def __init__(
-            self, models: List[str], **kwargs):
+            self, models: Dict[str, Type[keras.Model]], **kwargs):
         super().__init__(**kwargs)
         self._no_model: bool
         self._models = models
@@ -168,26 +178,31 @@ class TF2IOMixin(reilbase.ReilBase):
 
     def __getstate__(self):
         state = super().__getstate__()
-        if not state['_no_model']:
-            for model in self._models:
-                state[f'_serialized_{model}'] = SerializeTF().dump(
-                    state[model])
+        if '_no_model' in state and state['_no_model']:
+            pass
+        else:
+            for name, model in self._models.items():
+                try:
+                    state[f'_serialized_{name}'] = SerializeTF(
+                        cls=model).dump(state[name])
+                except ValueError:
+                    state[f'_serialized_{name}'] = None
 
-        for k in self._models + ['_callbacks', '_tensorboard']:
+        for k in list(self._models) + ['_callbacks', '_tensorboard']:
             if k in state:
                 del state[k]
 
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        if state['_no_model']:
-            for model in state['_models']:
-                self.__dict__[model] = keras.Model()
+        if '_no_model' in state and state['_no_model']:
+            for name, model in state['_models'].items():
+                self.__dict__[name] = model
         else:
-            for model in state['_models']:
-                self.__dict__[model] = SerializeTF().load(
-                    state[f'_serialized_{model}'])
-            del state[f'_serialized_{model}']
+            for name, model in state['_models'].items():
+                self.__dict__[name] = SerializeTF(
+                    cls=model).load(state[f'_serialized_{name}'])
+            del state[f'_serialized_{name}']
 
         self.__dict__.update(state)
 
@@ -198,8 +213,8 @@ class TF2IOMixin(reilbase.ReilBase):
             # , histogram_freq=1)  #, write_images=True)
             self._callbacks.append(self._tensorboard)
 
-        if not isinstance(self._learning_rate,
-                          ConstantLearningRate):
+        if '_learning_rate' in state and not isinstance(
+                self._learning_rate, ConstantLearningRate):
             learning_rate_scheduler = \
                 keras.callbacks.LearningRateScheduler(
                     self._learning_rate.new_rate, verbose=0)
