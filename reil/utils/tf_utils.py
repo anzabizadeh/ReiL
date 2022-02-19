@@ -195,11 +195,17 @@ class TF2IOMixin(reilbase.ReilBase):
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        if '_no_model' in state and state['_no_model']:
-            for name, model in state['_models'].items():
+        _models = state['_models']
+        if '_no_model' in state and state['_no_model']:  # for compatibility
+            for name, model in _models.items():
                 self.__dict__[name] = model
+        elif isinstance(_models, list):  # for compatibility
+            for name in _models:
+                self.__dict__[name] = SerializeTF().load(
+                    state[f'_serialized_{name}'])
+            del state[f'_serialized_{name}']
         else:
-            for name, model in state['_models'].items():
+            for name, model in _models.items():
                 self.__dict__[name] = SerializeTF(
                     cls=model).load(state[f'_serialized_{name}'])
             del state[f'_serialized_{name}']
@@ -257,7 +263,7 @@ class BroadcastAndConcatLayer(keras.layers.Layer):
     def count_params(self):
         return 0
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         return super().get_config()
 
 
@@ -278,7 +284,7 @@ class ArgMaxLayer(keras.layers.Layer):
     def count_params(self):
         return 0
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         return super().get_config()
 
 
@@ -299,5 +305,5 @@ class MaxLayer(keras.layers.Layer):
     def count_params(self):
         return 0
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         return super().get_config()
