@@ -39,6 +39,40 @@ class testFeature(unittest.TestCase):
         self.assertEqual(categorical().value, 'A')
         self.assertEqual(categorical.is_numerical, False)
 
+    def test_feature_config(self):
+        rl_value = feature.Feature(
+            name='test', value=self._numerical_data, is_numerical=True)
+        self.assertEqual(
+            feature.Feature.from_config(rl_value.get_config()), rl_value)
+
+        lower = min(self._numerical_data)
+        upper = max(self._numerical_data)
+
+        def midpoint(f: feature.Feature) -> float:
+            return (f.lower + f.upper)/2  # type: ignore
+
+        numerical = feature.FeatureGenerator.continuous(
+            name='num', lower=lower,
+            upper=upper, generator=midpoint, randomized=True)  # type: ignore
+
+        self.assertEqual(
+            feature.FeatureGenerator.from_config(
+                numerical.get_config()), numerical)
+
+        categorical = feature.FeatureGenerator.categorical(
+            name='cat', categories=('A', 'B', 'C'), probabilities=(.3, .6, .1),
+            generator=lambda f: 'A', randomized=True)
+
+        self.assertEqual(
+            feature.FeatureGenerator.from_config(
+                categorical.get_config()), categorical)
+
+        fg_set = feature.FeatureGeneratorSet((numerical, categorical))
+
+        self.assertEqual(
+            feature.FeatureGeneratorSet.from_config(
+                fg_set.get_config()), fg_set)
+
     def test_add_features(self):
         rl_values = [feature.Feature(
             name='test', value=v, is_numerical=True)
@@ -102,7 +136,7 @@ class testFeature(unittest.TestCase):
             categoricals(feature.MISSING).normalized,
             tuple([0]*(len(self._categorical_data))))
 
-    def test_feature_array(self):
+    def test_feature_set(self):
         categoricals = feature.FeatureGenerator.categorical(
             name='cats', categories=tuple(self._categorical_data))
         numericals = feature.FeatureGenerator.continuous(
@@ -112,30 +146,30 @@ class testFeature(unittest.TestCase):
         with self.assertRaises(KeyError):
             feature.FeatureSet(
                 [categoricals(v) for v in self._categorical_data])
-            # print(rl_array.categories)
+            # print(rl_set.categories)
 
-        reilarray = feature.FeatureSet([
+        reilset = feature.FeatureSet([
             categoricals(self._categorical_data[0]),
             numericals(self._numerical_data[0]),
         ])
 
-        self.assertEqual(reilarray.lower,
-                         {reilarray['cats'].name: reilarray['cats'].lower,
-                          reilarray['nums'].name: reilarray['nums'].lower})
-        self.assertEqual(reilarray.upper,
-                         {reilarray['cats'].name: reilarray['cats'].upper,
-                          reilarray['nums'].name: reilarray['nums'].upper})
+        self.assertEqual(reilset.lower,
+                         {reilset['cats'].name: reilset['cats'].lower,
+                          reilset['nums'].name: reilset['nums'].lower})
+        self.assertEqual(reilset.upper,
+                         {reilset['cats'].name: reilset['cats'].upper,
+                          reilset['nums'].name: reilset['nums'].upper})
         self.assertEqual(
-            reilarray.categories,
-            {reilarray['cats'].name: reilarray['cats'].categories,
-             reilarray['nums'].name: reilarray['nums'].categories})
+            reilset.categories,
+            {reilset['cats'].name: reilset['cats'].categories,
+             reilset['nums'].name: reilset['nums'].categories})
 
-        self.assertEqual(reilarray.normalized.flattened,
-                         list(reilarray['cats'].normalized) +  # type: ignore
-                         [reilarray['nums'].normalized])
+        self.assertEqual(reilset.normalized.flattened,
+                         list(reilset['cats'].normalized) +  # type: ignore
+                         [reilset['nums'].normalized])
 
         self.assertEqual(
-            reilarray,
+            reilset,
             feature.FeatureSet([categoricals(self._categorical_data[0])]) +
             feature.FeatureSet([numericals(self._numerical_data[0])])
             )
@@ -149,14 +183,14 @@ class testFeature(unittest.TestCase):
                 self._categorical_data[0])).normalized,
             tuple([0]*len(self._categorical_data)))
 
-        array = feature.FeatureSet(
+        set_ = feature.FeatureSet(
             feature.FeatureGenerator.categorical(
                 name=v, categories=tuple(self._categorical_data),
                 allow_missing=True)(v)
             for v in self._categorical_data)
-        missing_array = feature.change_array_to_missing(array)
+        missing_set = feature.change_set_to_missing(set_)
         self.assertEqual(
-            next(iter(missing_array)).normalized,
+            next(iter(missing_set)).normalized,
             tuple([0]*len(self._categorical_data)))
 
         with self.assertRaises(TypeError):

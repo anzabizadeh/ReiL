@@ -10,6 +10,8 @@ INFO = 20
 DEBUG = 10
 NOTSET = 0
 
+DEFAULT_FORMAT = ' %(name)s :: %(levelname)-8s :: %(message)s'
+
 
 class Logger:
     def __init__(
@@ -19,7 +21,7 @@ class Logger:
         self._name = logger_name
         self._level = logger_level or logging.WARNING
         self._filename = logger_filename
-        self._fmt = fmt or ' %(name)s :: %(levelname)-8s :: %(message)s'
+        self._fmt = fmt or DEFAULT_FORMAT
 
         self._logger = logging.getLogger(self._name)
         self._logger.setLevel(self._level)
@@ -34,6 +36,13 @@ class Logger:
         else:
             self._logger.debug(
                 f'logger {self._name} already has a handler.')
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        return cls(**config)
+
+    def get_config(self) -> Dict[str, Any]:
+        return self.__getstate__()
 
     def debug(self, msg: str):
         self._logger.debug(msg)
@@ -54,14 +63,17 @@ class Logger:
         self._logger.critical(msg)
 
     def __getstate__(self):
-        return {
-                '_name': self._name,
-                '_level': self._level,
-                '_filename': self._filename,
-                '_fmt': self._fmt
-        }
+        state = dict(
+            logger_name=self._name,
+            logger_level=self._level,
+            logger_filename=self._filename)
+
+        if self._fmt != DEFAULT_FORMAT:
+            state.update({'fmt': self._fmt})
+
+        return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         self.__init__(
-            logger_name=state['_name'], logger_level=state.get('_level'),
-            logger_filename=state.get('_filename'), fmt=state.get('_fmt'))
+            logger_name=state['name'], logger_level=state.get('level'),
+            logger_filename=state.get('filename'), fmt=state.get('fmt'))

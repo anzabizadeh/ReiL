@@ -106,7 +106,7 @@ class DeepActorCriticModel(keras.Model):
         self.compile(optimizer=keras.optimizers.Adam(
             learning_rate=self._learning_rate))
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         config: Dict[str, Any] = dict(
             output_lengths=self._output_lengths,
             shared_layer_sizes=self._shared_layer_sizes,

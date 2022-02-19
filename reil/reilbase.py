@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import pathlib
 from typing import Any, Dict, List, Optional, Union
+import reil
 
 from reil.logger import Logger
-from reil.pickler import PickleMe
+from reil.serialization import PickleMe, deserialize
 
 
 class ReilBase:
@@ -29,7 +30,7 @@ class ReilBase:
             logger_level: Optional[int] = None,
             logger_filename: Optional[str] = None,
             persistent_attributes: Optional[List[str]] = None,
-            save_zipped: bool = False):
+            save_zipped: Optional[bool] = None):
         '''
         Arguments
         ---------
@@ -115,6 +116,26 @@ class ReilBase:
 
         return instance
 
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        internal_states = config.pop('internal_states', {})
+        args = deserialize(config)
+        instance = cls(**args)
+        instance.__dict__.update(internal_states)
+
+        return instance
+
+    def get_config(self) -> Dict[str, Any]:
+        config: Dict[str, Any] = dict(
+            name=self._name, path=self._path, save_zipped=self._save_zipped)
+
+        config.update(self._logger.get_config())
+        config.update({
+            'internal_states': {
+                '_persistent_attributes': self._persistent_attributes}})
+
+        return config
+
     def load(
             self, filename: str,
             path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
@@ -137,7 +158,9 @@ class ReilBase:
         RuntimeError
             Corrupted or inaccessible data file.
         '''
-        pickler = PickleMe.get('pbz2' if self._save_zipped else 'pkl')
+        fmt = reil.FILE_FORMAT if self._save_zipped is None else (
+            'pbz2' if self._save_zipped else 'pkl')
+        pickler = PickleMe.get(fmt)
         new_instance = pickler.load(filename=filename, path=path or self._path)
 
         for key in set(
@@ -168,7 +191,9 @@ class ReilBase:
             a `Path` object to the location of the saved file and its name
             as `str`
         '''
-        pickler = PickleMe.get('pbz2' if self._save_zipped else 'pkl')
+        fmt = reil.FILE_FORMAT if self._save_zipped is None else (
+            'pbz2' if self._save_zipped else 'pkl')
+        pickler = PickleMe.get(fmt)
         return pickler.dump(
             obj=self, filename=filename or self._name,
             path=path or self._path)

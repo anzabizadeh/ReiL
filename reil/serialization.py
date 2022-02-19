@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import bz2
+import importlib
+import inspect
 import logging
+import sys
 import time
 from pathlib import Path, PurePath
-from typing import Any, Callable, List, Protocol, Union
+from typing import Any, Callable, Dict, List, Protocol, Union
 
 import dill as pickle
 
@@ -20,6 +23,9 @@ class CustomUnPickler(pickle.Unpickler):
         if name == 'EnvironmentStaticMap':
             from reil.environments.sequential import Sequential
             return Sequential
+        if name == 'QDense':
+            from reil.learners.q_learner import QLearner
+            return QLearner
 
         return super().find_class(module, name)  # type: ignore
 
@@ -148,3 +154,41 @@ class PicklerManager:
 
 PickleMe = PicklerManager(
     low_level_picklers=[DefaultPickler(), ZippedPickler()])
+
+
+def full_qualname(obj: Any):
+    return '>'.join((obj.__class__.__module__, obj.__class__.__qualname__))
+
+def get_class_from_name(qualname: str):
+    module_name, class_name = qualname.split(sep='>')
+    module = sys.modules.get(module_name)
+    if module is None:
+        module = importlib.import_module(module_name)
+
+    return getattr(module, class_name)
+
+def serialize(obj: Any):
+    # if inspect.isclass(obj):
+    if hasattr(obj, 'get_config'):
+        return {
+            'class_name': full_qualname(obj),
+            'config': obj.get_config(),
+            '__needs_deserialization__': True
+        }
+    else:
+        raise TypeError(
+            'Could not find `get_config` method for class '
+            f'{obj.__class__.__qualname__}')
+
+def deserialize(object_info: Dict[str, Any]):
+    # The commented section only goes one layer down which might not be enough.
+    # So, better not rely on it, and implement per class instead!
+    # for key, value in object_info.items():
+    #     if isinstance(value, dict) and '__needs_deserialization__' in value:
+    #         object_info[key] = deserialize(value)
+
+    if object_info.get('__needs_deserialization__', False):
+        return get_class_from_name(
+            object_info['class_name']).from_config(object_info['config'])
+
+    return object_info
