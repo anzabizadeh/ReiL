@@ -6,11 +6,12 @@ HealthSubject class
 This `HealthSubject` class implements interaction with patients.
 '''
 
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from reil.datatypes.feature import (MISSING, Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
 from reil.healthcare.patient import Patient
+from reil.serialization import deserialize, full_qualname, get_class_from_name, serialize
 from reil.subjects.subject import Subject
 
 
@@ -69,6 +70,7 @@ class HealthSubject(Subject):
         self._interval_step = interval_step
         self._measurement_range = measurement_range
         self._measurement_name = measurement_name
+        self._actions_taken: List[FeatureSet] = []
 
         self._max_day = max_day
 
@@ -99,7 +101,59 @@ class HealthSubject(Subject):
 
         HealthSubject._generate_state_defs(self)
 
-        self.reset()
+        self._day: int = 0
+        self._full_measurement_history = [0.0] * self._max_day
+        self._full_dose_history = [0.0] * self._max_day
+        self._decision_points_measurement_history = [0.0] * (self._max_day + 1)
+        self._decision_points_dose_history = [0.0] * self._max_day
+        self._decision_points_interval_history: List[int] = [1] * self._max_day
+        self._decision_points_index: int = 0
+        self._actions_taken = []
+
+        self._full_measurement_history[0] = self._patient.model(
+            measurement_days=[0])[self._measurement_name][-1]
+        self._decision_points_measurement_history[0] = \
+            self._full_measurement_history[0]
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        patient_info = config['patient']
+        if patient_info is not None:
+            config['patient'] = deserialize(patient_info)
+
+        actions_taken = config['internal_states'].pop(
+            '_actions_taken', [])
+
+        instance = super().from_config(config)
+        for action in actions_taken:
+            a: FeatureSet = deserialize(action)  # type: ignore
+            instance.take_effect(a)
+
+        return instance
+
+    def get_config(self) -> Dict[str, Any]:
+        config = super().get_config()
+        if self._patient is None:
+            config.update({'patient': None})
+        else:
+            config.update({'patient': serialize(self._patient)})
+        config.update(dict(
+            measurement_name=self._measurement_name,
+            measurement_range=self._measurement_range,
+            dose_range=self._dose_range,
+            dose_step=self._dose_step,
+            interval_range=self._interval_range,
+            interval_step=self._interval_step,
+            max_day=self._max_day
+            ))
+        # Since we need to take actions again, dose list of the model should
+        # be cleared.
+        if config['patient']:
+            config['patient']['config']['model']['config']['dose'] = {}
+        config['internal_states']['_actions_taken'] = [
+            serialize(action) for action in self._actions_taken]
+
+        return config
 
     def _generate_state_defs(self):
         if 'day' not in self.state.definitions:
@@ -134,6 +188,8 @@ class HealthSubject(Subject):
     def _take_effect(
             self, action: FeatureSet, _id: int = 0
     ) -> FeatureSet:
+        self._actions_taken.append(action)
+
         action_temp = action.value
         current_dose = float(action_temp['dose'])  # type: ignore
         current_interval = min(int(action_temp['interval']),  # type: ignore
@@ -180,6 +236,7 @@ class HealthSubject(Subject):
         self._decision_points_dose_history = [0.0] * self._max_day
         self._decision_points_interval_history: List[int] = [1] * self._max_day
         self._decision_points_index: int = 0
+        self._actions_taken = []
 
         self._full_measurement_history[0] = self._patient.model(
             measurement_days=[0])[self._measurement_name][-1]
