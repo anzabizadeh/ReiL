@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 Feature, FeatureGenerator, FeatureSet classes
-===============================================
+=============================================
 
 `FeatureSet` is The main datatype used to communicate `state`s, `action`s,
 and `reward`s, between objects in `reil`. `FeatureSet` is basically a
@@ -20,6 +20,8 @@ from functools import cached_property
 from math import isclose
 from typing import (Any, Callable, Dict, Generator, Iterable, Iterator, List,
                     Literal, Optional, Tuple, Union)
+
+from reil.serialization import deserialize, full_qualname
 
 MISSING = '__missing_feature__'
 
@@ -111,6 +113,26 @@ class Feature:
             name=name, value=value, is_numerical=False,
             categories=categories, normalized=normalized, index=index)
 
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        try:
+            is_numerical = config.pop('is_numerical')
+            if is_numerical:
+                return cls.numerical(**config)
+            return cls.categorical(**config)
+        except KeyError:
+            return cls(**config)
+
+    def get_config(self) -> Dict[str, Any]:
+        config = {
+            key: value
+            for key, value in self.__dict__.items()
+            if value is not None}
+
+        del config['dict_fields']
+
+        return config
+
     @cached_property
     def as_dict(self):
         '''
@@ -131,7 +153,7 @@ class Feature:
                 f"'{my_type}' and '{type(other)}'")
 
         for k, v in self.__dict__.items():
-            if k not in ('value', 'normalized'):
+            if k not in ('value', 'normalized', 'index'):
                 if other.__dict__[k] != v:
                     raise TypeError(
                         f'Different {k} values: {v} != {other.__dict__[k]}.')
@@ -146,7 +168,6 @@ class Feature:
             return my_type.categorical(
                 name=self.name, value=new_value,
                 categories=self.__dict__.get('categories'))
-
 
 NoneFeature = Feature('None')
 
@@ -265,6 +286,29 @@ class FeatureGenerator:
             generator=generator, randomized=randomized,
             allow_missing=allow_missing)
 
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        step = config.get('step')
+        is_numerical = config.pop('is_numerical')
+        if is_numerical:
+            if step:
+                return cls.discrete(**config)
+            return cls.continuous(**config)
+        return cls.categorical(**config)
+
+    def get_config(self) -> Dict[str, Any]:
+        config = {
+            key: value
+            for key, value in self.__dict__.items()
+            if value is not None and key not in ('recent_value', 'normalizer')}
+
+        if 'count' in config:
+            del config['count']
+        if self.is_numerical:
+            del config['allow_missing']
+
+        return config
+
     def __post_init__(self):
         self.__dict__['recent_value'] = (None, None)
 
@@ -357,7 +401,6 @@ class FeatureGenerator:
             normalizer[MISSING] = tuple([0] * cat_count)
 
         self.__dict__['normalizer'] = normalizer
-        self.__dict__['iterable'] = True
 
     def _process_numerical(self):
         lower: Optional[float] = self.lower  # type: ignore
@@ -552,6 +595,22 @@ class FeatureSet:
                 raise TypeError(f'Unknown input type {type(d)} for item: {d}')
 
         self._data = temp
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        return cls(
+            data=(
+                deserialize(feature)  # type: ignore
+                for feature in config.get('data', {})))
+
+    def get_config(self) -> Dict[str, Any]:
+        return {'data': [
+            {
+                'class_name': full_qualname(feature),
+                'config': feature.get_config(),
+                '__needs_deserialization__': True
+            }
+            for feature in self._data.values()]}
 
     @cached_property
     def value(self):
@@ -795,6 +854,28 @@ class FeatureGeneratorSet:
         }
 
         self.count = tuple(g.count for g in temp.values())
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        instance = cls(
+            feature_generators=(
+                deserialize(feature_gen)  # type: ignore
+                for feature_gen in config.get('feature_generators', [])))
+        instance.__dict__.update(config['internal_states'])
+
+        return instance
+
+    def get_config(self) -> Dict[str, Any]:
+        return {
+            'feature_generators': [
+                {
+                    'class_name': full_qualname(feature_gen),
+                    'config': feature_gen.get_config(),
+                    '__needs_deserialization__': True
+                }
+                for feature_gen in self._generators.values()],
+            'internal_states': {'_masked_values': self._masked_values}
+        }
 
     def __call__(
             self, value: Optional[Dict[str, Any]] = None) -> FeatureSet:
@@ -1068,7 +1149,7 @@ def change_to_missing(feature: Feature) -> Feature:
         name=feature.name, categories=categories, allow_missing=True)(MISSING)
 
 
-def change_array_to_missing(
+def change_set_to_missing(
         features: FeatureSet, suppress_error: bool = True) -> FeatureSet:
     def try_to_change(feature: Feature) -> Feature:
         try:
