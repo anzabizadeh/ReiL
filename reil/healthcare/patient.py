@@ -6,17 +6,22 @@ Patient class
 This class is the base class to model patients with different characteristics.
 '''
 
-from typing import Any, Dict
+from copy import deepcopy
+from typing import Any, Dict, Optional
+import reil
 
 from reil.datatypes.feature import FeatureGeneratorSet
 from reil.healthcare.mathematical_models import HealthMathModel
+from reil.serialization import deserialize, full_qualname, get_class_from_name, serialize
 
 
 class Patient:
     '''
     Base class for patients in healthcare.
     '''
-    def __init__(self, model: HealthMathModel, **feature_values: Any) -> None:
+    def __init__(
+            self, model: HealthMathModel, random_seed: Optional[int] = None,
+            **feature_values: Any) -> None:
         '''
         Parameters
         ----------
@@ -31,12 +36,48 @@ class Patient:
         if not hasattr(self, 'feature_gen_set'):
             self.feature_gen_set = FeatureGeneratorSet()
 
-        self.feature_set = self.feature_gen_set(feature_values)
-
+        self._random_seed = random_seed
         self._model = model
-        self.feature_set.update(
-            self._model.generate(self.feature_set, **feature_values))
-        self._model.setup(self.feature_set)
+
+        rnd_generators = reil.random_generators_from_seed(random_seed)
+        with reil.random_generator_context(*rnd_generators):
+            self.feature_set = self.feature_gen_set(feature_values)
+
+            self.feature_set.update(
+                self._model.generate(
+                    random_seed=random_seed, input_features=self.feature_set,
+                    **feature_values))
+        self._model.setup(self.feature_set, random_seed=self._random_seed)
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        # Created a model first to initiate the Patient. Then here replace
+        # it with the loaded model.
+        internal_states = config.pop('internal_states', {})
+
+        model_config = config.pop('model')
+
+        model_init: HealthMathModel = deserialize(model_config)  # type: ignore
+        model_copy = deepcopy(model_init)
+        config['model'] = model_init
+        instance = cls(**config)
+
+        for key, value in internal_states.items():
+            instance.__dict__[key] = deserialize(value)
+
+        instance._model = model_copy
+
+        return instance
+
+    def get_config(self) -> Dict[str, Any]:
+        config = dict(
+            model=serialize(self._model),
+            internal_states={
+                'feature_gen_set': serialize(self.feature_gen_set),
+                'feature_set': serialize(self.feature_set)},
+            random_seed=self._random_seed)
+
+        return config
 
     def generate(self) -> None:
         '''
@@ -45,10 +86,14 @@ class Patient:
         This method calls every `feature`, and then sets
         up to `model` using the new values.
         '''
-        self.feature_set = self.feature_gen_set()
 
-        self.feature_set.update(self._model.generate(self.feature_set))
-        self._model.setup(self.feature_set)
+        rnd_generators = reil.random_generators_from_seed(self._random_seed)
+        with reil.random_generator_context(*rnd_generators):
+            self.feature_set = self.feature_gen_set()
+
+        self.feature_set.update(
+            self._model.generate(self._random_seed, self.feature_set))
+        self._model.setup(self.feature_set, random_seed=self._random_seed)
 
     def model(self, **inputs: Any) -> Dict[str, Any]:
         '''Model patient's behavior.

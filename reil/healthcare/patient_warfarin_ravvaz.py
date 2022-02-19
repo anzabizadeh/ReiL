@@ -23,11 +23,13 @@ Features included in this model are:
 * V2
 * EC_50
 '''
-from typing import Any
+from copy import deepcopy
+from typing import Any, Dict, Optional
 
 from reil.datatypes.feature import FeatureGenerator, FeatureGeneratorSet
 from reil.healthcare.patient import Patient
 from reil.healthcare.mathematical_models import HealthMathModel
+from reil.serialization import serialize
 from reil.utils.functions import random_categorical, random_normal_truncated
 
 
@@ -35,6 +37,7 @@ class PatientWarfarinRavvaz(Patient):
     def __init__(
             self,
             model: HealthMathModel,
+            random_seed: Optional[int] = None,
             randomized: bool = True,
             allow_missing_genotypes: bool = True,
             **feature_values: Any) -> None:
@@ -129,7 +132,7 @@ class PatientWarfarinRavvaz(Patient):
             allow_missing=allow_missing_genotypes)
 
         self._randomized = randomized
-        super().__init__(model, **feature_values)
+        super().__init__(model, random_seed, **feature_values)
 
     def generate(self) -> None:
         super().generate()
@@ -157,3 +160,11 @@ class PatientWarfarinRavvaz(Patient):
                 f'Unknown CYP2C9 and VKORC1 combination: {combo}.')
 
         self.feature_set += self._sensitivity_gen(s)
+
+    def get_config(self) -> Dict[str, Any]:
+        config = super().get_config()
+        config.update({'randomized': self._randomized})
+        config['internal_states'].update(
+            {'sensitivity_gen': serialize(self._sensitivity_gen)})
+
+        return config

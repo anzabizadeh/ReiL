@@ -156,6 +156,13 @@ class Warfarin(HealthSubject):
         Warfarin._generate_reward_defs(self)
         Warfarin._generate_statistic_defs(self)
 
+    def get_config(self) -> Dict[str, Any]:
+        config = super().get_config()
+        del config['measurement_name']
+        config['INR_range'] = config.pop('measurement_range')
+
+        return config
+
     def _generate_state_defs(self):
         current_defs = self.state.definitions
         for name, args in state_definitions.items():
