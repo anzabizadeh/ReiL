@@ -43,7 +43,101 @@ legacy
 
 @author: Sadjad Anzabi Zadeh (sadjad-anzabizadeh@uiowa.edu)
 '''
+import logging
+import random
+from contextlib import contextmanager
+from typing import Literal, Optional
+
+import numpy as np
+import tensorflow as tf
 
 from ._version import get_versions
+
 __version__ = get_versions()['version']  # type: ignore
 del get_versions
+
+
+FILE_FORMAT: Literal['pbz2', 'pkl'] = 'pkl'
+
+RANDOM_SEED = None
+RANDOM_GENERATOR = random.SystemRandom()
+RANDOM_GENERATOR_NP = np.random.default_rng()
+RANDOM_GENERATOR_TF = tf.random.get_global_generator()
+
+
+def random_generator():
+    return RANDOM_GENERATOR
+
+def random_generator_np():
+    return RANDOM_GENERATOR_NP
+
+def random_generator_tf():
+    return RANDOM_GENERATOR_TF
+
+
+def random_generators_from_seed(seed: Optional[int] = None):
+    if seed is None:
+        return (RANDOM_GENERATOR, RANDOM_GENERATOR_NP, RANDOM_GENERATOR_TF)
+
+    return (
+        random.Random(seed),
+        np.random.default_rng(seed),  # type: ignore
+        tf.random.Generator.from_seed(seed))
+
+
+def set_reil_random_seed(seed):
+    global RANDOM_SEED
+    global RANDOM_GENERATOR
+    global RANDOM_GENERATOR_NP
+    global RANDOM_GENERATOR_TF
+
+    RANDOM_SEED = seed
+
+    if seed is None:
+        RANDOM_GENERATOR = random.SystemRandom()
+        RANDOM_GENERATOR_NP = np.random.default_rng()
+        RANDOM_GENERATOR_TF = tf.random.get_global_generator()
+    else:
+        RANDOM_GENERATOR, RANDOM_GENERATOR_NP, RANDOM_GENERATOR_TF = \
+        random_generators_from_seed(RANDOM_SEED)
+
+@contextmanager
+def random_generator_context(
+        gen = None, gen_np = None, gen_tf = None):
+    global RANDOM_GENERATOR
+    global RANDOM_GENERATOR_NP
+    global RANDOM_GENERATOR_TF
+
+    temp = RANDOM_GENERATOR
+    temp_np = RANDOM_GENERATOR_NP
+    temp_tf = RANDOM_GENERATOR_TF
+    try:
+        gen_list = []
+        if gen:
+            RANDOM_GENERATOR = gen
+            gen_list.append(RANDOM_GENERATOR)
+        if gen_np:
+            RANDOM_GENERATOR_NP = gen_np
+            gen_list.append(RANDOM_GENERATOR_NP)
+        if gen_tf:
+            RANDOM_GENERATOR_TF = gen_tf
+            gen_list.append(RANDOM_GENERATOR_TF)
+        if len(gen_list) == 1:
+            yield gen_list[0]
+        else:
+            yield gen_list
+    finally:
+        RANDOM_GENERATOR = temp
+        RANDOM_GENERATOR_NP = temp_np
+        RANDOM_GENERATOR_TF = temp_tf
+
+
+def set_file_format(fmt: Literal['pbz2', 'pkl']):
+    global FILE_FORMAT
+
+    if fmt not in ('pbz2', 'pkl'):
+        logging.warn(
+            f'Unknown file format skipped: {fmt}. '
+            f'Current format: {FILE_FORMAT}.')
+    else:
+        FILE_FORMAT = fmt

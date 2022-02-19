@@ -7,11 +7,11 @@ Contains some useful functions.
 '''
 
 import math
-import random
-from typing import Any, Callable, Iterable, List, Optional, Tuple, TypeVar
+from typing import Any, Callable, Iterable, Optional, Tuple, TypeVar
 
 import numpy as np
-from reil.datatypes.feature import FeatureSet, FeatureGenerator
+from reil import random_generator, random_generator_np
+from reil.datatypes.feature import FeatureGenerator, FeatureSet
 from scipy.stats import lognorm  # type: ignore
 
 Categorical = TypeVar('Categorical')
@@ -23,12 +23,12 @@ def random_choice(f: Any):
     This function allows `yaml` config files to use `random.choice`
     as part of `reil` module.
     '''
-    return random.choice(f)
+    return random_generator().choice(f)
 
 
 def random_uniform(f: FeatureGenerator) -> float:
     if f.randomized:
-        return np.random.uniform(f.lower, f.upper)  # type: ignore
+        return random_generator_np().uniform(f.lower, f.upper)  # type: ignore
 
     if f.mean is not None:
         return f.mean
@@ -41,7 +41,7 @@ def random_uniform(f: FeatureGenerator) -> float:
 
 def random_normal(f: FeatureGenerator) -> float:
     if f.randomized:
-        return np.random.normal(f.mean, f.stdev)  # type: ignore
+        return random_generator_np().normal(f.mean, f.stdev)  # type: ignore
 
     if f.mean is None:
         raise ValueError('mean should be a number.')
@@ -52,7 +52,7 @@ def random_normal(f: FeatureGenerator) -> float:
 def random_normal_truncated(f: FeatureGenerator) -> float:
     if f.randomized:
         return min(max(
-            np.random.normal(
+            random_generator_np().normal(
                 f.mean, f.stdev), f.lower), f.upper)  # type: ignore
 
     if f.mean is None:
@@ -68,6 +68,7 @@ def random_lognormal(f: FeatureGenerator) -> float:
         raise ValueError('mean should be a number.')
 
     if f.randomized:
+        lognorm.random_state = random_generator_np()
         return lognorm.rvs(s=f.stdev, scale=exp_mu)  # type: ignore
 
     return exp_mu
@@ -83,13 +84,15 @@ def random_lognormal_truncated(f: FeatureGenerator) -> float:
 
     if f.randomized:
         quartileRange = (0.25, 0.75)
+        rnd_np = random_generator_np()
+        # lognorm.random_state = rnd_np
         lnorm = lognorm(f.stdev, scale=exp_mu)  # type: ignore
-        qValues: Tuple[float, float] = lnorm.ppf(quartileRange)  # type: ignore
-        values: List[float] = list(
-            v for v in lnorm.rvs(size=1000)  # type: ignore
-            if (v > qValues[0]) & (v < qValues[1]))
+        firstQ, thirdQ = lnorm.ppf(quartileRange)
+        values = lnorm.rvs(size=1000, random_state=rnd_np)
+        values = values[
+            np.logical_and(firstQ < values, values < thirdQ)] # type: ignore
 
-        return random.sample(values, 1)[0]
+        return rnd_np.choice(values)
 
     return exp_mu
 
@@ -100,9 +103,10 @@ def random_categorical(f: FeatureGenerator) -> Any:
 
     if f.randomized:
         if (probs := f.probabilities) is None:
-            return random.choice(categories)
+            return random_generator().choice(categories)
         else:
-            return np.random.choice(categories, 1, p=probs)[0]  # type: ignore
+            return random_generator_np().choice(
+                categories, 1, p=probs)[0]  # type: ignore
 
     return categories[0]
 
