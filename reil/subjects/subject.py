@@ -160,6 +160,9 @@ class Subject(stateful.Stateful):
         self.possible_actions.set_default_definition(
             self._default_action_definition)
 
+        if '_action_taken' not in self.__dict__:
+            self._actions_taken = []
+
         # try:
         #     self._generate_reward_defs()
         # except NotImplementedError:
