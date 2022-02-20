@@ -28,6 +28,33 @@ eps = np.finfo(np.float32).eps.item()
 
 @keras.utils.register_keras_serializable(
     package='reil.learners.actor_critic_learner')
+class ActionRank(tf.keras.metrics.Metric):
+
+    def __init__(self, name='action_rank', **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.cumulative_rank = self.add_weight(
+            name='rank', initializer='zeros', dtype=tf.float32)
+
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None], dtype=tf.int32, name='y_true'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='y_pred'))
+    )
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        k = tf.shape(y_pred)[1]
+        ranks = tf.cast(tf.math.top_k(y_pred, k=k).indices, tf.float32)
+        self.cumulative_rank.assign_add(
+            tf.reduce_sum(ranks * tf.one_hot(y_true, depth=k)))
+
+    def result(self):
+        return self.cumulative_rank
+
+    def reset_states(self):
+        self.cumulative_rank.assign(0)
+
+
+@keras.utils.register_keras_serializable(
+    package='reil.learners.actor_critic_learner')
 class DeepActorCriticModel(keras.Model):
     def __init__(
             self,
@@ -60,6 +87,7 @@ class DeepActorCriticModel(keras.Model):
             'total_loss', dtype=tf.float32)
         self._actor_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
             'actor_accuracy', dtype=tf.float32)
+        self._action_rank = ActionRank()
         self._return = tf.keras.metrics.Mean(
             'return', dtype=tf.float32)
 
@@ -166,7 +194,7 @@ class DeepActorCriticModel(keras.Model):
             tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns')))
     def _gradients(
             self, x: tf.Tensor, y: tf.Tensor, returns: tf.Tensor):
-        print('tracing')
+        print('tracing _gradients')
         lengths = tf.constant(self._output_lengths)
         starts = tf.pad(lengths[:-1], [[1, 0]])
         ends = tf.math.cumsum(lengths)
@@ -179,9 +207,9 @@ class DeepActorCriticModel(keras.Model):
             name='normalized_returns')
 
         with tf.GradientTape() as tape:
-            logits, values = self(tf.squeeze(x, name='x'), training=True)
+            logits, values = self(x, training=True)
             logits_concat = tf.concat(logits, axis=1, name='all_logits')
-            values: tf.Tensor = tf.squeeze(values, name='values')
+            # values: tf.Tensor = tf.squeeze(values, name='values')
 
             if self._entropy_loss_coef:
                 entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
@@ -209,18 +237,77 @@ class DeepActorCriticModel(keras.Model):
                 actor_loss += _loss
 
                 self._actor_accuracy.update_state(y_slice, logits_slice)
+                self._action_rank.update_state(y_slice, logits_slice)
 
             total_loss = actor_loss + critic_loss + entropy_loss
 
-            self._actor_loss.update_state(actor_loss)
-            self._critic_loss.update_state(critic_loss)
-            self._entropy_loss.update_state(entropy_loss)
-            self._total_loss.update_state(total_loss)
+        self._actor_loss.update_state(actor_loss)
+        self._critic_loss.update_state(critic_loss)
+        self._entropy_loss.update_state(entropy_loss)
+        self._total_loss.update_state(total_loss)
  
         return tape.gradient(total_loss, self.trainable_variables)
 
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='X'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.int32, name='Y'),
+            tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns')))
+    def _metrics_only(
+            self, x: tf.Tensor, y: tf.Tensor, returns: tf.Tensor):
+        print('tracing _metrics_only')
+        lengths = tf.constant(self._output_lengths)
+        starts = tf.pad(lengths[:-1], [[1, 0]])
+        ends = tf.math.cumsum(lengths)
+
+        m = len(lengths)
+
+        returns = tf.divide(
+            returns - tf.math.reduce_mean(returns),
+            tf.math.reduce_std(returns) + eps,
+            name='normalized_returns')
+
+        logits, values = self(x, training=False)
+        logits_concat = tf.concat(logits, axis=1, name='all_logits')
+        # values: tf.Tensor = tf.squeeze(values, name='values')
+
+        if self._entropy_loss_coef:
+            entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
+                logits_concat * tf.math.exp(logits_concat))
+        else:
+            entropy_loss = 0.0
+
+        if self._critic_loss_coef:
+            critic_loss = self._critic_loss_coef * huber_loss(
+                y_true=values, y_pred=returns)
+        else:
+            critic_loss = 0.0
+
+        advantage = tf.stop_gradient(
+            tf.subtract(returns, values, name='advantage'))
+
+        actor_loss = tf.constant(0.0)
+        for j in tf.range(m):
+            logits_slice = logits_concat[:, starts[j]:ends[j]]
+            y_slice = y[:, j]  # type: ignore
+            action_probs = tfp.distributions.Categorical(
+                logits=logits_slice)
+            log_prob = action_probs.log_prob(y_slice)
+            _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
+            actor_loss += _loss
+
+            self._actor_accuracy.update_state(y_slice, logits_slice)
+            self._action_rank.update_state(y_slice, logits_slice)
+
+        total_loss = actor_loss + critic_loss + entropy_loss
+
+        self._actor_loss.update_state(actor_loss)
+        self._critic_loss.update_state(critic_loss)
+        self._entropy_loss.update_state(entropy_loss)
+        self._total_loss.update_state(total_loss)
+
     def train_step(self, data):
-        x, y, returns = data
+        x, (y, returns) = data
 
         self._return.update_state(returns[0])
 
@@ -241,6 +328,19 @@ class DeepActorCriticModel(keras.Model):
         #         )
 
         self.optimizer.apply_gradients(zip(gradient, self.trainable_variables))
+
+        metrics = {metric.name: metric.result() for metric in self.metrics}
+
+        metrics.update({loss.name: loss.result() for loss in self.losses})
+
+        return metrics
+
+    def test_step(self, data):
+        x, (y, returns) = data
+
+        self._return.update_state(returns[0])
+
+        self._metrics_only(x, y, returns)
 
         metrics = {metric.name: metric.result() for metric in self.metrics}
 
@@ -337,12 +437,15 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
         G = tf.convert_to_tensor(G_temp, dtype=tf.float32)
         _Y: tf.Tensor = tf.convert_to_tensor(Y_temp)
 
-        metrics = self._model.train_step((_X, _Y, G))
+        # metrics = self._model.train_step((_X, (_Y, G)))
+        metrics = self._model.fit(
+            x=_X, y=(_Y, G), validation_split=0.3, verbose=0
+            ).history  # type: ignore
 
         if self._train_summary_writer:
             with self._train_summary_writer.as_default(step=self._iteration):
                 for name, value in metrics.items():
-                    tf.summary.scalar(name, value)
+                    tf.summary.scalar(name, value[0])
 
         self._iteration += 1
 
