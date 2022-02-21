@@ -33,7 +33,9 @@ class ActionRank(tf.keras.metrics.Metric):
     def __init__(self, name='action_rank', **kwargs):
         super().__init__(name=name, **kwargs)
         self.cumulative_rank = self.add_weight(
-            name='rank', initializer='zeros', dtype=tf.float32)
+            name='rank', initializer='zeros', dtype=tf.int32)
+        self.count = self.add_weight(
+            name='count', initializer='zeros', dtype=tf.int32)
 
     @tf.function(
         input_signature=(
@@ -41,16 +43,18 @@ class ActionRank(tf.keras.metrics.Metric):
             tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='y_pred'))
     )
     def update_state(self, y_true, y_pred, sample_weight=None):
-        k = tf.shape(y_pred)[1]
-        ranks = tf.cast(tf.math.top_k(y_pred, k=k).indices, tf.float32)
-        self.cumulative_rank.assign_add(
-            tf.reduce_sum(ranks * tf.one_hot(y_true, depth=k)))
+        shape = tf.shape(y_pred)
+        ranks = tf.math.top_k(y_pred, k=shape[1]).indices
+        one_hot = tf.one_hot(y_true, depth=shape[1], dtype=tf.int32)
+        self.count.assign_add(shape[0])
+        self.cumulative_rank.assign_add(tf.reduce_sum(ranks * one_hot))
 
     def result(self):
-        return self.cumulative_rank
+        return self.cumulative_rank / self.count
 
     def reset_states(self):
         self.cumulative_rank.assign(0)
+        self.count.assign(0)
 
 
 @keras.utils.register_keras_serializable(
@@ -392,7 +396,15 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
                 f'-{tensorboard_filename}' or '')
             self._train_summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                str(self._tensorboard_path / self._tensorboard_filename))
+                str(
+                    self._tensorboard_path /
+                    self._tensorboard_filename / 'train'))
+
+            self._validation_summary_writer = \
+                tf.summary.create_file_writer(  # type: ignore
+                str(
+                    self._tensorboard_path /
+                    self._tensorboard_filename / 'validation'))
 
     def predict(
             self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
@@ -443,8 +455,23 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
             ).history  # type: ignore
 
         if self._train_summary_writer:
+            training_metrics = {
+                key: value
+                for key, value in metrics.items()
+                if not key.startswith('val_')}
+
+            validation_metrics = {
+                key[4:]: value
+                for key, value in metrics.items()
+                if key.startswith('val_')}
+
             with self._train_summary_writer.as_default(step=self._iteration):
-                for name, value in metrics.items():
+                for name, value in training_metrics.items():
+                    tf.summary.scalar(name, value[0])
+
+            with self._validation_summary_writer.as_default(
+                    step=self._iteration):
+                for name, value in validation_metrics.items():
                     tf.summary.scalar(name, value[0])
 
         self._iteration += 1
