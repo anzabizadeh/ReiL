@@ -10,6 +10,7 @@ import pathlib
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import tensorflow as tf
+import tensorflow.keras.optimizers.schedules as k_sch
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
@@ -22,7 +23,8 @@ from tensorflow import keras
 class DeepQModel(keras.Model):
     def __init__(
             self,
-            learning_rate: Union[float, keras.optimizers.schedules.LearningRateSchedule],
+            learning_rate: Union[
+                float, keras.optimizers.schedules.LearningRateSchedule],
             validation_split: float = 0.3,
             hidden_layer_sizes: Tuple[int, ...] = (1,)):
         super().__init__()
@@ -34,151 +36,93 @@ class DeepQModel(keras.Model):
         self._hidden_layer_sizes = hidden_layer_sizes
         self._learning_rate = learning_rate
 
-        self._metrics = {}
-
-    @property
-    def metrics(self):
-        return list(self._metrics.values())
-
-    def build(self, input_shape: Tuple[int, ...]):
-        self._inputs = [
-            keras.Input(shape=(shape,), name=name)
-            for name, shape in zip(
-                ('state', 'action'), input_shape)]  # type: ignore
+    def build(self, input_shape: Tuple[Tuple[int, ...], Tuple[int, ...]]):
+        self._state_shape = [None, *input_shape[0][1:]]
+        self._action_shape =[None, *input_shape[1][1:]]
 
         self._concat = BroadcastAndConcatLayer(name='concat')
 
-        self._layers = [
+        self._dense_layers = [
             keras.layers.Dense(
                 size, activation='relu', name=f'layer_{i:0>2}')
             for i, size in enumerate(self._hidden_layer_sizes, 1)]
 
         self._output = keras.layers.Dense(1, name='Q')
 
-        max_layer = MaxLayer(name='max')
-        argmax_layer = ArgMaxLayer(name='argmax')
+        self._max_layer = MaxLayer(name='max')
+        self._argmax_layer = ArgMaxLayer(name='argmax')
 
-        self._model = keras.Model(self._inputs, output, name='Q_network')
-        self._max = keras.Model(self._inputs, max_layer, name='max_Q')
-        self._argmax = keras.Model(self._inputs, argmax, name='argmax_Q')
+        # self._model = keras.Model(self._inputs, self._output, name='Q_network')
+        # self._max = keras.Model(self._inputs, max_layer, name='max_Q')
+        # self._argmax = keras.Model(self._inputs, argmax_layer, name='argmax_Q')
 
-        self._model.compile(
+        self.compile(
             optimizer=keras.optimizers.Adam(
                 learning_rate=self._learning_rate), loss='mae')
 
-        self.optimizer = keras.optimizers.Adam(
-            learning_rate=self._learning_rate)
-
     def call(self, inputs, training=None):
         x = inputs
-        for layer in self._shared:
+        x[0].set_shape(self._state_shape)
+        x[1].set_shape(self._action_shape)
+
+        x = self._concat(x)
+        for layer in self._dense_layers:
             x = layer(x, training=training)
 
-        x_actor = x_critic = x
+        return self._output(x)
 
-        for layer in self._actor_layers:
-            x_actor = layer(x_actor, training=training)
+    def max(self, inputs, training=None):
+        return self._max_layer(self(inputs, training))
 
-        for layer in self._critic_layers:
-            x_critic = layer(x_critic, training=training)
+    def argmax(self, inputs, training=None):
+        return self._argmax_layer(self(inputs, training))
 
-        logits = [
-            layer(x_actor) for layer in self._actor_outputs]
-        values = self._critic_output(x_critic)
+    def fit(
+            self, x=None, y=None, batch_size=None, epochs=1, verbose=1,
+            callbacks=None, validation_split=0, validation_data=None,
+            shuffle=True, class_weight=None, sample_weight=None,
+            initial_epoch=0, steps_per_epoch=None, validation_steps=None,
+            validation_batch_size=None, validation_freq=1,
+            max_queue_size=10, workers=1, use_multiprocessing=False):
 
-        return logits, values
+        try:
+            return super().fit(
+                x, y, batch_size, epochs, verbose, callbacks,
+                validation_split or self._validation_split, validation_data,
+                shuffle, class_weight, sample_weight,
+                initial_epoch, steps_per_epoch,
+                validation_steps, validation_batch_size, validation_freq,
+                max_queue_size, workers, use_multiprocessing)
+        except RuntimeError:
+            self.__call__(x)
+            return super().fit(
+                x, y, batch_size, epochs, verbose, callbacks,
+                validation_split or self._validation_split, validation_data,
+                shuffle, class_weight, sample_weight,
+                initial_epoch, steps_per_epoch,
+                validation_steps, validation_batch_size, validation_freq,
+                max_queue_size, workers, use_multiprocessing)
 
-    @tf.function(
-        input_signature=(
-            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='X'),
-            tf.TensorSpec(shape=[None, None], dtype=tf.int32, name='Y'),
-            tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns')))
-    def _gradients(
-            self, x: tf.Tensor, y: tf.Tensor, returns: tf.Tensor):
-        print('tracing')
-        lengths = tf.constant(self._output_lengths)
-        starts = tf.pad(lengths[:-1], [[1, 0]])
-        ends = tf.math.cumsum(lengths)
+    def get_config(self) -> Dict[str, Any]:
+        config: Dict[str, Any] = dict(
+            validation_split=self._validation_split,
+            hidden_layer_sizes=self._hidden_layer_sizes)
 
-        m = len(lengths)
+        if isinstance(
+                self._learning_rate, k_sch.LearningRateSchedule):
+            config.update(
+                {'learning_rate': k_sch.serialize(self._learning_rate)})
 
-        returns = tf.divide(
-            returns - tf.math.reduce_mean(returns),
-            tf.math.reduce_std(returns) + eps,
-            name='normalized_returns')
+        return config
 
-        with tf.GradientTape() as tape:
-            logits, values = self.call(
-                tf.squeeze(x, name='x'), training=True)
-            logits_concat = tf.concat(logits, axis=1, name='all_logits')
-            values: tf.Tensor = tf.squeeze(values, name='values')
+    @classmethod
+    def from_config(cls, config, custom_objects=None):
+        if 'learning_rate' in config:
+            if isinstance(config['learning_rate'], dict):
+                config['learning_rate'] = k_sch.deserialize(
+                    config['learning_rate'], custom_objects=custom_objects)
 
-            if self._entropy_loss_coef:
-                entropy_loss = self._entropy_loss_coef * tf.reduce_sum(logits_concat * tf.math.exp(logits_concat))
-            else:
-                entropy_loss = 0.0
-
-            if self._critic_loss_coef:
-                critic_loss = self._critic_loss_coef * huber_loss(
-                    y_true=values, y_pred=returns)
-            else:
-                critic_loss = 0.0
-
-            advantage = tf.stop_gradient(
-                tf.subtract(returns, values, name='advantage'))
-
-            actor_loss = tf.constant(0.0)
-            for j in tf.range(m):
-                logits_slice = logits_concat[:, starts[j]:ends[j]]
-                y_slice = y[:, j]  # type: ignore
-                action_probs = tfp.distributions.Categorical(
-                    logits=logits_slice)
-                log_prob = action_probs.log_prob(y_slice)
-                _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
-                actor_loss += _loss
-
-                self._metrics['actor_accuracy'].update_state(
-                    y_slice, logits_slice)
-
-            total_loss = actor_loss + critic_loss + entropy_loss
-
-            self._metrics['actor_loss'].update_state(actor_loss)
-            self._metrics['critic_loss'].update_state(critic_loss)
-            self._metrics['entropy_loss'].update_state(entropy_loss)
-            self._metrics['total_loss'].update_state(total_loss)
- 
-        return tape.gradient(total_loss, self.trainable_variables)
-
-    def train_step(self, data):
-        x, y, returns = data
-
-        self._metrics['return'].update_state(returns[0])
-
-        gradient = self._gradients(x, y, returns)
-
-        # If wanted to graph _gradients function in Tensorboard.
-        # ------------------------------------------------------
-        # if self._iteration:
-        #     gradient = self._gradients(_X, _Y, G)
-        # else:
-        #     tf.summary.trace_on(graph=True, profiler=True)
-        #     gradient = self._gradients(_X, _Y, G)
-        #     with self._train_summary_writer.as_default():
-        #         tf.summary.trace_export(
-        #             name='gradient',
-        #             step=0,
-        #             profiler_outdir=str(self._tensorboard_path)
-        #         )
-
-        self.optimizer.apply_gradients(zip(gradient, self.trainable_variables))
-
-        metrics = {
-            name: metric.result() for name, metric in self._metrics.items()}
-
-        return metrics
-
-
-
+        return cls(**config)
 
 
 class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
@@ -226,7 +170,7 @@ class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
             Validation split not in the range of (0.0, 1.0).
         '''
 
-        super().__init__(models=['_model'], **kwargs)
+        super().__init__({'_model': type(model)}, **kwargs)
 
         self._iteration: int = 0
 
@@ -246,49 +190,12 @@ class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
             # , histogram_freq=1)  #, write_images=True)
             self._callbacks.append(self._tensorboard)
 
-    def _generate_network(self) -> None:
-        '''
-        Generate a multilayer neural net using `keras.Dense`.
-        '''
-        inputs = [
-            keras.Input(shape=(shape,), name=name)
-            for name, shape in zip(
-                ('state', 'action'), self._input_lengths)]  # type: ignore
-
-        concat = BroadcastAndConcatLayer(name='concat')(inputs)
-
-        layer = keras.layers.Dense(
-            self._hidden_layer_sizes[0],
-            activation='relu', name='layer_01')(concat)
-
-        for i, size in enumerate(self._hidden_layer_sizes[1:]):
-            layer = keras.layers.Dense(
-                size, activation='relu', name=f'layer_{i+2:0>2}')(layer)
-
-        output = keras.layers.Dense(1, name='Q')(layer)
-
-        max_layer = MaxLayer(name='max')(output)
-        argmax = ArgMaxLayer(name='argmax')(output)
-
-        self._model = keras.Model(inputs, output, name='Q_network')
-        self._max = keras.Model(inputs, max_layer, name='max_Q')
-        self._argmax = keras.Model(inputs, argmax, name='argmax_Q')
-
-        self._model.compile(
-            optimizer=keras.optimizers.Adam(
-                learning_rate=self._learning_rate), loss='mae')
-
-        self._no_model = False
-
     def argmax(
             self, states: Tuple[FeatureSet, ...],
             actions: Tuple[FeatureSet, ...]) -> Tuple[FeatureSet, FeatureSet]:
         _X = [self.convert_to_tensor(states), self.convert_to_tensor(actions)]
-        if self._no_model:
-            self._input_lengths = tuple(x.shape[1] for x in _X)
-            self._generate_network()
 
-        index = self._argmax(_X).numpy()[0]
+        index = self._model.argmax(_X).numpy()[0]
         try:
             state = states[index]
         except IndexError:
@@ -304,18 +211,14 @@ class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
     def max(
             self, states: Tuple[FeatureSet, ...],
             actions: Tuple[FeatureSet, ...]) -> float:
-        result = self._max([
+        return self._model.max([
             self.convert_to_tensor(states), self.convert_to_tensor(actions)])
-
-        return result
 
     def predict(
             self, X: Tuple[Tuple[FeatureSet, ...], ...],
             training: Optional[bool] = None) -> Tuple[float, ...]:
-        result = self._model(
+        return self._model(
             [self.convert_to_tensor(x) for x in X], training=training)
-
-        return result
 
     def learn(
             self, X: Tuple[Tuple[FeatureSet, ...], ...],
@@ -332,15 +235,13 @@ class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
             A list of float labels for the learning model.
         '''
         _X = [self.convert_to_tensor(x) for x in X]
-        if self._no_model:
-            self._input_lengths = tuple(x.shape[1] for x in _X)
-            self._generate_network()
+
+        self._iteration += 1
 
         return self._model.fit(  # type: ignore
             _X, tf.convert_to_tensor(Y),  # type: ignore
             initial_epoch=self._iteration, epochs=self._iteration+1,
             callbacks=self._callbacks,
-            validation_split=self._validation_split,
             verbose=0)
 
     def reset(self) -> None:
@@ -348,25 +249,6 @@ class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
         reset the learner.
         '''
         self._iteration += 1
-
-    def __getstate__(self):
-        state = super().__getstate__()
-        state['_max'] = None
-        state['_argmax'] = None
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        super().__setstate__(state)
-
-        if not self._no_model:
-            inputs = self._model.inputs
-            output = self._model.output
-
-            max_layer = MaxLayer(name='max')(output)
-            argmax = ArgMaxLayer(name='argmax')(output)
-
-            self._max = keras.Model(inputs, max_layer, name='max_Q')
-            self._argmax = keras.Model(inputs, argmax, name='argmax_Q')
 
 
 if tf.__version__[0] == '1':  # type: ignore
