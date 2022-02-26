@@ -29,7 +29,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
     def __init__(
             self,
             learning_rate: Union[float, LearningRateScheduler],
-            validation_split: float = 0.3,
+            validation_split: float = 0.0,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
             tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
@@ -71,8 +71,8 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         self._hidden_layer_sizes = hidden_layer_sizes
         self._input_length = input_length
 
-        if not 0.0 < validation_split < 1.0:
-            raise ValueError('validation split should be in (0.0, 1.0).')
+        if not 0.0 <= validation_split < 1.0:
+            raise ValueError('validation split should be in [0.0, 1.0).')
 
         self._validation_split = validation_split
 
@@ -125,8 +125,8 @@ class Dense_tf_1(Learner[FeatureSet, float]):
             self._model.add(  # type: ignore
                 keras.layers.Dense(1, name='output'))
 
-            self._model.compile(  # type: ignore
-                optimizer=keras.optimizers.Adam(
+            self._model.compile(
+                optimizer=keras.optimizers.Adam(  # type: ignore
                     learning_rate=self._learning_rate.initial_lr), loss='mae')
 
         self._no_model = False
@@ -301,7 +301,7 @@ class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
     def __init__(
             self,
             learning_rate: Union[float, LearningRateScheduler],
-            validation_split: float = 0.3,
+            validation_split: float = 0.,
             hidden_layer_sizes: Tuple[int, ...] = (1,),
             input_length: Optional[int] = None,
             tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
@@ -337,15 +337,16 @@ class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
         '''
 
         super().__init__(
-            models=['_model'], learning_rate=learning_rate, **kwargs)
+            models={'_model': keras.models.Sequential},
+            learning_rate=learning_rate, **kwargs)
 
         self._iteration: int = 0
 
         self._hidden_layer_sizes = hidden_layer_sizes
         self._input_length = input_length
 
-        if not 0.0 < validation_split < 1.0:
-            raise ValueError('validation split should be in (0.0, 1.0).')
+        if not 0.0 <= validation_split < 1.0:
+            raise ValueError('validation split should be in [0.0, 1.0).')
 
         self._validation_split = validation_split
 
@@ -388,8 +389,8 @@ class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
 
         self._model.add(keras.layers.Dense(1, name='output'))  # type: ignore
 
-        self._model.compile(  # type: ignore
-            optimizer=keras.optimizers.Adam(
+        self._model.compile(
+            optimizer=keras.optimizers.Adam(  # type: ignore
                 learning_rate=self._learning_rate.initial_lr), loss='mae')
 
         self._no_model = False

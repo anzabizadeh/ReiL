@@ -25,12 +25,12 @@ class DeepQModel(keras.Model):
             self,
             learning_rate: Union[
                 float, keras.optimizers.schedules.LearningRateSchedule],
-            validation_split: float = 0.3,
+            validation_split: float = 0.0,
             hidden_layer_sizes: Tuple[int, ...] = (1,)):
         super().__init__()
 
-        if not 0.0 < validation_split < 1.0:
-            raise ValueError('validation split should be in (0.0, 1.0).')
+        if not 0.0 <= validation_split < 1.0:
+            raise ValueError('validation split should be in [0.0, 1.0).')
 
         self._validation_split = validation_split
         self._hidden_layer_sizes = hidden_layer_sizes
@@ -57,7 +57,7 @@ class DeepQModel(keras.Model):
         # self._argmax = keras.Model(self._inputs, argmax_layer, name='argmax_Q')
 
         self.compile(
-            optimizer=keras.optimizers.Adam(
+            optimizer=keras.optimizers.Adam(  # type: ignore
                 learning_rate=self._learning_rate), loss='mae')
 
     def call(self, inputs, training=None):
@@ -242,7 +242,7 @@ class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
             _X, tf.convert_to_tensor(Y),  # type: ignore
             initial_epoch=self._iteration, epochs=self._iteration+1,
             callbacks=self._callbacks,
-            verbose=0)
+            verbose=0).history
 
     def reset(self) -> None:
         '''
