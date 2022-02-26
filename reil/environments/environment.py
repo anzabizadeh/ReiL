@@ -8,7 +8,7 @@ on one or more `subjects`.
 '''
 import inspect
 from collections import defaultdict
-from typing import Any, Dict, Generator, NamedTuple, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, NamedTuple, Optional, Tuple, Union
 
 import pandas as pd
 from reil import stateful
@@ -19,6 +19,7 @@ from reil.datatypes.feature import FeatureSet
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 from reil.utils.instance_generator import InstanceGenerator
+from reil.utils.instance_generator_v2 import InstanceGeneratorV2
 
 AgentSubjectTuple = Tuple[str, str]
 EntityType = Union[AgentBase, Subject]
@@ -26,7 +27,12 @@ EntityGenType = Union[
     InstanceGenerator[AgentBase],
     InstanceGenerator[AgentDemon],
     InstanceGenerator[Subject],
-    InstanceGenerator[SubjectDemon]]  # type: ignore
+    InstanceGenerator[SubjectDemon],  # type: ignore
+    InstanceGeneratorV2[AgentBase],
+    InstanceGeneratorV2[AgentDemon],
+    InstanceGeneratorV2[Subject],
+    InstanceGeneratorV2[SubjectDemon],  # type: ignore
+]
 
 
 class Plan(NamedTuple):
@@ -60,6 +66,8 @@ class Environment(stateful.Stateful):
             demon_dict: Optional[Dict[str, Union[
                 AgentDemon, SubjectDemon, str]]] = None,
             interaction_plans: Optional[Dict[str, Any]] = None,
+            stopping_criteria: Optional[
+                Callable[[Dict[str, float]], bool]] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -85,6 +93,11 @@ class Environment(stateful.Stateful):
             Generator[Union[FeatureSet, None], Any, None]] = {}
         self._plans: Dict[str, Any] = {}
         self._active_plan: Plan = Plan()
+
+        if stopping_criteria is None:
+            self._stopping_criteria = lambda _: False
+        else:
+            self._stopping_criteria = stopping_criteria
 
         if entity_dict:
             self.add_entities(entity_dict)
@@ -146,7 +159,7 @@ class Environment(stateful.Stateful):
             else:
                 _obj = obj
 
-            if isinstance(_obj, InstanceGenerator):
+            if isinstance(_obj, (InstanceGenerator, InstanceGeneratorV2)):
                 self._instance_generators.update({name: _obj})
 
                 _, instance = next(_obj)
@@ -314,8 +327,7 @@ class Environment(stateful.Stateful):
     def interact(
             cls,
             agent_id: int,
-            agent_observer: Generator[
-                Union[FeatureSet, None], Any, None],
+            agent_observer: Generator[Union[FeatureSet, None], Any, None],
             subject_instance: Union[Subject, SubjectDemon],
             state_name: str,
             action_name: str,
@@ -550,7 +562,8 @@ class Environment(stateful.Stateful):
             self._agent_observers[a_s_name] = \
                 agent_instance.observe(s_id, a_stat)
 
-    def close_agent_observer(self, protocol: InteractionProtocol) -> None:
+    def close_agent_observer(
+            self, protocol: InteractionProtocol) -> Dict[str, float]:
         '''
         Close an `agent_observer` corresponding to `protocol`.
 
@@ -561,6 +574,11 @@ class Environment(stateful.Stateful):
         -----------
         protocol:
             The protocol whose `agent_observer` should be closed.
+
+        Returns
+        -------
+        :
+            A dictionary of metrics and losses.
 
         Notes
         -----
@@ -584,7 +602,7 @@ class Environment(stateful.Stateful):
 
         if inspect.getgeneratorstate(
                 self._agent_observers[a_s_names]) != inspect.GEN_SUSPENDED:
-            return
+            return {}
 
         a_id, _ = self._assignment_list[a_s_names]
         reward = subject_instance.reward(name=r_func_name, _id=a_id)
@@ -593,7 +611,10 @@ class Environment(stateful.Stateful):
         self._agent_observers[a_s_names].send({'reward': reward})
         self._agent_observers[a_s_names].send(
             {'state': state, 'actions': None, 'iteration': None})
+
         self._agent_observers[a_s_names].close()
+
+        return self._agents[agent_name]._metrics
 
     def reset_subject(self, subject_name: str) -> bool:
         '''

@@ -282,9 +282,12 @@ class Single(Environment):
         except AttributeError:
             raise ValueError('No active plan!')
 
-        self.close_agent_observer(plan)
+        metrics = self.close_agent_observer(plan)
         success = self.reset_subject(subject_name)
         self.register_protocol(plan, get_agent_observer=True)
+
+        if self._stopping_criteria(metrics):
+            return False
 
         return success
 
