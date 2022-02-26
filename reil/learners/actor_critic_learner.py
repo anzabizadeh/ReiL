@@ -8,7 +8,7 @@ output layer.
 '''
 import datetime
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -70,6 +70,7 @@ class DeepActorCriticModel(keras.Model):
             critic_layer_sizes: Tuple[int, ...] = (),
             critic_loss_coef: float = 1.0,
             entropy_loss_coef: float = 0.0,
+            baseline: Literal['V', 'Q'] = 'V',
         ):
         super().__init__()
 
@@ -80,6 +81,11 @@ class DeepActorCriticModel(keras.Model):
         self._critic_loss_coef = critic_loss_coef
         self._entropy_loss_coef = entropy_loss_coef
         self._learning_rate = learning_rate
+        self._baseline = baseline.upper()
+        if self._baseline not in ['V', 'Q']:
+            raise ValueError(
+                f'baseline can only be "V" or "Q". Got {baseline}.')
+
 
         self._actor_loss = tf.keras.metrics.Mean(
             'actor_loss', dtype=tf.float32)
@@ -95,29 +101,19 @@ class DeepActorCriticModel(keras.Model):
         self._return = tf.keras.metrics.Mean(
             'return', dtype=tf.float32)
 
-    # @property
-    # def metrics(self):
-    #     return [
-    #         self._actor_accuracy,
-    #         self._return
-    #     ]
-
-    # @property
-    # def losses(self):
-    #     return [
-    #         self._actor_loss,
-    #         self._critic_loss,
-    #         self._entropy_loss,
-    #         self._total_loss
-    #     ]
-
     def build(self, input_shape: Tuple[int, ...]):
         self._input_shape = [None, *input_shape[1:]]
+
+        if self._baseline == 'Q' and len(self._output_lengths) > 1:
+            def concat(x):
+                return tf.concat(x, axis=1)
+            self._concat = concat
+        else:
+            self._concat = tf.identity
+
         self._shared = [
             keras.layers.Dense(v, activation='relu', name=f'shared_{i+2:0>2}')
             for i, v in enumerate(self._shared_layer_sizes, 1)]
-
-        # self._shared[0] = self._shared[0](keras.Input(shape=input_shape))
 
         self._actor_layers = [
             keras.layers.Dense(v, activation='relu', name=f'actor_{i:0>2}')
@@ -135,7 +131,7 @@ class DeepActorCriticModel(keras.Model):
 
         self._critic_output = keras.layers.Dense(1, name='critic_output')
 
-        self.compile(optimizer=keras.optimizers.Adam(
+        self.compile(optimizer=keras.optimizers.Adam(  # type: ignore
             learning_rate=self._learning_rate))
 
     def get_config(self) -> Dict[str, Any]:
@@ -182,11 +178,15 @@ class DeepActorCriticModel(keras.Model):
         for layer in self._actor_layers:
             x_actor = layer(x_actor, training=training)
 
+        logits = [
+            layer(x_actor) for layer in self._actor_outputs]
+
+        if self._baseline == 'Q':
+            x_critic = tf.concat([self._concat(logits), x_critic], axis=1)
+
         for layer in self._critic_layers:
             x_critic = layer(x_critic, training=training)
 
-        logits = [
-            layer(x_actor) for layer in self._actor_outputs]
         values = self._critic_output(x_critic)
 
         return logits, values
@@ -213,7 +213,7 @@ class DeepActorCriticModel(keras.Model):
         with tf.GradientTape() as tape:
             logits, values = self(x, training=True)
             logits_concat = tf.concat(logits, axis=1, name='all_logits')
-            # values: tf.Tensor = tf.squeeze(values, name='values')
+            values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
 
             if self._entropy_loss_coef:
                 entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
@@ -273,7 +273,7 @@ class DeepActorCriticModel(keras.Model):
 
         logits, values = self(x, training=False)
         logits_concat = tf.concat(logits, axis=1, name='all_logits')
-        # values: tf.Tensor = tf.squeeze(values, name='values')
+        values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
 
         if self._entropy_loss_coef:
             entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
@@ -351,6 +351,275 @@ class DeepActorCriticModel(keras.Model):
         metrics.update({loss.name: loss.result() for loss in self.losses})
 
         return metrics
+
+
+@keras.utils.register_keras_serializable(
+    package='reil.learners.actor_critic_learner')
+class DeepActorCriticActionProximityModel(DeepActorCriticModel):
+    def __init__(
+            self,
+            output_lengths: List[int],
+            learning_rate: Union[float, k_sch.LearningRateSchedule],
+            shared_layer_sizes: Tuple[int, ...],
+            actor_layer_sizes: Tuple[int, ...] = (),
+            critic_layer_sizes: Tuple[int, ...] = (),
+            critic_loss_coef: float = 1.,
+            entropy_loss_coef: float = 0.,
+            effect_widths: Union[int, Tuple[int, ...]] = 0,
+            effect_decay_factors: Union[float, Tuple[float, ...]] = 0.,
+            effect_temporal_decay_factors: Union[float, Tuple[float, ...]] = 1.
+            ):
+        super().__init__(
+            output_lengths=output_lengths,
+            learning_rate=learning_rate,
+            shared_layer_sizes=shared_layer_sizes,
+            actor_layer_sizes=actor_layer_sizes,
+            critic_layer_sizes=critic_layer_sizes,
+            critic_loss_coef=critic_loss_coef,
+            entropy_loss_coef=entropy_loss_coef,
+        )
+
+        output_heads = len(output_lengths)
+        if isinstance(effect_widths, int):
+            _effect_widths = [effect_widths] * output_heads
+        elif not effect_widths:
+            _effect_widths = [0] * output_heads
+        elif len(effect_widths) != output_heads:
+            raise ValueError(
+                'effect_widths should be an int or a tuple of size '
+                f'{output_heads}.')
+        else:
+            _effect_widths = effect_widths
+
+        if isinstance(effect_decay_factors, float) or not effect_decay_factors:
+            _effect_decay_factors = [effect_decay_factors] * output_heads
+        elif not effect_decay_factors:
+            _effect_decay_factors = [0.] * output_heads
+        elif len(effect_decay_factors) != output_heads:
+            raise ValueError(
+                'effect_decay_factors should be a float or a tuple of size '
+                f'{output_heads}.')
+        else:
+            _effect_decay_factors = effect_decay_factors
+
+        if isinstance(effect_temporal_decay_factors, float):
+            _effect_temporal_decay_factors = (
+                [effect_temporal_decay_factors] * output_heads)
+        elif not effect_temporal_decay_factors:
+            _effect_temporal_decay_factors = [0.] * output_heads
+        elif len(effect_temporal_decay_factors) != output_heads:
+            raise ValueError(
+                'effect_temporal_decay_factors should be a float or '
+                f' a tuple of size {output_heads}.')
+        else:
+            _effect_temporal_decay_factors = effect_temporal_decay_factors
+
+        self._effect_widths = tf.constant(
+            _effect_widths, name='effect_width', dtype=tf.int32)
+        self._effect_decay_factors = tf.constant(
+            _effect_decay_factors, name='effect_decay_factors',
+            dtype=tf.float32)
+        self._effect_temporal_decay_factors = tf.constant(
+            _effect_temporal_decay_factors,
+            name='effect_temporal_decay_factors', dtype=tf.float32)
+
+    def get_config(self) -> Dict[str, Any]:
+        config = super().get_config()
+        config.update(dict(
+            effect_widths=tuple(self._effect_widths.numpy()),
+            effect_decay_factors=tuple(self._effect_decay_factors.numpy()),
+            effect_temporal_decay_factors=tuple(
+                self._effect_temporal_decay_factors.numpy()),
+        ))
+
+        return config
+
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='X'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.int32, name='Y'),
+            tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns'),
+            # tf.TensorSpec(shape=[], dtype=tf.int32, name='iteration')
+        ))
+    def _gradients(
+            self, x: tf.Tensor, y: tf.Tensor,
+            returns: tf.Tensor):  # , iteration: tf.Tensor):
+        print('tracing _gradients')
+        lengths = tf.constant(self._output_lengths)
+        starts = tf.pad(lengths[:-1], [[1, 0]])
+        ends = tf.math.cumsum(lengths)
+
+        m = len(lengths)
+
+        returns = tf.divide(
+            returns - tf.math.reduce_mean(returns),
+            tf.math.reduce_std(returns) + eps,
+            name='normalized_returns')
+
+        with tf.GradientTape() as tape:
+            logits, values = self(x, training=True)
+            logits_concat = tf.concat(logits, axis=1, name='all_logits')
+            values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
+
+            if self._entropy_loss_coef:
+                entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
+                    logits_concat * tf.math.exp(logits_concat))
+            else:
+                entropy_loss = 0.0
+
+            if self._critic_loss_coef:
+                critic_loss = self._critic_loss_coef * huber_loss(
+                    y_true=values, y_pred=returns)
+            else:
+                critic_loss = 0.0
+
+            advantage = tf.stop_gradient(
+                tf.subtract(returns, values, name='advantage'))
+
+            actor_loss = tf.constant(0.0)
+            for j in tf.range(m):
+                logits_slice = logits_concat[:, starts[j]:ends[j]]
+                action_probs = tfp.distributions.Categorical(
+                    logits=logits_slice)
+                y_slice = y[:, j]  # type: ignore
+                effect_width = tf.gather(self._effect_widths, j)
+
+                if tf.equal(effect_width, 0):
+                    log_prob = action_probs.log_prob(y_slice)
+                    _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
+                    actor_loss += _loss
+                else:
+                    for diff in tf.range(-effect_width, effect_width+1):
+                        temp = y_slice + diff
+                        in_range_indicator = tf.logical_and(
+                            tf.greater_equal(temp, 0),
+                            tf.less(temp, tf.gather(lengths, j)))
+
+                        if not tf.reduce_all(in_range_indicator):
+                            continue
+
+                        in_range_indices = tf.cast(
+                            in_range_indicator, tf.int32)
+
+                        advantage_in_range = tf.dynamic_partition(  # type: ignore
+                            advantage, in_range_indices, 2)[1]
+
+                        log_prob = action_probs.log_prob(
+                            tf.where(in_range_indicator, temp, 0))
+                        log_prob_in_range = tf.dynamic_partition(  # type: ignore
+                            log_prob, in_range_indices, 2)[1]
+
+                        abs_diff = tf.cast(tf.abs(diff), dtype=tf.float32)
+                        effect = tf.pow(
+                            tf.gather(self._effect_decay_factors, j), abs_diff
+                        )  # * tf.pow(
+                        #    self._effect_temporal_decay_factors[j], abs_diff)
+
+                        _loss = -tf.reduce_sum(
+                            effect * advantage_in_range * log_prob_in_range)
+                        actor_loss += _loss
+
+                self._actor_accuracy.update_state(y_slice, logits_slice)
+                self._action_rank.update_state(y_slice, logits_slice)
+
+            total_loss = actor_loss + critic_loss + entropy_loss
+
+        self._actor_loss.update_state(actor_loss)
+        self._critic_loss.update_state(critic_loss)
+        self._entropy_loss.update_state(entropy_loss)
+        self._total_loss.update_state(total_loss)
+ 
+        return tape.gradient(total_loss, self.trainable_variables)
+
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='X'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.int32, name='Y'),
+            tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns')))
+    def _metrics_only(
+            self, x: tf.Tensor, y: tf.Tensor, returns: tf.Tensor):
+        print('tracing _metrics_only')
+        lengths = tf.constant(self._output_lengths)
+        starts = tf.pad(lengths[:-1], [[1, 0]])
+        ends = tf.math.cumsum(lengths)
+
+        m = len(lengths)
+
+        returns = tf.divide(
+            returns - tf.math.reduce_mean(returns),
+            tf.math.reduce_std(returns) + eps,
+            name='normalized_returns')
+
+        logits, values = self(x, training=False)
+        logits_concat = tf.concat(logits, axis=1, name='all_logits')
+        values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
+
+        if self._entropy_loss_coef:
+            entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
+                logits_concat * tf.math.exp(logits_concat))
+        else:
+            entropy_loss = 0.0
+
+        if self._critic_loss_coef:
+            critic_loss = self._critic_loss_coef * huber_loss(
+                y_true=values, y_pred=returns)
+        else:
+            critic_loss = 0.0
+
+        advantage = tf.subtract(returns, values, name='advantage')
+
+        actor_loss = tf.constant(0.0)
+        for j in tf.range(m):
+            logits_slice = logits_concat[:, starts[j]:ends[j]]
+            action_probs = tfp.distributions.Categorical(
+                logits=logits_slice)
+            y_slice = y[:, j]  # type: ignore
+            effect_width = tf.gather(self._effect_widths, j)
+
+            if tf.equal(effect_width, 0):
+                log_prob = action_probs.log_prob(y_slice)
+                _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
+                actor_loss += _loss
+            else:
+                for diff in tf.range(-effect_width, effect_width+1):
+                    temp = y_slice + diff
+                    in_range_indicator = tf.logical_and(
+                        tf.greater_equal(temp, 0),
+                        tf.less(temp, tf.gather(lengths, j)))
+
+                    if not tf.reduce_all(in_range_indicator):
+                        continue
+
+                    in_range_indices = tf.cast(
+                        in_range_indicator, tf.int32)
+
+                    advantage_in_range = tf.dynamic_partition(  # type: ignore
+                        advantage, in_range_indices, 2)[1]
+
+                    log_prob = action_probs.log_prob(
+                        tf.where(in_range_indicator, temp, 0))
+                    log_prob_in_range = tf.dynamic_partition(  # type: ignore
+                        log_prob, in_range_indices, 2)[1]
+
+                    abs_diff = tf.cast(tf.abs(diff), dtype=tf.float32)
+                    effect = tf.pow(
+                        tf.gather(self._effect_decay_factors, j), abs_diff
+                    )  # * tf.pow(
+                    #    self._effect_temporal_decay_factors[j], abs_diff)
+
+                    _loss = -tf.reduce_sum(
+                        effect * advantage_in_range * log_prob_in_range)
+                    actor_loss += _loss
+
+            self._actor_accuracy.update_state(y_slice, logits_slice)
+            self._action_rank.update_state(y_slice, logits_slice)
+
+        total_loss = actor_loss + critic_loss + entropy_loss
+
+        self._actor_loss.update_state(actor_loss)
+        self._critic_loss.update_state(critic_loss)
+        self._entropy_loss.update_state(entropy_loss)
+        self._total_loss.update_state(total_loss)
 
 
 class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
@@ -449,10 +718,8 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
         G = tf.convert_to_tensor(G_temp, dtype=tf.float32)
         _Y: tf.Tensor = tf.convert_to_tensor(Y_temp)
 
-        # metrics = self._model.train_step((_X, (_Y, G)))
         metrics = self._model.fit(
-            x=_X, y=(_Y, G), validation_split=0.3, verbose=0
-            ).history  # type: ignore
+            x=_X, y=(_Y, G), verbose=0).history  # type: ignore
 
         if self._train_summary_writer:
             training_metrics = {
@@ -481,6 +748,7 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
     def __getstate__(self):
         state = super().__getstate__()
         state['_train_summary_writer'] = None
+        state['_validation_summary_writer'] = None
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
@@ -489,4 +757,12 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
         if self._tensorboard_path:
             self._train_summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                str(self._tensorboard_path / self._tensorboard_filename))
+                str(
+                    self._tensorboard_path /
+                    self._tensorboard_filename / 'train'))
+
+            self._validation_summary_writer = \
+                tf.summary.create_file_writer(  # type: ignore
+                str(
+                    self._tensorboard_path /
+                    self._tensorboard_filename / 'validation'))
