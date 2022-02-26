@@ -52,6 +52,7 @@ class AgentBase(Stateful):
         super().__init__(**kwargs)
 
         self._variable_action_count = variable_action_count
+        self._metrics: Dict[str, float] = {}
 
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward'] = 'none'

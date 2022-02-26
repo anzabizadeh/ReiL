@@ -139,7 +139,8 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         if self._training_trigger != 'none':
             self._learner.reset()
 
-    def _prepare_training(self, history: History) -> TrainingData[InputType, LabelType]:
+    def _prepare_training(
+            self, history: History) -> TrainingData[InputType, LabelType]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -177,10 +178,12 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
             training_data = self._prepare_training(history)
 
         X, Y, kwargs = training_data
+        metrics = {}
         if Y:
-            return self._learner.learn(X, Y, **kwargs)
+            metrics = self._learner.learn(X, Y, **kwargs)
+            self._metrics.update(metrics)
 
-        return {}
+        return metrics
 
     def observe(  # noqa: C901
             self, subject_id: int, stat_name: Optional[str],
@@ -229,7 +232,8 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
                 new_observation.state = state
                 if learn_on_state:
-                    self.learn([history[-1], new_observation])
+                    self._metrics.update(
+                        self.learn([history[-1], new_observation]))
 
                 if actions is not None:
                     new_observation.action = self.act(
@@ -240,14 +244,15 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
                         yield new_observation.action)['action_taken']
 
                     if learn_on_action:
-                        self.learn([history[-1], new_observation])
+                        self._metrics.update(
+                            self.learn([history[-1], new_observation]))
 
                     new_observation.reward = (yield None)['reward']
 
                     history.append(new_observation)
 
                     if learn_on_reward:
-                        self.learn(history[-2:])
+                        self._metrics.update(self.learn(history[-2:]))
                 else:  # No actions to take, so skip the reward.
                     yield
 
@@ -258,7 +263,10 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
                     history.append(new_observation)
 
                 if learn_on_termination:
-                    self.learn(history)
+                    metrics = self.learn(history)
+                    self._metrics.update({
+                        key: val[0]  # type: ignore
+                        for key, val in metrics.items()})
 
                 if stat_name is not None:
                     self.statistic.append(stat_name, subject_id)
