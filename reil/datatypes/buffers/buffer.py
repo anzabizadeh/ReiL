@@ -6,7 +6,7 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import (Dict, Generic, List, Literal, Optional, Tuple, TypeVar,
+from typing import (Callable, Dict, Generic, List, Literal, Optional, Tuple, TypeVar,
                     Union)
 
 import numpy as np
@@ -16,7 +16,7 @@ T1 = TypeVar('T1')
 T2 = TypeVar('T2')
 
 PickModes = Literal['all', 'random', 'recent', 'old']
-
+Funcs = Literal['sum', 'min', 'max', 'mean']
 
 class Buffer(reilbase.ReilBase, Generic[T1, T2]):
     '''
@@ -193,6 +193,29 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
         else:
             raise ValueError(
                 'mode should be one of all, old, recent, or random.')
+
+    def aggregate(
+            self, func: Union[Funcs, Callable[
+                [Union[List[T1], List[T2]]],
+                Union[T1, T2]]]) -> Dict[str, Union[T1, T2]]:
+        if self._buffer is None:
+            return {}
+
+        if isinstance(func, str):
+            if func == 'mean':
+                fn = lambda x: sum(x) / len(x)
+            elif func == 'sum':
+                fn = sum
+            elif func == 'min':
+                fn = min
+            elif func == 'max':
+                fn = max
+        else:
+            fn = func
+
+        return {
+            name: fn(values[: self._buffer_index + 1])  # type: ignore
+            for name, values in self._buffer.items()}
 
     def reset(self) -> None:
         '''
