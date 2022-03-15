@@ -107,7 +107,7 @@ class MockStatistic:
             return x
 
         result: pd.DataFrame = grouped_df['value'].agg(  # type: ignore
-            aggregators or no_change)
+            aggregators or no_change)  # type: ignore
 
         if reset_history:
             self._history: Dict[

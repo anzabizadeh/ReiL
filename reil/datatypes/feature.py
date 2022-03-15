@@ -169,6 +169,7 @@ class Feature:
                 name=self.name, value=new_value,
                 categories=self.__dict__.get('categories'))
 
+
 NoneFeature = Feature('None')
 
 
@@ -418,7 +419,7 @@ class FeatureGenerator:
             denominator = upper - lower
 
             def normalizer(x: float) -> float:
-                return (x - lower)/denominator  # type: ignore
+                return (x - lower) / denominator  # type: ignore
 
             self.__dict__['normalizer'] = normalizer
 
@@ -573,12 +574,18 @@ class FeatureSet:
     objects in `reil`.
     '''
 
-    def __init__(self, data: Union[Feature, Iterable[Feature]]):
+    def __init__(
+            self, data: Union[Feature, Iterable[Feature], FeatureSet],
+            index: Optional[int] = None):
         '''
         Arguments
         ---------
         data:
             One or a sequence of `Feature`s.
+
+        index:
+            An integer value for the index. If omitted, the index will be a
+            tuple of indices of Features of the FeatureSet.
         '''
         temp: Dict[str, Feature] = {}
         _data: Iterable[Any] = (
@@ -595,6 +602,7 @@ class FeatureSet:
                 raise TypeError(f'Unknown input type {type(d)} for item: {d}')
 
         self._data = temp
+        self._index = index
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]):
@@ -636,6 +644,9 @@ class FeatureSet:
         :
             Names of the elements and their indexes.
         '''
+        if self._index is not None:
+            return {' '.join(name for name in self._data): self._index}
+
         return {name: v.index for name, v in self._data.items()}
 
     @cached_property
@@ -998,7 +1009,7 @@ class FeatureGeneratorSet:
             gen = self.generate_all(exclude_masked_values=True)
             for i, v in enumerate(gen):
                 if i == index:
-                    return v  # type: ignore
+                    return FeatureSet(v, index=index)  # type: ignore
             raise IndexError(f'Index out of range {index}.')
 
         if len(index) != len(self._generators):
@@ -1080,6 +1091,8 @@ class FeatureGeneratorSet:
             temp = _q[6:].replace(
                 '(', '').replace(')', '').replace('[', '').replace(']', '')
             lookup_index = tuple(map(int, temp.split(',')))
+            if len(lookup_index) == 1 and temp.find(',') == -1:
+                lookup_index = lookup_index[0]
             parsed = {'command': 'lookup', 'index': lookup_index}
 
         elif command == 'help':
