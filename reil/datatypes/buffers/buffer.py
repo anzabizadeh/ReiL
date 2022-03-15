@@ -195,11 +195,20 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
                 'mode should be one of all, old, recent, or random.')
 
     def aggregate(
-            self, func: Union[Funcs, Callable[
-                [Union[List[T1], List[T2]]],
-                Union[T1, T2]]]) -> Dict[str, Union[T1, T2]]:
+        self, func: Union[
+            Funcs, Callable[[Union[List[T1], List[T2]]], Union[T1, T2]]],
+        names: Optional[Union[str, List[str]]] = None
+    ) -> Dict[str, Union[T1, T2]]:
         if self._buffer is None:
             return {}
+
+        _names: List[str]
+        if names is None:
+            _names = self._buffer_names  # type: ignore
+        elif isinstance(names, str):
+            _names = [names]
+        else:
+            _names = names
 
         if isinstance(func, str):
             if func == 'mean':
@@ -210,12 +219,15 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
                 fn = min
             elif func == 'max':
                 fn = max
+            elif func == 'count':
+                fn = len
         else:
             fn = func
 
         return {
-            name: fn(values[: self._buffer_index + 1])  # type: ignore
-            for name, values in self._buffer.items()}
+            name: fn(
+                self._buffer[name][: self._buffer_index + 1])  # type: ignore
+            for name in _names}
 
     def reset(self) -> None:
         '''
