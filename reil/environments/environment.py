@@ -238,7 +238,7 @@ class Environment(stateful.Stateful):
         for name, obj in demon_dict.items():
             if isinstance(obj, str):
                 _obj = self._agent_demons.get(
-                        obj, self._subject_demons.get(obj))
+                    obj, self._subject_demons.get(obj))
                 if _obj is None:
                     raise ValueError(
                         f'entity {obj} defined for {name} is '
