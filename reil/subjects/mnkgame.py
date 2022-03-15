@@ -45,14 +45,13 @@ class MNKGame(MNKBoard, Subject):
             The number of players.
         '''
         self._board_status = None
-        self.set_params(**kwargs)
         Subject.__init__(self, **kwargs)
         MNKBoard.__init__(self, m=m, n=n, k=k, players=players,
                           can_recapture=False, **kwargs)
         self._board_gen = FeatureGenerator.categorical(
             name='board', categories=('X', 'O', ' '))
         self._action_gen = FeatureGeneratorSet(FeatureGenerator.discrete(
-            name='square', lower=0, upper=len(self._board)-1))
+            name='square', lower=0, upper=len(self._board) - 1))
         self.state.add_definition(
             'board', ('board', {}))
         self.possible_actions.add_definition(
