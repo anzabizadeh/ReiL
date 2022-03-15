@@ -52,7 +52,7 @@ state_definitions: Dict[str, DefComponents] = {
             *patient_basic,
             # ('day', {}),
             ('dose_history', {'length': i}),
-            ('INR_history', {'length': i}),
+            ('INR_history', {'length': i + 1}),
             ('interval_history', {'length': i}))
         for i in range(1, 10)},
 
@@ -114,6 +114,7 @@ class Warfarin(HealthSubject):
             interval_range: Tuple[int, int] = (1, 28),
             interval_step: int = 1,
             max_day: int = 90,
+            dose_only: bool = False,
             **kwargs: Any):
         '''
         Arguments
@@ -148,8 +149,10 @@ class Warfarin(HealthSubject):
             max_day=max_day,
             **kwargs)
 
+        self._dose_only = dose_only
         self.action_gen_set += self.feature_gen_set['dose']
-        self.action_gen_set += self.feature_gen_set['interval']
+        if not dose_only:
+            self.action_gen_set += self.feature_gen_set['interval']
 
         Warfarin._generate_state_defs(self)
         Warfarin._generate_action_defs(self)
@@ -211,16 +214,25 @@ class Warfarin(HealthSubject):
                 interval_masks: Tuple[Dict[int, int], ...]
         ) -> FeatureGeneratorType:
             self.action_gen_set.unmask('dose')
-            self.action_gen_set.unmask('interval')
-            for op, d_mask, i_mask in zip(ops, dose_masks, interval_masks):
-                if op(feature):
-                    self.action_gen_set.mask('dose', d_mask)
-                    self.action_gen_set.mask('interval', i_mask)
+            if self._dose_only:
+                for op, d_mask in zip(ops, dose_masks):
+                    if op(feature):
+                        self.action_gen_set.mask('dose', d_mask)
 
-                    return self.action_gen_set.make_generator()
+                        return self.action_gen_set.make_generator()
+
+            else:
+                self.action_gen_set.unmask('interval')
+                for op, d_mask, i_mask in zip(ops, dose_masks, interval_masks):
+                    if op(feature):
+                        self.action_gen_set.mask('dose', d_mask)
+                        self.action_gen_set.mask('interval', i_mask)
+
+                        return self.action_gen_set.make_generator()
+
+                self.action_gen_set.mask('interval', interval_masks[-1])
 
             self.action_gen_set.mask('dose', dose_masks[-1])
-            self.action_gen_set.mask('interval', interval_masks[-1])
 
             return self.action_gen_set.make_generator()
 
@@ -310,7 +322,7 @@ class Warfarin(HealthSubject):
                         interval_masks=(int_weekly, int_weekly)),
                     'day')
 
-        name = f'237_15'
+        name = '237_15'
         if name not in current_action_definitions:
             self.possible_actions.add_definition(
                 name, functools.partial(
@@ -326,7 +338,7 @@ class Warfarin(HealthSubject):
                         int_fixed[7], int_fixed[3], int_fixed[2])),
                 'day')
 
-        name = f'daily_15'
+        name = 'daily_15'
         if name not in current_action_definitions:
             self.possible_actions.add_definition(
                 name, functools.partial(
@@ -336,7 +348,7 @@ class Warfarin(HealthSubject):
                     interval_masks=(int_fixed[1],)),
                 'day')
 
-        name = f'free_15'
+        name = 'free_15'
         if name not in current_action_definitions:
             self.possible_actions.add_definition(
                 name, functools.partial(
@@ -346,7 +358,7 @@ class Warfarin(HealthSubject):
                     interval_masks=({},)),
                 'day')
 
-        name = f'semi_15'
+        name = 'semi_15'
         if name not in current_action_definitions:
             self.possible_actions.add_definition(
                 name, functools.partial(
@@ -356,7 +368,7 @@ class Warfarin(HealthSubject):
                     interval_masks=(int_semi_free,)),
                 'day')
 
-        name = f'weekly_15'
+        name = 'weekly_15'
         if name not in current_action_definitions:
             self.possible_actions.add_definition(
                 name, functools.partial(

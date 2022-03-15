@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from reil.datatypes.feature import (MISSING, Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
 from reil.healthcare.patient import Patient
-from reil.serialization import deserialize, full_qualname, get_class_from_name, serialize
+from reil.serialization import deserialize, serialize
 from reil.subjects.subject import Subject
 
 
@@ -145,7 +145,7 @@ class HealthSubject(Subject):
             interval_range=self._interval_range,
             interval_step=self._interval_step,
             max_day=self._max_day
-            ))
+        ))
         # Since we need to take actions again, dose list of the model should
         # be cleared.
         if config['patient']:
@@ -172,7 +172,7 @@ class HealthSubject(Subject):
 
         return list(min_dose + x * dose_increment
                     for x in range(
-                        int((max_dose - min_dose)/dose_increment) + 1))
+                        int((max_dose - min_dose) / dose_increment) + 1))
 
     @staticmethod
     def generate_interval_values(
@@ -291,7 +291,7 @@ class HealthSubject(Subject):
             if length > index:
                 i1, i2 = length - index, 0
             else:
-                i1, i2 = 0, index-length
+                i1, i2 = 0, index - length
             if backfill:
                 filler = _list[i2]
             result = [filler] * i1 + _list[i2:index]  # type: ignore
