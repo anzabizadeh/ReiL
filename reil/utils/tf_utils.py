@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import random
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import tensorflow as tf
 from reil import reilbase
@@ -83,7 +83,7 @@ class SerializeTF:
                 child.unlink()
 
 
-class TF2IOMixin(reilbase.ReilBase):
+class TF2UtilsMixin(reilbase.ReilBase):
     def __init__(
             self, models: Dict[str, Type[keras.Model]], **kwargs):
         super().__init__(**kwargs)
@@ -96,6 +96,31 @@ class TF2IOMixin(reilbase.ReilBase):
     @staticmethod
     def convert_to_tensor(data: Tuple[FeatureSet, ...]) -> tf.Tensor:
         return tf.convert_to_tensor([x.normalized.flattened for x in data])
+
+    @staticmethod
+    def mpl_layers(
+            layer_sizes: Tuple[int, ...],
+            activation: Union[str, Callable[[tf.Tensor], tf.Tensor]],
+            layer_name_format: str,
+            start_index: int = 1):
+        return [
+            keras.layers.Dense(v, activation=activation, name=layer_name_format.format(i=i))
+            for i, v in enumerate(layer_sizes, start_index)]
+
+    @staticmethod
+    def mlp_functional(
+            input_: tf.Tensor,
+            layer_sizes: Tuple[int, ...],
+            activation: Union[str, Callable[[tf.Tensor], tf.Tensor]],
+            layer_name_format: str = 'layer_{i:0>2}',
+            start_index: int = 1):
+        '''Build a feedforward dense network.'''
+        layers = TF2UtilsMixin.mpl_layers(
+            layer_sizes[:-1], activation, layer_name_format, start_index)
+        x = input_
+        for layer in layers:
+            x = layer(x)
+        return x
 
     def save(
             self,
