@@ -8,17 +8,12 @@ an iterator.
 '''
 
 from __future__ import annotations
-from inspect import isfunction
 
-import pathlib
-import time
-from typing import (Any, Callable, Dict, Generic, Iterable, Iterator, Optional, Tuple, Type,
-                    TypeVar, Union)
+from typing import (Any, Callable, Dict, Generic, Iterable, Iterator, Optional,
+                    Tuple, Type, TypeVar, Union)
 
-import dill as pickle
 from reil import reilbase, stateful
 from reil.datatypes.feature_array_dumper import FeatureSetDumper
-from reil.serialization import PickleMe
 from reil.datatypes.mock_statistic import MockStatistic
 
 T = TypeVar('T', bound=stateful.Stateful)
@@ -117,7 +112,7 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(object, lambda:(1, {}))
+        return cls(object, lambda: (1, {}))
 
     def __iter__(self):
         return self
@@ -129,7 +124,7 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
         try:
             return (
                 f'{self.__class__.__qualname__} '
-                f'{self._cls.__class__.__qualname__} '
+                f'{self._cls.__class__.__qualname__} '  # type: ignore
                 f'-- {self._instance_counter} --> '
                 f'{self._obj.__repr__()}')
         except AttributeError:

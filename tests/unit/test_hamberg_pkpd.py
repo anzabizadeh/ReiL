@@ -90,14 +90,15 @@ class testHambergPKPD(unittest.TestCase):
                     errors += f'\n({age:4.2f}, {cyp}, {vkor})\t{e}'
 
                 sns.lineplot(  # type: ignore
-                    data=h._computed_INRs, ax=axes[i][j])
-                axes[i][j].set_ylabel('INR', fontsize=12)
-                axes[i][j].set_ylim((0, 8))
-                axes[i][j].set_xlim((0, 59))
-                axes[i][j].set_xlabel('Time (days)', fontsize=12)
-                axes[i][j].set_xticks([0, 10, 20, 30, 40, 50])
+                    data=h._computed_INRs, ax=axes[i][j])  # type: ignore
+                axes[i][j].set_ylabel('INR', fontsize=12)  # type: ignore
+                axes[i][j].set_ylim((0, 8))  # type: ignore
+                axes[i][j].set_xlim((0, 59))  # type: ignore
+                axes[i][j].set_xlabel(  # type: ignore
+                    'Time (days)', fontsize=12)
+                axes[i][j].set_xticks([0, 10, 20, 30, 40, 50])  # type: ignore
                 for x in (2, 2.5, 3, 4, 5, 6, 7):
-                    axes[i][j].axhline(x, ls='--')
+                    axes[i][j].axhline(x, ls='--')  # type: ignore
 
         plt.tight_layout()
         plt.savefig('replicated_Hamberg_et_al_2007_Fig_3.png')
@@ -111,7 +112,8 @@ class testHambergPKPD(unittest.TestCase):
         data = data[data.t > 0]  # type: ignore
         data['t_w_jitter'] = data.t  # type: ignore
         ax = sns.scatterplot(  # type: ignore
-            data=data, x='t_w_jitter', y='Cs', size=1, legend=False)
+            data=data, x='t_w_jitter', y='Cs', size=1,
+            legend=False)  # type: ignore
         print(
             data.groupby(['t'])['Cs'].quantile(0.025),  # type: ignore
             data.groupby(['t'])['Cs'].median(),  # type: ignore
@@ -137,10 +139,11 @@ class testHambergPKPD(unittest.TestCase):
             random_demographic=True,
             random_pkpd=True,
             measurement_days=[0, 0.5, 1.5, 2.5]
-            )
+        )
         data['t_w_jitter'] = data.t + data.x_jitter  # type: ignore
         ax = sns.scatterplot(  # type: ignore
-            data=data, x='t_w_jitter', y='INR', size=1, legend=False)
+            data=data, x='t_w_jitter', y='INR', size=1,
+            legend=False)  # type: ignore
         # style='run')
         print(
             data.groupby(['t'])['INR'].quantile(0.025),  # type: ignore

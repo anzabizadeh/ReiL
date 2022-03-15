@@ -91,14 +91,18 @@ class testHambergPKPD(unittest.TestCase):
                     errors += f'\n({age:4.2f}, {cyp}, {vkor})\t{e}'
 
                 sns.lineplot(  # type: ignore
-                    data={k: v.numpy() for k, v in h._computed_INRs.items()}, ax=axes[i][j])
-                axes[i][j].set_ylabel('INR', fontsize=12)
-                axes[i][j].set_ylim((0, 8))
-                axes[i][j].set_xlim((0, 59))
-                axes[i][j].set_xlabel('Time (days)', fontsize=12)
-                axes[i][j].set_xticks([0, 10, 20, 30, 40, 50])
+                    data={
+                        k: v.numpy()  # type: ignore
+                        for k, v in h._computed_INRs.items()},
+                    ax=axes[i][j])  # type: ignore
+                axes[i][j].set_ylabel('INR', fontsize=12)  # type: ignore
+                axes[i][j].set_ylim((0, 8))  # type: ignore
+                axes[i][j].set_xlim((0, 59))  # type: ignore
+                axes[i][j].set_xlabel(  # type: ignore
+                    'Time (days)', fontsize=12)
+                axes[i][j].set_xticks([0, 10, 20, 30, 40, 50])  # type: ignore
                 for x in (2, 2.5, 3, 4, 5, 6, 7):
-                    axes[i][j].axhline(x, ls='--')
+                    axes[i][j].axhline(x, ls='--')  # type: ignore
 
         plt.tight_layout()
         plt.savefig('tf_replicated_Hamberg_et_al_2007_Fig_3.png')

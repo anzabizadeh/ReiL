@@ -248,12 +248,12 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
             current_instance = filename
         else:
             current_instance = self._filename_pattern.format(
-                    n=self._instance_counter)
+                n=self._instance_counter)
         new_instance = True
         if self._use_existing_instances:
             try:
-                self._object.load(path=self._save_path,
-                                  filename=current_instance)
+                self._object.load(
+                    path=self._save_path, filename=current_instance)
                 new_instance = False
             except FileNotFoundError:
                 self._object.reset()
@@ -278,7 +278,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
                                       filename=current_instance)
                 else:
                     raise FileExistsError(
-                            f'File {current_instance} already exists.')
+                        f'File {current_instance} already exists.')
             else:
                 self._object.save(path=self._save_path,
                                   filename=current_instance)
