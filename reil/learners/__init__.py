@@ -29,4 +29,5 @@ from .learning_rate_schedulers import (  # noqa: W0611
 from .learner import Learner  # noqa: W0611
 from .lookup_table import QLookupTable, TableEntry  # noqa: W0611
 from .dense import Dense  # noqa: W0611
-from .actor_critic_learner import ActorCriticLearner  # noqa: W0611
+from .actor_critic_learner import A2CLearner, DeepA2CModel, DeepA2CActionProximityModel, ActionRank  # noqa: W0611
+from .ppo_learner import PPOLearner, PPOModel  # noqa: W0611

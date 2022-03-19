@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 '''
-ActorCriticLearner class
-======================
+A2CLearner class
+================
 
-The DenseSoftMax learner, comprised of a fully-connected with a softmax in the
-output layer.
+The A2CLearner learner, comprised of an optional shared backbone, an actor
+segment with softmax outputs, and a critic output.
 '''
+
 import datetime
 import pathlib
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -16,7 +17,7 @@ import tensorflow.keras.optimizers.schedules as k_sch
 import tensorflow_probability as tfp
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.utils.tf_utils import TF2IOMixin
+from reil.utils.tf_utils import TF2UtilsMixin
 from tensorflow import keras
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
@@ -59,19 +60,18 @@ class ActionRank(tf.keras.metrics.Metric):
 
 @keras.utils.register_keras_serializable(
     package='reil.learners.actor_critic_learner')
-class DeepActorCriticModel(keras.Model):
+class DeepA2CModel(keras.Model):
     def __init__(
-            self,
-            output_lengths: List[int],
-            learning_rate: Union[
-                float, k_sch.LearningRateSchedule],
-            shared_layer_sizes: Tuple[int, ...],
-            actor_layer_sizes: Tuple[int, ...] = (),
-            critic_layer_sizes: Tuple[int, ...] = (),
-            critic_loss_coef: float = 1.0,
-            entropy_loss_coef: float = 0.0,
-            baseline: Literal['V', 'Q'] = 'V',
-        ):
+        self,
+        output_lengths: Tuple[int, ...],
+        learning_rate: Union[
+            float, k_sch.LearningRateSchedule],
+        shared_layer_sizes: Tuple[int, ...],
+        actor_layer_sizes: Tuple[int, ...] = (),
+        critic_layer_sizes: Tuple[int, ...] = (),
+        critic_loss_coef: float = 1.0,
+        entropy_loss_coef: float = 0.0,
+    ):
         super().__init__()
 
         self._output_lengths = output_lengths
@@ -81,11 +81,6 @@ class DeepActorCriticModel(keras.Model):
         self._critic_loss_coef = critic_loss_coef
         self._entropy_loss_coef = entropy_loss_coef
         self._learning_rate = learning_rate
-        self._baseline = baseline.upper()
-        if self._baseline not in ['V', 'Q']:
-            raise ValueError(
-                f'baseline can only be "V" or "Q". Got {baseline}.')
-
 
         self._actor_loss = tf.keras.metrics.Mean(
             'actor_loss', dtype=tf.float32)
@@ -104,30 +99,14 @@ class DeepActorCriticModel(keras.Model):
     def build(self, input_shape: Tuple[int, ...]):
         self._input_shape = [None, *input_shape[1:]]
 
-        if self._baseline == 'Q' and len(self._output_lengths) > 1:
-            def concat(x):
-                return tf.concat(x, axis=1)
-            self._concat = concat
-        else:
-            self._concat = tf.identity
-
-        self._shared = [
-            keras.layers.Dense(v, activation='relu', name=f'shared_{i+2:0>2}')
-            for i, v in enumerate(self._shared_layer_sizes, 1)]
-
-        self._actor_layers = [
-            keras.layers.Dense(v, activation='relu', name=f'actor_{i:0>2}')
-            for i, v in enumerate(self._actor_layer_sizes, 1)]
-
-        self._critic_layers = [
-            keras.layers.Dense(v, activation='relu', name=f'critic_{i:0>2}')
-            for i, v in enumerate(self._critic_layer_sizes, 1)]
-
-        self._actor_outputs = [
-            keras.layers.Dense(
-                output_length, activation='softmax',
-                name=f'actor_output_{i:02}')
-            for i, output_length in enumerate(self._output_lengths, 1)]
+        self._shared = TF2UtilsMixin.mpl_layers(
+            self._shared_layer_sizes, 'relu', 'shared_{i:0>2}')
+        self._actor_layers = TF2UtilsMixin.mpl_layers(
+            self._actor_layer_sizes, 'relu', 'actor_{i:0>2}')
+        self._critic_layers = TF2UtilsMixin.mpl_layers(
+            self._critic_layer_sizes, 'relu', 'critic_{i:0>2}')
+        self._actor_outputs = TF2UtilsMixin.mpl_layers(
+            self._output_lengths, 'softmax', 'actor_output_{i:0>2}')
 
         self._critic_output = keras.layers.Dense(1, name='critic_output')
 
@@ -167,7 +146,9 @@ class DeepActorCriticModel(keras.Model):
     # @tf.function(
     #     input_signature=(
     #         tf.TensorSpec(shape=[None, None]), tf.TensorSpec(shape=[])))
-    def call(self, inputs, training=None):
+    def call(
+        self, inputs: tf.Tensor, training=None
+    ) -> Tuple[List[tf.Tensor], List[tf.Tensor]]:
         x = inputs
         x.set_shape(self._input_shape)
         for layer in self._shared:
@@ -178,18 +159,15 @@ class DeepActorCriticModel(keras.Model):
         for layer in self._actor_layers:
             x_actor = layer(x_actor, training=training)
 
-        logits = [
+        action_probs: List[tf.Tensor] = [
             layer(x_actor) for layer in self._actor_outputs]
-
-        if self._baseline == 'Q':
-            x_critic = tf.concat([self._concat(logits), x_critic], axis=1)
 
         for layer in self._critic_layers:
             x_critic = layer(x_critic, training=training)
 
-        values = self._critic_output(x_critic)
+        values: List[tf.Tensor] = self._critic_output(x_critic)
 
-        return logits, values
+        return action_probs, values
 
     @tf.function(
         input_signature=(
@@ -198,21 +176,22 @@ class DeepActorCriticModel(keras.Model):
             tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns')))
     def _gradients(
             self, x: tf.Tensor, y: tf.Tensor, returns: tf.Tensor):
-        print('tracing _gradients')
+        print(f'tracing {self.__class__.__qualname__}._gradients')
         lengths = tf.constant(self._output_lengths)
         starts = tf.pad(lengths[:-1], [[1, 0]])
         ends = tf.math.cumsum(lengths)
 
         m = len(lengths)
 
-        returns = tf.divide(
+        normalized_returns = tf.divide(
             returns - tf.math.reduce_mean(returns),
             tf.math.reduce_std(returns) + eps,
             name='normalized_returns')
 
         with tf.GradientTape() as tape:
-            logits, values = self(x, training=True)
-            logits_concat = tf.concat(logits, axis=1, name='all_logits')
+            action_probs, values = self(x, training=True)
+            logits_concat = tf.math.log(
+                tf.concat(action_probs, axis=1, name='all_logits') + eps)
             values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
 
             if self._entropy_loss_coef:
@@ -223,16 +202,17 @@ class DeepActorCriticModel(keras.Model):
 
             if self._critic_loss_coef:
                 critic_loss = self._critic_loss_coef * huber_loss(
-                    y_true=values, y_pred=returns)
+                    y_true=values, y_pred=normalized_returns)
             else:
                 critic_loss = 0.0
 
             advantage = tf.stop_gradient(
-                tf.subtract(returns, values, name='advantage'))
+                tf.subtract(normalized_returns, values, name='advantage'))
 
             actor_loss = tf.constant(0.0)
             for j in tf.range(m):
-                logits_slice = logits_concat[:, starts[j]:ends[j]]
+                logits_slice = logits_concat[  # type: ignore
+                    :, starts[j]:ends[j]]
                 y_slice = y[:, j]  # type: ignore
                 action_probs = tfp.distributions.Categorical(
                     logits=logits_slice)
@@ -240,16 +220,20 @@ class DeepActorCriticModel(keras.Model):
                 _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
                 actor_loss += _loss
 
-                self._actor_accuracy.update_state(y_slice, logits_slice)
-                self._action_rank.update_state(y_slice, logits_slice)
+                with tape.stop_recording():
+                    self._actor_accuracy.update_state(y_slice, logits_slice)
+                    self._action_rank.update_state(y_slice, logits_slice)
 
             total_loss = actor_loss + critic_loss + entropy_loss
 
+        if self._critic_loss_coef:
+            self._critic_loss.update_state(critic_loss)
+        if self._entropy_loss_coef:
+            self._entropy_loss.update_state(entropy_loss)
+
         self._actor_loss.update_state(actor_loss)
-        self._critic_loss.update_state(critic_loss)
-        self._entropy_loss.update_state(entropy_loss)
         self._total_loss.update_state(total_loss)
- 
+
         return tape.gradient(total_loss, self.trainable_variables)
 
     @tf.function(
@@ -259,20 +243,21 @@ class DeepActorCriticModel(keras.Model):
             tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns')))
     def _metrics_only(
             self, x: tf.Tensor, y: tf.Tensor, returns: tf.Tensor):
-        print('tracing _metrics_only')
+        print(f'tracing {self.__class__.__qualname__}._metrics_only')
         lengths = tf.constant(self._output_lengths)
         starts = tf.pad(lengths[:-1], [[1, 0]])
         ends = tf.math.cumsum(lengths)
 
         m = len(lengths)
 
-        returns = tf.divide(
+        normalized_returns = tf.divide(
             returns - tf.math.reduce_mean(returns),
             tf.math.reduce_std(returns) + eps,
             name='normalized_returns')
 
-        logits, values = self(x, training=False)
-        logits_concat = tf.concat(logits, axis=1, name='all_logits')
+        action_probs, values = self(x, training=False)
+        logits_concat = tf.math.log(
+            tf.concat(action_probs, axis=1, name='all_logits') + eps)
         values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
 
         if self._entropy_loss_coef:
@@ -283,16 +268,17 @@ class DeepActorCriticModel(keras.Model):
 
         if self._critic_loss_coef:
             critic_loss = self._critic_loss_coef * huber_loss(
-                y_true=values, y_pred=returns)
+                y_true=values, y_pred=normalized_returns)
         else:
             critic_loss = 0.0
 
         advantage = tf.stop_gradient(
-            tf.subtract(returns, values, name='advantage'))
+            tf.subtract(normalized_returns, values, name='advantage'))
 
         actor_loss = tf.constant(0.0)
         for j in tf.range(m):
-            logits_slice = logits_concat[:, starts[j]:ends[j]]
+            logits_slice = logits_concat[  # type: ignore
+                :, starts[j]:ends[j]]
             y_slice = y[:, j]  # type: ignore
             action_probs = tfp.distributions.Categorical(
                 logits=logits_slice)
@@ -305,15 +291,18 @@ class DeepActorCriticModel(keras.Model):
 
         total_loss = actor_loss + critic_loss + entropy_loss
 
+        if self._critic_loss_coef:
+            self._critic_loss.update_state(critic_loss)
+        if self._entropy_loss_coef:
+            self._entropy_loss.update_state(entropy_loss)
+
         self._actor_loss.update_state(actor_loss)
-        self._critic_loss.update_state(critic_loss)
-        self._entropy_loss.update_state(entropy_loss)
         self._total_loss.update_state(total_loss)
 
     def train_step(self, data):
         x, (y, returns) = data
 
-        self._return.update_state(returns[0])
+        self._return.update_state(tf.reduce_mean(returns))
 
         gradient = self._gradients(x, y, returns)
 
@@ -355,10 +344,10 @@ class DeepActorCriticModel(keras.Model):
 
 @keras.utils.register_keras_serializable(
     package='reil.learners.actor_critic_learner')
-class DeepActorCriticActionProximityModel(DeepActorCriticModel):
+class DeepA2CActionProximityModel(DeepA2CModel):
     def __init__(
             self,
-            output_lengths: List[int],
+            output_lengths: Tuple[int, ...],
             learning_rate: Union[float, k_sch.LearningRateSchedule],
             shared_layer_sizes: Tuple[int, ...],
             actor_layer_sizes: Tuple[int, ...] = (),
@@ -368,7 +357,7 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
             effect_widths: Union[int, Tuple[int, ...]] = 0,
             effect_decay_factors: Union[float, Tuple[float, ...]] = 0.,
             effect_temporal_decay_factors: Union[float, Tuple[float, ...]] = 1.
-            ):
+    ):
         super().__init__(
             output_lengths=output_lengths,
             learning_rate=learning_rate,
@@ -444,7 +433,10 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
     def _gradients(
             self, x: tf.Tensor, y: tf.Tensor,
             returns: tf.Tensor):  # , iteration: tf.Tensor):
-        print('tracing _gradients')
+        # To avoid "UserWarning: Converting sparse IndexedSlices to a dense
+        # Tensor of unknown shape", I used `tf.dynamic_partition` instead of
+        # `tf.gather`
+        print(f'tracing {self.__class__.__qualname__}._gradients')
         lengths = tf.constant(self._output_lengths)
         starts = tf.pad(lengths[:-1], [[1, 0]])
         ends = tf.math.cumsum(lengths)
@@ -457,8 +449,9 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
             name='normalized_returns')
 
         with tf.GradientTape() as tape:
-            logits, values = self(x, training=True)
-            logits_concat = tf.concat(logits, axis=1, name='all_logits')
+            action_probs, values = self(x, training=True)
+            logits_concat = tf.math.log(
+                tf.concat(action_probs, axis=1, name='all_logits') + eps)
             values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
 
             if self._entropy_loss_coef:
@@ -478,22 +471,29 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
 
             actor_loss = tf.constant(0.0)
             for j in tf.range(m):
-                logits_slice = logits_concat[:, starts[j]:ends[j]]
+                logits_slice = logits_concat[  # type: ignore
+                    :, starts[j]:ends[j]]
                 action_probs = tfp.distributions.Categorical(
                     logits=logits_slice)
                 y_slice = y[:, j]  # type: ignore
-                effect_width = tf.gather(self._effect_widths, j)
+                j_one_hot = tf.one_hot(j, depth=m, dtype=tf.int32)
 
+                # effect_width = tf.gather(self._effect_widths, j)
+                effect_width = tf.dynamic_partition(  # type: ignore
+                    self._effect_widths, j_one_hot, 2)[1][0]
                 if tf.equal(effect_width, 0):
                     log_prob = action_probs.log_prob(y_slice)
                     _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
                     actor_loss += _loss
                 else:
-                    for diff in tf.range(-effect_width, effect_width+1):
+                    for diff in tf.range(-effect_width, effect_width + 1):
                         temp = y_slice + diff
+                        # _length = tf.less(temp, tf.gather(lengths, j))
+                        _length = tf.dynamic_partition(  # type: ignore
+                            lengths, j_one_hot, 2)[1][0]
                         in_range_indicator = tf.logical_and(
                             tf.greater_equal(temp, 0),
-                            tf.less(temp, tf.gather(lengths, j)))
+                            tf.less(temp, _length))
 
                         if not tf.reduce_all(in_range_indicator):
                             continue
@@ -510,8 +510,11 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
                             log_prob, in_range_indices, 2)[1]
 
                         abs_diff = tf.cast(tf.abs(diff), dtype=tf.float32)
+                        # effect_decay = tf.gather(self._effect_decay_factors, j)
+                        effect_decay = tf.dynamic_partition(  # type: ignore
+                            self._effect_decay_factors, j_one_hot, 2)[1][0]
                         effect = tf.pow(
-                            tf.gather(self._effect_decay_factors, j), abs_diff
+                            effect_decay, abs_diff
                         )  # * tf.pow(
                         #    self._effect_temporal_decay_factors[j], abs_diff)
 
@@ -524,11 +527,14 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
 
             total_loss = actor_loss + critic_loss + entropy_loss
 
+        if self._critic_loss_coef:
+            self._critic_loss.update_state(critic_loss)
+        if self._entropy_loss_coef:
+            self._entropy_loss.update_state(entropy_loss)
+
         self._actor_loss.update_state(actor_loss)
-        self._critic_loss.update_state(critic_loss)
-        self._entropy_loss.update_state(entropy_loss)
         self._total_loss.update_state(total_loss)
- 
+
         return tape.gradient(total_loss, self.trainable_variables)
 
     @tf.function(
@@ -538,7 +544,7 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
             tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns')))
     def _metrics_only(
             self, x: tf.Tensor, y: tf.Tensor, returns: tf.Tensor):
-        print('tracing _metrics_only')
+        print(f'tracing {self.__class__.__qualname__}._metrics_only')
         lengths = tf.constant(self._output_lengths)
         starts = tf.pad(lengths[:-1], [[1, 0]])
         ends = tf.math.cumsum(lengths)
@@ -550,8 +556,9 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
             tf.math.reduce_std(returns) + eps,
             name='normalized_returns')
 
-        logits, values = self(x, training=False)
-        logits_concat = tf.concat(logits, axis=1, name='all_logits')
+        action_probs, values = self(x, training=False)
+        logits_concat = tf.math.log(
+            tf.concat(action_probs, axis=1, name='all_logits') + eps)
         values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
 
         if self._entropy_loss_coef:
@@ -570,7 +577,8 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
 
         actor_loss = tf.constant(0.0)
         for j in tf.range(m):
-            logits_slice = logits_concat[:, starts[j]:ends[j]]
+            logits_slice = logits_concat[  # type: ignore
+                :, starts[j]:ends[j]]
             action_probs = tfp.distributions.Categorical(
                 logits=logits_slice)
             y_slice = y[:, j]  # type: ignore
@@ -581,7 +589,7 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
                 _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
                 actor_loss += _loss
             else:
-                for diff in tf.range(-effect_width, effect_width+1):
+                for diff in tf.range(-effect_width, effect_width + 1):
                     temp = y_slice + diff
                     in_range_indicator = tf.logical_and(
                         tf.greater_equal(temp, 0),
@@ -616,13 +624,16 @@ class DeepActorCriticActionProximityModel(DeepActorCriticModel):
 
         total_loss = actor_loss + critic_loss + entropy_loss
 
+        if self._critic_loss_coef:
+            self._critic_loss.update_state(critic_loss)
+        if self._entropy_loss_coef:
+            self._entropy_loss.update_state(entropy_loss)
+
         self._actor_loss.update_state(actor_loss)
-        self._critic_loss.update_state(critic_loss)
-        self._entropy_loss.update_state(entropy_loss)
         self._total_loss.update_state(total_loss)
 
 
-class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
+class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
     '''
     The DenseSoftMax learner, comprised of a fully-connected with a softmax
     in the output layer.
@@ -633,7 +644,7 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
 
     def __init__(
             self,
-            model: DeepActorCriticModel,
+            model: DeepA2CModel,
             tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
             tensorboard_filename: Optional[str] = None,
             **kwargs: Any) -> None:
@@ -643,11 +654,6 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
         tensorboard_path:
             A path to save tensorboard outputs. If not provided,
             tensorboard will be disabled.
-
-        Raises
-        ------
-        ValueError
-            Validation split not in the range of (0.0, 1.0).
         '''
 
         super().__init__(models={'_model': type(model)}, **kwargs)
@@ -665,15 +671,15 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
                 f'-{tensorboard_filename}' or '')
             self._train_summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                str(
-                    self._tensorboard_path /
-                    self._tensorboard_filename / 'train'))
+                    str(
+                        self._tensorboard_path /
+                        self._tensorboard_filename / 'train'))
 
-            self._validation_summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                str(
-                    self._tensorboard_path /
-                    self._tensorboard_filename / 'validation'))
+            # self._validation_summary_writer = \
+            #     tf.summary.create_file_writer(  # type: ignore
+            #     str(
+            #         self._tensorboard_path /
+            #         self._tensorboard_filename / 'validation'))
 
     def predict(
             self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
@@ -727,19 +733,19 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
                 for key, value in metrics.items()
                 if not key.startswith('val_')}
 
-            validation_metrics = {
-                key[4:]: value
-                for key, value in metrics.items()
-                if key.startswith('val_')}
+            # validation_metrics = {
+            #     key[4:]: value
+            #     for key, value in metrics.items()
+            #     if key.startswith('val_')}
 
             with self._train_summary_writer.as_default(step=self._iteration):
                 for name, value in training_metrics.items():
                     tf.summary.scalar(name, value[0])
 
-            with self._validation_summary_writer.as_default(
-                    step=self._iteration):
-                for name, value in validation_metrics.items():
-                    tf.summary.scalar(name, value[0])
+            # with self._validation_summary_writer.as_default(
+            #         step=self._iteration):
+            #     for name, value in validation_metrics.items():
+            #         tf.summary.scalar(name, value[0])
 
         self._iteration += 1
 
@@ -748,7 +754,7 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
     def __getstate__(self):
         state = super().__getstate__()
         state['_train_summary_writer'] = None
-        state['_validation_summary_writer'] = None
+        # state['_validation_summary_writer'] = None
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
@@ -757,12 +763,12 @@ class ActorCriticLearner(TF2IOMixin, Learner[FeatureSet, ACLabelType]):
         if self._tensorboard_path:
             self._train_summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                str(
-                    self._tensorboard_path /
-                    self._tensorboard_filename / 'train'))
+                    str(
+                        self._tensorboard_path /
+                        self._tensorboard_filename / 'train'))
 
-            self._validation_summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                str(
-                    self._tensorboard_path /
-                    self._tensorboard_filename / 'validation'))
+            # self._validation_summary_writer = \
+            #     tf.summary.create_file_writer(  # type: ignore
+            #     str(
+            #         self._tensorboard_path /
+            #         self._tensorboard_filename / 'validation'))
