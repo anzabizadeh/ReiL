@@ -13,8 +13,6 @@ import tensorflow as tf
 import tensorflow.keras.optimizers.schedules as k_sch
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
-                                                    LearningRateScheduler)
 from reil.utils.tf_utils import (ArgMaxLayer, BroadcastAndConcatLayer,
                                  MaxLayer, TF2UtilsMixin)
 from tensorflow import keras
@@ -38,7 +36,7 @@ class DeepQModel(keras.Model):
 
     def build(self, input_shape: Tuple[Tuple[int, ...], Tuple[int, ...]]):
         self._state_shape = [None, *input_shape[0][1:]]
-        self._action_shape =[None, *input_shape[1][1:]]
+        self._action_shape = [None, *input_shape[1][1:]]
 
         self._concat = BroadcastAndConcatLayer(name='concat')
 
@@ -240,7 +238,7 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
 
         return self._model.fit(  # type: ignore
             _X, tf.convert_to_tensor(Y),  # type: ignore
-            initial_epoch=self._iteration, epochs=self._iteration+1,
+            initial_epoch=self._iteration, epochs=self._iteration + 1,
             callbacks=self._callbacks,
             verbose=0).history
 

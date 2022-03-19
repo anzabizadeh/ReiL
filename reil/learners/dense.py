@@ -185,7 +185,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
             with self._graph.as_default():
                 return self._model.fit(  # type: ignore
                     np.array(_X), np.array(Y),  # type: ignore
-                    initial_epoch=self._iteration, epochs=self._iteration+1,
+                    initial_epoch=self._iteration, epochs=self._iteration + 1,
                     callbacks=self._callbacks,
                     validation_split=self._validation_split,
                     verbose=0)
@@ -444,7 +444,7 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
 
         return self._model.fit(  # type: ignore
             tf.convert_to_tensor(_X), tf.convert_to_tensor(Y),  # type: ignore
-            initial_epoch=self._iteration, epochs=self._iteration+1,
+            initial_epoch=self._iteration, epochs=self._iteration + 1,
             callbacks=self._callbacks,
             validation_split=self._validation_split,
             verbose=0)
