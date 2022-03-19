@@ -16,7 +16,7 @@ from reil.learners.learner import Learner
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 from reil.utils.tf_utils import (ArgMaxLayer, BroadcastAndConcatLayer,
-                                 MaxLayer, TF2IOMixin)
+                                 MaxLayer, TF2UtilsMixin)
 from tensorflow import keras
 
 
@@ -125,7 +125,7 @@ class DeepQModel(keras.Model):
         return cls(**config)
 
 
-class QLearner(TF2IOMixin, Learner[Tuple[FeatureSet, ...], float]):
+class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
     '''
     The Dense learner for Q learning.
 

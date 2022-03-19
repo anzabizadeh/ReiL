@@ -9,7 +9,6 @@ from abc import abstractmethod
 from typing import Any, Dict, Optional, Protocol, Tuple, TypeVar, Union
 
 from reil import reilbase
-from reil.datatypes.feature import FeatureSet
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 

@@ -14,7 +14,7 @@ from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
-from reil.utils.tf_utils import TF2IOMixin
+from reil.utils.tf_utils import TF2UtilsMixin
 from tensorflow import keras
 
 
@@ -290,7 +290,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         return state
 
 
-class Dense_tf_2(TF2IOMixin, Learner[FeatureSet, float]):
+class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
     '''
     The Dense learner.
 
