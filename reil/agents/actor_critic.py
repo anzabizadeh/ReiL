@@ -1,33 +1,35 @@
 # -*- coding: utf-8 -*-
 '''
-ActorCritic class
+A2C class
 =================
 
 An Actor-Critic Policy Gradient `agent`.
 '''
 
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
+from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners import Learner
 from reil.utils.exploration_strategies import NoExploration
 
-
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
 
-class ActorCritic(Agent[FeatureSet, ACLabelType]):
+class A2C(Agent[FeatureSet, ACLabelType]):
     '''
-    A reward to go Policy Gradient `agent`.
+    An advantage actor critic (Policy Gradient) `agent`.
     '''
 
     def __init__(
             self,
             learner: Learner[FeatureSet, ACLabelType],
+            buffer: Buffer[FeatureSet, Tuple[Tuple[int, ...], float]],
+            reward_clip: Tuple[Optional[float], Optional[float]] = (None, None),
             **kwargs: Any):
         '''
         Arguments
@@ -50,12 +52,17 @@ class ActorCritic(Agent[FeatureSet, ACLabelType]):
             variable_action_count=False,
             **kwargs)
 
+        self._buffer = buffer
+        self._buffer.setup(buffer_names=['state', 'y_and_g'])
+        self._reward_clip = reward_clip
+
     @classmethod
     def _empty_instance(cls):  # type: ignore
-        return cls(Learner._empty_instance())
+        return cls(Learner._empty_instance(), Buffer())
 
     def _prepare_training(
-            self, history: History) -> TrainingData[FeatureSet, int]:
+            self, history: History) -> TrainingData[
+                FeatureSet, Tuple[Tuple[int, ...], float]]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -72,35 +79,25 @@ class ActorCritic(Agent[FeatureSet, ACLabelType]):
 
         :meta public:
         '''
-        reward: float
+        state: FeatureSet
+        action_index: Tuple[int, ...]
 
         discount_factor = self._discount_factor
+        active_history = self.get_active_history(history)
 
-        for h in history[:-1]:
-            if h.state is None or (
-                    h.action is None and h.action_taken is None):
-                raise ValueError(f'state and action cannot be None.\n{h}')
+        rewards = self.extract_reward(active_history, *self._reward_clip)
+        disc_reward = self.discounted_cum_sum(rewards, discount_factor)
 
-        if history[-1].action_taken is None and history[-1].action is None:
-            active_history = history[:-1]
-        else:
-            active_history = history
+        for h, r in zip(active_history, disc_reward):
+            state = h.state  # type: ignore
+            action_index = tuple((
+                h.action_taken or h.action).index.values())  # type: ignore
+            self._buffer.add(
+                {'state': state, 'y_and_g': (action_index, r)})
 
-        _len = len(active_history)
-        returns = [0.0] * (_len + 1)
-        for i in range(_len-1, -1, -1):
-            reward = active_history[i].reward or 0.0
-            returns[i] = reward + discount_factor * returns[i+1]
+        temp = self._buffer.pick()
 
-        returns = np.array(returns[:-1])  # type: ignore
-
-        return (
-            [a.state for a in active_history],  # type: ignore
-            [(tuple(
-                (a.action_taken or a.action).index.values()),  # type: ignore
-              g)
-             for a, g in zip(active_history, returns)],
-            {})
+        return temp['state'], temp['y_and_g'], {}  # type: ignore
 
     def act(self,
             state: FeatureSet,
@@ -146,6 +143,8 @@ class ActorCritic(Agent[FeatureSet, ACLabelType]):
         else:
             action_index = [int(np.argmax(lo)) for lo in logits]
 
+        if len(action_index) == 1:
+            action_index = action_index[0]
         action: FeatureSet = actions.send(f'lookup {action_index}')
 
         return action
