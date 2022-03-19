@@ -7,8 +7,10 @@ This `agent` class is the base class of all agent classes that can learn from
 `history`.
 '''
 
-from typing import (Any, Dict, Generator, Generic, Literal, Optional, Tuple, TypeVar,
-                    Union)
+from typing import (Any, Dict, Generator, Generic, List, Literal, Optional, Tuple,
+                    TypeVar, Union)
+
+import scipy.signal
 
 from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
@@ -82,11 +84,55 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward'
-            ] = training_trigger
+        ] = training_trigger
 
     @classmethod
     def _empty_instance(cls):
         return cls(Learner._empty_instance(), ConstantEpsilonGreedy())
+
+    @staticmethod
+    def discounted_cum_sum(r: List[float], discount: float) -> List[float]:
+        # Copied from OpenAI SpinUp: algos/tf1/ppo/core.py
+        return scipy.signal.lfilter(  # type: ignore
+            [1], [1, float(-discount)], r[::-1], axis=0)[::-1]
+
+    @staticmethod
+    def extract_reward(
+            history: History,
+            min_clip: Optional[float] = None,
+            max_clip: Optional[float] = None) -> List[float]:
+        rewards: List[float] = [
+            a.reward for a in history
+            if a.reward is not None]
+
+        if min_clip is not None:
+            rewards = [max(r, min_clip) for r in rewards]
+        if max_clip is not None:
+            rewards = [min(r, max_clip) for r in rewards]
+
+        return rewards
+
+    @staticmethod
+    def get_active_history(history: History) -> History:
+        '''
+        Extract active history.
+
+        When history is one complete trajectory, the last observation
+        contains only the terminal state. In this case, we don't have an
+        action and a reward for the last observation, so we should clip it in
+        Q-learning, actor critic, and similar methods.
+        '''
+        for h in history[:-1]:
+            if h.state is None or (
+                    h.action is None and h.action_taken is None):
+                raise ValueError(f'state and action cannot be None.\n{h}')
+
+        if history[-1].action_taken is None and history[-1].action is None:
+            active_history = history[:-1]
+        else:
+            active_history = history
+
+        return active_history
 
     def act(self,
             state: FeatureSet,
