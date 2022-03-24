@@ -102,4 +102,4 @@ class PPO(A2C):
 
         temp = self._buffer.pick()
 
-        return temp['state'], temp['y_and_g'], {}  # type: ignore
+        return temp['state'], temp['y_r_a'], {}  # type: ignore
