@@ -252,6 +252,8 @@ class TF2UtilsMixin(reilbase.ReilBase):
             self._callbacks.append(learning_rate_scheduler)
 
 
+@keras.utils.register_keras_serializable(
+    package='reil.utils.tf_utils')
 class BroadcastAndConcatLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(trainable=False, dynamic=True, **kwargs)
@@ -261,7 +263,6 @@ class BroadcastAndConcatLayer(keras.layers.Layer):
         input_signature=(
             tf.TensorSpec(shape=[None, None], name='x'),
             tf.TensorSpec(shape=[None, None], name='y')))
-        # experimental_compile=True)
     def _broadcast_and_concat(x: tf.Tensor, y: tf.Tensor):
         dim_x = tf.shape(x)
         dim_y = tf.shape(y)
@@ -292,6 +293,8 @@ class BroadcastAndConcatLayer(keras.layers.Layer):
         return super().get_config()
 
 
+@keras.utils.register_keras_serializable(
+    package='reil.utils.tf_utils')
 class ArgMaxLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(trainable=False, dynamic=True, **kwargs)
@@ -299,7 +302,6 @@ class ArgMaxLayer(keras.layers.Layer):
     @tf.function(
         input_signature=(
             tf.TensorSpec(shape=[None, None]),))
-        # experimental_compile=True)
     def call(self, x: tf.Tensor):
         return tf.argmax(x)
 
@@ -313,6 +315,8 @@ class ArgMaxLayer(keras.layers.Layer):
         return super().get_config()
 
 
+@keras.utils.register_keras_serializable(
+    package='reil.utils.tf_utils')
 class MaxLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(trainable=False, dynamic=True, **kwargs)
@@ -320,7 +324,6 @@ class MaxLayer(keras.layers.Layer):
     @tf.function(
         input_signature=(
             tf.TensorSpec(shape=[None, 1]),))
-        # experimental_compile=True)
     def call(self, x: tf.Tensor):
         return tf.reduce_max(x)
 
@@ -332,3 +335,36 @@ class MaxLayer(keras.layers.Layer):
 
     def get_config(self) -> Dict[str, Any]:
         return super().get_config()
+
+
+@keras.utils.register_keras_serializable(
+    package='reil.utils.tf_utils')
+class ActionRank(keras.metrics.Metric):
+
+    def __init__(self, name='action_rank', **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.cumulative_rank = self.add_weight(
+            name='rank', initializer='zeros', dtype=tf.int64)
+        self.count = self.add_weight(
+            name='count', initializer='zeros', dtype=tf.int32)
+
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None], dtype=tf.int32, name='y_true'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='y_pred'))
+    )
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        shape = tf.shape(y_pred)
+        ranks = tf.math.top_k(y_pred, k=shape[1]).indices
+        self.count.assign_add(shape[0])
+        locs = tf.equal(ranks, tf.expand_dims(y_true, axis=1))
+        self.cumulative_rank.assign_add(
+            tf.reduce_sum(tf.gather(tf.where(locs), 1, axis=1)))
+
+    @tf.function
+    def result(self):
+        return tf.divide(self.cumulative_rank, tf.cast(self.count, tf.int64))
+
+    def reset_states(self):
+        self.cumulative_rank.assign(0)
+        self.count.assign(0)
