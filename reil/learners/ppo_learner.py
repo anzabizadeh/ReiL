@@ -12,15 +12,16 @@ from typing import Any, Dict, Optional, Tuple, Union
 import tensorflow as tf
 import tensorflow.keras.optimizers.schedules as k_sch
 from reil.datatypes.feature import FeatureSet
-from reil.learners.actor_critic_learner import ActionRank, DeepA2CModel
 from reil.learners.learner import Learner
-from reil.utils.tf_utils import TF2UtilsMixin
+from reil.utils.tf_utils import ActionRank, TF2UtilsMixin
 from tensorflow import keras
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
 
-class PPOModel:
+@keras.utils.register_keras_serializable(
+    package='reil.learners.ppo_learner')
+class PPOModel(TF2UtilsMixin):
     def __init__(
             self,
             input_shape: Tuple[int, ...],
@@ -38,6 +39,9 @@ class PPOModel:
             target_kl: float,
             critic_loss_coef: float = 1.0,
             entropy_loss_coef: float = 0.0) -> None:
+
+        super().__init__(models={})
+
         self._input_shape = input_shape
         self._output_lengths = output_lengths
         self._actor_learning_rate = actor_learning_rate
@@ -79,6 +83,10 @@ class PPOModel:
         self._actor_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
             'actor_accuracy', dtype=tf.float32)
         self._action_rank = ActionRank()
+
+        self._models = {
+            'actor': type(self.actor),
+            'critic': type(self.critic)}
 
     def __call__(self, inputs, training: Optional[bool] = None) -> Any:
         logits = self.actor(inputs, training)
@@ -172,17 +180,22 @@ class PPOModel:
 
         metrics['action_rank'] = [self._action_rank.result()]
 
+        self._actor_loss.reset_states()
+        self._critic_loss.reset_states()
+        self._actor_accuracy.reset_states()
+        self._action_rank.reset_states()
+
         return metrics
 
 
-class PPOLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
+class PPOLearner(Learner[FeatureSet, ACLabelType]):
     '''
     PPO Learner
     '''
 
     def __init__(
             self,
-            model: DeepA2CModel,
+            model: PPOModel,
             tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
             tensorboard_filename: Optional[str] = None,
             **kwargs: Any) -> None:
@@ -194,7 +207,7 @@ class PPOLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
             tensorboard will be disabled.
         '''
 
-        super().__init__(models={'_model': type(model)}, **kwargs)
+        super().__init__(**kwargs)
 
         self._model = model
 
@@ -232,7 +245,7 @@ class PPOLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         :
             The predicted `y`.
         '''
-        return self._model(self.convert_to_tensor(X), training=training)
+        return self._model(TF2UtilsMixin.convert_to_tensor(X), training=training)
 
     def learn(
             self, X: Tuple[FeatureSet, ...],
@@ -248,7 +261,7 @@ class PPOLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X = self.convert_to_tensor(X)
+        _X = TF2UtilsMixin.convert_to_tensor(X)
         if len(_X.shape) == 1:
             _X = tf.expand_dims(_X, axis=0)
 
@@ -283,6 +296,14 @@ class PPOLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         self._iteration += 1
 
         return metrics
+
+    def get_parameters(self) -> Any:
+        return (
+            self._model.actor.get_weights(), self._model.critic.get_weights())
+
+    def set_parameters(self, parameters: Any):
+        self._model.actor.set_weights(parameters[0])
+        self._model.critic.set_weights(parameters[1])
 
     def __getstate__(self):
         state = super().__getstate__()
