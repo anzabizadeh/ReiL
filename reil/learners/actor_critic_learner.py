@@ -17,7 +17,7 @@ import tensorflow.keras.optimizers.schedules as k_sch
 import tensorflow_probability as tfp
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.utils.tf_utils import TF2UtilsMixin
+from reil.utils.tf_utils import ActionRank, TF2UtilsMixin
 from tensorflow import keras
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
@@ -25,37 +25,6 @@ ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 huber_loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
 
 eps = np.finfo(np.float32).eps.item()
-
-
-@keras.utils.register_keras_serializable(
-    package='reil.learners.actor_critic_learner')
-class ActionRank(tf.keras.metrics.Metric):
-
-    def __init__(self, name='action_rank', **kwargs):
-        super().__init__(name=name, **kwargs)
-        self.cumulative_rank = self.add_weight(
-            name='rank', initializer='zeros', dtype=tf.int32)
-        self.count = self.add_weight(
-            name='count', initializer='zeros', dtype=tf.int32)
-
-    @tf.function(
-        input_signature=(
-            tf.TensorSpec(shape=[None], dtype=tf.int32, name='y_true'),
-            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='y_pred'))
-    )
-    def update_state(self, y_true, y_pred, sample_weight=None):
-        shape = tf.shape(y_pred)
-        ranks = tf.math.top_k(y_pred, k=shape[1]).indices
-        one_hot = tf.one_hot(y_true, depth=shape[1], dtype=tf.int32)
-        self.count.assign_add(shape[0])
-        self.cumulative_rank.assign_add(tf.reduce_sum(ranks * one_hot))
-
-    def result(self):
-        return self.cumulative_rank / self.count
-
-    def reset_states(self):
-        self.cumulative_rank.assign(0)
-        self.count.assign(0)
 
 
 @keras.utils.register_keras_serializable(
@@ -750,6 +719,12 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         self._iteration += 1
 
         return metrics
+
+    def get_parameters(self) -> Any:
+        return self._model.get_weights()
+
+    def set_parameters(self, parameters: Any):
+        self._model.set_weights(parameters)
 
     def __getstate__(self):
         state = super().__getstate__()

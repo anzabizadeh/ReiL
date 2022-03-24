@@ -455,6 +455,12 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
         '''
         self._iteration += 1
 
+    def get_parameters(self) -> Any:
+        return self._model.get_weights()
+
+    def set_parameters(self, parameters: Any):
+        self._model.set_weights(parameters)
+
 
 if tf.__version__[0] == '1':  # type: ignore
     Dense = Dense_tf_1

@@ -67,7 +67,7 @@ class Environment(stateful.Stateful):
                 AgentDemon, SubjectDemon, str]]] = None,
             interaction_plans: Optional[Dict[str, Any]] = None,
             stopping_criteria: Optional[
-                Callable[[Dict[str, float]], bool]] = None,
+                Callable[[Dict[str, float], Optional[Any]], bool]] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -94,10 +94,7 @@ class Environment(stateful.Stateful):
         self._plans: Dict[str, Any] = {}
         self._active_plan: Plan = Plan()
 
-        if stopping_criteria is None:
-            self._stopping_criteria = lambda _: False
-        else:
-            self._stopping_criteria = stopping_criteria
+        self._stopping_criteria = stopping_criteria
 
         if entity_dict:
             self.add_entities(entity_dict)

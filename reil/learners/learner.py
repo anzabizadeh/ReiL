@@ -66,6 +66,14 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
         '''
         raise NotImplementedError
 
+    @abstractmethod
+    def get_parameters(self) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_parameters(self, parameters: Any):
+        raise NotImplementedError
+
 
 class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
     '''

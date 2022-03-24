@@ -242,6 +242,12 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
             callbacks=self._callbacks,
             verbose=0).history
 
+    def get_parameters(self) -> Any:
+        return self._model.get_weights()
+
+    def set_parameters(self, parameters: Any):
+        self._model.set_weights(parameters)
+
     def reset(self) -> None:
         '''
         reset the learner.

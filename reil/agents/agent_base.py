@@ -221,3 +221,9 @@ class AgentBase(Stateful):
             action = random.choice(input_tuple)
 
         return action
+
+    def get_parameters(self) -> Any:
+        return None
+
+    def set_parameters(self, parameters: Any):
+        pass

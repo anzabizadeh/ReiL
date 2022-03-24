@@ -319,6 +319,12 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
                 return
 
+    def get_parameters(self) -> Any:
+        return self._learner.get_parameters()
+
+    def set_parameters(self, parameters: Any):
+        self._learner.set_parameters(parameters)
+
     # def load(
     #         self, filename: str,
     #         path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
