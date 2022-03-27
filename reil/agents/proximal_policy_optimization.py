@@ -7,6 +7,7 @@ A Proximal Policy Optimization Policy Gradient `agent`.
 '''
 
 from typing import Any, Optional, Tuple
+import numpy as np
 
 import tensorflow as tf
 from reil.agents.actor_critic import A2C
@@ -83,12 +84,16 @@ class PPO(A2C):
         discount_factor = self._discount_factor
         active_history = self.get_active_history(history)
 
-        rewards = self.extract_reward(active_history, *self._reward_clip)
+        # add zero to the end to have the correct length of `deltas`
+        rewards = self.extract_reward(
+            active_history, *self._reward_clip) + [0.0]
         disc_reward = self.discounted_cum_sum(rewards, discount_factor)
 
         state_list: Tuple[FeatureSet, ...] = tuple(  # type: ignore
             h.state for h in active_history)
-        values = tf.reshape(self._learner.predict(state_list)[1], -1)
+        # add zero to the end to have the correct length of `deltas`
+        values = np.append(
+            tf.reshape(self._learner.predict(state_list)[1], -1), 0.0)
         deltas = rewards[:-1] + discount_factor * values[1:] - values[:-1]
         advantage = self.discounted_cum_sum(
             deltas, discount_factor * self._gae_lambda)
