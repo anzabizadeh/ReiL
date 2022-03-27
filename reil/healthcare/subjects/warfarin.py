@@ -77,6 +77,11 @@ reward_sq_dist = reil_functions.NormalizedSquareDistance(
     length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
     center=2.5, band_width=1.0, exclude_first=True)
 
+reward_dist = reil_functions.NormalizedDistance(
+    name='dist', y_var_name='daily_INR_history',
+    length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+    center=2.5, band_width=1.0, exclude_first=True)
+
 reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
     name='sq_dist_interpolation',
     y_var_name='INR_history', x_var_name='interval_history',
@@ -174,6 +179,10 @@ class Warfarin(HealthSubject):
 
     def _generate_reward_defs(self):
         current_defs = self.reward.definitions
+
+        if 'dist_exact' not in current_defs:
+            self.reward.add_definition(
+                'dist_exact', reward_dist, 'recent_daily_INR')
 
         if 'sq_dist_exact' not in current_defs:
             self.reward.add_definition(

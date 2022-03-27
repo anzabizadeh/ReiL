@@ -4,7 +4,7 @@ import dataclasses
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
 
 from reil.datatypes.feature import FeatureSet
-from reil.utils.functions import in_range, interpolate, square_dist
+from reil.utils.functions import in_range, interpolate, dist, square_dist
 
 # SOME THOUGHTS!
 # Lookahead is not something a subject can/should do!
@@ -28,7 +28,7 @@ class ReilFunction(Generic[TypeY, TypeX]):
     interpolate: bool = True
 
     def __post_init__(self):
-        choice = self.retrospective*2 + self.interpolate
+        choice = self.retrospective * 2 + self.interpolate
         if choice == 0:
             self._fn = self._no_retro_no_inter
         elif choice == 1:
@@ -89,7 +89,37 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
             _y = y
 
         result = sum(square_dist(
-            self.center, interpolate(_y[i], _y[i+1], _x[i]))
+            self.center, interpolate(_y[i], _y[i + 1], _x[i]))
+            for i in range(len(_x)))
+
+        # normalize
+        result *= (2.0 / self.band_width) ** 2
+
+        return result
+
+
+@dataclasses.dataclass
+class NormalizedDistance(ReilFunction[float, int]):
+    center: float = 0.0
+    band_width: float = 1.0
+    exclude_first: bool = False
+
+    def _default_function(
+            self, y: List[float], x: Optional[List[int]] = None) -> float:
+        _x = x or [1] * (len(y) - 1)
+
+        if len(y) != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0] + y
+        else:
+            _y = y
+
+        result = sum(dist(
+            self.center, interpolate(_y[i], _y[i + 1], _x[i]))
             for i in range(len(_x)))
 
         # normalize
@@ -119,7 +149,7 @@ class PercentInRange(ReilFunction[float, int]):
         result = sum(
             in_range(
                 self.acceptable_range,
-                interpolate(_y[i], _y[i+1], _x[i]))
+                interpolate(_y[i], _y[i + 1], _x[i]))
             for i in range(len(_x)))
 
         total_intervals = sum(_x)

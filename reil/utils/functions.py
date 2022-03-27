@@ -90,7 +90,7 @@ def random_lognormal_truncated(f: FeatureGenerator) -> float:
         firstQ, thirdQ = lnorm.ppf(quartileRange)
         values = lnorm.rvs(size=1000, random_state=rnd_np)
         values = values[
-            np.logical_and(firstQ < values, values < thirdQ)] # type: ignore
+            np.logical_and(firstQ < values, values < thirdQ)]  # type: ignore
 
         return rnd_np.choice(values)
 
@@ -111,19 +111,22 @@ def random_categorical(f: FeatureGenerator) -> Any:
     return categories[0]
 
 
+def dist(x: float, y: Iterable[float]) -> float:
+    return sum(abs(x - yi) for yi in y)
+
+
 def square_dist(x: float, y: Iterable[float]) -> float:
-    return sum((x - yi) ** 2
-               for yi in y)
+    return sum((x - yi) ** 2 for yi in y)
 
 
 def in_range(r: Tuple[float, float], x: Iterable[float]) -> int:
-    return sum(r[0] <= xi <= r[1]
-               for xi in x)
+    return sum(r[0] <= xi <= r[1] for xi in x)
 
 
 def interpolate(start: float, end: float, steps: int) -> Iterable[float]:
-    return (start + (end - start) / steps * j
-            for j in range(1, steps + 1))
+    return (
+        start + (end - start) / steps * j
+        for j in range(1, steps + 1))
 
 
 def generate_modifier(
