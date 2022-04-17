@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import bz2
 import importlib
-import inspect
 import logging
 import sys
 import time
@@ -26,6 +25,12 @@ class CustomUnPickler(pickle.Unpickler):
         if name == 'QDense':
             from reil.learners.q_learner import QLearner
             return QLearner
+        if name == 'FeatureArray':
+            from reil.datatypes.feature import FeatureSet
+            return FeatureSet
+        if name == 'change_array_to_missing':
+            from reil.datatypes.feature import change_set_to_missing
+            return change_set_to_missing
 
         return super().find_class(module, name)  # type: ignore
 
@@ -111,9 +116,9 @@ class DefaultPickler(LowLevelPickler):
         filename: str, path: Union[str, PurePath]
     ) -> PurePath:
         return self._dump(
-                obj=obj,
-                full_path=self.resolve_path(filename, path),
-                file_fn=open, mode='wb+')
+            obj=obj,
+            full_path=self.resolve_path(filename, path),
+            file_fn=open, mode='wb+')
 
     def load(
             self, filename: str,
@@ -159,6 +164,7 @@ PickleMe = PicklerManager(
 def full_qualname(obj: Any):
     return '>'.join((obj.__class__.__module__, obj.__class__.__qualname__))
 
+
 def get_class_from_name(qualname: str):
     module_name, class_name = qualname.split(sep='>')
     module = sys.modules.get(module_name)
@@ -166,6 +172,7 @@ def get_class_from_name(qualname: str):
         module = importlib.import_module(module_name)
 
     return getattr(module, class_name)
+
 
 def serialize(obj: Any):
     # if inspect.isclass(obj):
@@ -180,12 +187,16 @@ def serialize(obj: Any):
             'Could not find `get_config` method for class '
             f'{obj.__class__.__qualname__}')
 
+
 def deserialize(object_info: Dict[str, Any]):
     # The commented section only goes one layer down which might not be enough.
     # So, better not rely on it, and implement per class instead!
     # for key, value in object_info.items():
     #     if isinstance(value, dict) and '__needs_deserialization__' in value:
     #         object_info[key] = deserialize(value)
+
+    if not isinstance(object_info, dict):
+        return object_info
 
     if object_info.get('__needs_deserialization__', False):
         return get_class_from_name(

@@ -220,9 +220,14 @@ class TF2UtilsMixin(reilbase.ReilBase):
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        _models = state['_models']
+        _models: Union[Dict[str, Any], List[str]]
+        try:
+            _models = state['_models']
+        except KeyError:
+            _models = ['model']
+
         if '_no_model' in state and state['_no_model']:  # for compatibility
-            for name, model in _models.items():
+            for name, model in _models.items():  # type: ignore
                 self.__dict__[name] = model
         elif isinstance(_models, list):  # for compatibility
             for name in _models:
@@ -290,7 +295,11 @@ class BroadcastAndConcatLayer(keras.layers.Layer):
         return 0
 
     def get_config(self) -> Dict[str, Any]:
-        return super().get_config()
+        config = super().get_config()
+        config.pop('trainable')
+        config.pop('dynamic')
+
+        return config
 
 
 @keras.utils.register_keras_serializable(
@@ -312,7 +321,11 @@ class ArgMaxLayer(keras.layers.Layer):
         return 0
 
     def get_config(self) -> Dict[str, Any]:
-        return super().get_config()
+        config = super().get_config()
+        config.pop('trainable')
+        config.pop('dynamic')
+
+        return config
 
 
 @keras.utils.register_keras_serializable(
@@ -334,7 +347,11 @@ class MaxLayer(keras.layers.Layer):
         return 0
 
     def get_config(self) -> Dict[str, Any]:
-        return super().get_config()
+        config = super().get_config()
+        config.pop('trainable')
+        config.pop('dynamic')
+
+        return config
 
 
 @keras.utils.register_keras_serializable(

@@ -394,7 +394,10 @@ class Environment(stateful.Stateful):
             possible_actions = subject_instance.possible_actions(
                 name=action_name, _id=agent_id)
             if possible_actions:
-                next(possible_actions)
+                try:
+                    next(possible_actions)
+                except TypeError:
+                    pass
                 action = agent_observer.send(
                     {'state': state,
                      'actions': possible_actions,
@@ -402,7 +405,10 @@ class Environment(stateful.Stateful):
                 action_taken = subject_instance.take_effect(
                     action, agent_id)  # type: ignore
                 agent_observer.send({'action_taken': action_taken})
-                possible_actions.close()
+                try:
+                    possible_actions.close()
+                except AttributeError:
+                    pass
 
     @classmethod
     def interact_while(

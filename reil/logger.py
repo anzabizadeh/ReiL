@@ -79,8 +79,15 @@ class Logger:
                 logger_name=state['name'], logger_level=state.get('level'),
                 logger_filename=state.get('filename'), fmt=state.get('fmt'))
         except KeyError:
-            self.__init__(
-                logger_name=state['logger_name'],
-                logger_level=state.get('logger_level'),
-                logger_filename=state.get('logger_filename'),
-                fmt=state.get('_fmt'))
+            try:
+                self.__init__(
+                    logger_name=state['_name'],
+                    logger_level=state.get('_level'),
+                    logger_filename=state.get('_filename'),
+                    fmt=state.get('_fmt'))
+            except KeyError:
+                self.__init__(
+                    logger_name=state['logger_name'],
+                    logger_level=state.get('logger_level'),
+                    logger_filename=state.get('logger_filename'),
+                    fmt=state.get('_fmt'))

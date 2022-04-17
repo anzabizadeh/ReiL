@@ -86,10 +86,14 @@ class AgentBase(Stateful):
         :
             The action
         '''
+        possible_actions: Tuple[FeatureSet, ...]
         query = (
             'return feature exclusive' if self._variable_action_count
             else 'return feature')
-        possible_actions = tuple(actions.send(query))
+        try:
+            possible_actions = tuple(actions.send(query))
+        except AttributeError:
+            possible_actions = actions  # type: ignore
 
         try:
             result = self.best_actions(state, possible_actions)

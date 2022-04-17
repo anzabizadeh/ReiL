@@ -7,6 +7,8 @@ A Q-learning `agent` with a Neural Network Q-function approximator.
 '''
 from typing import Any, Literal, Tuple, Union
 
+import numpy as np
+
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
@@ -202,7 +204,16 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
         :
             A list of best actions.
         '''
-        return (self._learner.argmax((state,), actions)[1],)
+        try:
+            return (self._learner.argmax((state,), actions)[1],)
+        except AttributeError:
+            q_values = self._q((state,), actions)
+            max_q: float = np.max(q_values)  # type: ignore
+            result = tuple(
+                actions[i]
+                for i in np.flatnonzero(q_values == max_q))
+
+            return result
 
     def reset(self) -> None:
         '''Resets the agent at the end of a learning iteration.'''
