@@ -55,6 +55,14 @@ state_definitions: Dict[str, DefComponents] = {
             ('INR_history', {'length': i + 1}),
             ('interval_history', {'length': i}))
         for i in range(1, 10)},
+    **{
+        f'old_patient_w_dosing_{i:02}': (
+            *patient_basic,
+            ('day', {}),
+            ('dose_history', {'length': i}),
+            ('INR_history', {'length': i}),
+            ('interval_history', {'length': i}))
+        for i in range(1, 10)},
 
     'patient_w_full_dosing': (
         *patient_basic, *patient_extra,
@@ -120,6 +128,7 @@ class Warfarin(HealthSubject):
             interval_step: int = 1,
             max_day: int = 90,
             dose_only: bool = False,
+            backfill: bool = True,
             **kwargs: Any):
         '''
         Arguments
@@ -155,6 +164,7 @@ class Warfarin(HealthSubject):
             **kwargs)
 
         self._dose_only = dose_only
+        self._backfill = backfill
         self.action_gen_set += self.feature_gen_set['dose']
         if not dose_only:
             self.action_gen_set += self.feature_gen_set['interval']
@@ -440,13 +450,13 @@ class Warfarin(HealthSubject):
             self, _id: int, length: int = 1, **kwargs: Any
     ) -> Feature:
         return self._sub_comp_measurement_history(
-            _id, length, **kwargs)
+            _id, length, backfill=self._backfill, **kwargs)
 
     def _sub_comp_daily_INR_history(
             self, _id: int, length: int = 1, **kwargs: Any
     ) -> Feature:
         return self._sub_comp_daily_measurement_history(
-            _id, length, **kwargs)
+            _id, length, backfill=self._backfill, **kwargs)
 
     def _sub_comp_INR_within(
             self, _id: int, length: int = 1, **kwargs: Any

@@ -4,6 +4,7 @@ Patient class
 =============
 
 This class is the base class to model patients with different characteristics.
+#TODO: Serialization and configs do not include random generators.
 '''
 
 from copy import deepcopy
@@ -12,7 +13,7 @@ import reil
 
 from reil.datatypes.feature import FeatureGeneratorSet
 from reil.healthcare.mathematical_models import HealthMathModel
-from reil.serialization import deserialize, full_qualname, get_class_from_name, serialize
+from reil.serialization import deserialize, serialize
 
 
 class Patient:
@@ -36,18 +37,17 @@ class Patient:
         if not hasattr(self, 'feature_gen_set'):
             self.feature_gen_set = FeatureGeneratorSet()
 
-        self._random_seed = random_seed
         self._model = model
+        self._random_seed = random_seed
+        self._rnd_generators = reil.random_generators_from_seed(random_seed)
 
-        rnd_generators = reil.random_generators_from_seed(random_seed)
-        with reil.random_generator_context(*rnd_generators):
+        with reil.random_generator_context(*self._rnd_generators):
             self.feature_set = self.feature_gen_set(feature_values)
 
-            self.feature_set.update(
-                self._model.generate(
-                    random_seed=random_seed, input_features=self.feature_set,
-                    **feature_values))
-        self._model.setup(self.feature_set, random_seed=self._random_seed)
+        self.feature_set.update(
+            self._model.generate(
+                self._rnd_generators, self.feature_set, **feature_values))
+        self._model.setup(self._rnd_generators, self.feature_set)
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]):
@@ -87,13 +87,12 @@ class Patient:
         up to `model` using the new values.
         '''
 
-        rnd_generators = reil.random_generators_from_seed(self._random_seed)
-        with reil.random_generator_context(*rnd_generators):
+        with reil.random_generator_context(*self._rnd_generators):
             self.feature_set = self.feature_gen_set()
 
         self.feature_set.update(
-            self._model.generate(self._random_seed, self.feature_set))
-        self._model.setup(self.feature_set, random_seed=self._random_seed)
+            self._model.generate(self._rnd_generators, self.feature_set))
+        self._model.setup(self._rnd_generators, self.feature_set)
 
     def model(self, **inputs: Any) -> Dict[str, Any]:
         '''Model patient's behavior.
@@ -111,3 +110,12 @@ class Patient:
             All the outputs of running the mathematical model, given the input.
         '''
         return self._model.run(**inputs)
+
+    def __setstate__(self, state):
+        self.__dict__ = self.from_config(dict(
+            feature_gen_set=state['feature_gen_set'],
+            sensitivity_gen=state['_sensitivity_gen'],
+            randomized=state['_randomized'],
+            feature_set=state['feature_set'],
+            model=state['_model']
+        )).__dict__

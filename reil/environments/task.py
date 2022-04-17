@@ -30,7 +30,7 @@ class Task:
         if save_iterations:
             self._filename_format = f'{{}}_{{:0{ceil(log10(max_iterations))}}}'
         else:
-            self._filename_format = f'{{}}'
+            self._filename_format = '{{}}'
 
         # for protocol in interaction_sequence:
         #     if protocol.unit != 'iteration':
