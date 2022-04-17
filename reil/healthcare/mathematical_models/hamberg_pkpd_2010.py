@@ -8,37 +8,31 @@ A warfarin PK/PD model proposed by Hamberg et al. (2010).
 DOI: 10.1038/clpt.2010.37
 '''
 import math
-from typing import (Any, Callable, Dict, Final, Iterable, List, NamedTuple,
-                    NewType, Union)
+from typing import Any, Dict, Final, List, Optional, Union
 
 import numpy as np
-from reil.datatypes.feature import Feature, FeatureGenerator
+import reil
+from reil.datatypes.feature import (Feature, FeatureGenerator,
+                                    FeatureGeneratorSet, FeatureSet)
 from reil.healthcare.mathematical_models.health_math_model import \
     HealthMathModel
-
-Day = NewType('Day', float)
-Hour = NewType('Hour', int)
-dT = NewType('dT', int)
-
-
-class DoseEffect(NamedTuple):
-    dose: float
-    Cs: Callable[[Iterable[dT]], List[float]]
+from reil.utils.functions import random_lognormal_truncated
 
 
 class HambergPKPD2010(HealthMathModel):
     '''
     Hamberg PK/PD model for warfarin.
     '''
-    _per_hour: int = 1
+    # region: class attributes
+    _per_day: Final[int] = 24
 
     # Hamberg et al. (2010) - Table 2
-    # CL_s: Apparent oral clearance
-    _CL_alleles: Final = {  # Effect of genotypes diff. from *1/*1 on CL_s
+    # CL: Apparent oral clearance
+    _CL_alleles: Final = {
         '*1': 0.174,
         '*2': 0.0879,
         '*3': 0.0422}
-    _CL_age: Final = -0.571  # Effect of age on CL_s centered around 71 years
+    _CL_age: Final = -0.00571  # Effect of age on CL centered around 71 years
     _V: Final = 14.3  # (l) Apparent central volume of distribution
     _k_a: Final = 2.0  # (1/hr) Absorption rate constant
 
@@ -62,46 +56,75 @@ class HambergPKPD2010(HealthMathModel):
     _eta_KDE: Final = 0.589  # Interindividual variability for KDE
     _epsilon_INR: Final = 0.20  # Residual error for INR
 
-    # Hamberg et al. (2010) - Misc.
-    _INR_max: Final = 20.0  # page 733
+    _INR_max: Final = 20.0
 
-    _parameter_generators: Dict[str, FeatureGenerator] = {
-        'MTT_1': FeatureGenerator.continuous(
-            name='MTT_1',  # (hours) Hamberg PK/PD
-            mean=math.log(_MTT_1),
-            stdev=math.sqrt(_omega_MTT_1),
+    # Note: In Hamberg et al. (2007), BASE_i is the measured baseline INR
+    # for patients, but Ravvaz fixed it to 1.
+    _baseINR: Final = 1.0    # Ravvaz source code
+
+    __log_V = math.log(_V)
+    __sqrt_eta_V = math.sqrt(_eta_V)
+    __sqrt_eta_CL = math.sqrt(_eta_CL)
+    __sqrt_eta_KDE = math.sqrt(_eta_KDE)
+    __log_EC_50_GG = math.log(_EC_50_G * 2)
+    __log_EC_50_GA = math.log(_EC_50_G + _EC_50_A)
+    __log_EC_50_AA = math.log(_EC_50_A * 2)
+    __sqrt_eta_EC_50 = math.sqrt(_eta_EC_50)
+
+    __FeatureGenerator_EC_50_non_random = FeatureGenerator.continuous(
+        name='EC_50',  # (mg/L) Hamberg PK/PD
+        mean=1.0,
+        stdev=__sqrt_eta_EC_50,
+        generator=random_lognormal_truncated,
+        randomized=False)
+
+    __FeatureGenerator_EC_50_GG = FeatureGenerator.continuous(
+        name='EC_50',  # (mg/L) Hamberg PK/PD
+        mean=__log_EC_50_GG,
+        stdev=__sqrt_eta_EC_50,
+        generator=random_lognormal_truncated,
+        randomized=True)
+
+    __FeatureGenerator_EC_50_GA = FeatureGenerator.continuous(
+        name='EC_50',  # (mg/L) Hamberg PK/PD
+        mean=__log_EC_50_GA,
+        stdev=__sqrt_eta_EC_50,
+        generator=random_lognormal_truncated,
+        randomized=True)
+
+    __FeatureGenerator_EC_50_AA = FeatureGenerator.continuous(
+        name='EC_50',  # (mg/L) Hamberg PK/PD
+        mean=__log_EC_50_AA,
+        stdev=__sqrt_eta_EC_50,
+        generator=random_lognormal_truncated,
+        randomized=True)
+
+    _parameter_generators = FeatureGeneratorSet((
+        FeatureGenerator.continuous(
+            name='V',  # (L) Volume in central compartment
+            mean=__log_V,
+            stdev=__sqrt_eta_V,
             generator=random_lognormal_truncated,
             randomized=True),
-        'MTT_2': FeatureGenerator.continuous(
-            name='MTT_2',  # (hours) Hamberg PK/PD
-            # Hamberg et al. (2007) - Table 4
-            mean=math.log(_MTT_2),
-            stdev=math.sqrt(_omega_MTT_2),
+        FeatureGenerator.continuous(
+            name='eta_CL',
+            mean=0.,
+            stdev=__sqrt_eta_CL,
             generator=random_lognormal_truncated,
             randomized=True),
-        'CL_S_cyp_1_1': FeatureGenerator.continuous(
-            name='CL_S_cyp_1_1',  # (l/h) Hamberg PK/PD
-            mean=math.log(_CL_s_1_1),
-            stdev=math.sqrt(_omega_CL_s),
+        FeatureGenerator.continuous(
+            name='eta_KDE',
+            mean=0.,
+            stdev=__sqrt_eta_KDE,
             generator=random_lognormal_truncated,
             randomized=True),
-        'V1': FeatureGenerator.continuous(
-            name='V1',  # (L) Volume in central compartment
-            mean=math.log(_V1),
-            stdev=math.sqrt(_omega_V1),
-            generator=random_lognormal_truncated,
-            randomized=True),
-        'V2': FeatureGenerator.continuous(
-            name='V2',  # (L) volume in peripheral compartment
-            mean=math.log(_V2),
-            stdev=math.sqrt(_omega_V2),
-            generator=random_lognormal_truncated,
-            randomized=True),
-        }
+    ))
+
+    # endregion
 
     def __init__(
             self, randomized: bool = True,
-            cache_size: Day = Day(30)) -> None:
+            cache_size: int = 30) -> None:
         """
         Arguments
         ---------
@@ -114,10 +137,45 @@ class HambergPKPD2010(HealthMathModel):
         """
         self._randomized = randomized
         self._cache_size = math.ceil(cache_size)
-        self._last_computed_day: Day = Day(0)
-        self._cached_cs: Dict[float, List[float]] = {}
+        self._last_computed_day: int = 0
+        self._cached_A: Dict[float, List[float]] = {}
+        self._age = None
 
-    def setup(self, **arguments: Feature) -> None:
+    @classmethod
+    def generate(
+            cls,
+            rnd_generators: reil.RandomGeneratorsType,
+            input_features: Optional[FeatureSet] = None,
+            **kwargs: Any) -> FeatureSet:
+        with reil.random_generator_context(*rnd_generators):
+            feature_set = super(HambergPKPD2010, cls).generate(
+                rnd_generators=rnd_generators,
+                input_features=input_features, **kwargs)
+
+            temp = (input_features or {}).get('VKORC1')
+            if temp is None:
+                if 'EC_50' not in kwargs:
+                    raise ValueError(
+                        'Either input_features should contain VKORC1 or '
+                        'EC_50 should be provided as a keyword argument.'
+                    )
+                feature_set += cls.__FeatureGenerator_EC_50_non_random(
+                    kwargs['EC_50'])
+
+            else:
+                vkorc1 = temp.value
+                if vkorc1 == 'G/G':
+                    feature_set += cls.__FeatureGenerator_EC_50_GG()
+                elif vkorc1 in ('G/A', 'A/G'):
+                    feature_set += cls.__FeatureGenerator_EC_50_GA()
+                else:  # 'A/A'
+                    feature_set += cls.__FeatureGenerator_EC_50_AA()
+
+        return feature_set
+
+    def setup(
+            self, rnd_generators: reil.RandomGeneratorsType,
+            input_features: Optional[FeatureSet] = None) -> None:
         '''
         Set up the model.
 
@@ -139,57 +197,128 @@ class HambergPKPD2010(HealthMathModel):
             `CYP2C9` is not one of the acceptable values:
             *1/*1, *1/*2, *1/*3, *2/*2, *2/*3, *3/*3
         '''
-        # Note: In Hamberg et al. (2007), BASE_i is the measured baseline INR
-        # for patients, but Ravvaz fixed it to 1.
-        self._baseINR = 1.0    # Ravvaz source code
 
-        age = float(arguments['age'].value)  # type: ignore
-        CYP2C9 = str(arguments['CYP2C9'].value)
-        MTT_1 = float(arguments['MTT_1'].value)  # type: ignore
-        MTT_2 = float(arguments['MTT_2'].value)  # type: ignore
-        V = float(arguments['V'].value)  # type: ignore
-        EC_50 = float(arguments['EC_50'].value)  # type: ignore
-        CL_S = float(arguments['CL_S'].value)  # type: ignore
+        if input_features is None:
+            raise TypeError('input_features expected.')
 
-        CYP_alleles = CYP2C9.split('/')
-        if (CYP_alleles[0] not in self._CL_alleles
-                or CYP_alleles[1] not in self._CL_alleles):
-            raise ValueError('Unknown alleles!')
+        args = input_features.value
 
-        CL_s = CL_S * (
-            1.0 - (self._CL_s_age * (age - 71.0))
-        ) * (
-            1 - self._CL_alleles[CYP_alleles[0]]
-            + self._CL_alleles[CYP_alleles[1]])
+        self._age = float(args['age'])  # type: ignore
+        self._CYP2C9 = str(args['CYP2C9'])
+        self._V = float(args['V'])  # type: ignore
+        self._EC_50 = float(args['EC_50'])  # type: ignore
+        self._eta_CL = float(args['eta_CL'])  # type: ignore
+        self._eta_KDE = float(args['eta_KDE'])  # type: ignore
 
-        self._KDE = CL_s / V
+        alleles = self._CYP2C9.split(sep='/')
 
-        self._ktr = np.array([[3.0/MTT_1], [3.0/MTT_2]])  # type: ignore
-        self._EC_50_gamma = EC_50 ** self._gamma
+        if any(a not in self._CL_alleles for a in alleles):
+            raise ValueError('The CYP2C9 genotype not recognized!')
 
-        self._dose_records: Dict[Day, DoseEffect] = {}
-        cs_size = self._cache_size * 24 * self._per_hour
-        self._total_cs = np.array([0.0] * cs_size)  # type: ignore  hourly
-        self._computed_INRs: Dict[Day, float] = {}  # daily
-        self._err_list: List[List[float]] = []  # hourly
-        self._err_ss_list: List[List[float]] = []  # hourly
-        self._exp_e_INR_list: List[List[float]] = []  # daily
+        CL = (
+            sum(self._CL_alleles[a] for a in alleles) *
+            (1.0 - (self._CL_age * (self._age - 71.0)))
+        ) * self._eta_CL
 
-        day_0 = Day(0)
-        dt_0 = dT(0)
-        self._last_computed_day = day_0
+        # -------- Implementation of the one compartment model ------------
 
-        temp_cs_generator = self._CS_function_generator(dt_0, 1.0)
-        self._cached_cs = {
-            1.0: temp_cs_generator(range(cs_size))}  # type: ignore
+        # Similar to "Equations to use for time points when absorption can
+        # occur and compartment A is unsaturated" available at
+        # http://www.rsc.org/suppdata/c7/md/c7md00586e/c7md00586e1.pdf
+        # There, compartment B is equivalent of compartment 1 here.
+        # Also, k_1 and k_4 are K_a, k_e, respectively.
+        # Note that $x_B^0$ term is zero as described in that document.
 
-        self._C = np.array([0.0] + [1.0] * 8)  # type: ignore
-        self._A: float = 0.0  # TODO: Make sure this is correct!
+        # bioavilability fraction 0-1 (from: "Applied Pharmacokinetics &
+        # Pharmacodynamics 4th edition, p.717", some other references)
+        # is 0.9. Ravvaz and our original PK/PD uses that number.
+        # Here, we use F = 1.0 as seem to be the value used in the PK/PD
+        # paper.
+        F = 1.0  # 0.9
 
-        # running _err to initialize their cache for reproducibility purposes
-        self._err(dt_0, False)
-        self._err(dt_0, True)
-        self._computed_INRs[day_0] = self._INR(self._C, day_0)
+        self._k_e = CL / self._V  # Elimination rate constant (p. 733)
+
+        # Note: Here we halved the value for KaF_2V1, because half of the
+        # warfarin is S, and only S affects the INR.
+        self._coef = (
+            (self._k_a * F / 2) / (self._V * (self._k_e - self._k_a)))
+
+        # ---- End of the implementation of the one compartment model -------
+
+        self._KDE = self._k_e * self._eta_KDE
+        self._EDK_50_gamma = (CL * self._EC_50) ** self._gamma
+
+        ktr1 = 3.0 / self._MTT_1  # (1/hours)
+        ktr2 = 3.0 / self._MTT_2  # (1/hours)
+        self._ktr = np.array([ktr1, ktr2])
+
+        self._C = np.ones([4, 2])
+        self._last_computed_day = 0
+
+        self._dose_records: Dict[int, float] = {}
+        self._computed_INRs: Dict[int, float] = {}  # daily
+
+        self._current_cache_size = self._cache_size
+        detailed_cache_size = self._cache_size * self._per_day
+
+        if self._randomized:
+            self._random_generator = rnd_generators[1]
+
+            def _gen_err():  # type: ignore
+                return np.exp(  # type: ignore
+                    self._random_generator.normal(
+                        0.0, self._epsilon_s, detailed_cache_size))
+
+            def _gen_exp_e_INR():  # type: ignore
+                return (  # type: ignore
+                    self._random_generator.normal(
+                        0.0, self._epsilon_INR, self._cache_size))
+        else:
+            def _gen_exp_e_INR():
+                return np.ones(shape=self._cache_size)
+
+            def _gen_err():
+                return np.ones(shape=detailed_cache_size)
+
+        self._gen_err = _gen_err
+        self._gen_exp_e_INR = _gen_exp_e_INR
+
+        self._err_list = self._gen_err()  # hourly
+        self._exp_e_INR_list = self._gen_exp_e_INR()  # daily
+
+        self._cached_A = self._base_concentration(
+            coef=self._coef, k_a=self._k_a, k_e=self._k_e,
+            max_time=detailed_cache_size)
+        self._total_A = np.array([0.0] * detailed_cache_size)  # hourly
+
+    def _expand_caches(self, segment_count: int = 1):
+        per_day = self._per_day
+        self._current_cache_size += self._cache_size * segment_count
+
+        self._err_list = np.concatenate(
+            [
+                self._err_list,
+                *(self._gen_err() for _ in range(segment_count))],
+            axis=0)
+
+        self._exp_e_INR_list = np.concatenate(
+            [
+                self._exp_e_INR_list,
+                *(self._gen_exp_e_INR() for _ in range(segment_count))],
+            axis=0)
+
+        self._cached_A = self._base_concentration(
+            coef=self._coef, k_a=self._k_a, k_e=self._k_e,
+            max_time=self._current_cache_size * per_day)
+
+        self._total_A = np.array([0.0] * self._current_cache_size * per_day)
+
+        for day, dose in self._dose_records.items():
+            cs = self._pad_and_dose(
+                cs=self._cached_A, dose=dose,
+                pad=day * per_day)
+            self._dose_records[day] = dose
+            self._total_A += cs
 
     def run(self, **inputs: Any) -> Dict[str, Any]:
         '''
@@ -217,7 +346,7 @@ class HambergPKPD2010(HealthMathModel):
         return {'INR': {}}
 
     @property
-    def dose(self) -> Dict[Day, float]:
+    def dose(self) -> Dict[int, float]:
         '''
         Return doses for each day.
 
@@ -226,10 +355,10 @@ class HambergPKPD2010(HealthMathModel):
         :
             A dictionary with days as keys and doses as values.
         '''
-        return {t: info.dose
-                for t, info in self._dose_records.items()}
+        return {t: dose
+                for t, dose in self._dose_records.items()}
 
-    def prescribe(self, dose: Dict[Day, float]) -> None:
+    def prescribe(self, dose: Dict[int, float]) -> None:
         '''
         Add warfarin doses at the specified days.
 
@@ -242,27 +371,36 @@ class HambergPKPD2010(HealthMathModel):
         # together because the history of "A" array is not kept.
         try:
             if self._last_computed_day > min(dose.keys()):
-                self._last_computed_day = Day(0)
+                self._last_computed_day = 0
         except ValueError:  # no doses
             pass
 
+        if max(dose or {0: 0.0}) >= self._current_cache_size:
+            segment_count = (
+                max(dose) - self._current_cache_size
+            ) // self._cache_size + 1
+            self._expand_caches(segment_count=segment_count)
+
         for day, _dose in dose.items():
             if _dose != 0.0:
-                dt = dT(math.ceil(day * 24 * self._per_hour))
                 if day in self._dose_records:
-                    # TODO: Implement!
-                    raise NotImplementedError
+                    prev_dose = self._dose_records[day]
+                else:
+                    prev_dose = 0.0
 
-                self._dose_records[day] = DoseEffect(
-                    _dose, self._CS_function_generator(dt, _dose))
+                new_dose = prev_dose + _dose
+                if new_dose < 0.0:
+                    raise ValueError(
+                        'Total dose for a day cannot be negative.')
 
-                self._total_cs += np.array(  # type: ignore
-                    self._dose_records[day].Cs(range(
-                        self._cache_size * 24 * self._per_hour)  # type: ignore
-                    )
-                )
+                cs = self._pad_and_dose(
+                    cs=self._cached_A, dose=new_dose,
+                    pad=day * self._per_day)
 
-    def INR(self, measurement_days: Union[Day, List[Day]]) -> List[float]:
+                self._dose_records[day] = new_dose
+                self._total_A += cs
+
+    def INR(self, measurement_days: Union[int, List[int]]) -> List[float]:
         '''
         Compute INR values for the specified days.
 
@@ -276,262 +414,121 @@ class HambergPKPD2010(HealthMathModel):
         :
             A list of INRs for the specified days.
         '''
-        days: List[Day]
+        days: List[int]
 
         days = (measurement_days if hasattr(measurement_days, '__iter__')
                 else [measurement_days])  # type: ignore
 
+        if max(days) >= self._current_cache_size:
+            segment_count = (
+                max(days) - self._current_cache_size
+            ) // self._cache_size + 1
+            self._expand_caches(segment_count=segment_count)
+
         not_computed_days = set(days).difference(self._computed_INRs)
         if (not_computed_days and
                 min(not_computed_days) < self._last_computed_day):
-            self._last_computed_day = Day(0)
+            self._last_computed_day: int = 0
             self._computed_INRs = {}
             not_computed_days = days
 
         if self._last_computed_day == 0:
-            self._C = np.array(  # type: ignore
-                [[0.0] * 3, [0.0] * 3], np.float)
+            self._C = np.ones([4, 2])
 
-        stop_points = [self._last_computed_day] + list(not_computed_days)
-        for d1, d2 in zip(stop_points[:-1], stop_points[1:]):
-            delta_Ts = 24 * self._per_hour
-            for dt in range(int(d1 * delta_Ts), int(d2 * delta_Ts)):
-                self._C[:, 0] = self._inflow(dt)  # type: ignore
-                self._C[:, 1:] += self._ktr * (
-                    self._C[:, :-1] - self._C[:, 1:]) / self._per_hour
-
-            self._computed_INRs[d2] = self._INR(self._C, Day(int(d2)))
-
+        stop_points = [self._last_computed_day] + sorted(
+            list(not_computed_days))
         self._last_computed_day = stop_points[-1]
+
+        start_day = stop_points[0]
+        start_point = start_day * HambergPKPD2010._per_day
+        all_points = list(range(
+            math.floor(start_point),
+            math.ceil(stop_points[-1] * HambergPKPD2010._per_day)))
+
+        # NOTE: In the paper's formulation, DR = KDE * A
+        # However, it does not produce the expected INR values.
+        # Using DR = V * KDE * A seem to fix the issue.
+        # self._V *
+
+        DR_gamma = np.power(  # type: ignore
+            self._V * self._KDE * self._total_A[all_points] * self._err_list[all_points],
+            HambergPKPD2010._gamma)
+        E = 1.0 - np.divide(  # type: ignore  # 22.5 *
+            HambergPKPD2010._E_max * DR_gamma,  # type: ignore
+            self._EDK_50_gamma + DR_gamma)
+
+        C = self._C
+        ktr = self._ktr
+        for d1, d2 in zip(stop_points[:-1], stop_points[1:]):
+            steps = range(
+                math.floor(d1 * HambergPKPD2010._per_day),
+                math.ceil(d2 * HambergPKPD2010._per_day))
+            for dt in steps:
+                C[0] = E[dt - start_point]
+                C[1:] += ktr * (C[:-1] - C[1:])
+                C = np.clip(C, a_min=0.0, a_max=1.0)
+            self._computed_INRs[d2] = (
+                HambergPKPD2010._baseINR +
+                HambergPKPD2010._INR_max * (1.0 - np.mean(C[3]))
+            ) + self._exp_e_INR_list[d2]
 
         return [self._computed_INRs[i] for i in days]
 
-    def _CS_function_generator(
-            self, dt_dose: dT, dose: float
-    ) -> Callable[[Iterable[dT]], List[float]]:
-        '''
-        Generate a Cs function.
+    @staticmethod
+    def _base_concentration(coef, k_a, k_e, max_time):
+        times = np.arange(max_time)
+        # clipping to avoid underflow. We do not need to be that accurate!
+        k_a_t = np.clip(k_a * times, a_min=None, a_max=100.0)
+        k_e_t = np.clip(k_e * times, a_min=None, a_max=100.0)
+        temp = np.exp(-k_a_t) - np.exp(-k_e_t)
+        base_cs = coef * temp
+        base_cs = np.clip(base_cs, a_min=0.0, a_max=None)
 
-        Arguments
-        ---------
-        dt_dose:
-            The time in which the dose is administered.
+        return base_cs
 
-        dose:
-            The value of the dose administered.
+    @staticmethod
+    def _pad_and_dose(cs, dose: float = 1.0, pad: int = 0):
+        cs = np.multiply(cs, [dose])  # type: ignore
+        padded_cs = np.pad(cs, [[pad, 0]], 'constant')
 
-        Returns
-        -------
-        :
-            A function that gets the time and returns that time's
-            warfarin concentration.
+        return padded_cs[:cs.shape[0]]  # type: ignore
 
-        Notes
-        -----
-        To speed up the process, the generated function uses a pre-computed
-        cache of concentrations and only computes the concentration
-        if the requested day is beyond the cached range.
-        '''
-        if dose == 1.0:
-            cached_cs_temp = []
-        else:
-            if dose not in self._cached_cs:
-                self._cached_cs[dose] = [dose * cs
-                                         for cs in self._cached_cs[1.0]]
-            cached_cs_temp = self._cached_cs[dose]
+    def get_config(self) -> Dict[str, Any]:
+        config: Dict[str, Any] = super().get_config()
+        config.update({
+            'randomized': self._randomized,
+            'cache_size': self._cache_size})
+        if self._age is not None:
+            config.update(
+                dict(
+                    random_generator=self._random_generator,
+                    age=self._age,
+                    CYP2C9=self._CYP2C9,
+                    MTT_1=self._MTT_1,
+                    MTT_2=self._MTT_2,
+                    V=self._V,
+                    EC_50=self._EC_50,
+                    eta_CL=self._eta_CL,
+                    eta_KDE=self._eta_KDE))
 
-        def Cs(dts: Iterable[dT]) -> List[float]:
-            '''
-            Get delta_t list and return the warfarin concentration of
-            those times.
+        return config
 
-            Arguments
-            ---------
-            dts:
-                The times for which concentration value is needed.
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]):
+        instance = cls(
+            randomized=config['randomized'],
+            cache_size=config['cache_size'])
+        if 'age' in config:
+            input_features = FeatureSet(
+                Feature.categorical(name=name, value=config[name])
+                for name in (
+                    'age', 'CYP2C9', 'MTT_1', 'MTT_2',
+                    'V', 'EC_50', 'eta_CL', 'eta_KDE'))
+            instance.setup(
+                rnd_generators=(
+                    None, config['random_generator'], None),  # type: ignore
+                input_features=input_features)
 
-            Returns
-            -------
-            :
-                Warfarin concentration
-            '''
-            max_diff = len(cached_cs_temp)
-            coef_alpha = self._coef_alpha
-            coef_beta = self._coef_beta
-            coef_k_a = self._coef_k_a
-            alpha = self._alpha
-            beta = self._beta
-            k_aS = self._k_aS
+            instance.prescribe(config['dose'])
 
-            # For hour_diff == 0, the Cs equation itself is zero, so included
-            # it in the main if to avoid unnecessary computation.
-            return [
-                0.0 if (dt_diff := dt - dt_dose) <= 0
-                else (
-                    cached_cs_temp[dt_diff] if dt_diff < max_diff
-                    else (
-                        coef_alpha *
-                        math.exp(-alpha * dt_diff / self._per_hour) +
-                        coef_beta *
-                        math.exp(-beta * dt_diff / self._per_hour) +
-                        coef_k_a *
-                        math.exp(-k_aS * dt_diff / self._per_hour)
-                    ) * dose
-                ) for dt in dts]
-
-        return Cs
-
-    def _err(self, dt: dT, ss: bool = False) -> float:
-        '''
-        Generate error term for the requested day.
-
-        Arguments
-        ---------
-        dt:
-            The time for which the error is requested.
-
-        ss:
-            Whether the error is for the steady-state case. For single dose
-            it should be `False`, and for multiple doses, it should be `True`.
-
-        Returns
-        -------
-        :
-            The error value.
-
-        Notes
-        -----
-        To speed up the process and generate reproducible results in each run,
-        the errors are cached in batches.
-        For each call of the function, the cached error is returned. If
-        the `hour` is beyond the cached range, a new range of error values
-        are generated and added to the cache.
-        Also, error is per hour. So, for any fraction of hour, the same
-        value will be returned.
-        '''
-        if self._randomized:
-            h = dt // self._per_hour
-            hourly_cache_size = self._cache_size * 24
-            index_0 = h // hourly_cache_size
-            index_1 = h % hourly_cache_size
-            e_list = self._err_ss_list if ss else self._err_list
-            try:
-                return e_list[index_0][index_1]
-            except IndexError:
-                missing_rows = index_0 - len(e_list) + 1
-                stdev = self._sigma_ss if ss else self._sigma_s
-                for _ in range(missing_rows):
-                    e_list.append(np.exp(np.random.normal(  # type:ignore
-                        0, stdev, hourly_cache_size)))
-
-            return e_list[index_0][index_1]
-        else:
-            return 1.0
-
-    def _exp_e_INR(self, d: Day) -> float:
-        '''
-        Generate exp(error) term of INR for the requested day.
-
-        Arguments
-        ---------
-        d:
-            The day for which the error is requested.
-
-        Returns
-        -------
-        :
-            The error value.
-
-        Notes
-        -----
-            error is generated per day. So, if the given `d` is fractional,
-            it will be truncated and the respective error is returned.
-
-            To speed up the process and generate reproducible results in each
-            run, the errors are cached in batches.
-            For each call of the function, the cached error is returned. If
-            the `day` is beyond the cached range, a new range of error values
-            are generated and added to the cache.
-        '''
-        _d = int(d)
-        if self._randomized:
-            index_0 = _d // self._cache_size
-            index_1 = _d % self._cache_size
-            try:
-                return self._exp_e_INR_list[index_0][index_1]
-            except IndexError:
-                missing_rows = index_0 - len(self._exp_e_INR_list) + 1
-                for _ in range(missing_rows):
-                    self._exp_e_INR_list.append(
-                        np.exp(np.random.normal(  # type:ignore
-                            0, self._sigma_INR,
-                            self._cache_size)))
-
-            return self._exp_e_INR_list[index_0][index_1]
-
-        else:
-            return 1.0
-
-    def _inflow(self, t: dT) -> float:
-        '''
-        Compute the warfarin concentration that enters the two compartments
-        in the PK/PD model.
-
-        Arguments
-        ---------
-        t:
-            The time for which the input is requested.
-            t = Hours * _per_hour + delta_t
-
-        Returns
-        -------
-        :
-            The input value.
-
-        Notes
-        -----
-        To speed up the process, total concentration is being cached for a
-        number of days. For days beyond this range, concentration values are
-        computed and used on each call.
-        '''
-        try:
-            Cs = self._total_cs[t]
-        except IndexError:
-            print('compute Cs')
-            Cs = sum(v.Cs([t])[0]
-                     for v in self._dose_records.values())
-
-        Cs_gamma = (Cs * self._err(t, t > 0)) ** self._gamma
-        inflow = 1 - (
-            (self._E_max * Cs_gamma) / (self._EC_50_gamma + Cs_gamma))
-
-        return inflow
-
-    def _INR(self, C: np.ndarray, d: Day) -> float:
-        '''
-        Compute the INR on day `d`.
-
-        Arguments
-        ---------
-
-        d:
-            The day for which the input is requested.
-
-        Returns
-        -------
-        :
-            The INR value.
-
-        Notes
-        -----
-        To speed up the process, total concentration is being cached for a
-        number of days. For days beyond this range, concentration values are
-        computed and used on each call.
-        '''
-
-        # Note: we defined `C` in such a way to compute changes in `C`s
-        # easier. In our implementation, `C*4` is the `C*3` in Hamberg et al.
-        return (
-            self._baseINR + (
-                self._INR_max * (1 - (C[0, 2] + C[1, 2])/2))
-        ) * self._exp_e_INR(d)
+            return instance
