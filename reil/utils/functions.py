@@ -85,7 +85,6 @@ def random_lognormal_truncated(f: FeatureGenerator) -> float:
     if f.randomized:
         quartileRange = (0.25, 0.75)
         rnd_np = random_generator_np()
-        # lognorm.random_state = rnd_np
         lnorm = lognorm(f.stdev, scale=exp_mu)  # type: ignore
         firstQ, thirdQ = lnorm.ppf(quartileRange)
         values = lnorm.rvs(size=1000, random_state=rnd_np)

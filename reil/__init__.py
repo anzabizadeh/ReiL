@@ -46,7 +46,7 @@ legacy
 import logging
 import random
 from contextlib import contextmanager
-from typing import Literal, Optional
+from typing import Literal, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -59,33 +59,41 @@ del get_versions
 
 FILE_FORMAT: Literal['pbz2', 'pkl'] = 'pkl'
 
-RANDOM_SEED = None
-RANDOM_GENERATOR = random.SystemRandom()
-RANDOM_GENERATOR_NP = np.random.default_rng()
-RANDOM_GENERATOR_TF = tf.random.get_global_generator()
+RandomGeneratorsType = Tuple[
+    random.SystemRandom, np.random.Generator, tf.random.Generator]
+
+RANDOM_SEED: Optional[int] = None
+RANDOM_GENERATOR: random.SystemRandom = random.SystemRandom()
+RANDOM_GENERATOR_NP: np.random.Generator = np.random.default_rng()
+RANDOM_GENERATOR_TF: tf.random.Generator = tf.random.get_global_generator()
 
 
 def random_generator():
     return RANDOM_GENERATOR
 
+
 def random_generator_np():
     return RANDOM_GENERATOR_NP
+
 
 def random_generator_tf():
     return RANDOM_GENERATOR_TF
 
 
-def random_generators_from_seed(seed: Optional[int] = None):
+def random_generators_from_seed(
+        seed: Optional[int] = None) -> RandomGeneratorsType:
     if seed is None:
         return (RANDOM_GENERATOR, RANDOM_GENERATOR_NP, RANDOM_GENERATOR_TF)
 
-    return (
-        random.Random(seed),
-        np.random.default_rng(seed),  # type: ignore
-        tf.random.Generator.from_seed(seed))
+    random_gen: random.SystemRandom = random.SystemRandom(seed)
+    random_gen_np: np.random.Generator = np.random.default_rng(
+        seed)  # type: ignore
+    random_gen_tf: tf.random.Generator = tf.random.Generator.from_seed(seed)
+
+    return random_gen, random_gen_np, random_gen_tf
 
 
-def set_reil_random_seed(seed):
+def set_reil_random_seed(seed: Optional[int]):
     global RANDOM_SEED
     global RANDOM_GENERATOR
     global RANDOM_GENERATOR_NP
@@ -99,11 +107,14 @@ def set_reil_random_seed(seed):
         RANDOM_GENERATOR_TF = tf.random.get_global_generator()
     else:
         RANDOM_GENERATOR, RANDOM_GENERATOR_NP, RANDOM_GENERATOR_TF = \
-        random_generators_from_seed(RANDOM_SEED)
+            random_generators_from_seed(RANDOM_SEED)
+
 
 @contextmanager
 def random_generator_context(
-        gen = None, gen_np = None, gen_tf = None):
+        gen: Optional[random.SystemRandom] = None,
+        gen_np: Optional[np.random.Generator] = None,
+        gen_tf: Optional[tf.random.Generator] = None):
     global RANDOM_GENERATOR
     global RANDOM_GENERATOR_NP
     global RANDOM_GENERATOR_TF
