@@ -21,10 +21,9 @@ class HealthMathModel:
     @classmethod
     def generate(
             cls,
-            random_seed: Optional[int] = None,
+            rnd_generators: reil.RandomGeneratorsType,
             input_features: Optional[FeatureSet] = None,
             **kwargs: Any) -> FeatureSet:
-        rnd_generators = reil.random_generators_from_seed(random_seed)
         with reil.random_generator_context(*rnd_generators):
             if input_features:
                 temp = input_features.value
@@ -43,8 +42,8 @@ class HealthMathModel:
         return {}
 
     def setup(
-            self, arguments: FeatureSet,
-            random_seed: Optional[int] = None) -> None:
+            self, rnd_generators: reil.RandomGeneratorsType,
+            input_features: Optional[FeatureSet] = None) -> None:
         '''
         Set up the model.
 

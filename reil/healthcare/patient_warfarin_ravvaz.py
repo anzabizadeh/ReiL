@@ -23,12 +23,11 @@ Features included in this model are:
 * V2
 * EC_50
 '''
-from copy import deepcopy
 from typing import Any, Dict, Optional
 
 from reil.datatypes.feature import FeatureGenerator, FeatureGeneratorSet
-from reil.healthcare.patient import Patient
 from reil.healthcare.mathematical_models import HealthMathModel
+from reil.healthcare.patient import Patient
 from reil.serialization import serialize
 from reil.utils.functions import random_categorical, random_normal_truncated
 

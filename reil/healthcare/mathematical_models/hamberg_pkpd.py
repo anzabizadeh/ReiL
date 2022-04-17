@@ -176,14 +176,13 @@ class HambergPKPD(HealthMathModel):
     @classmethod
     def generate(
             cls,
-            random_seed: Optional[int] = None,
+            rnd_generators: reil.RandomGeneratorsType,
             input_features: Optional[FeatureSet] = None,
             **kwargs: Any) -> FeatureSet:
-        rnd_generators = reil.random_generators_from_seed(random_seed)
         with reil.random_generator_context(*rnd_generators):
             feature_set = super(HambergPKPD, cls).generate(
-                random_seed=None, input_features=input_features, **kwargs)
-
+                rnd_generators=rnd_generators,
+                input_features=input_features, **kwargs)
             temp = (input_features or {}).get('VKORC1')
             if temp is None:
                 if 'EC_50' not in kwargs:
@@ -197,17 +196,20 @@ class HambergPKPD(HealthMathModel):
             else:
                 vkorc1 = temp.value
                 if vkorc1 == 'G/G':
-                    feature_set += cls.__FeatureGenerator_EC_50_GG()
+                    feature_set += cls.__FeatureGenerator_EC_50_GG(
+                        kwargs.get('EC_50'))
                 elif vkorc1 in ('G/A', 'A/G'):
-                    feature_set += cls.__FeatureGenerator_EC_50_GA()
+                    feature_set += cls.__FeatureGenerator_EC_50_GA(
+                        kwargs.get('EC_50'))
                 else:  # 'A/A'
-                    feature_set += cls.__FeatureGenerator_EC_50_AA()
+                    feature_set += cls.__FeatureGenerator_EC_50_AA(
+                        kwargs.get('EC_50'))
 
         return feature_set
 
     def setup(
-            self, arguments: FeatureSet,
-            random_seed: Optional[int] = None) -> None:
+            self, rnd_generators: reil.RandomGeneratorsType,
+            input_features: Optional[FeatureSet] = None) -> None:
         '''
         Set up the model.
 
@@ -230,16 +232,17 @@ class HambergPKPD(HealthMathModel):
             *1/*1, *1/*2, *1/*3, *2/*2, *2/*3, *3/*3
         '''
 
-        self._random_seed = random_seed
+        if input_features is None:
+            raise TypeError('input_features expected.')
 
-        args = arguments.value
+        args = input_features.value
 
         self._age = float(args['age'])  # type: ignore
         self._CYP2C9 = str(args['CYP2C9'])
-        self._MTT_1 = float(args['MTT_1'])  # type: ignore
-        self._MTT_2 = float(args['MTT_2'])  # type: ignore
-        self._V1 = float(args['V1'])  # type: ignore
-        self._V2 = float(args['V2'])  # type: ignore
+        self._observed_MTT_1 = float(args['MTT_1'])  # type: ignore
+        self._observed_MTT_2 = float(args['MTT_2'])  # type: ignore
+        self._observed_V1 = float(args['V1'])  # type: ignore
+        self._observed_V2 = float(args['V2'])  # type: ignore
         self._EC_50 = float(args['EC_50'])  # type: ignore
         self._CL_S_cyp_1_1 = float(args['CL_S_cyp_1_1'])  # type: ignore
 
@@ -270,36 +273,36 @@ class HambergPKPD(HealthMathModel):
         # Pharmacodynamics 4th edition, p.717", some other references)
         F = 0.9
 
-        k12 = self._Q / self._V1  # Central to peripheral distribution constant
-        k21 = self._Q / self._V2  # Peripheral to central distribution constant
-        k10 = CL_s / self._V1  # Elimination rate constant
+        k12 = self._Q / self._observed_V1  # Central to peripheral distribution constant
+        k21 = self._Q / self._observed_V2  # Peripheral to central distribution constant
+        k10 = CL_s / self._observed_V1  # Elimination rate constant
 
         b = k10 + k21 + k12
         c = k10 * k21
 
         # Alpha: distribution phase slope (-alpha)
         # Beta: elimination phase slope (-beta)
-        alpha = (b + math.sqrt(b ** 2 - 4*c)) / 2
-        beta = (b - math.sqrt(b ** 2 - 4*c)) / 2
+        alpha = (b + math.sqrt(b ** 2 - 4 * c)) / 2
+        beta = (b - math.sqrt(b ** 2 - 4 * c)) / 2
 
         # Note: Here we halved the value for KaF_2V1, because half of the
         # warfarin is S, and only S affects the INR.
-        kaF_2V1 = (self._k_aS * F / 2) / self._V1
+        kaF_2V1 = (self._k_aS * F / 2) / self._observed_V1
 
         # $C_s$ = c_{\k_1}\exp{-k_1 t}
         #       + c_{\alpha}\exp{-\alpha t}
         #       + c_{\beta}\exp{-\beta t}
         coef_alpha = (
             (k21 - alpha)
-            / ((self._k_aS - alpha)*(beta - alpha))
+            / ((self._k_aS - alpha) * (beta - alpha))
         ) * kaF_2V1
         coef_beta = (
             (k21 - beta)
-            / ((self._k_aS - beta)*(alpha - beta))
+            / ((self._k_aS - beta) * (alpha - beta))
         ) * kaF_2V1
         coef_k_a = (
             (k21 - self._k_aS)
-            / ((self._k_aS - alpha)*(self._k_aS - beta))
+            / ((self._k_aS - alpha) * (self._k_aS - beta))
         ) * kaF_2V1
 
         self._coefs = np.array([coef_alpha, coef_beta, coef_k_a])
@@ -311,14 +314,13 @@ class HambergPKPD(HealthMathModel):
         # However, Ravvaz set it to $6/MTT_1$. It must be because we have
         # 6 compartment amounts, and total $MTT_1$ for the whole chain is
         # 11.6 h (Figure 2), so each should take $\frac{1}{6} MTT_1$
-        ktr1 = 6.0/self._MTT_1  # (1/hours)
-        ktr2 = 1.0/self._MTT_2  # (1/hours)
+        ktr1 = 6.0 / self._observed_MTT_1  # (1/hours)
+        ktr2 = 1.0 / self._observed_MTT_2  # (1/hours)
         self._ktr = np.array([ktr1] * 6 + [0.0, ktr2])  # type: ignore
         self._EC_50_gamma = self._EC_50 ** self._gamma
 
         self._A = np.array([0.0] + [1.0] * 8)  # type: ignore
         self._last_computed_day = 0
-
 
         self._dose_records: Dict[int, DoseEffect] = {}
         self._computed_INRs: Dict[int, float] = {}  # daily
@@ -326,16 +328,13 @@ class HambergPKPD(HealthMathModel):
         detailed_cache_size = self._cache_size * self._per_day
 
         if self._randomized:
-            if random_seed is None:
-                self._random_generator = np.random.default_rng()
-            else:
-                self._random_generator = np.random.default_rng(
-                    random_seed)  # type: ignore
+            self._random_generator = rnd_generators[1]
 
             def _gen_err():  # type: ignore
                 return np.exp(  # type: ignore
                     self._random_generator.normal(
                         0.0, self._sigma_ss, detailed_cache_size))
+
             def _gen_exp_e_INR():  # type: ignore
                 return np.exp(  # type: ignore
                     self._random_generator.normal(
@@ -364,6 +363,8 @@ class HambergPKPD(HealthMathModel):
             coefs=self._coefs, exps=self._exps,
             max_time=detailed_cache_size)
         self._total_cs = np.array([0.0] * detailed_cache_size)  # hourly
+        # For day 0, with baseINR of 1.0 and A=[1]x8, only the random term remains
+        # self._computed_INRs[0] = self._exp_e_INR_list[0]
 
     def _expand_caches(self, segment_count: int = 1):
         per_day = self._per_day
@@ -386,8 +387,8 @@ class HambergPKPD(HealthMathModel):
 
         for day, (dose, _) in self._dose_records.items():
             cs = self._pad_and_dose(
-                    cs=self._cached_cs, dose=dose,
-                    pad=day * per_day)
+                cs=self._cached_cs, dose=dose,
+                pad=day * per_day)
             self._dose_records[day] = DoseEffect(dose, cs)
             self._total_cs += cs
 
@@ -465,8 +466,8 @@ class HambergPKPD(HealthMathModel):
                         'Total dose for a day cannot be negative.')
 
                 cs = self._pad_and_dose(
-                        cs=self._cached_cs, dose=new_dose,
-                        pad=day * self._per_day)
+                    cs=self._cached_cs, dose=new_dose,
+                    pad=day * self._per_day)
 
                 self._dose_records[day] = DoseEffect(new_dose, cs)
                 self._total_cs += cs
@@ -533,12 +534,14 @@ class HambergPKPD(HealthMathModel):
             for dt in steps:
                 A[0] = A[7] = inflow[dt - start_point]
                 A[1:] += ktr * (A[:-1] - A[1:])
-                A = np.clip(A, a_min=0.0, a_max=1.0)
+                # A = np.clip(A, a_min=0.0, a_max=1.0)
             self._computed_INRs[d2] = np.multiply(  # type: ignore
-                    HambergPKPD._baseINR +
-                    HambergPKPD._INR_max * np.power(  # type: ignore
-                        1.0 - A[6]*A[8], HambergPKPD._lambda),
-                    self._exp_e_INR_list[int(d2)])  # type: ignore
+                HambergPKPD._baseINR +
+                HambergPKPD._INR_max * np.power(  # type: ignore
+                    1.0 - A[6] * A[8], HambergPKPD._lambda),
+                self._exp_e_INR_list[int(d2)])  # type: ignore
+
+        self._A = A
 
         return [self._computed_INRs[i] for i in days]
 
@@ -572,13 +575,13 @@ class HambergPKPD(HealthMathModel):
         if self._age is not None:
             config.update(
                 dict(
-                    random_seed=self._random_seed,
+                    random_generator=self._random_generator,
                     age=self._age,
                     CYP2C9=self._CYP2C9,
-                    MTT_1=self._MTT_1,
-                    MTT_2=self._MTT_2,
-                    V1=self._V1,
-                    V2=self._V2,
+                    MTT_1=self._observed_MTT_1,
+                    MTT_2=self._observed_MTT_2,
+                    V1=self._observed_V1,
+                    V2=self._observed_V2,
                     EC_50=self._EC_50,
                     CL_S_cyp_1_1=self._CL_S_cyp_1_1,
                     dose=self.dose))
@@ -591,13 +594,15 @@ class HambergPKPD(HealthMathModel):
             randomized=config['randomized'],
             cache_size=config['cache_size'])
         if 'age' in config:
-            arguments = FeatureSet(
+            input_features = FeatureSet(
                 Feature.categorical(name=name, value=config[name])
                 for name in (
-                        'age', 'CYP2C9', 'MTT_1', 'MTT_2',
-                        'V1', 'V2', 'EC_50', 'CL_S_cyp_1_1'))
+                    'age', 'CYP2C9', 'MTT_1', 'MTT_2',
+                    'V1', 'V2', 'EC_50', 'CL_S_cyp_1_1'))
             instance.setup(
-                arguments=arguments, random_seed=config['random_seed'])
+                rnd_generators=(
+                    None, config['random_generator'], None),  # type: ignore
+                input_features=input_features)
 
             instance.prescribe(config['dose'])
 
