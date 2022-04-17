@@ -69,9 +69,11 @@ class DeepQModel(keras.Model):
 
         return self._output(x)
 
+    @tf.function
     def max(self, inputs, training=None):
         return self._max_layer(self(inputs, training))
 
+    @tf.function
     def argmax(self, inputs, training=None):
         return self._argmax_layer(self(inputs, training))
 
@@ -187,6 +189,10 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
                 log_dir=self._tensorboard_path / filename)
             # , histogram_freq=1)  #, write_images=True)
             self._callbacks.append(self._tensorboard)
+
+    @classmethod
+    def _empty_instance(cls):  # type: ignore
+        return cls(keras.Model())  # type: ignore
 
     def argmax(
             self, states: Tuple[FeatureSet, ...],
