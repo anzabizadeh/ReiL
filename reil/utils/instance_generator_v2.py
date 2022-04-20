@@ -93,9 +93,14 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
             def gen():
                 try:
                     return next(args_generator)
-                except RuntimeError:
-                    self._is_terminated = True
-                    raise StopIteration
+                except (RuntimeError, StopIteration):
+                    try:
+                        next(args_generator)
+                    except StopIteration:
+                        self._is_terminated = True
+                        raise StopIteration
+
+                    raise
 
             self._args_generator = gen
         else:
