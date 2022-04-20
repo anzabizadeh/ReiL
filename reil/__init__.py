@@ -60,10 +60,10 @@ del get_versions
 FILE_FORMAT: Literal['pbz2', 'pkl'] = 'pkl'
 
 RandomGeneratorsType = Tuple[
-    random.SystemRandom, np.random.Generator, tf.random.Generator]
+    random.Random, np.random.Generator, tf.random.Generator]
 
 RANDOM_SEED: Optional[int] = None
-RANDOM_GENERATOR: random.SystemRandom = random.SystemRandom()
+RANDOM_GENERATOR: random.Random = random.Random()
 RANDOM_GENERATOR_NP: np.random.Generator = np.random.default_rng()
 RANDOM_GENERATOR_TF: tf.random.Generator = tf.random.get_global_generator()
 
@@ -85,7 +85,7 @@ def random_generators_from_seed(
     if seed is None:
         return (RANDOM_GENERATOR, RANDOM_GENERATOR_NP, RANDOM_GENERATOR_TF)
 
-    random_gen: random.SystemRandom = random.SystemRandom(seed)
+    random_gen: random.Random = random.Random(seed)
     random_gen_np: np.random.Generator = np.random.default_rng(
         seed)  # type: ignore
     random_gen_tf: tf.random.Generator = tf.random.Generator.from_seed(seed)
