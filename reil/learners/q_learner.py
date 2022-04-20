@@ -58,24 +58,30 @@ class DeepQModel(keras.Model):
             optimizer=keras.optimizers.Adam(  # type: ignore
                 learning_rate=self._learning_rate), loss='mae')
 
-    def call(self, inputs, training=None):
+    def call(self, inputs):
         x = inputs
         x[0].set_shape(self._state_shape)
         x[1].set_shape(self._action_shape)
 
         x = self._concat(x)
         for layer in self._dense_layers:
-            x = layer(x, training=training)
+            x = layer(x)
 
         return self._output(x)
 
-    @tf.function
-    def max(self, inputs, training=None):
-        return self._max_layer(self(inputs, training))
+    @tf.function(
+        input_signature=((
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='states'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='actions')),))
+    def max(self, inputs):
+        return self._max_layer(self(inputs))
 
-    @tf.function
-    def argmax(self, inputs, training=None):
-        return self._argmax_layer(self(inputs, training))
+    @tf.function(
+        input_signature=((
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='states'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='actions')),))
+    def argmax(self, inputs):
+        return self._argmax_layer(self(inputs))
 
     def fit(
             self, x=None, y=None, batch_size=None, epochs=1, verbose=1,
@@ -222,7 +228,7 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
             self, X: Tuple[Tuple[FeatureSet, ...], ...],
             training: Optional[bool] = None) -> Tuple[float, ...]:
         return self._model(
-            [self.convert_to_tensor(x) for x in X], training=training)
+            [self.convert_to_tensor(x) for x in X])
 
     def learn(
             self, X: Tuple[Tuple[FeatureSet, ...], ...],

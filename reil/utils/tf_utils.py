@@ -333,6 +333,7 @@ class ArgMaxLayer(keras.layers.Layer):
 class MaxLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(trainable=False, dynamic=True, **kwargs)
+        super().build([])
 
     @tf.function(
         input_signature=(
