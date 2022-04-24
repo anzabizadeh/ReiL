@@ -8,6 +8,7 @@ PPOLearner class
 import datetime
 import pathlib
 from typing import Any, Dict, Optional, Tuple, Union
+import numpy as np
 
 import tensorflow as tf
 import tensorflow.keras.optimizers.schedules as k_sch
@@ -17,6 +18,8 @@ from reil.utils.tf_utils import ActionRank, TF2UtilsMixin
 from tensorflow import keras
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
+
+eps = np.finfo(np.float32).eps.item()
 
 
 @keras.utils.register_keras_serializable(
@@ -80,6 +83,10 @@ class PPOModel(TF2UtilsMixin):
             'actor_loss', dtype=tf.float32)
         self._critic_loss = tf.keras.metrics.Mean(
             'critic_loss', dtype=tf.float32)
+        self._advantage_mean = tf.keras.metrics.Mean(
+            'critic_loss', dtype=tf.float32)
+        self._advantage_std = tf.keras.metrics.Mean(
+            'critic_loss', dtype=tf.float32)
         self._actor_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
             'actor_accuracy', dtype=tf.float32)
         self._action_rank = ActionRank()
@@ -107,6 +114,13 @@ class PPOModel(TF2UtilsMixin):
         initial_logprobs = self.logprobs(
             y, action_indices, self._output_lengths[0])
         self._action_rank.update_state(tf.squeeze(action_indices), y[0])
+        self._advantage_mean.update_state(tf.reduce_mean(advantage))
+        self._advantage_std.update_state(tf.math.reduce_std(advantage))
+        advantage = tf.divide(
+            advantage - tf.math.reduce_mean(advantage),
+            tf.math.reduce_std(advantage) + eps,
+            name='normalized_advantage')
+
         for _ in tf.range(self._actor_train_iterations):
             with tf.GradientTape() as tape:
                 ratio = tf.exp(
@@ -179,11 +193,15 @@ class PPOModel(TF2UtilsMixin):
         metrics['total_loss'] = [sum(x[0] for x in metrics.values())]
 
         metrics['action_rank'] = [self._action_rank.result()]
+        metrics['advantage_mean'] = [self._advantage_mean.result()]
+        metrics['advantage_std'] = [self._advantage_std.result()]
 
         self._actor_loss.reset_states()
         self._critic_loss.reset_states()
         self._actor_accuracy.reset_states()
         self._action_rank.reset_states()
+        self._advantage_mean.reset_states()
+        self._advantage_std.reset_states()
 
         return metrics
 
