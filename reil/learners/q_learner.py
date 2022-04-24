@@ -118,6 +118,8 @@ class DeepQModel(keras.Model):
                 self._learning_rate, k_sch.LearningRateSchedule):
             config.update(
                 {'learning_rate': k_sch.serialize(self._learning_rate)})
+        else:
+            config['learning_rate'] = self._learning_rate
 
         return config
 
