@@ -64,9 +64,9 @@ class Logger:
 
     def __getstate__(self):
         state = dict(
-            logger_name=self._name,
-            logger_level=self._level,
-            logger_filename=self._filename)
+            name=self._name,
+            level=self._level,
+            filename=self._filename)
 
         if self._fmt != DEFAULT_FORMAT:
             state.update({'fmt': self._fmt})

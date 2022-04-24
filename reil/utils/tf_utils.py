@@ -42,7 +42,7 @@ class SerializeTF:
             model = keras.models.load_model(path / sub_folder)
             self.__remove_dir(path)
             path.rmdir()
-        except AttributeError:  # model not compiled.
+        except (AttributeError, TypeError):  # model not compiled.
             cls = self.cls or keras.models.Model
             model = cls.from_config(data)
 

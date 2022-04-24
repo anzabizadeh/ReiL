@@ -102,7 +102,7 @@ def set_reil_random_seed(seed: Optional[int]):
     RANDOM_SEED = seed
 
     if seed is None:
-        RANDOM_GENERATOR = random.SystemRandom()
+        RANDOM_GENERATOR = random.Random()
         RANDOM_GENERATOR_NP = np.random.default_rng()
         RANDOM_GENERATOR_TF = tf.random.get_global_generator()
     else:
@@ -112,7 +112,7 @@ def set_reil_random_seed(seed: Optional[int]):
 
 @contextmanager
 def random_generator_context(
-        gen: Optional[random.SystemRandom] = None,
+        gen: Optional[random.Random] = None,
         gen_np: Optional[np.random.Generator] = None,
         gen_tf: Optional[tf.random.Generator] = None):
     global RANDOM_GENERATOR

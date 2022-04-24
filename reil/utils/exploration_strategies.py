@@ -130,7 +130,7 @@ class VariableEpsilonGreedy:
     # def _empty_instance(cls):
     #     return cls(lambda e: 0.0)
 
-    def explore(self, iteration: int) -> bool:
+    def explore(self, iteration: int = 0) -> bool:
         '''
         Return `True` if a randomly generated number is less than `epsilon`.
 
