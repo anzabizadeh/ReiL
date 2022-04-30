@@ -27,12 +27,14 @@ patient_extra: DefComponents = (
 )
 
 sensitivity: DefComponents = (('sensitivity', {}),)
+patient_w_sensitivity: DefComponents = (
+    *patient_basic, *sensitivity, *patient_extra)
 
 state_definitions: Dict[str, DefComponents] = {
     'age': (('age', {}),),
     'patient_basic': patient_basic,
     'patient_w_sensitivity_basic': (*patient_basic, *sensitivity),
-    'patient_w_sensitivity': (*patient_basic, *sensitivity, *patient_extra),
+    'patient_w_sensitivity': patient_w_sensitivity,
     'patient': (*patient_basic, *patient_extra),
     'patient_w_dosing': (
         *patient_basic, *patient_extra,
@@ -65,7 +67,7 @@ state_definitions: Dict[str, DefComponents] = {
         for i in range(1, 10)},
 
     'patient_w_full_dosing': (
-        *patient_basic, *patient_extra,
+        *patient_w_sensitivity,
         ('day', {}),
         ('daily_dose_history', {'length': -1}),
         ('daily_INR_history', {'length': -1}),
