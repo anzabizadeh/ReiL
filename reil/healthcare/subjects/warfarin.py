@@ -265,7 +265,7 @@ class Warfarin(HealthSubject):
         dose = {
             cap: {
                 d: cap
-                for d in self.generate_dose_values(0.0, cap, 0.5)
+                for d in self.generate_dose_values(cap, max_cap, 0.5)
                 if d > cap}
             for cap in caps}
 
