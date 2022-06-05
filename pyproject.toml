@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "reil"
-version = "0.1.0"
+version = "0.1.9"
 description = ""
 authors = ["sanzabizadeh <sadjad-anzabizadeh@uiowa.edu>"]
 license = "MIT"

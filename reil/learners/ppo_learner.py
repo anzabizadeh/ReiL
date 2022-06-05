@@ -37,9 +37,11 @@ class PPOModel(TF2UtilsMixin):
             critic_layer_sizes: Tuple[int, ...],
             actor_train_iterations: int,
             critic_train_iterations: int,
-            clip_ratio: float,
             GAE_lambda: float,
             target_kl: float,
+            clip_ratio: Optional[float] = None,
+            critic_clip_range: Optional[float] = None,
+            max_grad_norm: Optional[float] = None,
             critic_loss_coef: float = 1.0,
             entropy_loss_coef: float = 0.0) -> None:
 
@@ -54,6 +56,8 @@ class PPOModel(TF2UtilsMixin):
         self._actor_train_iterations = actor_train_iterations
         self._critic_train_iterations = critic_train_iterations
         self._clip_ratio = clip_ratio
+        self._critic_clip_range = critic_clip_range
+        self._max_grad_norm = max_grad_norm
         self._GAE_lambda = GAE_lambda
         self._target_kl = target_kl
         self._critic_loss_coef = critic_loss_coef
@@ -83,6 +87,8 @@ class PPOModel(TF2UtilsMixin):
             'actor_loss', dtype=tf.float32)
         self._critic_loss = tf.keras.metrics.Mean(
             'critic_loss', dtype=tf.float32)
+        self._entropy_loss = tf.keras.metrics.Mean(
+            'entropy_loss', dtype=tf.float32)
         self._advantage_mean = tf.keras.metrics.Mean(
             'critic_loss', dtype=tf.float32)
         self._advantage_std = tf.keras.metrics.Mean(
@@ -122,29 +128,49 @@ class PPOModel(TF2UtilsMixin):
             name='normalized_advantage')
 
         for _ in tf.range(self._actor_train_iterations):
-            with tf.GradientTape() as tape:
+            with tf.GradientTape(persistent=True) as tape:
                 ratio = tf.exp(
                     self.logprobs(
                         self.actor(x), action_indices, self._output_lengths[0])
                     - initial_logprobs)
-                min_advantage = tf.where(
-                    tf.greater(advantage, 0.0),
-                    tf.multiply(1 + self._clip_ratio, advantage),
-                    tf.multiply(1 - self._clip_ratio, advantage)
-                )
+                if self._clip_ratio is not None:
+                    min_advantage = tf.where(
+                        tf.greater(advantage, 0.0),
+                        tf.multiply(1 + self._clip_ratio, advantage),
+                        tf.multiply(1 - self._clip_ratio, advantage)
+                    )
+                else:
+                    min_advantage = advantage
 
                 actor_loss = -tf.reduce_mean(
                     tf.minimum(ratio * advantage, min_advantage)
                 )
+
+                if self._entropy_loss_coef:
+                    new_logprobs = self.logprobs(
+                        self.actor(x), action_indices, self._output_lengths[0])
+                    entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
+                        new_logprobs * tf.math.exp(new_logprobs))
+                else:
+                    entropy_loss = 0.0
+
+                total_loss = actor_loss + entropy_loss
+
             self._actor_loss.update_state(actor_loss)
+            if self._entropy_loss_coef:
+                self._entropy_loss.update_state(entropy_loss)
             trainable_vars = self.actor.trainable_variables
-            policy_grads = tape.gradient(actor_loss, trainable_vars)
+            policy_grads = tape.gradient(total_loss, trainable_vars)
+            if self._max_grad_norm is not None:
+                policy_grads, _ = tf.clip_by_global_norm(
+                    policy_grads, self._max_grad_norm)
             self._actor_optimizer.apply_gradients(
                 zip(policy_grads, trainable_vars))
 
-            kl = tf.reduce_mean(
-                initial_logprobs - self.logprobs(
-                    self.actor(x), action_indices, self._output_lengths[0]))
+            new_logprobs = self.logprobs(
+                self.actor(x), action_indices, self._output_lengths[0])
+            kl = tf.reduce_mean(initial_logprobs - new_logprobs)
+
             # kl = tf.reduce_sum(kl)
             if kl > 1.5 * self._target_kl:  # Early Stopping
                 break
@@ -156,13 +182,30 @@ class PPOModel(TF2UtilsMixin):
         )
     )
     def train_critic(self, x, returns):
+        old_values = self.critic(x)
         for _ in tf.range(self._critic_train_iterations):
             with tf.GradientTape() as tape:
-                critic_loss = tf.reduce_mean((returns - self.critic(x)) ** 2)
+                if self._critic_clip_range is not None:
+                    values_clipped = old_values + tf.clip_by_value(
+                        self.critic(x) - old_values,
+                        -self._critic_clip_range, self._critic_clip_range
+                    )
+                    loss_unclipped = tf.square(returns - self.critic(x))
+                    loss_clipped = tf.square(returns - values_clipped)
+                    critic_loss = 0.5 * tf.reduce_mean(
+                        tf.maximum(loss_unclipped, loss_clipped)
+                    )
+                else:
+                    critic_loss = tf.reduce_mean(
+                        tf.square(returns - self.critic(x)))
 
             self._critic_loss.update_state(critic_loss)
             trainable_vars = self.critic.trainable_variables
             value_grads = tape.gradient(critic_loss, trainable_vars)
+            if self._max_grad_norm is not None:
+                value_grads, _ = tf.clip_by_global_norm(
+                    value_grads, self._max_grad_norm)
+
             self._critic_optimizer.apply_gradients(
                 zip(value_grads, trainable_vars))
 
@@ -190,6 +233,9 @@ class PPOModel(TF2UtilsMixin):
             'critic_loss': [self._critic_loss.result()]
         }
 
+        if self._entropy_loss_coef:
+            metrics['entropy_loss'] = [self._entropy_loss.result()]
+
         metrics['total_loss'] = [sum(x[0] for x in metrics.values())]
 
         metrics['action_rank'] = [self._action_rank.result()]
@@ -198,6 +244,7 @@ class PPOModel(TF2UtilsMixin):
 
         self._actor_loss.reset_states()
         self._critic_loss.reset_states()
+        self._entropy_loss.reset_states()
         self._actor_accuracy.reset_states()
         self._action_rank.reset_states()
         self._advantage_mean.reset_states()
