@@ -72,13 +72,15 @@ class ReilFunction(Generic[TypeY, TypeX]):
 class NormalizedSquareDistance(ReilFunction[float, int]):
     center: float = 0.0
     band_width: float = 1.0
+    amplifying_factor: float = 1.0
     exclude_first: bool = False
 
     def _default_function(
             self, y: List[float], x: Optional[List[int]] = None) -> float:
-        _x = x or [1] * (len(y) - 1)
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
 
-        if len(y) != len(_x) + 1:
+        if len_y != len(_x) + 1:
             raise ValueError(
                 'y should have exactly one item more than x.')
 
@@ -88,9 +90,10 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
         else:
             _y = y
 
-        result = sum(square_dist(
-            self.center, interpolate(_y[i], _y[i + 1], _x[i]))
-            for i in range(len(_x)))
+        result = sum(
+            (self.amplifying_factor ** i) * square_dist(
+                self.center, interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x))
 
         # normalize
         result *= (2.0 / self.band_width) ** 2
@@ -106,9 +109,10 @@ class NormalizedDistance(ReilFunction[float, int]):
 
     def _default_function(
             self, y: List[float], x: Optional[List[int]] = None) -> float:
-        _x = x or [1] * (len(y) - 1)
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
 
-        if len(y) != len(_x) + 1:
+        if len_y != len(_x) + 1:
             raise ValueError(
                 'y should have exactly one item more than x.')
 
@@ -119,8 +123,8 @@ class NormalizedDistance(ReilFunction[float, int]):
             _y = y
 
         result = sum(dist(
-            self.center, interpolate(_y[i], _y[i + 1], _x[i]))
-            for i in range(len(_x)))
+            self.center, interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x))
 
         # normalize
         result *= (2.0 / self.band_width) ** 2
@@ -135,8 +139,9 @@ class PercentInRange(ReilFunction[float, int]):
 
     def _default_function(
             self, y: List[float], x: Optional[List[int]] = None) -> float:
-        _x = x or [1] * (len(y) - 1)
-        if len(y) != len(_x) + 1:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+        if len_y != len(_x) + 1:
             raise ValueError(
                 'y should have exactly one item more than x.')
 
@@ -149,8 +154,8 @@ class PercentInRange(ReilFunction[float, int]):
         result = sum(
             in_range(
                 self.acceptable_range,
-                interpolate(_y[i], _y[i + 1], _x[i]))
-            for i in range(len(_x)))
+                interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x))
 
         total_intervals = sum(_x)
 
