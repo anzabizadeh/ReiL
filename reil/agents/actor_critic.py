@@ -88,12 +88,19 @@ class A2C(Agent[FeatureSet, ACLabelType]):
         rewards = self.extract_reward(active_history, *self._reward_clip)
         disc_reward = self.discounted_cum_sum(rewards, discount_factor)
 
-        for h, r in zip(active_history, disc_reward):
-            state = h.state  # type: ignore
-            action_index = tuple((
-                h.action_taken or h.action).index.values())  # type: ignore
-            self._buffer.add(
-                {'state': state, 'y_and_g': (action_index, r)})
+        # for h, r in zip(active_history, disc_reward):
+        #     state = h.state  # type: ignore
+        #     action_index = tuple((
+        #         h.action_taken or h.action).index.values())  # type: ignore
+        #     self._buffer.add(
+        #         {'state': state, 'y_and_g': (action_index, r)})
+        self._buffer.add_iter(
+            {
+                'state': h.state,
+                'y_and_g': (
+                    tuple((h.action_taken or h.action).index.values()),  # type: ignore
+                    r)
+            } for h, r in zip(active_history, disc_reward))
 
         temp = self._buffer.pick()
 

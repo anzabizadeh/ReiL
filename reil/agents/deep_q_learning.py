@@ -174,11 +174,16 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
             rewards = self.extract_reward(active_history)
             disc_reward = self.discounted_cum_sum(rewards, discount_factor)
 
-            for h, r in zip(active_history, disc_reward):
-                state = h.state  # type: ignore
-                action = h.action_taken or h.action  # type: ignore
-                self._buffer.add(
-                    {'state': state, 'action': action, 'Y': r})
+            # for h, r in zip(active_history, disc_reward):
+            #     state = h.state  # type: ignore
+            #     action = h.action_taken or h.action  # type: ignore
+            #     self._buffer.add(
+            #         {'state': state, 'action': action, 'Y': r})
+            self._buffer.add_iter({
+                'state': h.state,
+                'action': h.action_taken or h.action,
+                'Y': r
+            } for h, r in zip(active_history, disc_reward))
 
         temp = self._buffer.pick()
 
