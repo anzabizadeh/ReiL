@@ -381,7 +381,10 @@ class ActionRank(keras.metrics.Metric):
 
     @tf.function
     def result(self):
-        return tf.divide(self.cumulative_rank, tf.cast(self.count, tf.int64))
+        # ranks are zero-based. Add one to make it 1-based, which is more
+        # intuitive.
+        return tf.divide(
+            self.cumulative_rank, tf.cast(self.count, tf.int64)) + 1.0
 
     def reset_states(self):
         self.cumulative_rank.assign(0)
