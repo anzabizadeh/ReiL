@@ -6,7 +6,7 @@ Sink class
 A dummy buffer that does nothing!
 '''
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 from reil.datatypes.buffers.buffer import Buffer, T1, T2, PickModes
 
@@ -83,6 +83,9 @@ class Sink(Buffer[T1, T2]):
         or if the provided names exist in the buffer queues. As a result, this
         situations will result in exceptions by the system.
         '''
+        return
+
+    def add_iter(self, iter: Iterator[Dict[str, Union[T1, T2]]]) -> None:
         return
 
     def pick(

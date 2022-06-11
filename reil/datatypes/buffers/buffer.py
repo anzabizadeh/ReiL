@@ -6,8 +6,8 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import (Callable, Dict, Generic, List, Literal, Optional, Tuple, TypeVar,
-                    Union)
+from typing import (Callable, Dict, Generic, Iterator, List, Literal, Optional,
+                    Tuple, TypeVar, Union)
 
 import numpy as np
 from reil import reilbase
@@ -17,6 +17,20 @@ T2 = TypeVar('T2')
 
 PickModes = Literal['all', 'random', 'recent', 'old']
 Funcs = Literal['sum', 'min', 'max', 'mean']
+
+
+def mean(x: Union[List[T1], List[T2]]) -> Union[T1, T2]:
+    return sum(x) / len(x)  # type: ignore
+
+
+funcs_dict = {
+    'mean': mean,
+    'sum': sum,
+    'min': min,
+    'max': max,
+    'count': len,
+}
+
 
 class Buffer(reilbase.ReilBase, Generic[T1, T2]):
     '''
@@ -107,7 +121,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
                 self._buffer_names = buffer_names
 
         if self._buffer_size is not None and self._buffer_names is not None:
-            self._buffer = {name: [None]*self._buffer_size  # type: ignore
+            self._buffer = {name: [None] * self._buffer_size  # type: ignore
                             for name in self._buffer_names}
         else:
             self._buffer = None
@@ -143,6 +157,31 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
             self._buffer[key][self._buffer_index] = v  # type: ignore
 
         self._count += 1
+
+    def add_iter(self, iter: Iterator[Dict[str, Union[T1, T2]]]) -> None:
+        '''
+        Append a new item to the buffer.
+
+        Arguments
+        ---------
+        data:
+            A dictionary with the name of buffer queues as keys.
+
+        Notes
+        -----
+        This implementation of `add` does not check if the buffer is full
+        or if the provided names exist in the buffer queues. As a result, this
+        situations will result in exceptions by the system.
+        '''
+        if self._buffer is None:
+            raise RuntimeError('Buffer is not set up!')
+
+        for data in iter:
+            self._buffer_index += 1
+            for key, v in data.items():
+                self._buffer[key][self._buffer_index] = v  # type: ignore
+
+            self._count += 1
 
     def pick(
             self,
@@ -210,19 +249,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
         else:
             _names = names
 
-        if isinstance(func, str):
-            if func == 'mean':
-                fn = lambda x: sum(x) / len(x)
-            elif func == 'sum':
-                fn = sum
-            elif func == 'min':
-                fn = min
-            elif func == 'max':
-                fn = max
-            elif func == 'count':
-                fn = len
-        else:
-            fn = func
+        fn = funcs_dict[func] if isinstance(func, str) else func
 
         return {
             name: fn(

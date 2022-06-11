@@ -6,9 +6,9 @@ CircularBuffer class
 A `Buffer` that overflows!
 '''
 
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterator, List, Optional, Tuple, Union
 
-from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2, Funcs
+from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2, Funcs, funcs_dict
 
 
 class CircularBuffer(Buffer[T1, T2]):
@@ -51,29 +51,60 @@ class CircularBuffer(Buffer[T1, T2]):
         # the size does not change if buffer is full.
         self._count -= self._buffer_full
 
+    def add_iter(self, iter: Iterator[Dict[str, Union[T1, T2]]]) -> None:
+        '''
+        Append a new item to the buffer.
+
+        Arguments
+        ---------
+        data:
+            A dictionary with the name of buffer queues as keys.
+
+        Notes
+        -----
+        This implementation of `add` does not check if the buffer is full
+        or if the provided names exist in the buffer queues. As a result, this
+        situations will result in exceptions by the system.
+        '''
+        if self._buffer is None:
+            raise RuntimeError('Buffer is not set up!')
+
+        for data in iter:
+            self._buffer_index += 1
+            try:
+                for key, v in data.items():
+                    self._buffer[key][self._buffer_index] = v  # type: ignore
+                self._count += 1
+            except IndexError:
+                self._buffer_full = True
+                self._buffer_index = 0
+                for key, v in data.items():
+                    self._buffer[key][self._buffer_index] = v  # type: ignore
+        if self._buffer_full:
+            self._count = self._buffer_size
+
     def aggregate(
-            self, func: Union[Funcs, Callable[
-                [Union[List[T1], List[T2]]],
-                Union[T1, T2]]]) -> Dict[str, Union[T1, T2]]:
+        self, func: Union[
+            Funcs, Callable[[Union[List[T1], List[T2]]], Union[T1, T2]]],
+        names: Optional[Union[str, List[str]]] = None
+    ) -> Dict[str, Union[T1, T2]]:
         if not self._buffer_full:
             return {}
 
-        if isinstance(func, str):
-            if func == 'mean':
-                fn = lambda x: sum(x) / len(x)
-            elif func == 'sum':
-                fn = sum
-            elif func == 'min':
-                fn = min
-            elif func == 'max':
-                fn = max
+        _names: List[str]
+        if names is None:
+            _names = self._buffer_names  # type: ignore
+        elif isinstance(names, str):
+            _names = [names]
         else:
-            fn = func
+            _names = names
+
+        fn = funcs_dict[func] if isinstance(func, str) else func
 
         return {
-            name: fn(values)  # type: ignore
-            for name, values in self._buffer.items()}
-
+            name: fn(self._buffer[name])  # type: ignore
+            for name in _names
+        }
 
     def _pick_old(
         self, count: int

@@ -6,7 +6,7 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import Dict, List, Literal, Optional, Tuple, TypeVar, Union
+from typing import Dict, List, Optional, Tuple, TypeVar, Union
 
 from reil.datatypes.buffers.endless_buffer import EndlessBuffer, PickModes
 

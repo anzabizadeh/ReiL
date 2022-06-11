@@ -6,7 +6,7 @@ EndlessBuffer class
 A `Buffer` without size limit.
 '''
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterator, List, Optional, Union
 
 from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2
 
@@ -91,6 +91,31 @@ class EndlessBuffer(Buffer[T1, T2]):
 
         else:
             raise RuntimeError('Buffer is not set up.')
+
+    def add_iter(self, iter: Iterator[Dict[str, Union[T1, T2]]]) -> None:
+        '''
+        Append a new item to the buffer.
+
+        Arguments
+        ---------
+        data:
+            A dictionary with the name of buffer queues as keys.
+
+        Notes
+        -----
+        This implementation of `add` does not check if the buffer is full
+        or if the provided names exist in the buffer queues. As a result, this
+        situations will result in exceptions by the system.
+        '''
+        if self._buffer is None:
+            raise RuntimeError('Buffer is not set up!')
+
+        for data in iter:
+            self._buffer_index += 1
+            for key, v in data.items():
+                self._buffer[key].append(v)  # type: ignore
+
+            self._count += 1
 
     def reset(self) -> None:
         '''
