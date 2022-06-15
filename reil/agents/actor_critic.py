@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 A2C class
-=================
+=========
 
 An Actor-Critic Policy Gradient `agent`.
 '''
@@ -14,7 +14,7 @@ from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
-from reil.learners import Learner
+from reil.learners.learner import Learner, LearnerProtocol
 from reil.utils.exploration_strategies import NoExploration
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
@@ -22,12 +22,12 @@ ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
 class A2C(Agent[FeatureSet, ACLabelType]):
     '''
-    An advantage actor critic (Policy Gradient) `agent`.
+    An actor critic (Policy Gradient) `agent`.
     '''
 
     def __init__(
             self,
-            learner: Learner[FeatureSet, ACLabelType],
+            learner: LearnerProtocol[FeatureSet, ACLabelType],
             buffer: Buffer[FeatureSet, Tuple[Tuple[int, ...], float]],
             reward_clip: Tuple[Optional[float], Optional[float]] = (None, None),
             **kwargs: Any):
@@ -79,21 +79,12 @@ class A2C(Agent[FeatureSet, ACLabelType]):
 
         :meta public:
         '''
-        state: FeatureSet
-        action_index: Tuple[int, ...]
-
         discount_factor = self._discount_factor
         active_history = self.get_active_history(history)
 
         rewards = self.extract_reward(active_history, *self._reward_clip)
         disc_reward = self.discounted_cum_sum(rewards, discount_factor)
 
-        # for h, r in zip(active_history, disc_reward):
-        #     state = h.state  # type: ignore
-        #     action_index = tuple((
-        #         h.action_taken or h.action).index.values())  # type: ignore
-        #     self._buffer.add(
-        #         {'state': state, 'y_and_g': (action_index, r)})
         self._buffer.add_iter(
             {
                 'state': h.state,
