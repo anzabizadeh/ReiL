@@ -16,7 +16,7 @@ from reil.agents.agent_base import AgentBase
 from reil.datatypes import History
 from reil.datatypes.dataclasses import Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
-from reil.learners.learner import LabelType, Learner
+from reil.learners.learner import LabelType, Learner, LearnerProtocol
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
@@ -32,7 +32,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
     def __init__(
             self,
-            learner: Learner[InputType, LabelType],
+            learner: LearnerProtocol[InputType, LabelType],
             exploration_strategy: Union[float, ExplorationStrategy],
             discount_factor: float = 1.0,
             tie_breaker: Literal['first', 'last', 'random'] = 'random',
@@ -70,7 +70,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
         super().__init__(tie_breaker, **kwargs)
 
-        self._learner: Learner[InputType, LabelType] = learner
+        self._learner: LearnerProtocol[InputType, LabelType] = learner
         if not 0.0 <= discount_factor <= 1.0:
             self._logger.warning(
                 f'{self.__class__.__qualname__} discount_factor should be in'
@@ -226,8 +226,11 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         X, Y, kwargs = training_data
         metrics = {}
         if Y:
-            metrics = self._learner.learn(X, Y, **kwargs)
-            self._metrics.update(metrics)
+            for name, m in self._metrics.items():
+                metrics[name] = m.result()
+                m.reset_states()
+
+            metrics.update(self._learner.learn(X, Y, **kwargs))
 
         return metrics
 
@@ -278,7 +281,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
                 new_observation.state = state
                 if learn_on_state:
-                    self._metrics.update(
+                    self._computed_metrics.update(
                         self.learn([history[-1], new_observation]))
 
                 if actions is not None:
@@ -290,7 +293,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
                         yield new_observation.action)['action_taken']
 
                     if learn_on_action:
-                        self._metrics.update(
+                        self._computed_metrics.update(
                             self.learn([history[-1], new_observation]))
 
                     new_observation.reward = (yield None)['reward']
@@ -298,7 +301,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
                     history.append(new_observation)
 
                     if learn_on_reward:
-                        self._metrics.update(self.learn(history[-2:]))
+                        self._computed_metrics.update(self.learn(history[-2:]))
                 else:  # No actions to take, so skip the reward.
                     yield
 
@@ -309,10 +312,11 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
                     history.append(new_observation)
 
                 if learn_on_termination:
-                    metrics = self.learn(history)
-                    self._metrics.update({
-                        key: val[0]  # type: ignore
-                        for key, val in metrics.items()})
+                    self._computed_metrics = self.learn(history)
+
+                if self._summary_writer:
+                    self._summary_writer.write(
+                        self._computed_metrics, self._learner._iteration)
 
                 if stat_name is not None:
                     self.statistic.append(stat_name, subject_id)
@@ -324,67 +328,3 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
     def set_parameters(self, parameters: Any):
         self._learner.set_parameters(parameters)
-
-    # def load(
-    #         self, filename: str,
-    #         path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
-    #     '''
-    #     Load an object from a file.
-
-    #     Arguments
-    #     ---------
-    #     filename:
-    #         the name of the file to be loaded.
-
-    #     path:
-    #         the path in which the file is saved.
-
-    #     Raises
-    #     ------
-    #         ValueError
-    #             Filename is not specified.
-    #     '''
-    #     _path = pathlib.Path(path or self._path)
-    #     super().load(filename, _path)
-
-    #     # when loading, self._learner is the object type, not an instance.
-    #     self._learner = self._learner.from_pickle(  # type: ignore
-    #         filename, _path.parent / 'learner')
-
-    # def save(
-    #         self,
-    #         filename: Optional[str] = None,
-    #         path: Optional[Union[str, pathlib.PurePath]] = None
-    # ) -> pathlib.PurePath:
-    #     '''
-    #     Save the object to a file.
-
-    #     Arguments
-    #     ---------
-    #     filename:
-    #         the name of the file to be saved.
-
-    #     path:
-    #         the path in which the file should be saved.
-
-    #     data_to_save:
-    #         a list of variables that should be pickled. If omitted,
-    #         the `agent` is saved completely.
-
-    #     Returns
-    #     -------
-    #     :
-    #         a `Path` object to the location of the saved file and its name as
-    #         `str`
-    #     '''
-    #     full_path = super().save(filename, path)
-    #     self._learner.save(full_path.name, full_path.parent / 'learner')
-
-    #     return full_path
-
-    # def __getstate__(self):
-    #     state = super().__getstate__()
-
-    #     state['_learner'] = type(self._learner)
-
-    #     return state
