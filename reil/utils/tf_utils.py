@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime
 
 import pathlib
 import random
@@ -100,11 +101,12 @@ class TF2UtilsMixin(reilbase.ReilBase):
     @staticmethod
     def mpl_layers(
             layer_sizes: Tuple[int, ...],
-            activation: Union[str, Callable[[tf.Tensor], tf.Tensor]],
+            activation: Union[str, Callable[[tf.Tensor], tf.Tensor], None],
             layer_name_format: str,
             start_index: int = 1):
         return [
-            keras.layers.Dense(v, activation=activation, name=layer_name_format.format(i=i))
+            keras.layers.Dense(
+                v, activation=activation, name=layer_name_format.format(i=i))
             for i, v in enumerate(layer_sizes, start_index)]
 
     @staticmethod
@@ -389,3 +391,49 @@ class ActionRank(keras.metrics.Metric):
     def reset_states(self):
         self.cumulative_rank.assign(0)
         self.count.assign(0)
+
+
+class SummaryWriter:
+    def __init__(
+            self,
+            tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
+            tensorboard_filename: Optional[str] = None):
+
+        self._tensorboard_path: Optional[pathlib.PurePath] = None
+        if (tensorboard_path or tensorboard_filename) is not None:
+            current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+            self._tensorboard_path = pathlib.PurePath(
+                tensorboard_path or './logs')
+            self._tensorboard_filename = current_time + (
+                f'-{tensorboard_filename}' or '')
+            self._summary_writer = \
+                tf.summary.create_file_writer(  # type: ignore
+                    str(self._tensorboard_path / self._tensorboard_filename))
+        else:
+            self._summary_writer = tf.summary.create_noop_writer()  # type: ignore
+
+    def __getstate__(self):
+        state = dict(
+            _tensorboard_filename=self._tensorboard_filename,
+            _tensorboard_path=self._tensorboard_path
+        )
+
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self._tensorboard_filename = state['_tensorboard_filename']
+        self._tensorboard_path = state['_tensorboard_path']
+
+        if self._tensorboard_path:
+            self._summary_writer = \
+                tf.summary.create_file_writer(  # type: ignore
+                    str(
+                        self._tensorboard_path /
+                        self._tensorboard_filename))
+        else:
+            self._summary_writer = tf.summary.create_noop_writer()  # type: ignore
+
+    def write(self, data: Dict[str, float], iteration: Optional[int] = None):
+        with self._summary_writer.as_default(step=iteration):
+            for name, value in data.items():
+                tf.summary.scalar(name, value)
