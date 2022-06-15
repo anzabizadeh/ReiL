@@ -617,7 +617,7 @@ class Environment(stateful.Stateful):
 
         self._agent_observers[a_s_names].close()
 
-        return self._agents[agent_name]._metrics
+        return self._agents[agent_name]._computed_metrics
 
     def reset_subject(self, subject_name: str) -> bool:
         '''
