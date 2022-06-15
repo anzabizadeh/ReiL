@@ -707,10 +707,14 @@ class Statistic:
             aggregators: Optional[Tuple[str, ...]] = None,
             groupby: Optional[Tuple[str, ...]] = None,
             _id: Optional[int] = None,
-            reset_history: bool = False):
+            reset_history: bool = False,
+            n: Optional[int] = None):
         temp = self._history_none if _id is None else self._history[_id]
         if not temp:
             return None
+
+        if n is not None:
+            temp = temp[-n:]
 
         df = pd.DataFrame(
             {'instance_id': i,  # type: ignore
