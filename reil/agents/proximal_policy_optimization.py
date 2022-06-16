@@ -6,9 +6,9 @@ PPO class
 A Proximal Policy Optimization Policy Gradient `agent`.
 '''
 
-from typing import Any, Optional, Tuple
-import numpy as np
+from typing import Any, Dict, Optional, Tuple
 
+import numpy as np
 import tensorflow as tf
 from reil.agents.actor_critic import A2C
 from reil.agents.agent import TrainingData
@@ -17,7 +17,8 @@ from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.feature import FeatureSet
 from reil.learners.ppo_learner import PPOLearner
 from reil.utils.exploration_strategies import NoExploration
-
+from reil.utils.metrics import MetricProtocol
+from reil.utils.tf_utils import ActionRank
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
@@ -56,9 +57,15 @@ class PPO(A2C):
             **kwargs)
 
         self._buffer = buffer
-        self._buffer.setup(buffer_names=['state', 'y_disr_a_r'])
+        self._buffer.setup(buffer_names=['state', 'y_r_a'])
         self._reward_clip = reward_clip
         self._gae_lambda = gae_lambda
+        self._metrics: Dict[str, MetricProtocol] = {  # type: ignore
+            'action_rank': ActionRank(),
+            'advantage_mean': tf.keras.metrics.Mean(
+                'advantage_mean', dtype=tf.float32),
+            'rewards': tf.keras.metrics.Mean('rewards', dtype=tf.float32)
+        }
 
     def _prepare_training(
             self, history: History) -> TrainingData[FeatureSet, int]:
@@ -78,41 +85,55 @@ class PPO(A2C):
 
         :meta public:
         '''
-        state: FeatureSet
-        action_index: Tuple[int, ...]
-
         discount_factor = self._discount_factor
         active_history = self.get_active_history(history)
 
         # add zero to the end to have the correct length of `deltas`
         rewards = self.extract_reward(
             active_history, *self._reward_clip) + [0.0]
-        disc_reward = self.discounted_cum_sum(rewards, discount_factor)
+        dis_reward = self.discounted_cum_sum(rewards, discount_factor)
 
         state_list: Tuple[FeatureSet, ...] = tuple(  # type: ignore
             h.state for h in active_history)
         # add zero to the end to have the correct length of `deltas`
-        values = np.append(
-            tf.reshape(self._learner.predict(state_list)[1], -1), 0.0)
+        y, values = self._learner.predict(state_list)
+        values = np.append(tf.reshape(values, -1), 0.0)
+        action_indices = tuple(
+            list((h.action_taken or h.action).index.values())  # type: ignore
+            for h in active_history)
         deltas = (
             rewards[:-1] + discount_factor * values[1:]  # type: ignore
             - values[:-1])
         advantage = self.discounted_cum_sum(
             deltas, discount_factor * self._gae_lambda)
 
-        # for h, dis_r, a in zip(active_history, disc_reward, advantage):
-        #     state = h.state  # type: ignore
-        #     action_index = tuple((
-        #         h.action_taken or h.action).index.values())  # type: ignore
-        #     self._buffer.add(
-        #         {'state': state, 'y_disr_a_r': (action_index, dis_r, a, h.reward)})
         self._buffer.add_iter({
             'state': h.state,
-            'y_disr_a_r': (
+            'y_r_a': (
                 tuple((h.action_taken or h.action).index.values()),  # type: ignore
-                dis_r, a, h.reward)
-        } for h, dis_r, a in zip(active_history, disc_reward, advantage))
+                dis_r, a)
+        } for h, dis_r, a in zip(active_history, dis_reward, advantage))
 
         temp = self._buffer.pick()
 
-        return temp['state'], temp['y_disr_a_r'], {}  # type: ignore
+        self._update_metrics(
+            rewards=rewards, dis_reward=dis_reward, state_list=state_list,
+            y=y, values=values, action_indices=action_indices,
+            deltas=deltas, advantage=advantage)
+
+        return temp['state'], temp['y_r_a'], {}  # type: ignore
+
+    def _update_metrics(self, **kwargs: Any) -> None:
+        super()._update_metrics(**kwargs)
+        action_indices = kwargs.get('action_indices')
+        y = kwargs.get('y')
+        advantage = kwargs.get('advantage')
+        rewards = kwargs.get('rewards')
+
+        if action_indices and y:
+            self._metrics['action_rank'].update_state(
+                tf.squeeze(action_indices), y[0])
+        if advantage:
+            self._metrics['advantage_mean'].update_state(advantage)
+        if rewards:
+            self._metrics['rewards'].update_state(rewards[:-1])
