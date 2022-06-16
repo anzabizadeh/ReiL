@@ -3,7 +3,8 @@ from typing import Dict, List, Optional, Union
 
 from reil.environments.session import Session
 from reil.environments.task import Task
-from reil.utils import ConfigParser, OutputWriter
+from reil.utils.argument_parser import ConfigParser
+from reil.utils.output_writer import OutputWriter
 
 # TODO: documentation
 

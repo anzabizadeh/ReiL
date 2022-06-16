@@ -174,7 +174,7 @@ class Stateful(reilbase.ReilBase):
         return NoneFeature
 
     def _update_metrics(self, **kwargs: Any) -> None:
-        raise NotImplementedError
+        pass
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         '''
