@@ -15,7 +15,7 @@ from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
 from reil.datatypes.feature import FeatureSet
-from reil.learners import Learner
+from reil.learners.learner import Learner, LearnerProtocol
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
@@ -29,7 +29,7 @@ class QLearning(Agent[FeatureSet, float]):
 
     def __init__(
             self,
-            learner: Learner[FeatureSet, float],
+            learner: LearnerProtocol[FeatureSet, float],
             buffer: Buffer[FeatureSet, float],
             exploration_strategy: Union[float, ExplorationStrategy],
             method: Literal['forward', 'backward'] = 'backward',
@@ -204,7 +204,7 @@ class QLearning(Agent[FeatureSet, float]):
                 reward = h.reward or 0.0
 
                 try:
-                    next_state = history[i+1].state  # type: ignore
+                    next_state = history[i + 1].state  # type: ignore
                     new_q = reward + discount_factor * \
                         self._max_q(next_state)
                 except IndexError:
@@ -215,7 +215,7 @@ class QLearning(Agent[FeatureSet, float]):
 
         else:  # backward
             q_list = [0.0] * 2
-            for i in range(len(active_history)-1, -1, -1):
+            for i in range(len(active_history) - 1, -1, -1):
                 state = active_history[i].state  # type: ignore
                 action = (
                     active_history[i].action_taken or
