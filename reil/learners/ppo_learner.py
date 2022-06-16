@@ -5,16 +5,14 @@ PPOLearner class
 
 '''
 
-import datetime
-import pathlib
 from typing import Any, Dict, Optional, Tuple, Union
-import numpy as np
 
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras.optimizers.schedules as k_sch
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.utils.tf_utils import ActionRank, TF2UtilsMixin
+from reil.utils.tf_utils import TF2UtilsMixin
 from tensorflow import keras
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
@@ -67,7 +65,7 @@ class PPOModel(TF2UtilsMixin):
         actor_layers = TF2UtilsMixin.mlp_functional(
             input_, self._actor_layer_sizes, 'relu', 'actor_{i:0>2}')
         logit_heads = TF2UtilsMixin.mpl_layers(
-            self._output_lengths, 'softmax', 'actor_output_{i:0>2}')
+            self._output_lengths, None, 'actor_output_{i:0>2}')
         logits = [output(actor_layers) for output in logit_heads]
 
         self.actor = keras.Model(inputs=input_, outputs=[logits])
@@ -89,13 +87,10 @@ class PPOModel(TF2UtilsMixin):
             'critic_loss', dtype=tf.float32)
         self._entropy_loss = tf.keras.metrics.Mean(
             'entropy_loss', dtype=tf.float32)
-        self._advantage_mean = tf.keras.metrics.Mean(
-            'critic_loss', dtype=tf.float32)
-        self._advantage_std = tf.keras.metrics.Mean(
-            'critic_loss', dtype=tf.float32)
+        self._kl = tf.keras.metrics.Mean(
+            'kl', dtype=tf.float32)
         self._actor_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
             'actor_accuracy', dtype=tf.float32)
-        self._action_rank = ActionRank()
 
         self._models = {
             'actor': type(self.actor),
@@ -105,6 +100,18 @@ class PPOModel(TF2UtilsMixin):
         logits = self.actor(inputs, training)
         values = self.critic(inputs, training)
         return logits, values
+
+    @staticmethod
+    @tf.function
+    def _entropy(logits: tf.Tensor):
+        # Adopted the code from OpenAI baseline
+        # https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/common/distributions.py
+        a0 = logits - tf.reduce_max(logits, axis=-1, keepdims=True)
+        ea0 = tf.exp(a0)
+        z0 = tf.reduce_sum(ea0, axis=-1, keepdims=True)
+        p0 = ea0 / z0
+
+        return tf.reduce_sum(p0 * (tf.math.log(z0) - a0), axis=-1)
 
     @tf.function(
         input_signature=(
@@ -119,47 +126,37 @@ class PPOModel(TF2UtilsMixin):
         y = self.actor(x)
         initial_logprobs = self.logprobs(
             y, action_indices, self._output_lengths[0])
-        self._action_rank.update_state(tf.squeeze(action_indices), y[0])
-        self._advantage_mean.update_state(tf.reduce_mean(advantage))
-        self._advantage_std.update_state(tf.math.reduce_std(advantage))
-        advantage = tf.divide(
+        _advantage = tf.divide(
             advantage - tf.math.reduce_mean(advantage),
             tf.math.reduce_std(advantage) + eps,
             name='normalized_advantage')
 
-        for _ in tf.range(self._actor_train_iterations):
-            with tf.GradientTape(persistent=True) as tape:
-                ratio = tf.exp(
-                    self.logprobs(
-                        self.actor(x), action_indices, self._output_lengths[0])
-                    - initial_logprobs)
-                if self._clip_ratio is not None:
-                    min_advantage = tf.where(
-                        tf.greater(advantage, 0.0),
-                        tf.multiply(1 + self._clip_ratio, advantage),
-                        tf.multiply(1 - self._clip_ratio, advantage)
-                    )
-                else:
-                    min_advantage = advantage
+        trainable_vars = self.actor.trainable_variables
 
-                actor_loss = -tf.reduce_mean(
-                    tf.minimum(ratio * advantage, min_advantage)
-                )
+        actor_loss = entropy_loss = kl = tf.constant(0.0, dtype=tf.float32)
+        for _ in tf.range(self._actor_train_iterations):
+            with tf.GradientTape() as tape:
+                new_logprobs = self.logprobs(
+                    self.actor(x), action_indices, self._output_lengths[0])
+                ratio = tf.exp(new_logprobs - initial_logprobs)
+                if self._clip_ratio is not None:
+                    clipped_ratio = tf.clip_by_value(
+                        ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
+                    actor_loss = -tf.reduce_mean(
+                        tf.minimum(
+                            ratio * _advantage, clipped_ratio * _advantage))
+
+                else:
+                    actor_loss = -tf.reduce_mean(ratio * _advantage)
 
                 if self._entropy_loss_coef:
-                    new_logprobs = self.logprobs(
-                        self.actor(x), action_indices, self._output_lengths[0])
-                    entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
-                        new_logprobs * tf.math.exp(new_logprobs))
-                else:
-                    entropy_loss = 0.0
+                    entropy_loss = self._entropy(new_logprobs)
+                    entropy_loss.set_shape([])
+                    # entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
+                    #     new_logprobs * tf.math.exp(new_logprobs))
 
-                total_loss = actor_loss + entropy_loss
+                total_loss = actor_loss - self._entropy_loss_coef * entropy_loss
 
-            self._actor_loss.update_state(actor_loss)
-            if self._entropy_loss_coef:
-                self._entropy_loss.update_state(entropy_loss)
-            trainable_vars = self.actor.trainable_variables
             policy_grads = tape.gradient(total_loss, trainable_vars)
             if self._max_grad_norm is not None:
                 policy_grads, _ = tf.clip_by_global_norm(
@@ -167,13 +164,25 @@ class PPOModel(TF2UtilsMixin):
             self._actor_optimizer.apply_gradients(
                 zip(policy_grads, trainable_vars))
 
+            y = self.actor(x)
             new_logprobs = self.logprobs(
-                self.actor(x), action_indices, self._output_lengths[0])
-            kl = tf.reduce_mean(initial_logprobs - new_logprobs)
+                y, action_indices, self._output_lengths[0])
+            kl = .5 * tf.reduce_mean(
+                tf.square(new_logprobs - initial_logprobs))
+            # kl = tf.reduce_sum(
+            #     tf.exp(initial_logprobs) * (initial_logprobs - new_logprobs))
+            # kl = tf.reduce_mean(initial_logprobs - new_logprobs)
 
             # kl = tf.reduce_sum(kl)
             if kl > 1.5 * self._target_kl:  # Early Stopping
                 break
+
+        self._kl.update_state(kl)
+        self._actor_accuracy.update_state(
+            tf.squeeze(action_indices), y[0])
+        self._actor_loss.update_state(actor_loss)
+        if self._entropy_loss_coef:
+            self._entropy_loss.update_state(entropy_loss)
 
     @tf.function(
         input_signature=(
@@ -185,19 +194,19 @@ class PPOModel(TF2UtilsMixin):
         old_values = self.critic(x)
         for _ in tf.range(self._critic_train_iterations):
             with tf.GradientTape() as tape:
+                new_values = self.critic(x)
                 if self._critic_clip_range is not None:
                     values_clipped = old_values + tf.clip_by_value(
-                        self.critic(x) - old_values,
-                        -self._critic_clip_range, self._critic_clip_range
-                    )
-                    loss_unclipped = tf.square(returns - self.critic(x))
+                        new_values - old_values, -self._critic_clip_range,
+                        self._critic_clip_range)
+                    loss_unclipped = tf.square(returns - new_values)
                     loss_clipped = tf.square(returns - values_clipped)
                     critic_loss = 0.5 * tf.reduce_mean(
                         tf.maximum(loss_unclipped, loss_clipped)
                     )
                 else:
                     critic_loss = tf.reduce_mean(
-                        tf.square(returns - self.critic(x)))
+                        tf.square(returns - new_values))
 
             self._critic_loss.update_state(critic_loss)
             trainable_vars = self.critic.trainable_variables
@@ -211,17 +220,20 @@ class PPOModel(TF2UtilsMixin):
 
     @staticmethod
     def logprobs(logits, action_indices, action_count):
-        logprobabilities_all = tf.nn.log_softmax(logits)
-        logprobability = tf.reduce_sum(
-            tf.squeeze(
-                tf.one_hot(action_indices, action_count)
-            ) * tf.squeeze(logprobabilities_all),
-            axis=1)
-        # logprobability = tf.reduce_sum(
-        #     tf.one_hot(action_indices, action_count) * logprobabilities_all,
-        #     axis=1)
+        return -tf.nn.softmax_cross_entropy_with_logits(
+            tf.one_hot(tf.squeeze(action_indices), action_count),
+            tf.squeeze(logits))
 
-        return logprobability
+        # logprobabilities_all = tf.nn.log_softmax(tf.squeeze(logits))
+        # logprobability = tf.reduce_sum(
+        #     tf.one_hot(tf.squeeze(action_indices), action_count)
+        #     * logprobabilities_all,
+        #     axis=1)
+        # # logprobability = tf.reduce_sum(
+        # #     tf.one_hot(action_indices, action_count) * logprobabilities_all,
+        # #     axis=1)
+
+        # return logprobability
 
     def train_step(self, data):
         x, (action_indices, returns, advantage) = data
@@ -229,26 +241,20 @@ class PPOModel(TF2UtilsMixin):
         self.train_critic(x, returns)
 
         metrics = {
-            'actor_loss': [self._actor_loss.result()],
-            'critic_loss': [self._critic_loss.result()]
+            'actor_loss': self._actor_loss.result(),
+            'critic_loss': self._critic_loss.result()
         }
 
         if self._entropy_loss_coef:
-            metrics['entropy_loss'] = [self._entropy_loss.result()]
+            metrics['entropy_loss'] = self._entropy_loss.result()
 
-        metrics['total_loss'] = [sum(x[0] for x in metrics.values())]
-
-        metrics['action_rank'] = [self._action_rank.result()]
-        metrics['advantage_mean'] = [self._advantage_mean.result()]
-        metrics['advantage_std'] = [self._advantage_std.result()]
+        metrics['total_loss'] = sum(x for x in metrics.values())
+        metrics['kl'] = self._kl.result()
 
         self._actor_loss.reset_states()
         self._critic_loss.reset_states()
         self._entropy_loss.reset_states()
         self._actor_accuracy.reset_states()
-        self._action_rank.reset_states()
-        self._advantage_mean.reset_states()
-        self._advantage_std.reset_states()
 
         return metrics
 
@@ -261,8 +267,6 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
     def __init__(
             self,
             model: PPOModel,
-            tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
-            tensorboard_filename: Optional[str] = None,
             **kwargs: Any) -> None:
         '''
         Arguments
@@ -277,19 +281,6 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         self._model = model
 
         self._iteration = 0
-
-        self._tensorboard_path: Optional[pathlib.PurePath] = None
-        if (tensorboard_path or tensorboard_filename) is not None:
-            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            self._tensorboard_path = pathlib.PurePath(
-                tensorboard_path or './logs')
-            self._tensorboard_filename = current_time + (
-                f'-{tensorboard_filename}' or '')
-            self._train_summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                    str(
-                        self._tensorboard_path /
-                        self._tensorboard_filename / 'train'))
 
     def predict(
             self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
@@ -338,26 +329,6 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         metrics = self._model.train_step(
             (_X, (action_index, returns, advantage)))
 
-        if self._train_summary_writer:
-            training_metrics = {
-                key: value
-                for key, value in metrics.items()
-                if not key.startswith('val_')}
-
-            # validation_metrics = {
-            #     key[4:]: value
-            #     for key, value in metrics.items()
-            #     if key.startswith('val_')}
-
-            with self._train_summary_writer.as_default(step=self._iteration):
-                for name, value in training_metrics.items():
-                    tf.summary.scalar(name, value[0])
-
-            # with self._validation_summary_writer.as_default(
-            #         step=self._iteration):
-            #     for name, value in validation_metrics.items():
-            #         tf.summary.scalar(name, value[0])
-
         self._iteration += 1
 
         return metrics
@@ -369,25 +340,3 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
     def set_parameters(self, parameters: Any):
         self._model.actor.set_weights(parameters[0])
         self._model.critic.set_weights(parameters[1])
-
-    def __getstate__(self):
-        state = super().__getstate__()
-        state['_train_summary_writer'] = None
-        # state['_validation_summary_writer'] = None
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        super().__setstate__(state)
-
-        if self._tensorboard_path:
-            self._train_summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                    str(
-                        self._tensorboard_path /
-                        self._tensorboard_filename / 'train'))
-
-            # self._validation_summary_writer = \
-            #     tf.summary.create_file_writer(  # type: ignore
-            #     str(
-            #         self._tensorboard_path /
-            #         self._tensorboard_filename / 'validation'))
