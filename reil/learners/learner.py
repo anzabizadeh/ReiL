@@ -21,6 +21,7 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
     The base class for all `learner` classes.
     '''
     _learning_rate: LearningRateScheduler
+    _iteration: int
 
     @abstractmethod
     def predict(
@@ -67,6 +68,10 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
         raise NotImplementedError
 
     @abstractmethod
+    def reset(self):
+        raise NotImplementedError
+
+    @abstractmethod
     def get_parameters(self) -> Any:
         raise NotImplementedError
 
@@ -93,11 +98,16 @@ class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
             determine the learning rate at each iteration.
         '''
         super().__init__(**kwargs)
+        self._iteration = 0
         if learning_rate:
             if isinstance(learning_rate, float):
                 self._learning_rate = ConstantLearningRate(learning_rate)
             else:
                 self._learning_rate = learning_rate
+
+    def reset(self) -> None:
+        super().reset()
+        self._iteration += 1
 
     @classmethod
     def _empty_instance(cls):
