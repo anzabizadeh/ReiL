@@ -37,13 +37,3 @@ TrainingData
     `FeatureSet` for X matrix and a tuple of floats for Y vector.
 
 '''
-from .agent_base import AgentBase  # noqa: W601
-from .agent import Agent, TrainingData  # noqa: W601
-from .q_learning import QLearning  # noqa: W601
-from .deep_q_learning import DeepQLearning  # noqa: W601
-from .random_agent import RandomAgent  # noqa: W601
-from .user_agent import UserAgent  # noqa: W601
-from .agent_demon import AgentDemon  # noqa: W601
-from .linear_regression_agent import LRAgent  # noqa: W601
-from .actor_critic import A2C  # noqa: W601
-from .proximal_policy_optimization import PPO  # noqa: W601
