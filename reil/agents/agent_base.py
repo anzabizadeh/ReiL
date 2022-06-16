@@ -13,8 +13,6 @@ from typing import (Any, Dict, Generator, Literal, Optional, Tuple, TypeVar,
 from reil.datatypes.dataclasses import History, Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.stateful import Stateful
-from reil.utils.metrics import MetricProtocol
-from reil.utils.tf_utils import SummaryWriter
 
 T = TypeVar('T')
 
@@ -29,7 +27,6 @@ class AgentBase(Stateful):
             self,
             tie_breaker: Literal['first', 'last', 'random'] = 'random',
             variable_action_count: bool = True,
-            summary_writer: Optional[SummaryWriter] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -55,8 +52,6 @@ class AgentBase(Stateful):
         super().__init__(**kwargs)
 
         self._variable_action_count = variable_action_count
-        self._metrics: Dict[str, MetricProtocol] = {}
-        self._computed_metrics: Dict[str, float] = {}
 
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward'] = 'none'
@@ -65,7 +60,6 @@ class AgentBase(Stateful):
             raise ValueError(
                 'Tie breaker should be one of first, last, or random options.')
         self._tie_breaker: Literal['first', 'last', 'random'] = tie_breaker
-        self._summary_writer = summary_writer
 
     def act(self,
             state: FeatureSet,

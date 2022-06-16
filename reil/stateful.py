@@ -42,6 +42,8 @@ from reil.datatypes.components import (State, Statistic,
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import Feature, FeatureSet, NoneFeature
 from reil.datatypes.feature_array_dumper import FeatureSetDumper
+from reil.utils.metrics import MetricProtocol
+from reil.utils.tf_utils import SummaryWriter
 
 
 class Stateful(reilbase.ReilBase):
@@ -55,9 +57,14 @@ class Stateful(reilbase.ReilBase):
             max_entity_count: int = -1,
             unique_entities: bool = True,
             state_dumper: Optional[FeatureSetDumper] = None,
+            summary_writer: Optional[SummaryWriter] = None,
             **kwargs: Any):
 
         super().__init__(**kwargs)
+
+        self._metrics: Dict[str, MetricProtocol] = {}
+        self._computed_metrics: Dict[str, float] = {}
+        self._summary_writer = summary_writer
 
         sub_comp_list = self._extract_sub_components()
         self.state = State(
@@ -165,6 +172,9 @@ class Stateful(reilbase.ReilBase):
             self, _id: int, **kwargs: Any
     ) -> Feature:
         return NoneFeature
+
+    def _update_metrics(self, **kwargs: Any) -> None:
+        raise NotImplementedError
 
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         '''
