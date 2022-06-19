@@ -286,7 +286,8 @@ class Single(Environment):
         success = self.reset_subject(subject_name)
         self.register_protocol(plan, get_agent_observer=True)
 
-        if metrics and self._stopping_criteria:
+        if (metrics and self._stopping_criteria and
+                self._agents[plan.agent.name]._training_trigger != 'none'):
             if self._stopping_criteria(
                     metrics, self._agents[plan.agent.name].get_parameters):
                 _, best_parameters = self._stopping_criteria.get_best()
