@@ -12,7 +12,8 @@ import tensorflow as tf
 import tensorflow.keras.optimizers.schedules as k_sch
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.utils.tf_utils import TF2UtilsMixin
+from reil.utils.tf_utils import (MeanMetric, SparseCategoricalAccuracyMetric,
+                                 TF2UtilsMixin)
 from tensorflow import keras
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
@@ -81,15 +82,13 @@ class PPOModel(TF2UtilsMixin):
         self._critic_optimizer = keras.optimizers.Adam(
             learning_rate=self._critic_learning_rate)
 
-        self._actor_loss = tf.keras.metrics.Mean(
-            'actor_loss', dtype=tf.float32)
-        self._critic_loss = tf.keras.metrics.Mean(
-            'critic_loss', dtype=tf.float32)
-        self._entropy_loss = tf.keras.metrics.Mean(
-            'entropy_loss', dtype=tf.float32)
-        self._kl = tf.keras.metrics.Mean(
-            'kl', dtype=tf.float32)
-        self._actor_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+        self._actor_loss = MeanMetric('actor_loss', dtype=tf.float32)
+        self._critic_loss = MeanMetric('critic_loss', dtype=tf.float32)
+        self._entropy_loss = MeanMetric('entropy_loss', dtype=tf.float32)
+        self._actor_accuracy = SparseCategoricalAccuracyMetric(
+            'actor_accuracy', dtype=tf.float32)
+        self._kl = MeanMetric('kl', dtype=tf.float32)
+        self._actor_accuracy = SparseCategoricalAccuracyMetric(
             'actor_accuracy', dtype=tf.float32)
 
         self._models = {

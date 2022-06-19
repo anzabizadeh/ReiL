@@ -17,7 +17,9 @@ import tensorflow.keras.optimizers.schedules as k_sch
 import tensorflow_probability as tfp
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.utils.tf_utils import ActionRank, TF2UtilsMixin
+from reil.utils.tf_utils import (ActionRank, MeanMetric,
+                                 SparseCategoricalAccuracyMetric,
+                                 TF2UtilsMixin)
 from tensorflow import keras
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
@@ -51,19 +53,14 @@ class DeepA2CModel(keras.Model):
         self._entropy_loss_coef = entropy_loss_coef
         self._learning_rate = learning_rate
 
-        self._actor_loss = tf.keras.metrics.Mean(
-            'actor_loss', dtype=tf.float32)
-        self._critic_loss = tf.keras.metrics.Mean(
-            'critic_loss', dtype=tf.float32)
-        self._entropy_loss = tf.keras.metrics.Mean(
-            'entropy_loss', dtype=tf.float32)
-        self._total_loss = tf.keras.metrics.Mean(
-            'total_loss', dtype=tf.float32)
-        self._actor_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+        self._actor_loss = MeanMetric('actor_loss', dtype=tf.float32)
+        self._critic_loss = MeanMetric('critic_loss', dtype=tf.float32)
+        self._entropy_loss = MeanMetric('entropy_loss', dtype=tf.float32)
+        self._total_loss = MeanMetric('total_loss', dtype=tf.float32)
+        self._actor_accuracy = SparseCategoricalAccuracyMetric(
             'actor_accuracy', dtype=tf.float32)
-        self._action_rank = ActionRank()
-        self._return = tf.keras.metrics.Mean(
-            'return', dtype=tf.float32)
+        self._action_rank = ActionRank('action_rank')
+        self._return = MeanMetric('return', dtype=tf.float32)
 
     def build(self, input_shape: Tuple[int, ...]):
         self._input_shape = [None, *input_shape[1:]]

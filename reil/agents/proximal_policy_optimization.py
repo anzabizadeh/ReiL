@@ -18,7 +18,7 @@ from reil.datatypes.feature import FeatureSet
 from reil.learners.ppo_learner import PPOLearner
 from reil.utils.exploration_strategies import NoExploration
 from reil.utils.metrics import MetricProtocol
-from reil.utils.tf_utils import ActionRank
+from reil.utils.tf_utils import ActionRank, MeanMetric
 
 ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
 
@@ -62,9 +62,8 @@ class PPO(A2C):
         self._gae_lambda = gae_lambda
         self._metrics: Dict[str, MetricProtocol] = {  # type: ignore
             'action_rank': ActionRank(),
-            'advantage_mean': tf.keras.metrics.Mean(
-                'advantage_mean', dtype=tf.float32),
-            'rewards': tf.keras.metrics.Mean('rewards', dtype=tf.float32)
+            'advantage_mean': MeanMetric('advantage_mean', dtype=tf.float32),
+            'rewards': MeanMetric('rewards', dtype=tf.float32)
         }
 
     def _prepare_training(
