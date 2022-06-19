@@ -215,7 +215,7 @@ class TF2UtilsMixin(reilbase.ReilBase):
                 except ValueError:
                     state[f'_serialized_{name}'] = None
 
-        for k in list(self._models) + ['_callbacks', '_tensorboard']:
+        for k in list(self._models) + ['_callbacks']:
             if k in state:
                 del state[k]
 
@@ -245,12 +245,6 @@ class TF2UtilsMixin(reilbase.ReilBase):
         self.__dict__.update(state)
 
         self._callbacks: List[Any] = []
-        if self._tensorboard_path is not None:
-            self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path)
-            # , histogram_freq=1)  #, write_images=True)
-            self._callbacks.append(self._tensorboard)
-
         if '_learning_rate' in state and not isinstance(
                 self._learning_rate, ConstantLearningRate):
             learning_rate_scheduler = \
@@ -357,14 +351,29 @@ class MaxLayer(keras.layers.Layer):
         return config
 
 
+class MetricSerializerMixin:
+    def __getstate__(self):
+        variables = {v.name: v.numpy() for v in self.variables}
+        state = {
+            name: variables[var.name]
+            for name, var in self._unconditional_dependency_names.items()
+            if isinstance(var, tf.Variable)}
+        state['name'] = self.name
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]):
+        self.__init__(name=state.pop('name'))
+        for name, value in state.items():
+            self._unconditional_dependency_names[name].assign(value)
+
+
 @keras.utils.register_keras_serializable(
     package='reil.utils.tf_utils')
-class ActionRank(keras.metrics.Metric):
-
+class ActionRank(MetricSerializerMixin, keras.metrics.Metric):
     def __init__(self, name='action_rank', **kwargs):
         super().__init__(name=name, **kwargs)
         self.cumulative_rank = self.add_weight(
-            name='rank', initializer='zeros', dtype=tf.int64)
+            name='cumulative_rank', initializer='zeros', dtype=tf.int64)
         self.count = self.add_weight(
             name='count', initializer='zeros', dtype=tf.int32)
 
@@ -391,6 +400,15 @@ class ActionRank(keras.metrics.Metric):
     def reset_states(self):
         self.cumulative_rank.assign(0)
         self.count.assign(0)
+
+
+class MeanMetric(MetricSerializerMixin, keras.metrics.Mean):
+    pass
+
+
+class SparseCategoricalAccuracyMetric(
+        MetricSerializerMixin, tf.keras.metrics.SparseCategoricalAccuracy):
+    pass
 
 
 class SummaryWriter:
