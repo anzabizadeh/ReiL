@@ -47,7 +47,8 @@ class PPOModel(TF2UtilsMixin):
         super().__init__(models={})
 
         self._input_shape = input_shape
-        self._output_lengths = output_lengths
+        self._output_lengths = [
+            tf.constant(i, dtype=tf.int32) for i in output_lengths]
         self._actor_learning_rate = actor_learning_rate
         self._critic_learning_rate = critic_learning_rate
         self._actor_layer_sizes = actor_layer_sizes
@@ -66,10 +67,12 @@ class PPOModel(TF2UtilsMixin):
         actor_layers = TF2UtilsMixin.mlp_functional(
             input_, self._actor_layer_sizes, 'relu', 'actor_{i:0>2}')
         logit_heads = TF2UtilsMixin.mpl_layers(
-            self._output_lengths, None, 'actor_output_{i:0>2}')
+            output_lengths, None, 'actor_output_{i:0>2}')
         logits = [output(actor_layers) for output in logit_heads]
 
-        self.actor = keras.Model(inputs=input_, outputs=[logits])
+        self.actor = keras.Model(
+            inputs=input_,
+            outputs=logits if len(logits) > 1 else [logits])
 
         critic_layers = TF2UtilsMixin.mlp_functional(
             input_, self._critic_layer_sizes, 'relu', 'critic_{i:0>2}')
@@ -105,6 +108,7 @@ class PPOModel(TF2UtilsMixin):
     def _entropy(logits: tf.Tensor):
         # Adopted the code from OpenAI baseline
         # https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/common/distributions.py
+        print('tracing PPOModel._entropy')
         a0 = logits - tf.reduce_max(logits, axis=-1, keepdims=True)
         ea0 = tf.exp(a0)
         z0 = tf.reduce_sum(ea0, axis=-1, keepdims=True)
@@ -115,16 +119,37 @@ class PPOModel(TF2UtilsMixin):
     @tf.function(
         input_signature=(
             tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
-            tf.TensorSpec(shape=[None, 1], dtype=tf.int32, name='action_indices'),
+            tf.TensorSpec(shape=[None, None], dtype=tf.int32, name='action_indices'),
             tf.TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
         )
     )
     def train_actor(
         self, x: tf.Tensor, action_indices: tf.Tensor, advantage: tf.Tensor
     ):
-        y = self.actor(x)
-        initial_logprobs = self.logprobs(
-            y, action_indices, self._output_lengths[0])
+        print(f'tracing {self.__class__.__qualname__}.train_actor')
+        lengths = self._output_lengths
+        starts = tf.pad(lengths[:-1], [[1, 0]])
+        ends = tf.math.cumsum(lengths)
+        m = len(lengths)
+
+        logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
+
+        initial_logprobs = tf.expand_dims(
+            self.logprobs(
+                logits_concat[:, starts[0]:ends[0]],
+                tf.gather(action_indices, 0, axis=1),
+                tf.gather(self._output_lengths, 0)),
+            axis=1)
+        for j in tf.range(1, m):
+            initial_logprobs = tf.concat([
+                initial_logprobs,
+                tf.expand_dims(
+                    self.logprobs(
+                        logits_concat[:, starts[j]:ends[j]],
+                        tf.gather(action_indices, j, axis=1),
+                        tf.gather(self._output_lengths, j)),
+                    axis=1)], axis=1)
+
         _advantage = tf.divide(
             advantage - tf.math.reduce_mean(advantage),
             tf.math.reduce_std(advantage) + eps,
@@ -132,29 +157,36 @@ class PPOModel(TF2UtilsMixin):
 
         trainable_vars = self.actor.trainable_variables
 
-        actor_loss = entropy_loss = kl = tf.constant(0.0, dtype=tf.float32)
+        total_loss = tf.constant(0.0, dtype=tf.float32)
+        actor_loss = entropy_loss = kl = tf.constant(
+            0.0, dtype=tf.float32)
         for _ in tf.range(self._actor_train_iterations):
             with tf.GradientTape() as tape:
-                new_logprobs = self.logprobs(
-                    self.actor(x), action_indices, self._output_lengths[0])
-                ratio = tf.exp(new_logprobs - initial_logprobs)
-                if self._clip_ratio is not None:
-                    clipped_ratio = tf.clip_by_value(
-                        ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
-                    actor_loss = -tf.reduce_mean(
-                        tf.minimum(
-                            ratio * _advantage, clipped_ratio * _advantage))
+                logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
+                for j in tf.range(m):
+                    new_logprobs = self.logprobs(
+                        logits_concat[:, starts[j]:ends[j]],
+                        tf.gather(action_indices, j, axis=1),
+                        tf.gather(self._output_lengths, j))
 
-                else:
-                    actor_loss = -tf.reduce_mean(ratio * _advantage)
+                    ratio = tf.exp(new_logprobs - tf.gather(initial_logprobs, j, axis=1))
+                    if self._clip_ratio is not None:
+                        clipped_ratio = tf.clip_by_value(
+                            ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
+                        actor_loss = -tf.reduce_mean(
+                            tf.minimum(
+                                ratio * _advantage, clipped_ratio * _advantage))
 
-                if self._entropy_loss_coef:
-                    entropy_loss = self._entropy(new_logprobs)
-                    entropy_loss.set_shape([])
-                    # entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
-                    #     new_logprobs * tf.math.exp(new_logprobs))
+                    else:
+                        actor_loss = -tf.reduce_mean(ratio * _advantage)
 
-                total_loss = actor_loss - self._entropy_loss_coef * entropy_loss
+                    if self._entropy_loss_coef:
+                        entropy_loss = self._entropy(new_logprobs)
+                        entropy_loss.set_shape([])
+                        # entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
+                        #     new_logprobs * tf.math.exp(new_logprobs))
+
+                    total_loss += actor_loss - self._entropy_loss_coef * entropy_loss
 
             policy_grads = tape.gradient(total_loss, trainable_vars)
             if self._max_grad_norm is not None:
@@ -163,22 +195,40 @@ class PPOModel(TF2UtilsMixin):
             self._actor_optimizer.apply_gradients(
                 zip(policy_grads, trainable_vars))
 
-            y = self.actor(x)
-            new_logprobs = self.logprobs(
-                y, action_indices, self._output_lengths[0])
+            logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
+
+            new_logprobs = tf.expand_dims(
+                self.logprobs(
+                    logits_concat[:, starts[0]:ends[0]],
+                    tf.gather(action_indices, 0, axis=1),
+                    tf.gather(self._output_lengths, 0)),
+                axis=1)
+            for j in tf.range(1, m):
+                new_logprobs = tf.concat([
+                    new_logprobs,
+                    tf.expand_dims(
+                        self.logprobs(
+                            logits_concat[:, starts[j]:ends[j]],
+                            tf.gather(action_indices, j, axis=1),
+                            tf.gather(self._output_lengths, j)),
+                        axis=1)], axis=1)
+            # new_logprobs = tf.concat([
+            #     tf.expand_dims(
+            #         self.logprobs(
+            #             logits_concat[:, starts[j]:ends[j]],
+            #             tf.gather(action_indices, 0, axis=1),
+            #             tf.gather(self._output_lengths, j)),
+            #         axis=1)
+                # for j in tf.range(m)], axis=1)
             kl = .5 * tf.reduce_mean(
                 tf.square(new_logprobs - initial_logprobs))
-            # kl = tf.reduce_sum(
-            #     tf.exp(initial_logprobs) * (initial_logprobs - new_logprobs))
-            # kl = tf.reduce_mean(initial_logprobs - new_logprobs)
 
-            # kl = tf.reduce_sum(kl)
             if kl > 1.5 * self._target_kl:  # Early Stopping
                 break
 
         self._kl.update_state(kl)
-        self._actor_accuracy.update_state(
-            tf.squeeze(action_indices), y[0])
+        # self._actor_accuracy.update_state(
+        #     tf.squeeze(action_indices), y[0])
         self._actor_loss.update_state(actor_loss)
         if self._entropy_loss_coef:
             self._entropy_loss.update_state(entropy_loss)
@@ -190,6 +240,7 @@ class PPOModel(TF2UtilsMixin):
         )
     )
     def train_critic(self, x, returns):
+        print(f'tracing {self.__class__.__qualname__}.train_critic')
         old_values = self.critic(x)
         for _ in tf.range(self._critic_train_iterations):
             with tf.GradientTape() as tape:
@@ -218,21 +269,18 @@ class PPOModel(TF2UtilsMixin):
                 zip(value_grads, trainable_vars))
 
     @staticmethod
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='logits'),
+            tf.TensorSpec(shape=[None], dtype=tf.int32, name='action_indices'),
+            tf.TensorSpec(shape=[], dtype=tf.int32, name='action_count'),
+        )
+    )
     def logprobs(logits, action_indices, action_count):
+        print('tracing PPOModel.logprobs')
         return -tf.nn.softmax_cross_entropy_with_logits(
             tf.one_hot(tf.squeeze(action_indices), action_count),
             tf.squeeze(logits))
-
-        # logprobabilities_all = tf.nn.log_softmax(tf.squeeze(logits))
-        # logprobability = tf.reduce_sum(
-        #     tf.one_hot(tf.squeeze(action_indices), action_count)
-        #     * logprobabilities_all,
-        #     axis=1)
-        # # logprobability = tf.reduce_sum(
-        # #     tf.one_hot(action_indices, action_count) * logprobabilities_all,
-        # #     axis=1)
-
-        # return logprobability
 
     def train_step(self, data):
         x, (action_indices, returns, advantage) = data

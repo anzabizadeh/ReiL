@@ -130,8 +130,10 @@ class PPO(A2C):
         rewards = kwargs.get('rewards')
 
         if action_indices is not None and y is not None:
-            self._metrics['action_rank'].update_state(
-                tf.squeeze(action_indices), y[0])
+            action_lists = list(zip(*action_indices))
+            for i, yi in enumerate(y):
+                self._metrics['action_rank'].update_state(
+                    tf.squeeze(action_lists[i]), yi)
         if advantage is not None:
             self._metrics['advantage_mean'].update_state(advantage)
         if rewards is not None:
