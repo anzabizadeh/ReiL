@@ -21,15 +21,28 @@ class testFeature(unittest.TestCase):
         upper = max(self._numerical_data)
 
         def midpoint(f: feature.Feature) -> float:
-            return (f.lower + f.upper)/2  # type: ignore
+            return (f.lower + f.upper) / 2  # type: ignore
 
         numerical = feature.FeatureGenerator.continuous(
             name='num', lower=lower,
             upper=upper, generator=midpoint, randomized=True)  # type: ignore
 
         self.assertEqual(numerical.name, 'num')
-        self.assertEqual(numerical().value, (lower + upper)/2)
+        self.assertEqual(numerical().value, (lower + upper) / 2)
         self.assertEqual(numerical.is_numerical, True)
+
+        discrete = feature.FeatureGenerator.discrete(
+            name='num', lower=lower, upper=upper, step=0.2)
+
+        self.assertEqual(discrete.name, 'num')
+        self.assertEqual(discrete(lower + 0.4).value, lower + 0.4)
+
+        fixed_values = feature.FeatureGenerator.numerical_fixed_values(
+            name='num', lower=lower, upper=upper, fixed_values=(1.2, 4.7, 5.5))
+
+        self.assertEqual(fixed_values(1.2).value, 1.2)
+        with self.assertRaises(ValueError):
+            fixed_values(2.0)
 
         categorical = feature.FeatureGenerator.categorical(
             name='cat', categories=('A', 'B', 'C'), probabilities=(.3, .6, .1),
@@ -38,6 +51,24 @@ class testFeature(unittest.TestCase):
         self.assertEqual(categorical.name, 'cat')
         self.assertEqual(categorical().value, 'A')
         self.assertEqual(categorical.is_numerical, False)
+
+    def test_generate_values(self):
+        data = [x * 0.5 for x in range(20)]
+        lower = min(data)
+        upper = max(data)
+
+        discrete = feature.FeatureGenerator.discrete(
+            name='num', lower=lower, upper=upper, step=0.5)
+
+        self.assertEqual(
+            [f.value for f in discrete.generate_all()], data)
+
+        fixed_values = feature.FeatureGenerator.numerical_fixed_values(
+            name='num', lower=lower, upper=upper, fixed_values=(1.2, 4.7, 5.5))
+
+        self.assertEqual(
+            [f.value for f in fixed_values.generate_all()],
+            [1.2, 4.7, 5.5])
 
     def test_feature_config(self):
         rl_value = feature.Feature(
@@ -49,7 +80,7 @@ class testFeature(unittest.TestCase):
         upper = max(self._numerical_data)
 
         def midpoint(f: feature.Feature) -> float:
-            return (f.lower + f.upper)/2  # type: ignore
+            return (f.lower + f.upper) / 2  # type: ignore
 
         numerical = feature.FeatureGenerator.continuous(
             name='num', lower=lower,
@@ -104,10 +135,10 @@ class testFeature(unittest.TestCase):
         rl_values = [categoricals(v) for v in self._categorical_data]
         self.assertEqual(
             rl_values[0].normalized,
-            tuple([1] + [0]*(len(self._categorical_data) - 2)))
+            tuple([1] + [0] * (len(self._categorical_data) - 2)))
         self.assertEqual(
             rl_values[-1].normalized,
-            tuple([0]*(len(self._categorical_data) - 1)))
+            tuple([0] * (len(self._categorical_data) - 1)))
 
         rl_new = sum(rl_values[1:], rl_values[0])
         self.assertEqual(rl_new.name, 'test')
@@ -128,13 +159,13 @@ class testFeature(unittest.TestCase):
         rl_values = [categoricals(v) for v in self._categorical_data]
         self.assertEqual(
             rl_values[0].normalized,
-            tuple([1] + [0]*(len(self._categorical_data) - 1)))
+            tuple([1] + [0] * (len(self._categorical_data) - 1)))
         self.assertEqual(
             rl_values[-1].normalized,
-            tuple([0]*(len(self._categorical_data) - 1) + [1]))
+            tuple([0] * (len(self._categorical_data) - 1) + [1]))
         self.assertEqual(
             categoricals(feature.MISSING).normalized,
-            tuple([0]*(len(self._categorical_data))))
+            tuple([0] * (len(self._categorical_data))))
 
     def test_feature_set(self):
         categoricals = feature.FeatureGenerator.categorical(
@@ -164,15 +195,16 @@ class testFeature(unittest.TestCase):
             {reilset['cats'].name: reilset['cats'].categories,
              reilset['nums'].name: reilset['nums'].categories})
 
-        self.assertEqual(reilset.normalized.flattened,
-                         list(reilset['cats'].normalized) +  # type: ignore
-                         [reilset['nums'].normalized])
+        self.assertEqual(
+            reilset.normalized.flattened,
+            list(reilset['cats'].normalized) +  # type: ignore
+            [reilset['nums'].normalized])
 
         self.assertEqual(
             reilset,
             feature.FeatureSet([categoricals(self._categorical_data[0])]) +
             feature.FeatureSet([numericals(self._numerical_data[0])])
-            )
+        )
 
     def test_change_to_missing(self):
         categoricals = feature.FeatureGenerator.categorical(
@@ -181,7 +213,7 @@ class testFeature(unittest.TestCase):
         self.assertEqual(
             feature.change_to_missing(categoricals(  # type: ignore
                 self._categorical_data[0])).normalized,
-            tuple([0]*len(self._categorical_data)))
+            tuple([0] * len(self._categorical_data)))
 
         set_ = feature.FeatureSet(
             feature.FeatureGenerator.categorical(
@@ -191,7 +223,7 @@ class testFeature(unittest.TestCase):
         missing_set = feature.change_set_to_missing(set_)
         self.assertEqual(
             next(iter(missing_set)).normalized,
-            tuple([0]*len(self._categorical_data)))
+            tuple([0] * len(self._categorical_data)))
 
         with self.assertRaises(TypeError):
             feature.change_to_missing(
