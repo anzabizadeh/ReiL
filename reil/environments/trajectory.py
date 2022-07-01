@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import Entity, InteractionProtocol
-from reil.datatypes.feature_array_dumper import FeatureSetDumper
+from reil.datatypes.feature_set_dumper import FeatureSetDumper
 from reil.environments.single import Single
 from reil.environments.task import Task
 from reil.subjects.subject import Subject

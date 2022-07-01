@@ -15,7 +15,7 @@ from typing import (Any, Callable, DefaultDict, Dict, Generic, List, Optional,
 
 import pandas as pd
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
-from reil.datatypes.feature_array_dumper import FeatureSetDumper
+from reil.datatypes.feature_set_dumper import FeatureSetDumper
 
 SubComponentInfo = Tuple[Callable[..., Dict[str, Any]], Tuple[str, ...]]
 

@@ -54,7 +54,7 @@ SecondayComponent:
 from . import buffers  # noqa: W601
 from .feature import (Feature, FeatureSet, FeatureGenerator,  # noqa: W601
                       FeatureGeneratorSet, FeatureGeneratorType)
-from .feature_array_dumper import FeatureSetDumper  # noqa: W0611
+from .feature_set_dumper import FeatureSetDumper  # noqa: W0611
 from .components import (ActionSet, Reward, State,  # noqa: W601
                          SecondayComponent, Statistic)
 from .dataclasses import (Entity, History, InteractionProtocol,  # noqa: W601

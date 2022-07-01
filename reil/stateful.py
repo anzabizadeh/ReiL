@@ -41,7 +41,7 @@ from reil.datatypes.components import (State, Statistic,
                                        SubComponentInfo)
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import Feature, FeatureSet, NoneFeature
-from reil.datatypes.feature_array_dumper import FeatureSetDumper
+from reil.datatypes.feature_set_dumper import FeatureSetDumper
 from reil.utils.metrics import MetricProtocol
 from reil.utils.tf_utils import SummaryWriter
 

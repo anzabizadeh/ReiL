@@ -16,7 +16,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple, TypeVar, Union
 
 import dill as pickle
 from reil import stateful
-from reil.datatypes.feature_array_dumper import FeatureSetDumper
+from reil.datatypes.feature_set_dumper import FeatureSetDumper
 from reil.serialization import PickleMe
 from reil.utils.instance_generator import InstanceGenerator
 

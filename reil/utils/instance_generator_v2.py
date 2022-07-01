@@ -13,7 +13,7 @@ from typing import (Any, Callable, Dict, Generic, Iterable, Iterator, Optional,
                     Tuple, Type, TypeVar, Union)
 
 from reil import reilbase, stateful
-from reil.datatypes.feature_array_dumper import FeatureSetDumper
+from reil.datatypes.feature_set_dumper import FeatureSetDumper
 from reil.datatypes.mock_statistic import MockStatistic
 
 T = TypeVar('T', bound=stateful.Stateful)
