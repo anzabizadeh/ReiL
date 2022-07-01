@@ -236,6 +236,7 @@ class FeatureGenerator:
     lower: Optional[Any] = None
     upper: Optional[Any] = None
     step: Optional[Any] = None
+    fixed_values: Optional[Tuple[Any, ...]] = None
     normalizer: Optional[Any] = dataclasses.field(
         default=None, init=False, repr=False, compare=False)
     randomized: Optional[bool] = True
@@ -272,6 +273,19 @@ class FeatureGenerator:
             name=name, is_numerical=True, lower=lower, upper=upper, step=step,
             generator=generator, randomized=randomized,
             allow_missing=False)
+
+    @classmethod
+    def numerical_fixed_values(
+            cls, name: str,
+            fixed_values: Tuple[float, ...],
+            lower: Optional[float] = None, upper: Optional[float] = None,
+            generator: Optional[Callable[
+                [FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None,
+            randomized: Optional[bool] = None):
+        return cls(
+            name=name, is_numerical=True, lower=lower, upper=upper,
+            fixed_values=fixed_values, generator=generator,
+            randomized=randomized, allow_missing=False)
 
     @classmethod
     def categorical(
@@ -331,10 +345,11 @@ class FeatureGenerator:
                     self.upper is not None or
                     self.step is not None or
                     self.mean is not None or
-                    self.stdev is not None):
+                    self.stdev is not None or
+                    self.fixed_values is not None):
                 raise ValueError(
                     'Categorical type cannot have any of '
-                    'lower, upper, step, mean, or stdev.')
+                    'lower, upper, step, mean, stdev, or fixed_values.')
 
             probabilities = self.probabilities
             categories = self.categories
@@ -423,8 +438,11 @@ class FeatureGenerator:
 
             self.__dict__['normalizer'] = normalizer
 
-            if (lower is not None and upper is not None and step is not None):
-                self.__dict__['count'] = int((upper - lower) / step) + 1
+            if (lower is not None and upper is not None):
+                if step is not None:
+                    self.__dict__['count'] = int((upper - lower) / step) + 1
+                elif self.fixed_values is not None:
+                    self.__dict__['count'] = len(self.fixed_values)
 
     def _call_categorical(
             self, value: Union[Any, Tuple[Any, ...], MissingType]
@@ -461,7 +479,7 @@ class FeatureGenerator:
 
         return instance
 
-    def _call_numerical(
+    def _call_numerical(  # noqa: C901
             self, value: Union[Any, Tuple[Any, ...]]
     ) -> Feature:
         normalizer = self.normalizer
@@ -495,12 +513,20 @@ class FeatureGenerator:
             normalized = normalizer(value)  # type: ignore
 
             if self.count is not None:
-                _index = (value - lower) / self.step
-                index = int(_index)
-                if index != _index:
-                    raise ValueError(
-                        f'{value} is not a valid value for this '
-                        'discrete variable.')
+                if self.step:
+                    _index = (value - lower) / self.step
+                    index = int(_index)
+                    if abs(index - _index) > 1e-6:
+                        raise ValueError(
+                            f'{value} is not a valid value for this '
+                            'discrete variable.')
+                elif self.fixed_values:
+                    try:
+                        index = self.fixed_values.index(value)
+                    except ValueError:
+                        raise ValueError(
+                            f'{value} is not a valid value for this '
+                            'fixed value variable.')
 
         instance: Feature = \
             Feature.numerical(
@@ -520,10 +546,13 @@ class FeatureGenerator:
             lower = self.lower
             step = self.step
             count = self.count
-            iterator = (
-                lower + i * step  # type: ignore
-                for i in range(count)
-            )
+            if step is not None:
+                iterator = (
+                    lower + i * step  # type: ignore
+                    for i in range(count)
+                )
+            else:
+                iterator = self.fixed_values
         else:
             iterator = self.categories or ()
 
@@ -544,10 +573,15 @@ class FeatureGenerator:
         if self.count is None:
             raise TypeError('Feature is not iterable.')
         if self.is_numerical:
-            iterator = {
-                i * self.step: i  # type: ignore
-                for i in range(self.count)
-            }
+            if self.step is not None:
+                iterator = {
+                    i * self.step: i  # type: ignore
+                    for i in range(self.count)
+                }
+            else:
+                iterator = {
+                    v: i for i, v in enumerate(self.fixed_values)
+                }
         else:
             iterator = {v: i for i, v in enumerate(self.categories or ())}
 
@@ -564,6 +598,9 @@ class FeatureGenerator:
                 raise IndexError('No categories defined.')
             else:
                 return self.__call__(self.categories[index])
+
+        if self.step is None:
+            return self.__call__(self.fixed_values[index])
 
         return self.__call__(self.lower + index * self.step)  # type: ignore
 
@@ -759,6 +796,18 @@ class FeatureSet:
             splitted_list = list(FeatureSet(v) for v in self._data.values())
 
         return splitted_list
+
+    def pop(self, k: str):
+        v = self._data.pop(k)
+        if self._index is not None:
+            self._index = None
+
+        return v
+
+    def __delitem__(self, k: str):
+        del self._data[k]
+        if self._index is not None:
+            self._index = None
 
     def __iter__(self):
         return iter(self._data.values())
