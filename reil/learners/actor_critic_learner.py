@@ -322,7 +322,6 @@ class DeepA2CActionProximityModel(DeepA2CModel):
             entropy_loss_coef: float = 0.,
             effect_widths: Union[int, Tuple[int, ...]] = 0,
             effect_decay_factors: Union[float, Tuple[float, ...]] = 0.,
-            effect_temporal_decay_factors: Union[float, Tuple[float, ...]] = 1.
     ):
         super().__init__(
             output_lengths=output_lengths,
@@ -357,34 +356,17 @@ class DeepA2CActionProximityModel(DeepA2CModel):
         else:
             _effect_decay_factors = effect_decay_factors
 
-        if isinstance(effect_temporal_decay_factors, float):
-            _effect_temporal_decay_factors = (
-                [effect_temporal_decay_factors] * output_heads)
-        elif not effect_temporal_decay_factors:
-            _effect_temporal_decay_factors = [0.] * output_heads
-        elif len(effect_temporal_decay_factors) != output_heads:
-            raise ValueError(
-                'effect_temporal_decay_factors should be a float or '
-                f' a tuple of size {output_heads}.')
-        else:
-            _effect_temporal_decay_factors = effect_temporal_decay_factors
-
         self._effect_widths = tf.constant(
             _effect_widths, name='effect_width', dtype=tf.int32)
         self._effect_decay_factors = tf.constant(
             _effect_decay_factors, name='effect_decay_factors',
             dtype=tf.float32)
-        self._effect_temporal_decay_factors = tf.constant(
-            _effect_temporal_decay_factors,
-            name='effect_temporal_decay_factors', dtype=tf.float32)
 
     def get_config(self) -> Dict[str, Any]:
         config = super().get_config()
         config.update(dict(
             effect_widths=tuple(self._effect_widths.numpy()),
             effect_decay_factors=tuple(self._effect_decay_factors.numpy()),
-            effect_temporal_decay_factors=tuple(
-                self._effect_temporal_decay_factors.numpy()),
         ))
 
         return config
@@ -481,8 +463,7 @@ class DeepA2CActionProximityModel(DeepA2CModel):
                             self._effect_decay_factors, j_one_hot, 2)[1][0]
                         effect = tf.pow(
                             effect_decay, abs_diff
-                        )  # * tf.pow(
-                        #    self._effect_temporal_decay_factors[j], abs_diff)
+                        )
 
                         _loss = -tf.reduce_sum(
                             effect * advantage_in_range * log_prob_in_range)
@@ -578,8 +559,7 @@ class DeepA2CActionProximityModel(DeepA2CModel):
                     abs_diff = tf.cast(tf.abs(diff), dtype=tf.float32)
                     effect = tf.pow(
                         tf.gather(self._effect_decay_factors, j), abs_diff
-                    )  # * tf.pow(
-                    #    self._effect_temporal_decay_factors[j], abs_diff)
+                    )
 
                     _loss = -tf.reduce_sum(
                         effect * advantage_in_range * log_prob_in_range)
