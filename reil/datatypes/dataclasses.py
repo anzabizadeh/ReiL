@@ -32,6 +32,19 @@ class Entity:
             self.__dict__['aggregators'] = tuple(self.aggregators)
 
 
+@dataclasses.dataclass(frozen=True)
+class LookaheadPlan:
+    '''
+    The datatype to specify lookahead plan.
+    Used in `InteractionProtocol`.
+    '''
+    action: Literal['fixed', 'training', 'optimal'] = 'fixed'
+    steps: int = 1
+    subject_count: int = 1
+    perturb_subject: bool = False
+    branch_on_each_node: bool = False
+
+
 @dataclasses.dataclass
 class InteractionProtocol:
     '''
@@ -45,6 +58,7 @@ class InteractionProtocol:
     reward_name: str
     n: int
     unit: Literal['interaction', 'instance', 'iteration']
+    lookahead: Optional[LookaheadPlan] = None
 
 
 @dataclasses.dataclass
