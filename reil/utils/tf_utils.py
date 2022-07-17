@@ -103,10 +103,11 @@ class TF2UtilsMixin(reilbase.ReilBase):
             layer_sizes: Tuple[int, ...],
             activation: Union[str, Callable[[tf.Tensor], tf.Tensor], None],
             layer_name_format: str,
-            start_index: int = 1):
+            start_index: int = 1, **kwargs):
         return [
             keras.layers.Dense(
-                v, activation=activation, name=layer_name_format.format(i=i))
+                v, activation=activation, name=layer_name_format.format(i=i),
+                **kwargs)
             for i, v in enumerate(layer_sizes, start_index)]
 
     @staticmethod
@@ -115,10 +116,11 @@ class TF2UtilsMixin(reilbase.ReilBase):
             layer_sizes: Tuple[int, ...],
             activation: Union[str, Callable[[tf.Tensor], tf.Tensor]],
             layer_name_format: str = 'layer_{i:0>2}',
-            start_index: int = 1):
+            start_index: int = 1, **kwargs):
         '''Build a feedforward dense network.'''
         layers = TF2UtilsMixin.mpl_layers(
-            layer_sizes[:-1], activation, layer_name_format, start_index)
+            layer_sizes[:-1], activation, layer_name_format,
+            start_index, **kwargs)
         x = input_
         for layer in layers:
             x = layer(x)
