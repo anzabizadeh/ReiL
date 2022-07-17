@@ -201,7 +201,7 @@ class HealthSubject(Subject):
                 for i in range(self._day, self._day + current_interval)
             },
             measurement_days=list(
-                range(self._day + 1, self._day + current_interval + 1)
+                range(self._day, self._day + current_interval + 1)
             )
         )[self._measurement_name]
 

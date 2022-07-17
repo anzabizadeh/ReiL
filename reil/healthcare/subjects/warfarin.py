@@ -48,7 +48,12 @@ state_definitions: Dict[str, DefComponents] = {
         ('dose_history', {'length': 4}),
         ('INR_history', {'length': 4}),
         ('interval_history', {'length': 4})),
-
+    **{
+        f'no_patient_w_dosing_{i:02}': (
+            ('dose_history', {'length': i}),
+            ('INR_history', {'length': i + 1}),
+            ('interval_history', {'length': i}))
+        for i in range(1, 4)},
     **{
         f'patient_w_dosing_{i:02}': (
             *patient_basic,
@@ -56,15 +61,16 @@ state_definitions: Dict[str, DefComponents] = {
             ('dose_history', {'length': i}),
             ('INR_history', {'length': i + 1}),
             ('interval_history', {'length': i}))
-        for i in range(1, 10)},
+        for i in range(1, 4)},
+
     **{
-        f'old_patient_w_dosing_{i:02}': (
-            *patient_basic,
+        f'patient_w_dosing_w_baseline_{i:02}': (
+            *patient_basic, *patient_extra,
             ('day', {}),
             ('dose_history', {'length': i}),
-            ('INR_history', {'length': i}),
+            ('INR_history', {'length': i + 1}),
             ('interval_history', {'length': i}))
-        for i in range(1, 10)},
+        for i in range(1, 4)},
 
     'patient_w_full_dosing': (
         *patient_w_sensitivity,
@@ -187,6 +193,14 @@ class Warfarin(HealthSubject):
         config['INR_range'] = config.pop('measurement_range')
 
         return config
+
+    def copy(self, perturb: bool = False) -> FeatureSet:
+        copied_subject = super().copy(perturb=False)
+
+        if perturb:
+            copied_subject._patient._model.perturb(day=self._day)
+
+        return copied_subject
 
     def _generate_state_defs(self):
         current_defs = self.state.definitions

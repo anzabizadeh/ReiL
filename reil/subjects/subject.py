@@ -6,6 +6,7 @@ subject class
 This `subject` class is the base class of all subject classes.
 '''
 
+import copy
 from abc import abstractmethod
 from typing import Any, Dict, Optional
 
@@ -107,6 +108,22 @@ class Subject(stateful.Stateful):
 
         taken_action = self._take_effect(action, _id)
         return taken_action
+
+    def copy(self, perturb: bool = False) -> 'Subject':
+        '''
+        Returns a copy of the subject.
+
+        Arguments
+        ---------
+        perturb:
+            `False` should return an exact copy. `True` should be a subject
+            with the same current `state`, but other attributes might change
+            depending on the implementation.
+        '''
+        if perturb:
+            raise NotImplementedError
+
+        return copy.deepcopy(self)
 
     @abstractmethod
     def _take_effect(

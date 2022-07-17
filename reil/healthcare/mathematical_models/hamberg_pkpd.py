@@ -169,7 +169,6 @@ class HambergPKPD(HealthMathModel):
         """
         self._randomized = randomized
         self._cache_size = math.ceil(cache_size)
-        self._last_computed_day: int = 0
         self._cached_cs: Dict[float, List[float]] = {}
         self._age = None
 
@@ -319,8 +318,9 @@ class HambergPKPD(HealthMathModel):
         self._ktr = np.array([ktr1] * 6 + [0.0, ktr2])  # type: ignore
         self._EC_50_gamma = self._EC_50 ** self._gamma
 
-        self._A = np.array([0.0] + [1.0] * 8)  # type: ignore
-        self._last_computed_day = 0
+        self._A: Dict[int, np.array] = {
+            0: np.array([0.0] + [1.0] * 8)  # type: ignore
+        }
 
         self._dose_records: Dict[int, DoseEffect] = {}
         self._computed_INRs: Dict[int, float] = {}  # daily
@@ -442,12 +442,14 @@ class HambergPKPD(HealthMathModel):
         # if a dose is added ealier in the list, INRs should be updated all
         # together because the history of "A" array is not kept.
         try:
-            if self._last_computed_day > min(dose.keys()):
-                self._last_computed_day = 0
+            first_day = min(dose)
+            for d in [d for d in self._computed_INRs if d > first_day]:
+                del self._computed_INRs[d]
+                del self._A[d]
         except ValueError:  # no doses
             pass
 
-        if max(dose or {0: 0.0}) >= self._current_cache_size:
+        if max(dose or (0,)) >= self._current_cache_size:
             segment_count = (
                 max(dose) - self._current_cache_size
             ) // self._cache_size + 1
@@ -498,25 +500,24 @@ class HambergPKPD(HealthMathModel):
             self._expand_caches(segment_count=segment_count)
 
         not_computed_days = set(days).difference(self._computed_INRs)
-        if (not_computed_days and
-                min(not_computed_days) < self._last_computed_day):
-            self._last_computed_day = int(0)
-            self._computed_INRs = {}
-            not_computed_days = days
 
-        if self._last_computed_day == 0:
-            self._A = np.array([0.0] + [1.0] * 8)  # type: ignore
+        if not_computed_days:
+            last_computed_day = max(self._computed_INRs or {0: 0.0})
+            if last_computed_day > min(not_computed_days):
+                self._computed_INRs = {}
+                self._A = {0: np.array([0.0] + [1.0] * 8)}  # type: ignore
+                last_computed_day = 0
+                not_computed_days = days
+        else:
+            return [self._computed_INRs[i] for i in days]
 
-        stop_points = [self._last_computed_day] + sorted(
-            list(not_computed_days))
-        self._last_computed_day = stop_points[-1]
+        stop_points = [last_computed_day] + sorted(list(not_computed_days))
 
         start_day = stop_points[0]
         start_point = start_day * HambergPKPD._per_day
         all_points = list(range(
             math.floor(start_point),
             math.ceil(stop_points[-1] * HambergPKPD._per_day)))
-
         Cs_gamma = np.power(  # type: ignore
             self._total_cs[all_points] *
             self._err_list[all_points],  # type: ignore
@@ -525,7 +526,7 @@ class HambergPKPD(HealthMathModel):
             HambergPKPD._E_max * Cs_gamma,  # type: ignore
             self._EC_50_gamma + Cs_gamma)
 
-        A = self._A
+        A = self._A[stop_points[0]].copy()
         ktr = self._ktr
         for d1, d2 in zip(stop_points[:-1], stop_points[1:]):
             steps = range(
@@ -540,8 +541,7 @@ class HambergPKPD(HealthMathModel):
                 HambergPKPD._INR_max * np.power(  # type: ignore
                     1.0 - A[6] * A[8], HambergPKPD._lambda),
                 self._exp_e_INR_list[int(d2)])  # type: ignore
-
-        self._A = A
+            self._A[d2] = A.copy()
 
         return [self._computed_INRs[i] for i in days]
 
@@ -607,3 +607,26 @@ class HambergPKPD(HealthMathModel):
             instance.prescribe(config['dose'])
 
             return instance
+
+    def perturb(self, **kwargs) -> None:
+        day = kwargs['day']
+        per_day = self._per_day
+        segment_count = self._current_cache_size // self._cache_size
+        self._err_list = np.concatenate(
+            [
+                self._err_list[:day * per_day],
+                np.concatenate(
+                    [self._gen_err() for _ in range(segment_count)],
+                    axis=0)[day * per_day:]],
+            axis=0)
+        self._exp_e_INR_list = np.concatenate(
+            [
+                self._exp_e_INR_list[:day],
+                np.concatenate(
+                    [self._gen_exp_e_INR() for _ in range(segment_count)],
+                    axis=0)[day:]],
+            axis=0)
+        for d in [d for d in self._computed_INRs if d > day]:
+            del self._computed_INRs[d]
+            del self._A[d]
+        self._expand_caches(0)

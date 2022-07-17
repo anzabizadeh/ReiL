@@ -69,3 +69,6 @@ class HealthMathModel:
             A dictionary of model's return values.
         '''
         raise NotImplementedError
+
+    def purturb(self, **kwargs) -> None:
+        raise NotImplementedError
