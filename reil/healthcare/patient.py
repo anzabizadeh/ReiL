@@ -112,10 +112,7 @@ class Patient:
         return self._model.run(**inputs)
 
     def __setstate__(self, state):
-        self.__dict__ = self.from_config(dict(
-            feature_gen_set=state['feature_gen_set'],
-            sensitivity_gen=state['_sensitivity_gen'],
-            randomized=state['_randomized'],
-            feature_set=state['feature_set'],
-            model=state['_model']
-        )).__dict__
+        self.__dict__ = self.from_config(state).__dict__
+
+    def __getstate__(self):
+        return self.get_config()

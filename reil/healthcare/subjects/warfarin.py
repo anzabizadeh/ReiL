@@ -7,7 +7,7 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 '''
 
 import functools
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
 from reil.healthcare.patient import Patient
@@ -194,13 +194,19 @@ class Warfarin(HealthSubject):
 
         return config
 
-    def copy(self, perturb: bool = False) -> FeatureSet:
-        copied_subject = super().copy(perturb=False)
+    def copy(
+        self, perturb: bool = False, n: Optional[int] = None
+    ) -> List['Warfarin']:
+        copied_subjects = super().copy(perturb=False, n=n)
 
         if perturb:
-            copied_subject._patient._model.perturb(day=self._day)
+            if n is None:
+                copied_subjects._patient._model.perturb(day=self._day)
+            else:
+                for c in copied_subjects:
+                    c._patient._model.perturb(day=self._day)
 
-        return copied_subject
+        return copied_subjects
 
     def _generate_state_defs(self):
         current_defs = self.state.definitions
