@@ -127,3 +127,9 @@ class EntityRegister:
 
     def __contains__(self, _id: int) -> bool:
         return _id in self._id_list
+
+    def __getitem__(self, _id: int) -> str:
+        return self._entity_list[self._id_list.index(_id)]
+
+    def get_id(self, entity: str) -> int:
+        return self._id_list[self._entity_list.index(entity)]
