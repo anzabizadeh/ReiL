@@ -279,7 +279,7 @@ class DeepA2CModel(keras.Model):
         # else:
         #     tf.summary.trace_on(graph=True, profiler=True)
         #     gradient = self._gradients(_X, _Y, G)
-        #     with self._train_summary_writer.as_default():
+        #     with self._summary_writer.as_default():
         #         tf.summary.trace_export(
         #             name='gradient',
         #             step=0,
@@ -615,17 +615,9 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
                 tensorboard_path or './logs')
             self._tensorboard_filename = current_time + (
                 f'-{tensorboard_filename}' or '')
-            self._train_summary_writer = \
+            self._summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                    str(
-                        self._tensorboard_path /
-                        self._tensorboard_filename / 'train'))
-
-            # self._validation_summary_writer = \
-            #     tf.summary.create_file_writer(  # type: ignore
-            #     str(
-            #         self._tensorboard_path /
-            #         self._tensorboard_filename / 'validation'))
+                    str(self._tensorboard_path / self._tensorboard_filename))
 
     def predict(
             self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
@@ -673,25 +665,10 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         metrics = self._model.fit(
             x=_X, y=(_Y, G), verbose=0).history  # type: ignore
 
-        if self._train_summary_writer:
-            training_metrics = {
-                key: value
-                for key, value in metrics.items()
-                if not key.startswith('val_')}
-
-            # validation_metrics = {
-            #     key[4:]: value
-            #     for key, value in metrics.items()
-            #     if key.startswith('val_')}
-
-            with self._train_summary_writer.as_default(step=self._iteration):
-                for name, value in training_metrics.items():
+        if self._summary_writer:
+            with self._summary_writer.as_default(step=self._iteration):
+                for name, value in metrics.items():
                     tf.summary.scalar(name, value[0])
-
-            # with self._validation_summary_writer.as_default(
-            #         step=self._iteration):
-            #     for name, value in validation_metrics.items():
-            #         tf.summary.scalar(name, value[0])
 
         self._iteration += 1
 
@@ -705,22 +682,14 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
 
     def __getstate__(self):
         state = super().__getstate__()
-        state['_train_summary_writer'] = None
-        # state['_validation_summary_writer'] = None
+        state['_summary_writer'] = None
+
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         super().__setstate__(state)
 
         if self._tensorboard_path:
-            self._train_summary_writer = \
+            self._summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                    str(
-                        self._tensorboard_path /
-                        self._tensorboard_filename / 'train'))
-
-            # self._validation_summary_writer = \
-            #     tf.summary.create_file_writer(  # type: ignore
-            #     str(
-            #         self._tensorboard_path /
-            #         self._tensorboard_filename / 'validation'))
+                    str(self._tensorboard_path / self._tensorboard_filename))
