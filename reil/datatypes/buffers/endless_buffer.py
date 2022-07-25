@@ -31,7 +31,9 @@ class EndlessBuffer(Buffer[T1, T2]):
         pick_mode:
             The default mode to pick items from the list.
         '''
-        self.setup(buffer_names=buffer_names, pick_mode=pick_mode)
+        super().__init__(
+            buffer_names=buffer_names, pick_mode=pick_mode)
+        self._buffer_size = -1
 
     def setup(
             self, buffer_size: Optional[int] = None,
