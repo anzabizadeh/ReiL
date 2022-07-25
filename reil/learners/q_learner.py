@@ -34,6 +34,9 @@ class DeepQModel(keras.Model):
         self._hidden_layer_sizes = hidden_layer_sizes
         self._learning_rate = learning_rate
 
+        self._max_layer = MaxLayer(name='max')
+        self._argmax_layer = ArgMaxLayer(name='argmax')
+
     def build(self, input_shape: Tuple[Tuple[int, ...], Tuple[int, ...]]):
         self._state_shape = [None, *input_shape[0][1:]]
         self._action_shape = [None, *input_shape[1][1:]]
@@ -46,9 +49,6 @@ class DeepQModel(keras.Model):
             for i, size in enumerate(self._hidden_layer_sizes, 1)]
 
         self._output = keras.layers.Dense(1, name='Q')
-
-        self._max_layer = MaxLayer(name='max')
-        self._argmax_layer = ArgMaxLayer(name='argmax')
 
         # self._model = keras.Model(self._inputs, self._output, name='Q_network')
         # self._max = keras.Model(self._inputs, max_layer, name='max_Q')
@@ -74,6 +74,8 @@ class DeepQModel(keras.Model):
             tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='states'),
             tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='actions')),))
     def max(self, inputs):
+        if not self.built:
+            self.build(tf.shape(inputs))
         return self._max_layer(self(inputs))
 
     @tf.function(
@@ -191,12 +193,11 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             self._tensorboard_path = pathlib.PurePath(
                 tensorboard_path or './logs')
-            filename = current_time + (f'-{tensorboard_filename}' or '')
-
-            self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path / filename)
-            # , histogram_freq=1)  #, write_images=True)
-            self._callbacks.append(self._tensorboard)
+            self._tensorboard_filename = current_time + (
+                f'-{tensorboard_filename}' or '')
+            self._summary_writer = \
+                tf.summary.create_file_writer(  # type: ignore
+                    str(self._tensorboard_path / self._tensorboard_filename))
 
     @classmethod
     def _empty_instance(cls):  # type: ignore
@@ -223,8 +224,9 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
     def max(
             self, states: Tuple[FeatureSet, ...],
             actions: Tuple[FeatureSet, ...]) -> float:
-        return self._model.max([
-            self.convert_to_tensor(states), self.convert_to_tensor(actions)])
+        inputs = [
+            self.convert_to_tensor(states), self.convert_to_tensor(actions)]
+        return self._model.max(inputs)
 
     def predict(
             self, X: Tuple[Tuple[FeatureSet, ...], ...],
@@ -250,11 +252,17 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
 
         self._iteration += 1
 
-        return self._model.fit(  # type: ignore
+        metrics = self._model.fit(  # type: ignore
             _X, tf.convert_to_tensor(Y),  # type: ignore
             initial_epoch=self._iteration, epochs=self._iteration + 1,
-            callbacks=self._callbacks,
             verbose=0).history
+
+        if self._summary_writer:
+            with self._summary_writer.as_default(step=self._iteration):
+                for name, value in metrics.items():
+                    tf.summary.scalar(name, value[0])
+
+        return metrics
 
     def get_parameters(self) -> Any:
         return self._model.get_weights()
@@ -267,6 +275,20 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
         reset the learner.
         '''
         self._iteration += 1
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        state['_summary_writer'] = None
+
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+
+        if self._tensorboard_path:
+            self._summary_writer = \
+                tf.summary.create_file_writer(  # type: ignore
+                    str(self._tensorboard_path / self._tensorboard_filename))
 
 
 if tf.__version__[0] == '1':  # type: ignore
