@@ -5,14 +5,14 @@ DeepQLearning class
 
 A Q-learning `agent` with a Neural Network Q-function approximator.
 '''
-from typing import Any, Literal, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
-
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
-from reil.datatypes.feature import FeatureSet
+from reil.datatypes.dataclasses import LookaheadData
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.q_learner import QLearner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
@@ -30,7 +30,7 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
             learner: QLearner,
             buffer: Buffer[FeatureSet, float],
             exploration_strategy: Union[float, ExplorationStrategy],
-            method: Literal['forward', 'backward'] = 'backward',
+            # method: Literal['forward', 'backward'] = 'backward',
             default_actions: Tuple[FeatureSet, ...] = (),
             **kwargs: Any):
         '''
@@ -63,16 +63,16 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
             **kwargs)
         self._learner: QLearner
 
-        self._method: Literal['forward', 'backward'] = method
-        if method not in ('backward', 'forward'):
-            self._logger.warning(
-                f'method {method} is not acceptable. Should be '
-                'either "forward" or "backward". Will use "backward".')
-            self._method = 'backward'
+        # self._method: Literal['forward', 'backward'] = method
+        # if method not in ('backward', 'forward'):
+        #     self._logger.warning(
+        #         f'method {method} is not acceptable. Should be '
+        #         'either "forward" or "backward". Will use "backward".')
+        #     self._method = 'backward'
 
-        if method == 'forward' and not default_actions:
-            raise ValueError(
-                'forward method requires `default_actions` to be non-empty.')
+        # if method == 'forward' and not default_actions:
+        #     raise ValueError(
+        #         'forward method requires `default_actions` to be non-empty.')
 
         self._default_actions = default_actions
         self._buffer = buffer
@@ -109,7 +109,9 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
         '''
         return self._learner.predict((states, actions))
 
-    def _max_q(self, state: FeatureSet) -> float:
+    def _max_q(
+            self, state: FeatureSet,
+            possible_actions: Optional[FeatureGeneratorType] = None) -> float:
         '''
         Return `max(Q)` of one state or a list of states.
 
@@ -121,12 +123,34 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
 
         :meta public:
         '''
+        if possible_actions is None:
+            actions = self._default_actions
+        else:
+            actions = tuple(possible_actions.send('return feature exclusive'))
         try:
-            max_q = self._learner.max((state,), self._default_actions)
+            max_q = self._learner.max((state,), actions)
         except ValueError:
             max_q = 0.0
 
         return max_q
+
+    def _compute_lookahead_term(
+            self, lookahead_data: Optional[LookaheadData], gamma: float):
+        if lookahead_data is None:
+            return 0.0
+        return sum(
+            sum(
+                (gamma ** n) * obs.reward
+                for n, obs in enumerate(subject_i[:-1], 1)
+            ) + (
+                gamma ** len(subject_i) * self._max_q(
+                    subject_i[-1].state, subject_i[-1].possible_actions)
+                if subject_i[-1].possible_actions is not None
+                else 0.0
+            )
+            for subject_i in lookahead_data
+            if subject_i
+        ) / len(lookahead_data)
 
     def _prepare_training(
             self, history: History) -> TrainingData[Tuple[FeatureSet, ...], float]:
@@ -146,44 +170,22 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
 
         :meta public:
         '''
-        state: FeatureSet
-        action: FeatureSet
-        next_state: FeatureSet
-        reward: float
-
-        discount_factor = self._discount_factor
         active_history = self.get_active_history(history)
 
-        if self._method == 'forward':
-            for i, h in enumerate(active_history):
-                state = h.state  # type: ignore
-                action = (h.action_taken or h.action).feature  # type: ignore
-                reward = h.reward or 0.0
+        discounted_next_q = [(
+            self._discount_factor * self._max_q(h.state, h.possible_actions)
+            if h.lookahead is None
+            else self._compute_lookahead_term(h.lookahead, self._discount_factor)
+        ) for h in active_history[1:]
+        ]
 
-                try:
-                    next_state = history[i + 1].state  # type: ignore
-                    new_q = reward + discount_factor * \
-                        self._max_q(next_state)
-                except IndexError:
-                    new_q = reward
+        discounted_next_q.append(0.0)
 
-                self._buffer.add(
-                    {'state': state, 'action': action, 'Y': new_q})
-
-        else:  # backward
-            rewards = self.extract_reward(active_history)
-            disc_reward = self.discounted_cum_sum(rewards, discount_factor)
-
-            # for h, r in zip(active_history, disc_reward):
-            #     state = h.state  # type: ignore
-            #     action = h.action_taken or h.action  # type: ignore
-            #     self._buffer.add(
-            #         {'state': state, 'action': action, 'Y': r})
-            self._buffer.add_iter({
-                'state': h.state,
-                'action': h.action_taken or h.action,
-                'Y': r
-            } for h, r in zip(active_history, disc_reward))
+        self._buffer.add_iter({
+            'state': h.state,
+            'action': h.action_taken or h.action,
+            'Y': (h.reward or 0.0) + _q
+        } for h, _q in zip(active_history, discounted_next_q))
 
         temp = self._buffer.pick()
 

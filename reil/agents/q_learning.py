@@ -8,13 +8,14 @@ A Q-learning `agent`.
 
 '''
 
-from typing import Any, Literal, Tuple, Union
+from typing import Any, Tuple, Optional, Union
 
 import numpy as np
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
-from reil.datatypes.feature import FeatureSet
+from reil.datatypes.dataclasses import LookaheadData
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.learner import Learner, LearnerProtocol
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
@@ -32,7 +33,7 @@ class QLearning(Agent[FeatureSet, float]):
             learner: LearnerProtocol[FeatureSet, float],
             buffer: Buffer[FeatureSet, float],
             exploration_strategy: Union[float, ExplorationStrategy],
-            method: Literal['forward', 'backward'] = 'backward',
+            # method: Literal['forward', 'backward'] = 'backward',
             default_actions: Tuple[FeatureSet, ...] = (),
             **kwargs: Any):
         '''
@@ -64,16 +65,16 @@ class QLearning(Agent[FeatureSet, float]):
             variable_action_count=True,
             **kwargs)
 
-        self._method: Literal['forward', 'backward'] = method
-        if method not in ('backward', 'forward'):
-            self._logger.warning(
-                f'method {method} is not acceptable. Should be '
-                'either "forward" or "backward". Will use "backward".')
-            self._method = 'backward'
+        # self._method: Literal['forward', 'backward'] = method
+        # if method not in ('backward', 'forward'):
+        #     self._logger.warning(
+        #         f'method {method} is not acceptable. Should be '
+        #         'either "forward" or "backward". Will use "backward".')
+        #     self._method = 'backward'
 
-        if method == 'forward' and not default_actions:
-            raise ValueError(
-                'forward method requires `default_actions` to be non-empty.')
+        # if method == 'forward' and not default_actions:
+        #     raise ValueError(
+        #         'forward method requires `default_actions` to be non-empty.')
 
         self._default_actions = default_actions
         self._buffer = buffer
@@ -138,7 +139,9 @@ class QLearning(Agent[FeatureSet, float]):
 
         return self._learner.predict(x)
 
-    def _max_q(self, state: Feature_or_Tuple_of_Feature) -> float:
+    def _max_q(
+            self, state: Feature_or_Tuple_of_Feature,
+            possible_actions: Optional[FeatureGeneratorType] = None) -> float:
         '''
         Return `max(Q)` of one state or a list of states.
 
@@ -150,13 +153,35 @@ class QLearning(Agent[FeatureSet, float]):
 
         :meta public:
         '''
+        if possible_actions is None:
+            actions = self._default_actions
+        else:
+            actions = tuple(possible_actions.send('return feature exclusive'))
         try:
-            q_values = self._q(state, self._default_actions)
+            q_values = self._q(state, actions)
             max_q: float = np.max(q_values)  # type: ignore
         except ValueError:
             max_q = 0.0
 
         return max_q
+
+    def _compute_lookahead_term(
+            self, lookahead_data: Optional[LookaheadData], gamma: float):
+        if lookahead_data is None:
+            return 0.0
+        return sum(
+            sum(
+                (gamma ** n) * obs.reward
+                for n, obs in enumerate(subject_i[:-1], 1)
+            ) + (
+                gamma ** len(subject_i) * self._max_q(
+                    subject_i[-1].state, subject_i[-1].possible_actions)
+                if subject_i[-1].possible_actions is not None
+                else 0.0
+            )
+            for subject_i in lookahead_data
+            if subject_i
+        ) / len(lookahead_data)
 
     def _prepare_training(
             self, history: History) -> TrainingData[FeatureSet, float]:
@@ -176,57 +201,51 @@ class QLearning(Agent[FeatureSet, float]):
 
         :meta public:
         '''
-        state: FeatureSet
-        action: FeatureSet
-        next_state: FeatureSet
-        reward: float
+        active_history = self.get_active_history(history)
 
-        discount_factor = self._discount_factor
+        discounted_next_q = [(
+            self._discount_factor * self._max_q(h.state, h.possible_actions)
+            if h.lookahead is None
+            else self._compute_lookahead_term(h.lookahead, self._discount_factor)
+        ) for h in active_history[1:]
+        ]
+        discounted_next_q.append(0.0)
 
-        for h in history[:-1]:
-            if h.state is None or (
-                    h.action is None and h.action_taken is None):
-                raise ValueError(f'state and action cannot be None.\n{h}')
+        self._buffer.add_iter({
+            'X': h.state + (h.action_taken or h.action),
+            'Y': (h.reward or 0.0) + _q
+        } for h, _q in zip(active_history, discounted_next_q))
 
-        # When history is one complete trajectory, the last observation
-        # contains only the terminal state. In this case, we don't have an
-        # action and a reward for the last observation, so we do not compute
-        # its new Q value.
-        if history[-1].action is None or history[-1].action_taken is None:
-            active_history = history[:-1]
-        else:
-            active_history = history
+        # if self._method == 'forward':
+        #     ...
+        # else:  # backward
+        #     for i in range(len(active_history) - 1, -1, -1):
+        #         state = active_history[i].state  # type: ignore
+        #         action = (
+        #             active_history[i].action_taken or
+        #             active_history[i].action)  # type: ignore
+        #         reward = active_history[i].reward or 0.0
 
-        if self._method == 'forward':
-            for i, h in enumerate(active_history):
-                state = h.state  # type: ignore
-                action = (h.action_taken or h.action).feature  # type: ignore
-                reward = h.reward or 0.0
+        #         self._buffer.add({
+        #             'X': state + action,
+        #             'Y': reward + discount_factor * next_q[i + 1]})
 
-                try:
-                    next_state = history[i + 1].state  # type: ignore
-                    new_q = reward + discount_factor * \
-                        self._max_q(next_state)
-                except IndexError:
-                    new_q = reward
+        #     # This is left here for reference. In the previous implementation
+        #     # only the reward was back-propagated, and Q was not used.
+        #     # But it seems wrong!
+        #     q_list = [0.0] * 2
+        #     for i in range(len(active_history) - 1, -1, -1):
+        #         state = active_history[i].state  # type: ignore
+        #         action = (
+        #             active_history[i].action_taken or
+        #             active_history[i].action)  # type: ignore
+        #         reward = active_history[i].reward or 0.0
+        #         q_list[0] = reward + discount_factor * q_list[1]
 
-                self._buffer.add(
-                    {'X': state + action, 'Y': new_q})
+        #         self._buffer.add(
+        #             {'X': state + action, 'Y': q_list[0]})
 
-        else:  # backward
-            q_list = [0.0] * 2
-            for i in range(len(active_history) - 1, -1, -1):
-                state = active_history[i].state  # type: ignore
-                action = (
-                    active_history[i].action_taken or
-                    active_history[i].action)  # type: ignore
-                reward = active_history[i].reward or 0.0
-                q_list[0] = reward + discount_factor * q_list[1]
-
-                self._buffer.add(
-                    {'X': state + action, 'Y': q_list[0]})
-
-                q_list[1] = q_list[0]
+        #         q_list[1] = q_list[0]
 
         temp = self._buffer.pick()
 
