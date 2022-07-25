@@ -172,6 +172,8 @@ class AgentBase(Stateful):
                         state=state, subject_id=subject_id,
                         actions=actions, iteration=iteration)
 
+                    # AgentBase do not consider `Lookahead` data, because it
+                    # has no learning mechanism.
                     new_observation.action_taken = (
                         yield new_observation.action)['action_taken']
 

@@ -276,21 +276,24 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
                 new_observation = Observation()
                 temp: Dict[str, Any] = yield
                 state: FeatureSet = temp['state']
-                actions: FeatureGeneratorType = temp['actions']
+                possible_actions: FeatureGeneratorType = temp['possible_actions']
                 iteration: int = temp['iteration']
 
                 new_observation.state = state
+                new_observation.possible_actions = possible_actions
                 if learn_on_state:
                     self._computed_metrics.update(
                         self.learn([history[-1], new_observation]))
 
-                if actions is not None:
+                if possible_actions is not None:
                     new_observation.action = self.act(
                         state=state, subject_id=subject_id,
-                        actions=actions, iteration=iteration)
+                        actions=possible_actions, iteration=iteration)
 
-                    new_observation.action_taken = (
-                        yield new_observation.action)['action_taken']
+                    temp = yield new_observation.action
+
+                    new_observation.action_taken = temp['action_taken']
+                    new_observation.lookahead = temp.get('lookahead')
 
                     if learn_on_action:
                         self._computed_metrics.update(
