@@ -9,7 +9,7 @@ new values. This datatype uses `Entity` to specify an `agent` or a `subject`.
 import dataclasses
 from typing import List, Literal, Optional, Tuple
 
-from reil.datatypes.feature import FeatureSet
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 
 
 @dataclasses.dataclass(frozen=True)
@@ -38,11 +38,14 @@ class LookaheadPlan:
     The datatype to specify lookahead plan.
     Used in `InteractionProtocol`.
     '''
-    action: Literal['fixed', 'training', 'optimal'] = 'fixed'
+    reward_name: str
+    action_type: Literal['fixed', 'training', 'optimal'] = 'fixed'
     steps: int = 1
     subject_count: int = 1
     perturb_subject: bool = False
-    branch_on_each_node: bool = False
+    # Removed 'branch_on_each_node', because it makes the implementation
+    # too complicated
+    # branch_on_each_node: bool = False
 
 
 @dataclasses.dataclass
@@ -65,12 +68,17 @@ class InteractionProtocol:
 class Observation:
     # the state received from the subject
     state: Optional[FeatureSet] = None
+    # the action generator available to the agent
+    possible_actions: Optional[FeatureGeneratorType] = None
     # the action chosen by the agent
     action: Optional[FeatureSet] = None
     # the action taken by the subject
     action_taken: Optional[FeatureSet] = None
+    # lookahead data
+    lookahead: Optional['LookaheadData'] = None
     # the reward of taking the action at the state
     reward: Optional[float] = None
 
 
 History = List[Observation]
+LookaheadData = List[History]
