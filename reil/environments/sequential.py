@@ -191,7 +191,7 @@ class Sequential(Environment):
 
                 agent_name = protocol.agent.name
                 a_s_name = (agent_name, subject_name)
-                agent_id, _ = self._assignment_list[a_s_name]
+                agent_id, subject_id = self._assignment_list[a_s_name]
                 if agent_id is None:
                     raise ValueError(f'{a_s_name} are not assigned!')
 
@@ -203,11 +203,10 @@ class Sequential(Environment):
 
                 args: InteractArgs = {
                     'agent_id': agent_id,
+                    'subject_id': subject_id,
                     'agent_observer': self._agent_observers[a_s_name],
                     'subject_instance': subject_instance,
-                    'state_name': protocol.state_name,
-                    'action_name': protocol.action_name,
-                    'reward_name': protocol.reward_name,
+                    'protocol': protocol,
                     'iteration': self._iterations[subject_name]}
 
                 unit = protocol.unit
@@ -233,7 +232,7 @@ class Sequential(Environment):
                             if subject_demon:
                                 subject_instance = \
                                     self._subject_demons[subject_demon](
-                                            subject_instance)
+                                        subject_instance)
                             args['subject_instance'] = subject_instance
                             args['agent_observer'] = \
                                 self._agent_observers[a_s_name]

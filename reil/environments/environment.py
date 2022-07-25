@@ -8,7 +8,8 @@ on one or more `subjects`.
 '''
 import inspect
 from collections import defaultdict
-from typing import Any, Callable, Dict, Generator, NamedTuple, Optional, Tuple, Union
+from typing import (Any, Callable, Dict, Generator, NamedTuple, Optional,
+                    Tuple, TypeVar, Union)
 
 import pandas as pd
 from reil import stateful
@@ -35,9 +36,12 @@ EntityGenType = Union[
 ]
 
 
+PlanDetails = TypeVar('PlanDetails')
+
+
 class Plan(NamedTuple):
     name: Optional[str] = None
-    plan: Optional[Any] = None
+    plan: Optional[PlanDetails] = None
 
 
 class Environment(stateful.Stateful):
@@ -320,15 +324,13 @@ class Environment(stateful.Stateful):
         '''
         raise NotImplementedError
 
-    @classmethod
     def interact(
-            cls,
+            self,
             agent_id: int,
+            subject_id: int,
             agent_observer: Generator[Union[FeatureSet, None], Any, None],
             subject_instance: Union[Subject, SubjectDemon],
-            state_name: str,
-            action_name: str,
-            reward_name: str,
+            protocol: InteractionProtocol,
             iteration: int,
             times: int = 1) -> None:
         '''
@@ -349,14 +351,8 @@ class Environment(stateful.Stateful):
             An instance of a `subject` that computes reward, determines
             possible actions, and takes the action.
 
-        state_name:
-            A string that specifies the state definition.
-
-        action_name:
-            A string that specifies the action definition.
-
-        reward_name:
-            A string that specifies the reward function definition.
+        protocol:
+            The `InteractionProtocol` that should be used.
 
         iteration:
             The iteration of of the current run. This value is used by the
@@ -377,6 +373,10 @@ class Environment(stateful.Stateful):
         be truncated and returned. In other words, the output will not
         necessarily have a lenght of "times".
         '''
+        state_name = protocol.state_name
+        action_name = protocol.action_name
+        reward_name = protocol.reward_name
+
         for _ in range(times):
             reward = subject_instance.reward(
                 name=reward_name, _id=agent_id)
@@ -400,26 +400,25 @@ class Environment(stateful.Stateful):
                     pass
                 action = agent_observer.send(
                     {'state': state,
-                     'actions': possible_actions,
+                     'possible_actions': possible_actions,
                      'iteration': iteration})
                 action_taken = subject_instance.take_effect(
                     action, agent_id)  # type: ignore
-                agent_observer.send({'action_taken': action_taken})
-                try:
-                    possible_actions.close()
-                except AttributeError:
-                    pass
 
-    @classmethod
+                agent_observer.send({'action_taken': action_taken})
+                # try:
+                #     possible_actions.close()
+                # except AttributeError:
+                #     pass
+
     def interact_while(
-            cls,
+            self,
             agent_id: int,
+            subject_id: int,
             agent_observer: Generator[
                 Union[FeatureSet, None], Any, None],
             subject_instance: Union[Subject, SubjectDemon],
-            state_name: str,
-            action_name: str,
-            reward_name: str,
+            protocol: InteractionProtocol,
             iteration: int) -> None:
         '''
         Allow `agent` and `subject` to interact until `subject` is terminated.
@@ -461,9 +460,9 @@ class Environment(stateful.Stateful):
         instance is run to termination, not the whole generator.
         '''
         while not subject_instance.is_terminated(agent_id):
-            cls.interact(
-                agent_id, agent_observer, subject_instance,
-                state_name, action_name, reward_name, iteration)
+            self.interact(
+                agent_id, subject_id, agent_observer, subject_instance,
+                protocol, iteration)
 
     def assert_protocol(self, protocol: InteractionProtocol) -> None:
         '''
@@ -613,7 +612,7 @@ class Environment(stateful.Stateful):
 
         self._agent_observers[a_s_names].send({'reward': reward})
         self._agent_observers[a_s_names].send(
-            {'state': state, 'actions': None, 'iteration': None})
+            {'state': state, 'possible_actions': None, 'iteration': None})
 
         self._agent_observers[a_s_names].close()
 
