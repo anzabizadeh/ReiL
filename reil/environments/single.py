@@ -12,7 +12,7 @@ from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
 
 import pandas as pd
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import InteractionProtocol
+from reil.datatypes.dataclasses import InteractionProtocol, Observation
 from reil.datatypes.feature import FeatureSet
 from reil.environments.environment import (EntityGenType, EntityType,
                                            Environment)
@@ -151,6 +151,165 @@ class Single(Environment):
         if (plan := self._active_plan.plan):
             self.register_protocol(plan, get_agent_observer=True)
 
+    def interact(  # noqa: C901
+            self,
+            agent_id: int,
+            subject_id: int,
+            agent_observer: Generator[Union[FeatureSet, None], Any, None],
+            subject_instance: Union[Subject, SubjectDemon],
+            protocol: InteractionProtocol,
+            iteration: int,
+            times: int = 1) -> None:
+        '''
+        Allow `agent` and `subject` to interact at most `times` times.
+
+        Attributes
+        ----------
+        agent_id:
+            Agent's ID by which it is registered at the subject.
+
+        subject_id:
+            Subject's ID by which it is registered at the `agent`.
+
+        agent_instance:
+            An instance of an `agent` that takes the action.
+
+        subject_instance:
+            An instance of a `subject` that computes reward, determines
+            possible actions, and takes the action.
+
+        protocol:
+            The `InteractionProtocol` that should be used.
+
+        iteration:
+            The iteration of of the current run. This value is used by the
+            `agent` to determine the action.
+
+        times:
+            The number of times the `agent` and the `subject` should interact.
+
+        Returns
+        -------
+        :
+            A list of subject's reward and state before taking an action
+            and agent's action.
+
+        Notes
+        -----
+        If subject is terminated before "times" iterations, the result will
+        be truncated and returned. In other words, the output will not
+        necessarily have a lenght of "times".
+        '''
+        state_name = protocol.state_name
+        action_name = protocol.action_name
+        reward_name = protocol.reward_name
+        lookahead = protocol.lookahead
+        if lookahead is not None:
+            steps = lookahead.steps
+            subject_count = lookahead.subject_count
+            lookahead_action_type = lookahead.action_type
+            lookahead_reward_name = lookahead.reward_name
+            agent = self._agents[subject_instance._entity_list[agent_id]]
+
+        for _ in range(times):
+            reward = subject_instance.reward(
+                name=reward_name, _id=agent_id)
+            # When dealing with multiple agents, the first agent enables the
+            # reward. Hence, other agent observers cannot get `None` to start.
+            # In such cases, we have to manually feed the generator with a
+            # `None`.
+            try:
+                agent_observer.send(
+                    None if reward is None else {'reward': reward})
+            except TypeError:
+                agent_observer.send(None)
+
+            state = subject_instance.state(name=state_name, _id=agent_id)
+            possible_actions = subject_instance.possible_actions(
+                name=action_name, _id=agent_id)
+            if possible_actions:
+                try:
+                    next(possible_actions)
+                except TypeError:
+                    pass
+                action = agent_observer.send(
+                    {'state': state,
+                     'possible_actions': possible_actions,
+                     'iteration': iteration})
+                action_taken = subject_instance.take_effect(
+                    action, agent_id)  # type: ignore
+
+                if lookahead is None:
+                    lookahead_data = None
+                else:
+                    subject_pool = subject_instance.copy(
+                        perturb=lookahead.perturb_subject, n=subject_count)
+                    lookahead_data = [
+                        []
+                        for _ in range(subject_count)
+                    ]
+
+                    if lookahead_action_type == 'optimal':
+                        current_trigger, agent._training_trigger = (
+                            agent._training_trigger, 'none')
+
+                    if lookahead_action_type == 'fixed':
+                        def act(state, _id, actions, iteration):
+                            return actions.send(
+                                f'lookup {tuple(action_taken.index.values())}')
+                    else:
+                        act = agent.act
+
+                    for i, subject in enumerate(subject_pool):
+                        for step in range(steps):
+                            if subject.is_terminated(agent_id):
+                                break
+                            lookahead_state = subject.state(
+                                name=state_name, _id=agent_id)
+                            lookahead_possible_actions = \
+                                subject.possible_actions(
+                                    name=action_name, _id=agent_id)
+                            if lookahead_possible_actions:
+                                try:
+                                    next(lookahead_possible_actions)
+                                except TypeError:
+                                    pass
+                                lookahead_action = act(
+                                    lookahead_state, subject_id,
+                                    lookahead_possible_actions, iteration)
+                                lookahead_action_taken = subject.take_effect(
+                                    action, agent_id)  # type: ignore
+                                lookahead_reward = subject.reward(
+                                    name=lookahead_reward_name, _id=agent_id)
+                            lookahead_data[i].append(Observation(
+                                state=lookahead_state,
+                                possible_actions=lookahead_possible_actions,
+                                action=lookahead_action,
+                                action_taken=lookahead_action_taken,
+                                reward=lookahead_reward
+                            ))
+
+                        if not subject.is_terminated(agent_id):
+                            possible_actions = subject.possible_actions(
+                                name=action_name, _id=agent_id)
+                            next(possible_actions)
+                            lookahead_data[i].append(Observation(
+                                state=subject.state(
+                                    name=state_name, _id=agent_id),
+                                possible_actions=possible_actions
+                            ))
+
+                    if lookahead_action_type == 'optimal':
+                        agent._training_trigger = current_trigger
+
+                agent_observer.send({
+                    'action_taken': action_taken,
+                    'lookahead': lookahead_data})
+                # try:
+                #     possible_actions.close()
+                # except AttributeError:
+                #     pass
+
     def simulate_pass(self, n: int = 1) -> None:  # noqa: C901
         '''
         Go through the interaction sequence for a number of passes and
@@ -168,7 +327,7 @@ class Single(Environment):
         subject_name = protocol.subject.name
         agent_name = protocol.agent.name
         a_s_name = (agent_name, subject_name)
-        agent_id, _ = self._assignment_list[a_s_name]
+        agent_id, subject_id = self._assignment_list[a_s_name]
         if agent_id is None:
             raise ValueError(f'{a_s_name} are not assigned!')
 
@@ -187,11 +346,10 @@ class Single(Environment):
 
             args: InteractArgs = {
                 'agent_id': agent_id,
+                'subject_id': subject_id,
                 'agent_observer': self._agent_observers[a_s_name],
                 'subject_instance': subject_instance,
-                'state_name': protocol.state_name,
-                'action_name': protocol.action_name,
-                'reward_name': protocol.reward_name,
+                'protocol': protocol,
                 'iteration': self._iterations[subject_name]}
 
             if unit == 'interaction':
