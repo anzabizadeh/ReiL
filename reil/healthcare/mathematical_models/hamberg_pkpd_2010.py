@@ -529,6 +529,6 @@ class HambergPKPD2010(HealthMathModel):
                     None, config['random_generator'], None),  # type: ignore
                 input_features=input_features)
 
-            instance.prescribe(config['dose'])
+            instance.prescribe(config.get('dose', {}))
 
             return instance
