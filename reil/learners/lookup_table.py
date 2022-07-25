@@ -105,8 +105,8 @@ class QLookupTable(Learner[FeatureSet, float]):
         return result
 
     def learn(
-            self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
-            ) -> Dict[str, float]:
+        self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
+    ) -> Dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -127,6 +127,12 @@ class QLookupTable(Learner[FeatureSet, float]):
             self._table[Xi].N += 1
 
         return {}
+
+    def get_parameters(self) -> Any:
+        return
+
+    def set_parameters(self, parameters: Any):
+        pass
 
     # def load(self, filename: str,
     #          path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
