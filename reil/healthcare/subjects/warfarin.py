@@ -86,43 +86,48 @@ state_definitions: Dict[str, DefComponents] = {
     'Measured_INR_2': (
         ('INR_history', {'length': 2}),
         ('interval_history', {'length': 1})),
+    'measured_dose_2': (('daily_dose_history', {'length': 2}),),
 }
 
 reward_sq_dist = reil_functions.NormalizedSquareDistance(
     name='sq_dist', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+    length=-1, multiplier=-1.0,  interpolate=False,
     center=2.5, band_width=1.0, exclude_first=True)
 
 reward_sq_dist_modified = reil_functions.NormalizedSquareDistance(
     name='sq_dist_modified', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+    length=-1, multiplier=-1.0,  interpolate=False,
     center=2.5, band_width=1.0, exclude_first=True, amplifying_factor=1.05)
 
 reward_dist = reil_functions.NormalizedDistance(
     name='dist', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+    length=-1, multiplier=-1.0,  interpolate=False,
     center=2.5, band_width=1.0, exclude_first=True)
 
 reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
     name='sq_dist_interpolation',
     y_var_name='INR_history', x_var_name='interval_history',
-    length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+    length=2, multiplier=-1.0,  interpolate=True,
     center=2.5, band_width=1.0, exclude_first=True)
 
 reward_PTTR = reil_functions.PercentInRange(
     name='PTTR', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0, retrospective=True, interpolate=False,
+    length=-1, multiplier=-1.0,  interpolate=False,
     acceptable_range=(2, 3), exclude_first=True)
+
+reward_dose_change = reil_functions.NotEqual(
+    name='dose_change', y_var_name='daily_dose_history',
+    length=2, multiplier=-1.0)
 
 reward_PTTR_interpolation = reil_functions.PercentInRange(
     name='PTTR',
     y_var_name='INR_history', x_var_name='interval_history',
-    length=2, multiplier=-1.0, retrospective=True, interpolate=True,
+    length=2, multiplier=-1.0,  interpolate=True,
     acceptable_range=(2, 3), exclude_first=True)
 
 statistic_PTTR = reil_functions.PercentInRange(
     name='PTTR', y_var_name='daily_INR_history',
-    length=-1, multiplier=1.0, retrospective=True, interpolate=False,
+    length=-1, multiplier=1.0,  interpolate=False,
     acceptable_range=(2, 3), exclude_first=True)
 
 
@@ -243,6 +248,11 @@ class Warfarin(HealthSubject):
             self.reward.add_definition(
                 'PTTR_interpolation', reward_PTTR_interpolation,
                 'Measured_INR_2')
+
+        if 'dose_change' not in current_defs:
+            self.reward.add_definition(
+                'dose_change', reward_dose_change,
+                'measured_dose_2')
 
     def _generate_statistic_defs(self):
         if 'PTTR_exact_basic' not in self.statistic.definitions:
