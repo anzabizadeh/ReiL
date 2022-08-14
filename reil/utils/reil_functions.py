@@ -3,15 +3,17 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
 
+from reil.logger import Logger
 from reil.datatypes.feature import FeatureSet
-from reil.utils.functions import in_range, interpolate, dist, square_dist
+from reil.utils.functions import dist, in_range, interpolate, square_dist
 
-# SOME THOUGHTS!
-# Lookahead is not something a subject can/should do!
-# The environment should take a copy of the subject, apply some policy (random,
-# current policy, fixed, etc.) for a number of steps (ReilFunction.length) for
-# a number of times (sample size), then provide the outcome to the ReilFunction
-# and finally add that to the reward from the subject!
+# NOTE:
+# `retrospective` was meant to be used to indicate regular reward computation
+# vs lookahead. However, lookahead should be done by an `Environment`. So,
+# I removed `retrospective` to simplify the implementation and improve
+# performance.
+
+reil_func_logger = Logger('reil_functions')
 
 TypeY = TypeVar('TypeY')
 TypeX = TypeVar('TypeX')
@@ -24,19 +26,10 @@ class ReilFunction(Generic[TypeY, TypeX]):
     x_var_name: Optional[str] = None
     length: int = -1
     multiplier: float = 1.0
-    retrospective: bool = True
     interpolate: bool = True
 
     def __post_init__(self):
-        choice = self.retrospective * 2 + self.interpolate
-        if choice == 0:
-            self._fn = self._no_retro_no_inter
-        elif choice == 1:
-            self._fn = self._no_retro_inter
-        elif choice == 2:
-            self._fn = self._retro_no_inter
-        else:
-            self._fn = self._retro_inter
+        self._fn = self._inter if self.interpolate else self._no_inter
 
     def __call__(self, args: FeatureSet) -> float:
         temp = args.value
@@ -51,22 +44,27 @@ class ReilFunction(Generic[TypeY, TypeX]):
 
         return result
 
+    # just for the compatibility with old saved models. Should not be used.
     def _retro_inter(self, y: List[TypeY], x: List[TypeX]) -> float:
         raise NotImplementedError
 
-    def _retro_no_inter(self, y: List[TypeY]) -> float:
+    # just for the compatibility with old saved models. Should not be used.
+    def _retro_no_inter(self, y: List[TypeY], x: List[TypeX]) -> float:
         raise NotImplementedError
 
-    def _no_retro_inter(self, y: List[TypeY], x: List[TypeX]) -> float:
+    def _inter(self, y: List[TypeY], x: List[TypeX]) -> float:
         raise NotImplementedError
 
-    def _no_retro_no_inter(self, y: List[TypeY]) -> float:
+    def _no_inter(self, y: List[TypeY]) -> float:
         raise NotImplementedError
 
     def _default_function(
             self, y: List[TypeY], x: Optional[List[TypeX]] = None) -> float:
         raise NotImplementedError
 
+    # def __setstate__(self, state):
+    #     print(state)
+    #     super().__setstate__(state)
 
 @dataclasses.dataclass
 class NormalizedSquareDistance(ReilFunction[float, int]):
@@ -160,6 +158,27 @@ class PercentInRange(ReilFunction[float, int]):
         total_intervals = sum(_x)
 
         return result / total_intervals
+
+
+@dataclasses.dataclass
+class NotEqual(ReilFunction[float, int]):
+    interpolate: bool = False
+
+    def _no_inter(
+            self, y: List[float], x: Optional[List[int]] = None) -> float:
+        if x:
+            reil_func_logger.info(
+                'x is provided, but is not used in `NotEqual` function.')
+
+        try:
+            result = sum(
+                y1 != y2
+                for y1, y2 in zip(y[:-1], y[1:])
+            ) / (len(y) - 1)
+        except ZeroDivisionError:  # NotEqual for one observation is 0.
+            result = 0
+
+        return result
 
 
 # TODO: not implemented yet!
