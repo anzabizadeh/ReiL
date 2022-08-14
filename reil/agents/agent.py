@@ -324,6 +324,8 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
                 if stat_name is not None:
                     self.statistic.append(stat_name, subject_id)
 
+                self.reset()
+
                 return
 
     def get_parameters(self) -> Any:
