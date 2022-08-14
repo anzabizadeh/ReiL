@@ -62,9 +62,6 @@ class ReilFunction(Generic[TypeY, TypeX]):
             self, y: List[TypeY], x: Optional[List[TypeX]] = None) -> float:
         raise NotImplementedError
 
-    # def __setstate__(self, state):
-    #     print(state)
-    #     super().__setstate__(state)
 
 @dataclasses.dataclass
 class NormalizedSquareDistance(ReilFunction[float, int]):
