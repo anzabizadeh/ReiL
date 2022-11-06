@@ -552,7 +552,7 @@ class FeatureGenerator:
                     for i in range(count)
                 )
             else:
-                iterator = self.fixed_values
+                iterator: Tuple[Any, ...] = self.fixed_values  # type: ignore
         else:
             iterator = self.categories or ()
 
@@ -575,12 +575,13 @@ class FeatureGenerator:
         if self.is_numerical:
             if self.step is not None:
                 iterator = {
-                    i * self.step: i  # type: ignore
+                    self.lower + i * self.step: i  # type: ignore
                     for i in range(self.count)
                 }
             else:
                 iterator = {
-                    v: i for i, v in enumerate(self.fixed_values)
+                    v: i
+                    for i, v in enumerate(self.fixed_values)  # type: ignore
                 }
         else:
             iterator = {v: i for i, v in enumerate(self.categories or ())}
@@ -600,7 +601,7 @@ class FeatureGenerator:
                 return self.__call__(self.categories[index])
 
         if self.step is None:
-            return self.__call__(self.fixed_values[index])
+            return self.__call__(self.fixed_values[index])  # type: ignore
 
         return self.__call__(self.lower + index * self.step)  # type: ignore
 
@@ -1015,6 +1016,18 @@ class FeatureGeneratorSet:
                     masked.get(name), exclude_masked_values))
                 for name, gen in gens.items()))
 
+    def generate_mask_vector(self) -> Union[Iterator[Index], Tuple[Iterator[int], ...]]:
+        gens = self._generators
+        masked = {
+            name: self._masked_values.get(name, {}).keys()
+            for name in gens}
+
+        return tuple(
+            (
+                0 if i.value in masked[name] else 1
+                for i in gen.generate_all())
+            for name, gen in gens.items())
+
     def make_generator(self) -> FeatureGeneratorType:
 
         query = yield
@@ -1031,6 +1044,8 @@ class FeatureGeneratorSet:
                 elif item == 'index':
                     result = self.generate_indexes(
                         exclude_masked_values=exclusive, split=split)
+                elif item == 'mask_vector':
+                    result = self.generate_mask_vector()
                 else:  # item == 'count'
                     # temp = self.generate_indexes(
                     #     exclude_masked_values=exclusive, split=True)
@@ -1090,7 +1105,7 @@ class FeatureGeneratorSet:
         command = words[0]
         allowed_words = (
             ('return', 'lookup', 'choose', 'help'),
-            ('feature', 'index', 'count'),
+            ('feature', 'index', 'count', 'mask_vector'),
         )
 
         parsed: Dict[str, Any] = {'command': command}
