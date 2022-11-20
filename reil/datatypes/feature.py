@@ -760,11 +760,7 @@ class FeatureSet:
 
     def update(self, other: FeatureSet):
         self._data.update(other._data)
-        for v in (
-                'value', 'index', 'lower', 'upper',
-                'categories', 'normalized', 'flattened'):
-            if v in self.__dict__:
-                del self.__dict__[v]
+        self.__reset_cached_properties()
 
     def get(self, key: str, return_val: Optional[Feature] = None):
         return self._data.get(key, return_val)
@@ -798,10 +794,19 @@ class FeatureSet:
 
         return splitted_list
 
+    def __reset_cached_properties(self):
+        for k in (
+                'index', 'value', 'lower', 'upper',
+                'categories', 'normalized', 'flattened'):
+            if k in self.__dict__:
+                del self.__dict__[k]
+
     def pop(self, k: str):
         v = self._data.pop(k)
         if self._index is not None:
             self._index = None
+
+        self.__reset_cached_properties()
 
         return v
 
@@ -809,6 +814,7 @@ class FeatureSet:
         del self._data[k]
         if self._index is not None:
             self._index = None
+        self.__reset_cached_properties()
 
     def __iter__(self):
         return iter(self._data.values())
@@ -858,6 +864,8 @@ class FeatureSet:
                         f'Bounds violated: lower: {lower}, '
                         f'upper: {upper}, '
                         f'negative value: {neg_value}')
+
+        self.__reset_cached_properties()
 
         return FeatureSet(temp)  # type: ignore
 
@@ -1019,11 +1027,11 @@ class FeatureGeneratorSet:
     def generate_mask_vector(self) -> Union[Iterator[Index], Tuple[Iterator[int], ...]]:
         gens = self._generators
         masked = {
-            name: self._masked_values.get(name, {}).keys()
+            name: tuple(self._masked_values.get(name, {}).keys())
             for name in gens}
 
-        return tuple(
-            (
+        return (
+            tuple(
                 0 if i.value in masked[name] else 1
                 for i in gen.generate_all())
             for name, gen in gens.items())
