@@ -8,7 +8,7 @@ This `subject` class is the base class of all subject classes.
 
 import copy
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from reil import stateful
 from reil.datatypes.components import ActionSet, Reward
@@ -111,7 +111,7 @@ class Subject(stateful.Stateful):
 
     def copy(
         self, perturb: bool = False, n: Optional[int] = None
-    ) -> List['Subject']:
+    ) -> Union['Subject', List['Subject']]:
         '''
         Returns a copy of the subject.
 
