@@ -105,28 +105,29 @@ class Lenzini(dp.DosingProtocol):
         dose_history = patient['dose_history']
         interval_history = patient['interval_history']
         all_doses = functools.reduce(
-            lambda x, y: x+y,
-            ([dose_history[-i]]*interval_history[-i]
+            lambda x, y: x + y,
+            ([dose_history[-i]] * interval_history[-i]
              for i in range(len(interval_history), 0, -1)))
 
         # Since on day 4, we don't have dose-4, a zero is padded to avoid
         # producing error in the run time.
         dose_4, dose_3, dose_2 = ([0] + all_doses)[-4:-1]
 
-        dose = exp(2.81602
-                   - 0.76679 * ln_INR
-                   - 0.00590 * age
-                   + 0.27815 * target_INR
-                   - 0.16759 * diabetes
-                   + 0.17675 * bsa
-                   - 0.22844 * stroke
-                   - 0.25487 * fluvastatin
-                   + 0.07123 * african_american
-                   - 0.11137 * amiodarone
-                   + 0.03471 * dose_2
-                   + 0.03047 * dose_3
-                   + 0.01929 * dose_4
-                   ) / 7
+        dose = exp(
+            + 2.81602
+            - 0.76679 * ln_INR
+            - 0.00590 * age
+            + 0.27815 * target_INR
+            - 0.16759 * diabetes
+            + 0.17675 * bsa
+            - 0.22844 * stroke
+            - 0.25487 * fluvastatin
+            + 0.07123 * african_american
+            - 0.11137 * amiodarone
+            + 0.03471 * dose_2
+            + 0.03047 * dose_3
+            + 0.01929 * dose_4
+        ) / 7
 
         return dose
 
