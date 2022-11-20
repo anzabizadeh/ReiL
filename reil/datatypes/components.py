@@ -59,6 +59,8 @@ class State:
         self._available_sub_components: Dict[str, SubComponentInfo] = {}
         self._definitions: Dict[str, List[
             SubComponentInstance[Dict[str, Any]]]] = defaultdict(list)
+        self._definition_reference_function: Optional[Callable[
+            [str], Optional[Tuple[Tuple[str, Dict[str, Any]]]]]] = None
 
         if available_sub_components is not None:
             self.sub_components = available_sub_components
@@ -168,6 +170,12 @@ class State:
             self._definitions[name].append(SubComponentInstance(
                 name=sub_comp_name, fn=fn, args=kwargs))
 
+    def definition_reference_function(
+        self,
+        f: Callable[[str], Optional[Tuple[Tuple[str, Dict[str, Any]]]]]
+    ):
+        self._definition_reference_function = f
+
     def default(self, _id: Optional[int] = None) -> FeatureSet:
         '''
         Generate the default component definition.
@@ -215,6 +223,12 @@ class State:
                 return self.default(_id)
             except AttributeError:
                 pass
+
+        if name not in self._definitions:
+            if self._definition_reference_function:
+                def_args = self._definition_reference_function(name)
+                if def_args:
+                    self.add_definition(name=name, *def_args)
 
         if name not in self._definitions:
             raise ValueError(f'Definition {name} not found.')
@@ -282,6 +296,8 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
         self._definitions: Dict[
             str, SubComponentInstance[str]] = defaultdict(None)
+        self._definition_reference_function: Optional[Callable[
+            [str], Optional[Tuple[Callable[..., ComponentReturnType], str]]]] = None
 
     @property
     def definitions(self):
@@ -399,7 +415,14 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
         raise AttributeError('Default definition not found.')
 
-    def __call__(
+    def definition_reference_function(
+        self,
+        f: Callable[
+            [str], Optional[Tuple[Callable[..., ComponentReturnType], str]]]
+    ):
+        self._definition_reference_function = f
+
+    def __call__(  # noqa: C901
             self, name: str,
             _id: Optional[int] = None) -> Union[ComponentReturnType, None]:
         '''
@@ -432,6 +455,12 @@ class SecondayComponent(Generic[ComponentReturnType]):
                 return self.default(_id)
             except AttributeError:
                 pass
+
+        if name not in self._definitions:
+            if self._definition_reference_function:
+                def_args = self._definition_reference_function(name)
+                if def_args:
+                    self.add_definition(name, *def_args)
 
         try:
             d = self._definitions[name]
