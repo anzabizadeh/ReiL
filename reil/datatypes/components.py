@@ -45,8 +45,6 @@ class State:
             object_ref: object,
             available_sub_components: Optional[
                 Dict[str, SubComponentInfo]] = None,
-            default_definition: Optional[Callable[[
-                Optional[int]], FeatureSet]] = None,
             dumper: Optional[FeatureSetDumper] = None,
             pickle_stripped: bool = False):
         '''
@@ -58,7 +56,7 @@ class State:
         '''
         self._available_sub_components: Dict[str, SubComponentInfo] = {}
         self._definitions: Dict[str, List[
-            SubComponentInstance[Dict[str, Any]]]] = defaultdict(list)
+            SubComponentInstance[Dict[str, Any]]]] = {}
         self._definition_reference_function: Optional[Callable[
             [str], Optional[Tuple[Tuple[str, Dict[str, Any]]]]]] = None
 
@@ -66,7 +64,6 @@ class State:
             self.sub_components = available_sub_components
 
         self.object_ref = object_ref
-        self._default = default_definition
         self._dumper = dumper
         self._pickle_stripped = pickle_stripped
 
@@ -103,19 +100,6 @@ class State:
                              'Cannot modify it.')
         self._available_sub_components = sub_components
 
-    def set_default_definition(
-            self, default_definition: Callable[[Optional[int]], FeatureSet]
-    ) -> None:
-        '''Add a new component definition.
-
-        Parameters
-        ----------
-        default_definition:
-            A function that can optionally accept `_id`, and returns a
-            `FeatureSet`.
-        '''
-        self._default = default_definition
-
     def add_definition(
             self,
             name: str,
@@ -144,11 +128,7 @@ class State:
         ValueError
             Unknown keyword argument.
         '''
-        if name == 'default':
-            raise ValueError(
-                'Use `set_default_definition` for the default definition')
-
-        if name in self._definitions:
+        if self._definitions.get(name, []):
             raise ValueError(f'Definition {name} already exists.')
 
         unknown_sub_components = set(
@@ -159,6 +139,7 @@ class State:
             raise ValueError(
                 f'Unknown sub components: {unknown_sub_components}')
 
+        self._definitions[name] = []
         for sub_comp_name, kwargs in sub_components:
             fn, arg_list = self._available_sub_components[sub_comp_name]
 
@@ -172,28 +153,12 @@ class State:
 
     def definition_reference_function(
         self,
-        f: Callable[[str], Optional[Tuple[Tuple[str, Dict[str, Any]]]]]
+        f: Callable[[str], Optional[Tuple[Tuple[str, Dict[str, Any]]]]],
+        available_definitions: List[str]
     ):
         self._definition_reference_function = f
-
-    def default(self, _id: Optional[int] = None) -> FeatureSet:
-        '''
-        Generate the default component definition.
-
-        Parameters
-        ----------
-        _id:
-            ID of the caller object
-
-        Returns
-        -------
-        :
-            The component with the default definition.
-        '''
-        if self._default is None:
-            raise AttributeError('Default definition not found.')
-
-        return self._default(_id)
+        for d in set(available_definitions).difference(self._definitions):
+            self._definitions[d] = []
 
     def __call__(self, name: str, _id: Optional[int] = None) -> FeatureSet:
         '''
@@ -218,24 +183,20 @@ class State:
         ValueError
             Definition not found.
         '''
-        if name == 'default':
-            try:
-                return self.default(_id)
-            except AttributeError:
-                pass
-
-        if name not in self._definitions:
+        if not self._definitions.get(name, []):
             if self._definition_reference_function:
                 def_args = self._definition_reference_function(name)
                 if def_args:
-                    self.add_definition(name=name, *def_args)
+                    self.add_definition(name, *def_args)
 
-        if name not in self._definitions:
+        try:
+            def_ = self._definitions[name]
+        except KeyError:
             raise ValueError(f'Definition {name} not found.')
 
         return FeatureSet(d.fn(
             self.object_ref, _id=_id, **d.args)  # type: ignore
-            for d in self._definitions[name])
+            for d in def_)
 
     def dump(
             self, name: str, _id: Optional[int] = None,
@@ -267,8 +228,6 @@ class SecondayComponent(Generic[ComponentReturnType]):
             self,
             name: str,
             state: Optional[State] = None,
-            default_definition: Optional[Callable[[
-                Optional[int]], ComponentReturnType]] = None,
             enabled: bool = True,
             pickle_stripped: bool = False):
         '''
@@ -282,20 +241,16 @@ class SecondayComponent(Generic[ComponentReturnType]):
             An instance of a `State` from which component
             definitions are used.
 
-        default_definition:
-            The `default` definition.
-
         enabled:
             Whether to return the computed value or `None`.
         '''
         self._name = name
         self._state = state
-        self._default = default_definition
         self._enabled = enabled
         self._pickle_stripped = pickle_stripped
 
         self._definitions: Dict[
-            str, SubComponentInstance[str]] = defaultdict(None)
+            str, Optional[SubComponentInstance[str]]] = {}
         self._definition_reference_function: Optional[Callable[
             [str], Optional[Tuple[Callable[..., ComponentReturnType], str]]]] = None
 
@@ -338,22 +293,9 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
         self._state = state
 
-    def set_default_definition(
-            self,
-            default_definition: Callable[[Optional[int]], ComponentReturnType]
-    ) -> None:
-        '''Add a new component definition.
-
-        Parameters
-        ----------
-        default_definition:
-            A function that can optionally accept `_id`, and returns a value.
-        '''
-        self._default = default_definition
-
     def add_definition(
             self, name: str, fn: Callable[..., ComponentReturnType],
-            state_name: str = 'default') -> None:
+            state_name: str) -> None:
         '''
         Add a new component definition.
 
@@ -363,11 +305,11 @@ class SecondayComponent(Generic[ComponentReturnType]):
             The name of the new component.
 
         fn:
-            The function that will receive the primary component instance and
+            The function that will receive the state instance and
             computes the value of the secondary component.
 
         state_name:
-            The component name that will be used by `fn`.
+            The state name that will be used by `fn`.
 
         Raises
         ------
@@ -377,11 +319,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
         ValueError
             Undefined primary component name.
         '''
-        if name == 'default':
-            raise ValueError(
-                'Use `set_default_definition` for the default definition')
-
-        if name in self._definitions:
+        if self._definitions.get(name, []):
             raise ValueError(f'Definition {name} already exists.')
 
         if self._state is None:
@@ -389,38 +327,21 @@ class SecondayComponent(Generic[ComponentReturnType]):
                 'Primary component is not defined. '
                 'Use `set_state` to specify it.')
 
-        if (state_name != 'default' and
-                state_name not in self._state.definitions):
-            raise ValueError(f'Undefined {state_name}.')
+        # if state_name not in self._state.definitions:
+        #     raise ValueError(f'Undefined {state_name}.')
 
         self._definitions[name] = SubComponentInstance(
             name=name, fn=fn, args=state_name)
 
-    def default(self, _id: Optional[int] = None) -> ComponentReturnType:
-        '''
-        Generate the default component definition.
-
-        Parameters
-        ----------
-        _id:
-            ID of the caller object
-
-        Returns
-        -------
-        :
-            The component with the default definition.
-        '''
-        if self._default is not None:
-            return self._default(_id)
-
-        raise AttributeError('Default definition not found.')
-
     def definition_reference_function(
         self,
         f: Callable[
-            [str], Optional[Tuple[Callable[..., ComponentReturnType], str]]]
+            [str], Optional[Tuple[Callable[..., ComponentReturnType], str]]],
+        available_definitions: List[str]
     ):
         self._definition_reference_function = f
+        for d in set(available_definitions).difference(self._definitions):
+            self._definitions[d] = None
 
     def __call__(  # noqa: C901
             self, name: str,
@@ -450,30 +371,23 @@ class SecondayComponent(Generic[ComponentReturnType]):
         if not self._enabled:
             return None
 
-        if name == 'default':
-            try:
-                return self.default(_id)
-            except AttributeError:
-                pass
-
-        if name not in self._definitions:
+        if self._definitions.get(name) is None:
             if self._definition_reference_function:
                 def_args = self._definition_reference_function(name)
                 if def_args:
                     self.add_definition(name, *def_args)
 
-        try:
-            d = self._definitions[name]
-        except KeyError:
+        d = self._definitions.get(name)
+
+        if d is None:
             raise ValueError(f'Definition {name} not found.')
 
-        try:
-            p = self._state(  # type: ignore
-                name=d.args, _id=_id)
-        except AttributeError:
+        if self._state is None:
             raise ValueError(
-                'Primary component is not defined. '
+                'State is not defined. '
                 'Use `set_state` to specify it.')
+
+        p = self._state(name=d.args, _id=_id)
 
         return d.fn(p)
 
@@ -498,8 +412,6 @@ class Statistic:
             self,
             name: str,
             state: Optional[State] = None,
-            default_definition: Optional[Callable[[
-                Optional[int]], Tuple[FeatureSet, float]]] = None,
             enabled: bool = True,
             pickle_stripped: bool = False):
         '''
@@ -521,7 +433,6 @@ class Statistic:
         '''
         self._name = name
         self._state = state
-        self._default = default_definition
         self._enabled = enabled
         self._pickle_stripped = pickle_stripped
 
@@ -571,20 +482,6 @@ class Statistic:
 
         self._state = state
 
-    def set_default_definition(
-            self,
-            default_definition: Callable[
-                [Optional[int]], Tuple[FeatureSet, float]]) -> None:
-        '''Add a new component definition.
-
-        Parameters
-        ----------
-        default_definition:
-            A function that can optionally accept `_id`, and returns a
-            `FeatureSet`.
-        '''
-        self._default = default_definition
-
     def add_definition(
             self, name: str, fn: Callable[..., Any],
             stat_component: str, aggregation_component: str) -> None:
@@ -614,10 +511,6 @@ class Statistic:
         ValueError
             Undefined primary component name.
         '''
-        if name == 'default':
-            raise ValueError(
-                'Use `set_default_definition` for the default definition')
-
         if name in self._definitions:
             raise ValueError(f'Definition {name} already exists.')
 
@@ -634,25 +527,6 @@ class Statistic:
 
         self._definitions[name] = SubComponentInstance[Tuple[str, str]](
             name=name, fn=fn, args=(aggregation_component, stat_component))
-
-    def default(self, _id: Optional[int] = None) -> Tuple[FeatureSet, float]:
-        '''
-        Generate the default component definition.
-
-        Parameters
-        ----------
-        _id:
-            ID of the caller object
-
-        Returns
-        -------
-        :
-            The component with the default definition.
-        '''
-        if self._default is not None:
-            return self._default(_id)
-
-        raise AttributeError('Default definition not found.')
 
     def __call__(
             self,
@@ -683,12 +557,6 @@ class Statistic:
         '''
         if not self._enabled:
             return None
-
-        if name == 'default':
-            try:
-                return self.default(_id)
-            except AttributeError:
-                pass
 
         if self._state is None:
             raise ValueError(
