@@ -220,8 +220,10 @@ class DosingSubject(HealthSubject):
                         (current_dose - self._dose_range[0]) / self._dose_step)
         else:
             raise ValueError('dose/ dose_change/ dose_change_p not found.')
+
+        interval = action_temp.get('interval', self._default_interval)
         current_interval = min(
-            action_temp['interval'], self._max_day - self._day)  # type: ignore
+            interval, self._max_day - self._day)  # type: ignore
 
         measurements_temp = self._patient.model(
             dose={
