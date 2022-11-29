@@ -7,11 +7,12 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 '''
 
 import functools
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import (Any, Callable, Dict, List, Literal, Optional, Tuple, Union,
+                    cast)
 
 from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
 from reil.healthcare.patient import Patient
-from reil.healthcare.subjects.health_subject import HealthSubject
+from reil.healthcare.subjects.dosing_subject import DosingSubject
 from reil.utils import reil_functions
 
 DefComponents = Tuple[Tuple[str, Dict[str, Any]], ...]
@@ -57,7 +58,6 @@ state_definitions: Dict[str, DefComponents] = {
     **{
         f'patient_w_dosing_{i:02}': (
             *patient_basic,
-            # ('day', {}),
             ('dose_history', {'length': i}),
             ('INR_history', {'length': i + 1}),
             ('interval_history', {'length': i}))
@@ -87,43 +87,64 @@ state_definitions: Dict[str, DefComponents] = {
         ('INR_history', {'length': 2}),
         ('interval_history', {'length': 1})),
     'measured_dose_2': (('daily_dose_history', {'length': 2}),),
+    'day_and_last_dose': (('day', {}), ('daily_dose_history', {'length': 1}))
 }
 
-reward_sq_dist = reil_functions.NormalizedSquareDistance(
-    name='sq_dist', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0,  interpolate=False,
-    center=2.5, band_width=1.0, exclude_first=True)
+action_definition_names = [
+    '237_15', 'daily_15', 'free_15', 'semi_15', 'weekly_15', 'delta', 'percent']
 
-reward_sq_dist_modified = reil_functions.NormalizedSquareDistance(
-    name='sq_dist_modified', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0,  interpolate=False,
-    center=2.5, band_width=1.0, exclude_first=True, amplifying_factor=1.05)
-
-reward_dist = reil_functions.NormalizedDistance(
-    name='dist', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0,  interpolate=False,
-    center=2.5, band_width=1.0, exclude_first=True)
-
-reward_sq_dist_interpolation = reil_functions.NormalizedSquareDistance(
-    name='sq_dist_interpolation',
-    y_var_name='INR_history', x_var_name='interval_history',
-    length=2, multiplier=-1.0,  interpolate=True,
-    center=2.5, band_width=1.0, exclude_first=True)
-
-reward_PTTR = reil_functions.PercentInRange(
-    name='PTTR', y_var_name='daily_INR_history',
-    length=-1, multiplier=-1.0,  interpolate=False,
-    acceptable_range=(2, 3), exclude_first=True)
-
-reward_dose_change = reil_functions.NotEqual(
-    name='dose_change', y_var_name='daily_dose_history',
-    length=2, multiplier=-1.0)
-
-reward_PTTR_interpolation = reil_functions.PercentInRange(
-    name='PTTR',
-    y_var_name='INR_history', x_var_name='interval_history',
-    length=2, multiplier=-1.0,  interpolate=True,
-    acceptable_range=(2, 3), exclude_first=True)
+reward_definitions: Dict[str, Tuple[reil_functions.ReilFunction[float, int], str]] = dict(
+    sq_dist=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=True),
+        'recent_daily_INR'
+    ),
+    sq_dist_modified=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=True, amplifying_factor=1.05),
+        'recent_daily_INR'
+    ),
+    dist=(
+        reil_functions.NormalizedDistance(
+            name='dist', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=True),
+        'recent_daily_INR'
+    ),
+    sq_dist_interpolation=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_interpolation',
+            y_var_name='INR_history', x_var_name='interval_history',
+            length=2, multiplier=-1.0,  interpolate=True,
+            center=2.5, band_width=1.0, exclude_first=True),
+        'Measured_INR_2'
+    ),
+    PTTR_exact=(
+        reil_functions.PercentInRange(
+            name='PTTR_exact', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            acceptable_range=(2, 3), exclude_first=True),
+        'recent_daily_INR'
+    ),
+    dose_change=(
+        reil_functions.NotEqual(
+            name='dose_change', y_var_name='daily_dose_history',
+            length=2, multiplier=-1.0),
+        'measured_dose_2'
+    ),
+    PTTR_interpolation=(
+        reil_functions.PercentInRange(
+            name='PTTR_interpolation',
+            y_var_name='INR_history', x_var_name='interval_history',
+            length=2, multiplier=-1.0,  interpolate=True,
+            acceptable_range=(2, 3), exclude_first=True),
+        'Measured_INR_2'
+    )
+)
 
 statistic_PTTR = reil_functions.PercentInRange(
     name='PTTR', y_var_name='daily_INR_history',
@@ -131,7 +152,7 @@ statistic_PTTR = reil_functions.PercentInRange(
     acceptable_range=(2, 3), exclude_first=True)
 
 
-class Warfarin(HealthSubject):
+class Warfarin(DosingSubject):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model.
     '''
@@ -145,7 +166,13 @@ class Warfarin(HealthSubject):
             interval_range: Tuple[int, int] = (1, 28),
             interval_step: int = 1,
             max_day: int = 90,
-            dose_only: bool = False,
+            decision_mode: Literal[
+                'dose', 'dose_interval', 'dose_change', 'dose_change_interval',
+                'dose_change_p', 'dose_change_interval_p'
+            ] = 'dose_interval',
+            percent_dose_change: Optional[Tuple[float, ...]] = None,
+            dose_range_p: Optional[Tuple[float, float]] = None,
+            round_to_step: bool = True,
             backfill: bool = True,
             **kwargs: Any):
         '''
@@ -174,23 +201,27 @@ class Warfarin(HealthSubject):
             patient=patient,
             measurement_name='INR',
             measurement_range=INR_range,
-            dose_range=dose_range,
-            dose_step=dose_step,
-            interval_range=interval_range,
-            interval_step=interval_step,
             max_day=max_day,
+            backfill=backfill,
+            interval_range=interval_range,
+            dose_range=dose_range,
+            decision_mode=decision_mode,
+            interval_step=interval_step,
+            dose_step=dose_step,
+            percent_dose_change=percent_dose_change,
+            dose_range_p=dose_range_p,
+            round_to_step=round_to_step,
             **kwargs)
 
-        self._dose_only = dose_only
-        self._backfill = backfill
-        self.action_gen_set += self.feature_gen_set['dose']
-        if not dose_only:
-            self.action_gen_set += self.feature_gen_set['interval']
-
-        Warfarin._generate_state_defs(self)
-        Warfarin._generate_action_defs(self)
-        Warfarin._generate_reward_defs(self)
-        Warfarin._generate_statistic_defs(self)
+        self.state.definition_reference_function(
+            f=self._state_def_reference,
+            available_definitions=list(state_definitions))
+        self.possible_actions.definition_reference_function(
+            f=self._action_def_reference,
+            available_definitions=action_definition_names)
+        self.reward.definition_reference_function(
+            f=self._reward_def_reference,
+            available_definitions=list(reward_definitions))
 
     def get_config(self) -> Dict[str, Any]:
         config = super().get_config()
@@ -201,15 +232,23 @@ class Warfarin(HealthSubject):
 
     def copy(
         self, perturb: bool = False, n: Optional[int] = None
-    ) -> List['Warfarin']:
-        copied_subjects = super().copy(perturb=False, n=n)
+    ) -> Union['Warfarin', List['Warfarin']]:
+        copied_subjects_temp = super().copy(perturb=False, n=n)
 
         if perturb:
             if n is None:
-                copied_subjects._patient._model.perturb(day=self._day)
+                copied_subjects = cast(Warfarin, copied_subjects_temp)
+                if copied_subjects._patient is not None:
+                    copied_subjects._patient._model.perturb(  # type: ignore
+                        day=self._day)
             else:
+                copied_subjects = cast(List[Warfarin], copied_subjects_temp)
                 for c in copied_subjects:
-                    c._patient._model.perturb(day=self._day)
+                    if c._patient is not None:
+                        c._patient._model.perturb(day=self._day)  # type: ignore
+        else:
+            copied_subjects = cast(
+                Union[Warfarin, List[Warfarin]], copied_subjects_temp)
 
         return copied_subjects
 
@@ -222,37 +261,10 @@ class Warfarin(HealthSubject):
     def _generate_reward_defs(self):
         current_defs = self.reward.definitions
 
-        if 'dist_exact' not in current_defs:
-            self.reward.add_definition(
-                'dist_exact', reward_dist, 'recent_daily_INR')
-
-        if 'sq_dist_exact' not in current_defs:
-            self.reward.add_definition(
-                'sq_dist_exact', reward_sq_dist, 'recent_daily_INR')
-
-        if 'sq_dist_exact_modified' not in current_defs:
-            self.reward.add_definition(
-                'sq_dist_exact_modified', reward_sq_dist_modified,
-                'recent_daily_INR')
-
-        if 'sq_dist_interpolation' not in current_defs:
-            self.reward.add_definition(
-                'sq_dist_interpolation', reward_sq_dist_interpolation,
-                'Measured_INR_2')
-
-        if 'PTTR_exact' not in current_defs:
-            self.reward.add_definition(
-                'PTTR_exact', reward_PTTR, 'recent_daily_INR')
-
-        if 'PTTR_interpolation' not in current_defs:
-            self.reward.add_definition(
-                'PTTR_interpolation', reward_PTTR_interpolation,
-                'Measured_INR_2')
-
-        if 'dose_change' not in current_defs:
-            self.reward.add_definition(
-                'dose_change', reward_dose_change,
-                'measured_dose_2')
+        for name, args in reward_definitions.items():
+            if name not in current_defs:
+                self.reward.add_definition(
+                    name, *args)
 
     def _generate_statistic_defs(self):
         if 'PTTR_exact_basic' not in self.statistic.definitions:
@@ -269,13 +281,13 @@ class Warfarin(HealthSubject):
         current_action_definitions = self.possible_actions.definitions
 
         def _generate(
-                feature: FeatureSet,
-                ops: Tuple[Callable[[FeatureSet], bool], ...],
-                dose_masks: Tuple[Dict[float, float], ...],
-                interval_masks: Tuple[Dict[int, int], ...]
+            feature: FeatureSet,
+            ops: Tuple[Callable[[FeatureSet], bool], ...],
+            dose_masks: Tuple[Dict[float, float], ...],
+            interval_masks: Tuple[Dict[int, int], ...]
         ) -> FeatureGeneratorType:
             self.action_gen_set.unmask('dose')
-            if self._dose_only:
+            if not self._interval_mode:
                 for op, d_mask in zip(ops, dose_masks):
                     if op(feature):
                         self.action_gen_set.mask('dose', d_mask)
@@ -439,13 +451,354 @@ class Warfarin(HealthSubject):
                     interval_masks=(int_weekly,)),
                 'day')
 
-    def _default_state_definition(
-            self, _id: Optional[int] = None) -> FeatureSet:
-        patient_features = self._patient.feature_set
-        return FeatureSet([
-            patient_features['age'],
-            patient_features['CYP2C9'],
-            patient_features['VKORC1']])
+        name = 'delta'
+        if name not in current_action_definitions:
+            def delta_dose(feature: FeatureSet) -> FeatureGeneratorType:
+                self.action_gen_set.unmask('dose_change')
+                self.action_gen_set.unmask('interval')
+                last_dose: float = \
+                    feature['daily_dose_history'].value[-1]  # type: ignore
+                day: int = feature['day'].value  # type: ignore
+                min_dose, max_dose = self._dose_range
+                min_delta = min_dose - last_dose
+                max_delta = max_dose - last_dose
+                d_list = self.generate_dose_values(min_dose, max_dose)
+                d_list = set((*d_list, *(-x for x in d_list)))
+                d_mask = {
+                    d: min_delta if d < min_delta else max_delta
+                    for d in d_list
+                    if not (min_delta <= d <= max_delta)
+                }
+                self.action_gen_set.mask('dose_change', d_mask)
+
+                if day >= 5:
+                    interval_mask = int_fixed[7]
+                elif day == 2:
+                    interval_mask = int_fixed[3]
+                elif day == 0:
+                    interval_mask = int_fixed[2]
+                else:
+                    raise ValueError(f'wrong day: {day}.')
+
+                self.action_gen_set.mask('interval', interval_mask)
+
+                return self.action_gen_set.make_generator()
+
+            self.possible_actions.add_definition(
+                name, delta_dose, 'day_and_last_dose')
+
+        name = 'percent'
+        if name not in current_action_definitions:
+            def percent_dose(feature: FeatureSet) -> FeatureGeneratorType:
+                self.action_gen_set.unmask('dose_change_p')
+                self.action_gen_set.unmask('interval')
+                last_dose: float = \
+                    feature['daily_dose_history'].value[-1]  # type: ignore
+                day: int = feature['day'].value  # type: ignore
+                min_dose, max_dose = self._dose_range
+                min_delta = min_dose - last_dose
+                max_delta = max_dose - last_dose
+                d_list = self.generate_dose_values(min_dose, max_dose)
+                d_list = set((*d_list, *(-x for x in d_list)))
+                d_mask = {
+                    d: min_delta if d < min_delta else max_delta
+                    for d in d_list
+                    if not (min_delta <= d <= max_delta)
+                }
+                self.action_gen_set.mask('dose_change_p', d_mask)
+
+                if day >= 5:
+                    interval_mask = int_fixed[7]
+                elif day == 2:
+                    interval_mask = int_fixed[3]
+                elif day == 0:
+                    interval_mask = int_fixed[2]
+                else:
+                    raise ValueError(f'wrong day: {day}.')
+
+                self.action_gen_set.mask('interval', interval_mask)
+
+                return self.action_gen_set.make_generator()
+
+            self.possible_actions.add_definition(
+                name, percent_dose, 'day_and_last_dose')
+
+    def _state_def_reference(
+            self, name: str) -> Optional[DefComponents]:
+        try:
+            return state_definitions[name]
+        except KeyError:
+            return super()._state_def_reference(name)
+
+    def _action_def_reference(  # noqa: C901
+        self, name: str
+    ) -> Optional[Tuple[Callable[..., FeatureGeneratorType], str]]:
+        def _generate(
+                feature: FeatureSet,
+                ops: Tuple[Callable[[FeatureSet], bool], ...],
+                dose_masks: Tuple[Dict[float, float], ...],
+                interval_masks: Tuple[Dict[int, int], ...]
+        ) -> FeatureGeneratorType:
+            self.action_gen_set.unmask('dose')
+            if not self._interval_mode:
+                for op, d_mask in zip(ops, dose_masks):
+                    if op(feature):
+                        self.action_gen_set.mask('dose', d_mask)
+
+                        return self.action_gen_set.make_generator()
+
+            else:
+                self.action_gen_set.unmask('interval')
+                for op, d_mask, i_mask in zip(ops, dose_masks, interval_masks):
+                    if op(feature):
+                        self.action_gen_set.mask('dose', d_mask)
+                        self.action_gen_set.mask('interval', i_mask)
+
+                        return self.action_gen_set.make_generator()
+
+                self.action_gen_set.mask('interval', interval_masks[-1])
+
+            self.action_gen_set.mask('dose', dose_masks[-1])
+
+            return self.action_gen_set.make_generator()
+
+        caps = tuple(
+            i for i in (5.0, 10.0, 15.0)
+            if self._dose_range[0] <= i <= self._dose_range[1])
+        max_cap = min(caps[-1], self._dose_range[1])
+
+        dose = {
+            cap: {
+                d: cap
+                for d in self.generate_dose_values(cap, max_cap, 0.5)
+                if d > cap}
+            for cap in caps}
+
+        min_interval, max_interval = self._interval_range
+        int_fixed = {
+            d: {
+                i: d
+                for i in range(
+                    min_interval, max_interval + 1, self._interval_step)
+                if i != d}
+            for d in (1, 2, 3, 7)}
+        int_semi_free = {
+            i: min_interval
+            for i in range(min_interval, max_interval + 1, self._interval_step)
+            if i not in (1, 2, 3, 7, 14, 21, 28)}
+        int_weekly = {
+            i: min_interval
+            for i in range(min_interval, max_interval + 1, self._interval_step)
+            if i not in (7, 14, 21, 28)}
+
+        # for cap in caps[:-1]:
+        #     name = f'237_{int(cap):02}'
+        #     if name not in current_action_definitions:
+        #         self.possible_actions.add_definition(
+        #             name, functools.partial(
+        #                 _generate,
+        #                 ops=(
+        #                     lambda f: f['day'].value >= 5,
+        #                     lambda f: f['day'].value == 2,
+        #                     lambda f: f['day'].value == 0),
+        #                 dose_masks=(
+        #                     dose[max_cap], dose[max_cap], dose[cap]
+        #                 ),
+        #                 interval_masks=(
+        #                     int_fixed[7], int_fixed[3], int_fixed[2])),
+        #             'day')
+
+        #     name = f'daily_{int(cap):02}'
+        #     if name not in current_action_definitions:
+        #         self.possible_actions.add_definition(
+        #             name, functools.partial(
+        #                 _generate,
+        #                 ops=(lambda f: f['day'].value > 0,),
+        #                 dose_masks=(dose[max_cap], dose[cap]),
+        #                 interval_masks=(int_fixed[1], int_fixed[1])),
+        #             'day')
+
+        #     name = f'free_{int(cap):02}'
+        #     if name not in current_action_definitions:
+        #         self.possible_actions.add_definition(
+        #             name, functools.partial(
+        #                 _generate,
+        #                 ops=(lambda f: f['day'].value > 0,),
+        #                 dose_masks=(dose[max_cap], dose[cap]),
+        #                 interval_masks=({}, {})),
+        #             'day')
+
+        #     name = f'semi_{int(cap):02}'
+        #     if name not in current_action_definitions:
+        #         self.possible_actions.add_definition(
+        #             name, functools.partial(
+        #                 _generate,
+        #                 ops=(lambda f: f['day'].value > 0,),
+        #                 dose_masks=(dose[max_cap], dose[cap]),
+        #                 interval_masks=(int_semi_free, int_semi_free)),
+        #             'day')
+
+        #     name = f'weekly_{int(cap):02}'
+        #     if name not in current_action_definitions:
+        #         self.possible_actions.add_definition(
+        #             name, functools.partial(
+        #                 _generate,
+        #                 ops=(lambda f: f['day'].value > 0,),
+        #                 dose_masks=(dose[max_cap], dose[cap]),
+        #                 interval_masks=(int_weekly, int_weekly)),
+        #             'day')
+
+        if name == '237_15':
+            return (
+                functools.partial(
+                    _generate,
+                    ops=(
+                        lambda f: f['day'].value >= 5,
+                        lambda f: f['day'].value == 2,
+                        lambda f: f['day'].value == 0),
+                    dose_masks=(
+                        dose[max_cap], dose[max_cap], dose[max_cap]
+                    ),
+                    interval_masks=(
+                        int_fixed[7], int_fixed[3], int_fixed[2])),
+                'day')
+
+        if name == 'daily_15':
+            return (
+                functools.partial(
+                    _generate, ops=(),
+                    dose_masks=(dose[max_cap],),
+                    interval_masks=(int_fixed[1],)),
+                'day')
+
+        if name == 'free_15':
+            return (
+                functools.partial(
+                    _generate, ops=(),
+                    dose_masks=(dose[max_cap],), interval_masks=({},)),
+                'day')
+
+        if name == 'semi_15':
+            return (
+                functools.partial(
+                    _generate, ops=(),
+                    dose_masks=(dose[max_cap],),
+                    interval_masks=(int_semi_free,)),
+                'day')
+
+        if name == 'weekly_15':
+            return (
+                functools.partial(
+                    _generate, ops=(lambda f: f['day'].value > 0,),
+                    dose_masks=(dose[max_cap],),
+                    interval_masks=(int_weekly,)),
+                'day')
+
+        if name == 'delta':
+            def delta_dose(feature: FeatureSet) -> FeatureGeneratorType:
+                self.action_gen_set.unmask('dose_change')
+                self.action_gen_set.unmask('interval')
+                last_dose: float = \
+                    feature['daily_dose_history'].value[-1]  # type: ignore
+                day: int = feature['day'].value  # type: ignore
+                min_dose, max_dose = self._dose_range
+                min_delta = min_dose - last_dose
+                max_delta = max_dose - last_dose
+                d_list = self.generate_dose_values(min_dose, max_dose)
+                d_list = set((*d_list, *(-x for x in d_list)))
+                d_mask = {
+                    d: min_delta if d < min_delta else max_delta
+                    for d in d_list
+                    if not (min_delta <= d <= max_delta)
+                }
+                self.action_gen_set.mask('dose_change', d_mask)
+
+                if day >= 5:
+                    interval_mask = int_fixed[7]
+                elif day == 2:
+                    interval_mask = int_fixed[3]
+                elif day == 0:
+                    interval_mask = int_fixed[2]
+                else:
+                    raise ValueError(f'wrong day: {day}.')
+
+                self.action_gen_set.mask('interval', interval_mask)
+
+                return self.action_gen_set.make_generator()
+
+            return delta_dose, 'day_and_last_dose'
+
+        if name == 'percent_interval':
+            def percent_dose(feature: FeatureSet) -> FeatureGeneratorType:
+                self.action_gen_set.unmask('dose_change_p')
+                self.action_gen_set.unmask('interval')
+                last_dose: float = \
+                    feature['daily_dose_history'].value[-1]  # type: ignore
+                day: int = feature['day'].value  # type: ignore
+                min_dose, max_dose = self._dose_range
+                all_ps: Tuple[float, ...] = \
+                    self.feature_gen_set['dose_change_p'].fixed_values  # type: ignore
+                permissibles = [
+                    p for p in all_ps
+                    if (min_dose <= last_dose * (1 + p) <= max_dose)
+                ]
+                min_p = min(permissibles)
+                max_p = max(permissibles)
+                p_mask = {
+                    p: min_p if p < min_p else max_p
+                    for p in all_ps
+                    if p not in permissibles
+                }
+                self.action_gen_set.mask('dose_change_p', p_mask)
+
+                if day >= 5:
+                    interval_mask = int_fixed[7]
+                    self.action_gen_set.mask('interval', interval_mask)
+                # elif day == 2:
+                #     interval_mask = int_fixed[3]
+                # elif day == 0:
+                #     interval_mask = int_fixed[2]
+                # else:
+                #     raise ValueError(f'wrong day: {day}.')
+
+                # self.action_gen_set.mask('interval', interval_mask)
+
+                return self.action_gen_set.make_generator()
+
+            return percent_dose, 'day_and_last_dose'
+
+        if name == 'percent':
+            def percent_dose(feature: FeatureSet) -> FeatureGeneratorType:
+                self.action_gen_set.unmask('dose_change_p')
+                last_dose: float = \
+                    feature['daily_dose_history'].value[-1]  # type: ignore
+                min_dose, max_dose = self._dose_range
+                all_ps: Tuple[float, ...] = \
+                    self.feature_gen_set['dose_change_p'].fixed_values  # type: ignore
+                permissibles = [
+                    p for p in all_ps
+                    if (min_dose <= last_dose * (1 + p) <= max_dose)
+                ]
+                min_p = min(permissibles)
+                max_p = max(permissibles)
+                p_mask = {
+                    p: min_p if p < min_p else max_p
+                    for p in all_ps
+                    if p not in permissibles
+                }
+                self.action_gen_set.mask('dose_change_p', p_mask)
+
+                return self.action_gen_set.make_generator()
+
+            return percent_dose, 'day_and_last_dose'
+
+    def _reward_def_reference(
+        self, name: str
+    ) -> Optional[Tuple[reil_functions.ReilFunction, str]]:
+        try:
+            return reward_definitions[name]
+        except KeyError:
+            return super()._reward_def_reference(name)
 
     def _sub_comp_age(self, _id: int, **kwargs: Any) -> Feature:
         return super()._numerical_sub_comp('age')
