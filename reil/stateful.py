@@ -40,7 +40,7 @@ from reil import reilbase
 from reil.datatypes.components import (State, Statistic,
                                        SubComponentInfo)
 from reil.datatypes.entity_register import EntityRegister
-from reil.datatypes.feature import Feature, FeatureSet, NoneFeature
+from reil.datatypes.feature import Feature, NoneFeature
 from reil.datatypes.feature_set_dumper import FeatureSetDumper
 from reil.utils.metrics import MetricProtocol
 from reil.utils.tf_utils import SummaryWriter
@@ -68,15 +68,11 @@ class Stateful(reilbase.ReilBase):
 
         sub_comp_list = self._extract_sub_components()
         self.state = State(
-            self, sub_comp_list, self._default_state_definition,
+            self, sub_comp_list,
             dumper=state_dumper, pickle_stripped=True)
-
-        if 'none' not in self.state._definitions:
-            self.state.add_definition('none', ('none', {}))
 
         self.statistic = Statistic(
             name='statistic', state=self.state,
-            default_definition=self._default_statistic_definition,
             pickle_stripped=True)
 
         self._entity_list = EntityRegister(
@@ -84,17 +80,14 @@ class Stateful(reilbase.ReilBase):
             max_entity_count=max_entity_count,
             unique_entities=unique_entities)
 
-    def _default_state_definition(
-            self, _id: Optional[int] = None) -> FeatureSet:
-        return FeatureSet(NoneFeature)
-
-    def _default_statistic_definition(
-            self, _id: Optional[int] = None) -> Tuple[FeatureSet, float]:
-        return (self._default_state_definition(_id), 0.0)
-
     def _generate_state_defs(self) -> None:
-        self.state.add_definition(
-            'none', ('none', {}))
+        if 'none' not in self.state.definitions:
+            self.state.add_definition('none', ('none', {}))
+
+    def _state_def_reference(
+            self, name: str) -> Optional[Tuple[Tuple[str, Dict[str, Any]], ...]]:
+        if name == 'none':
+            return (('none', {}),)
 
     def _generate_statistic_defs(self) -> None:
         raise NotImplementedError
@@ -236,6 +229,6 @@ class Stateful(reilbase.ReilBase):
                 f'{self.statistic._state}. Resetting the value!')
             self.statistic._state = self.state
 
-        self.state.set_default_definition(self._default_state_definition)
-        self.statistic.set_default_definition(
-            self._default_statistic_definition)
+        # self.state.set_default_definition(self._default_state_definition)
+        # self.statistic.set_default_definition(
+        #     self._default_statistic_definition)
