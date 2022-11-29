@@ -8,7 +8,7 @@ This `subject` class is the base class of all subject classes.
 
 import copy
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from reil import stateful
 from reil.datatypes.components import ActionSet, Reward
@@ -41,23 +41,14 @@ class Subject(stateful.Stateful):
         self.reward = Reward(
             name='reward',
             state=self.state,
-            default_definition=self._default_reward_definition,
             enabled=False, pickle_stripped=True)
 
         self.possible_actions = ActionSet(
             name='action',
             state=self.state,
-            default_definition=self._default_action_definition,
             enabled=True, pickle_stripped=True)
 
         Subject._generate_reward_defs(self)
-
-    def _default_reward_definition(self, _id: Optional[int] = None) -> float:
-        return 0.0
-
-    def _default_action_definition(
-            self, _id: Optional[int] = None) -> FeatureGeneratorType:
-        raise NotImplementedError
 
     def _generate_reward_defs(self) -> None:
         if 'no_reward' not in self.reward.definitions:
@@ -66,6 +57,11 @@ class Subject(stateful.Stateful):
 
     def _generate_action_defs(self) -> None:
         raise NotImplementedError
+
+    def _action_def_reference(
+        self, name: str
+    ) -> Optional[Tuple[Callable[..., FeatureGeneratorType], str]]:
+        return None
 
     @abstractmethod
     def is_terminated(self, _id: Optional[int] = None) -> bool:
@@ -167,8 +163,8 @@ class Subject(stateful.Stateful):
                 f'{self.reward._state}. Resetting the value!')
             self.reward._state = self.state
 
-        self.reward.set_default_definition(
-            self._default_reward_definition)
+        # self.reward.set_default_definition(
+        #     self._default_reward_definition)
 
         try:
             self.possible_actions.set_state(self.state)
@@ -179,8 +175,8 @@ class Subject(stateful.Stateful):
                 'Resetting the value!')
             self.possible_actions._state = self.state
 
-        self.possible_actions.set_default_definition(
-            self._default_action_definition)
+        # self.possible_actions.set_default_definition(
+        #     self._default_action_definition)
 
         if '_action_taken' not in self.__dict__:
             self._actions_taken = []
