@@ -76,8 +76,8 @@ class DeepA2CModel(keras.Model):
 
         self._critic_output = keras.layers.Dense(1, name='critic_output')
 
-        self.compile(optimizer=keras.optimizers.Adam(  # type: ignore
-            learning_rate=self._learning_rate))
+        self.compile(optimizer=keras.optimizers.Adam(
+            learning_rate=self._learning_rate))  # type: ignore
 
     def get_config(self) -> Dict[str, Any]:
         config: Dict[str, Any] = dict(
@@ -126,12 +126,12 @@ class DeepA2CModel(keras.Model):
             x_actor = layer(x_actor, training=training)
 
         action_probs: List[tf.Tensor] = [
-            layer(x_actor) for layer in self._actor_outputs]
+            layer(x_actor) for layer in self._actor_outputs]  # type: ignore
 
         for layer in self._critic_layers:
             x_critic = layer(x_critic, training=training)
 
-        values: List[tf.Tensor] = self._critic_output(x_critic)
+        values: List[tf.Tensor] = self._critic_output(x_critic)  # type: ignore
 
         return action_probs, values
 
@@ -155,7 +155,7 @@ class DeepA2CModel(keras.Model):
             name='normalized_returns')
 
         with tf.GradientTape() as tape:
-            action_probs, values = self(x, training=True)
+            action_probs, values = self(x, training=True)  # type: ignore
             logits_concat = tf.math.log(
                 tf.concat(action_probs, axis=1, name='all_logits') + eps)
             values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
@@ -167,7 +167,7 @@ class DeepA2CModel(keras.Model):
                 entropy_loss = 0.0
 
             if self._critic_loss_coef:
-                critic_loss = self._critic_loss_coef * huber_loss(
+                critic_loss = self._critic_loss_coef * huber_loss(  # type: ignore
                     y_true=values, y_pred=normalized_returns)
             else:
                 critic_loss = 0.0
@@ -186,7 +186,7 @@ class DeepA2CModel(keras.Model):
                 _loss = -tf.reduce_sum(advantage * tf.squeeze(log_prob))
                 actor_loss += _loss
 
-                with tape.stop_recording():
+                with tape.stop_recording():  # type: ignore
                     self._actor_accuracy.update_state(y_slice, logits_slice)
                     self._action_rank.update_state(y_slice, logits_slice)
 
@@ -221,7 +221,7 @@ class DeepA2CModel(keras.Model):
             tf.math.reduce_std(returns) + eps,
             name='normalized_returns')
 
-        action_probs, values = self(x, training=False)
+        action_probs, values = self(x, training=False)  # type: ignore
         logits_concat = tf.math.log(
             tf.concat(action_probs, axis=1, name='all_logits') + eps)
         values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
@@ -233,7 +233,7 @@ class DeepA2CModel(keras.Model):
             entropy_loss = 0.0
 
         if self._critic_loss_coef:
-            critic_loss = self._critic_loss_coef * huber_loss(
+            critic_loss = self._critic_loss_coef * huber_loss(  # type: ignore
                 y_true=values, y_pred=normalized_returns)
         else:
             critic_loss = 0.0
@@ -286,7 +286,8 @@ class DeepA2CModel(keras.Model):
         #             profiler_outdir=str(self._tensorboard_path)
         #         )
 
-        self.optimizer.apply_gradients(zip(gradient, self.trainable_variables))
+        self.optimizer.apply_gradients(  # type: ignore
+            zip(gradient, self.trainable_variables))
 
         metrics = {metric.name: metric.result() for metric in self.metrics}
 
@@ -397,7 +398,7 @@ class DeepA2CActionProximityModel(DeepA2CModel):
             name='normalized_returns')
 
         with tf.GradientTape() as tape:
-            action_probs, values = self(x, training=True)
+            action_probs, values = self(x, training=True)  # type: ignore
             logits_concat = tf.math.log(
                 tf.concat(action_probs, axis=1, name='all_logits') + eps)
             values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
@@ -409,7 +410,7 @@ class DeepA2CActionProximityModel(DeepA2CModel):
                 entropy_loss = 0.0
 
             if self._critic_loss_coef:
-                critic_loss = self._critic_loss_coef * huber_loss(
+                critic_loss = self._critic_loss_coef * huber_loss(  # type: ignore
                     y_true=values, y_pred=returns)
             else:
                 critic_loss = 0.0
@@ -503,7 +504,7 @@ class DeepA2CActionProximityModel(DeepA2CModel):
             tf.math.reduce_std(returns) + eps,
             name='normalized_returns')
 
-        action_probs, values = self(x, training=False)
+        action_probs, values = self(x, training=False)  # type: ignore
         logits_concat = tf.math.log(
             tf.concat(action_probs, axis=1, name='all_logits') + eps)
         values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
@@ -515,7 +516,7 @@ class DeepA2CActionProximityModel(DeepA2CModel):
             entropy_loss = 0.0
 
         if self._critic_loss_coef:
-            critic_loss = self._critic_loss_coef * huber_loss(
+            critic_loss = self._critic_loss_coef * huber_loss(  # type: ignore
                 y_true=values, y_pred=returns)
         else:
             critic_loss = 0.0
@@ -638,7 +639,8 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         :
             The predicted `y`.
         '''
-        return self._model(self.convert_to_tensor(X), training=training)
+        return self._model(  # type: ignore
+            self.convert_to_tensor(X), training=training)
 
     def learn(
             self, X: Tuple[FeatureSet, ...],
