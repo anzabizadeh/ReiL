@@ -13,6 +13,7 @@ from reil.datatypes.feature import (MISSING, Feature, FeatureGenerator,
 from reil.healthcare.patient import Patient
 from reil.serialization import deserialize, serialize
 from reil.subjects.subject import Subject
+from reil.utils import reil_functions
 
 
 class HealthSubject(Subject):
@@ -29,6 +30,7 @@ class HealthSubject(Subject):
             interval_range: Tuple[int, int],
             backfill: bool,
             interval_step: int = 1,
+            default_interval: Optional[int] = None,
             **kwargs: Any):
         '''
         Arguments
@@ -58,6 +60,9 @@ class HealthSubject(Subject):
 
         interval_step:
             Minimum number of days between two measurements.
+
+        default_interval:
+            Used if the interval is not provided as part of the action.
         '''
 
         super().__init__(max_entity_count=1, **kwargs)
@@ -68,6 +73,7 @@ class HealthSubject(Subject):
 
         self._interval_range = interval_range
         self._interval_step = interval_step
+        self._default_interval = default_interval
         self._measurement_range = measurement_range
         self._measurement_name = measurement_name
 
@@ -139,6 +145,10 @@ class HealthSubject(Subject):
         if 'day' not in self.state.definitions:
             self.state.add_definition(
                 'day', ('day', {}))
+
+    def _reward_def_reference(
+            self, name: str) -> Optional[Tuple[reil_functions.ReilFunction, str]]:
+        raise NotImplementedError
 
     @classmethod
     def _empty_instance(cls):
