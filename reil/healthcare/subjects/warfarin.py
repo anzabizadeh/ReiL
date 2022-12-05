@@ -146,6 +146,8 @@ reward_definitions: Dict[str, Tuple[reil_functions.ReilFunction[float, int], str
     )
 )
 
+statistic_definition_names = ['PTTR_exact_basic', 'PTTR_exact']
+
 statistic_PTTR = reil_functions.PercentInRange(
     name='PTTR', y_var_name='daily_INR_history',
     length=-1, multiplier=1.0,  interpolate=False,
@@ -222,6 +224,9 @@ class Warfarin(DosingSubject):
         self.reward.definition_reference_function(
             f=self._reward_def_reference,
             available_definitions=list(reward_definitions))
+        self.statistic.definition_reference_function(
+            f=self._statistic_def_reference,
+            available_definitions=list(statistic_definition_names))
 
     def get_config(self) -> Dict[str, Any]:
         config = super().get_config()
@@ -799,6 +804,13 @@ class Warfarin(DosingSubject):
             return reward_definitions[name]
         except KeyError:
             return super()._reward_def_reference(name)
+
+    def _statistic_def_reference(self, name: str):
+        if name == 'PTTR_exact_basic':
+            return statistic_PTTR, 'daily_INR', 'patient_w_sensitivity_basic'
+
+        if name == 'PTTR_exact':
+            return statistic_PTTR, 'daily_INR', 'patient_w_sensitivity'
 
     def _sub_comp_age(self, _id: int, **kwargs: Any) -> Feature:
         return super()._numerical_sub_comp('age')
