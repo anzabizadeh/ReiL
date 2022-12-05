@@ -36,7 +36,7 @@ class RickerWavelet:
             tf.TensorSpec(shape=[None], dtype=tf.float32, name='t'),
         )
     )
-    def _f(coef, one_over_s2, t):
+    def _f(coef: tf.Tensor, one_over_s2: tf.Tensor, t: tf.Tensor) -> tf.Tensor:
         t2 = tf.math.pow(t, 2.)
         return coef * (1. - t2 * one_over_s2) * tf.exp(-t2 * one_over_s2 * 0.5)
 
@@ -52,7 +52,7 @@ class RickerWavelet2:
         self.t = t
         self.t2 = tf.math.pow(t, 2.)
 
-    def f(self, sigma: tf.Tensor):
+    def f(self, sigma: tf.Tensor) -> tf.Tensor:
         coef, one_over_s2 = self._prep(sigma)
         return self._f(coef, one_over_s2, self.t2)
 
@@ -77,5 +77,11 @@ class RickerWavelet2:
             tf.TensorSpec(shape=[None], dtype=tf.float32, name='t2'),
         )
     )
-    def _f(coef, one_over_s2, t2):
-        return coef * (1. - t2 * one_over_s2) * tf.exp(-t2 * one_over_s2 * 0.5)
+    def _f(coef: tf.Tensor, one_over_s2: tf.Tensor, t2: tf.Tensor):
+        return tf.multiply(
+            coef,
+            tf.multiply(
+                1. - tf.multiply(t2, one_over_s2),
+                tf.exp(tf.multiply(-0.5, tf.multiply(t2, one_over_s2)))
+            )
+        )
