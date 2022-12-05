@@ -6,12 +6,14 @@ Environment class
 The base class of all learning environments in which one or more `agents` act
 on one or more `subjects`.
 '''
+import dataclasses
 import inspect
 from collections import defaultdict
-from typing import (Any, Callable, Dict, Generator, NamedTuple, Optional,
-                    Tuple, TypeVar, Union)
+from typing import (Any, Callable, Dict, Generator, Generic, Optional, Tuple,
+                    TypeVar, Union)
 
 import pandas as pd
+
 from reil import stateful
 from reil.agents.agent_base import AgentBase
 from reil.agents.agent_demon import AgentDemon
@@ -39,7 +41,8 @@ EntityGenType = Union[
 PlanDetails = TypeVar('PlanDetails')
 
 
-class Plan(NamedTuple):
+@dataclasses.dataclass
+class Plan(Generic[PlanDetails]):
     name: Optional[str] = None
     plan: Optional[PlanDetails] = None
 
@@ -96,7 +99,7 @@ class Environment(stateful.Stateful):
             Tuple[str, str],
             Generator[Union[FeatureSet, None], Any, None]] = {}
         self._plans: Dict[str, Any] = {}
-        self._active_plan: Plan = Plan()
+        self._active_plan: Plan[InteractionProtocol] = Plan()
 
         self._stopping_criteria = stopping_criteria
 

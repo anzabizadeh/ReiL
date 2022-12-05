@@ -7,10 +7,11 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
+from typing import (Any, Dict, Generator, List, NamedTuple, Optional, Tuple,
                     TypedDict, Union)
 
 import pandas as pd
+
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol, Observation
 from reil.datatypes.feature import FeatureSet
@@ -31,12 +32,11 @@ class StatInfo(NamedTuple):
 
 class InteractArgs(TypedDict):
     agent_id: int
+    subject_id: int
     agent_observer: Generator[
         Union[FeatureSet, None], Dict[str, Any], None]
     subject_instance: Union[Subject, SubjectDemon]
-    state_name: str
-    action_name: str
-    reward_name: str
+    protocol: InteractionProtocol
     iteration: int
 
 
@@ -210,6 +210,12 @@ class Single(Environment):
             lookahead_action_type = lookahead.action_type
             lookahead_reward_name = lookahead.reward_name
             agent = self._agents[subject_instance._entity_list[agent_id]]
+        else:
+            steps = 0
+            subject_count = 0
+            lookahead_action_type = ''
+            lookahead_reward_name = ''
+            agent = self._agents[subject_instance._entity_list[agent_id]]
 
         for _ in range(times):
             reward = subject_instance.reward(
@@ -242,8 +248,9 @@ class Single(Environment):
                 if lookahead is None:
                     lookahead_data = None
                 else:
-                    subject_pool = subject_instance.copy(
-                        perturb=lookahead.perturb_subject, n=subject_count)
+                    subject_pool: Union[List[Subject], List[SubjectDemon]] = \
+                        subject_instance.copy(  # type: ignore
+                            perturb=lookahead.perturb_subject, n=subject_count)
                     lookahead_data = [
                         []
                         for _ in range(subject_count)
@@ -252,6 +259,8 @@ class Single(Environment):
                     if lookahead_action_type == 'optimal':
                         current_trigger, agent._training_trigger = (
                             agent._training_trigger, 'none')
+                    else:
+                        current_trigger = agent._training_trigger
 
                     if lookahead_action_type == 'fixed':
                         def act(state, _id, actions, iteration):
@@ -281,6 +290,10 @@ class Single(Environment):
                                     action, agent_id)  # type: ignore
                                 lookahead_reward = subject.reward(
                                     name=lookahead_reward_name, _id=agent_id)
+                            else:
+                                lookahead_action = None
+                                lookahead_action_taken = None
+                                lookahead_reward = None
                             lookahead_data[i].append(Observation(
                                 state=lookahead_state,
                                 possible_actions=lookahead_possible_actions,
@@ -292,7 +305,8 @@ class Single(Environment):
                         if not subject.is_terminated(agent_id):
                             possible_actions = subject.possible_actions(
                                 name=action_name, _id=agent_id)
-                            next(possible_actions)
+                            if possible_actions:
+                                next(possible_actions)
                             lookahead_data[i].append(Observation(
                                 state=subject.state(
                                     name=state_name, _id=agent_id),
@@ -328,7 +342,7 @@ class Single(Environment):
         agent_name = protocol.agent.name
         a_s_name = (agent_name, subject_name)
         agent_id, subject_id = self._assignment_list[a_s_name]
-        if agent_id is None:
+        if agent_id is None or subject_id is None:
             raise ValueError(f'{a_s_name} are not assigned!')
 
         subject_demon = protocol.subject.demon_name
