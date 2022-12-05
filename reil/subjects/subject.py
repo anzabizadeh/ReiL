@@ -48,7 +48,12 @@ class Subject(stateful.Stateful):
             state=self.state,
             enabled=True, pickle_stripped=True)
 
+        Subject._generate_state_defs(self)
         Subject._generate_reward_defs(self)
+
+    def _generate_state_defs(self) -> None:
+        if 'default' not in self.state.definitions:
+            self.state.add_definition('default', ('none', {}))
 
     def _generate_reward_defs(self) -> None:
         if 'no_reward' not in self.reward.definitions:
@@ -61,6 +66,13 @@ class Subject(stateful.Stateful):
     def _action_def_reference(
         self, name: str
     ) -> Optional[Tuple[Callable[..., FeatureGeneratorType], str]]:
+        return None
+
+    def _state_def_reference(
+            self, name: str) -> Optional[Tuple[Tuple[str, Dict[str, Any]], ...]]:
+        if name == 'default':
+            return ('none', {}),
+
         return None
 
     @abstractmethod
