@@ -53,9 +53,6 @@ class MockStatistic:
         return self._obj.statistic.add_definition(
             name, fn, stat_component, aggregation_component)
 
-    def default(self, _id: Optional[int] = None) -> Tuple[FeatureSet, float]:
-        return self._obj.statistic.default(_id)
-
     def __call__(
             self,
             name: str,
