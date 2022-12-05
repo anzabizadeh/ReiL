@@ -76,11 +76,11 @@ class PPOModel(TF2UtilsMixin):
             input_, self._actor_layer_sizes, actor_hidden_activation, 'actor_{i:0>2}')
         logit_heads = TF2UtilsMixin.mpl_layers(
             output_lengths, actor_head_activation, 'actor_output_{i:0>2}')
-        logits = [output(actor_layers) for output in logit_heads]
+        logits = tuple(output(actor_layers) for output in logit_heads)
 
         self.actor = keras.Model(
             inputs=input_,
-            outputs=logits if len(logits) > 1 else [logits])
+            outputs=logits if len(logits) > 1 else tuple(logits))
 
         critic_layers = TF2UtilsMixin.mlp_functional(
             input_, self._critic_layer_sizes, critic_hidden_activation, 'critic_{i:0>2}')
