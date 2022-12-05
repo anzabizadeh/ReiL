@@ -9,11 +9,11 @@ and `statistic`.
 from __future__ import annotations
 
 import dataclasses
-from collections import defaultdict
 from typing import (Any, Callable, DefaultDict, Dict, Generic, List, Optional,
                     Tuple, TypeVar, Union)
 
 import pandas as pd
+
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.datatypes.feature_set_dumper import FeatureSetDumper
 
@@ -437,7 +437,9 @@ class Statistic:
         self._pickle_stripped = pickle_stripped
 
         self._definitions: Dict[
-            str, SubComponentInstance[Tuple[str, str]]] = defaultdict(None)
+            str, Optional[SubComponentInstance[Tuple[str, str]]]] = {}
+        self._definition_reference_function: Optional[Callable[
+            [str], Optional[Tuple[Callable[..., Any], str, str]]]] = None
 
         self._history: Dict[
             int, List[Tuple[FeatureSet, float]]] = DefaultDict(list)
@@ -511,7 +513,7 @@ class Statistic:
         ValueError
             Undefined primary component name.
         '''
-        if name in self._definitions:
+        if self._definitions.get(name, []):
             raise ValueError(f'Definition {name} already exists.')
 
         if self._state is None:
@@ -527,6 +529,16 @@ class Statistic:
 
         self._definitions[name] = SubComponentInstance[Tuple[str, str]](
             name=name, fn=fn, args=(aggregation_component, stat_component))
+
+    def definition_reference_function(
+        self,
+        f: Callable[
+            [str], Optional[Tuple[Callable[..., Any], str, str]]],
+        available_definitions: List[str]
+    ):
+        self._definition_reference_function = f
+        for d in set(available_definitions).difference(self._definitions):
+            self._definitions[d] = None
 
     def __call__(
             self,
@@ -558,15 +570,21 @@ class Statistic:
         if not self._enabled:
             return None
 
+        if self._definitions.get(name) is None:
+            if self._definition_reference_function:
+                def_args = self._definition_reference_function(name)
+                if def_args:
+                    self.add_definition(name, *def_args)
+
+        d = self._definitions.get(name)
+
+        if d is None:
+            raise ValueError(f'Definition {name} not found.')
+
         if self._state is None:
             raise ValueError(
                 'Primary component is not defined. '
                 'Use `set_state` to specify it.')
-
-        try:
-            d = self._definitions[name]
-        except KeyError:
-            raise ValueError(f'Definition {name} not found.')
 
         agg, comp_name = d.args
 
