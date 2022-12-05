@@ -6,9 +6,10 @@ SubjectDemon class
 `SubjectDemon` class changes the behavior of a given subject.
 '''
 from __future__ import annotations
+import copy
 
 import dataclasses
-from typing import Any, Callable, Generic, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, List, Optional, TypeVar, Union
 
 from reil.datatypes.components import Reward, Statistic
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
@@ -170,8 +171,37 @@ class SubjectDemon(ReilBase):
     # ) -> pathlib.PurePath:
     #     return super().save(filename, path)
 
+    @property
+    def _entity_list(self):
+        return self._subject._entity_list
+
+    @_entity_list.setter
+    def _entity_list(self, arg):
+        self._subject._entity_list = arg
+
     def register(self, entity_name: str, _id: Optional[int] = None) -> int:
         return self._subject.register(entity_name, _id)
 
     def deregister(self, entity_id: int) -> None:
         return self._subject.deregister(entity_id)
+
+    def copy(
+        self, perturb: bool = False, n: Optional[int] = None
+    ) -> Union['SubjectDemon', List['SubjectDemon']]:
+        '''
+        Returns a copy of the subject.
+
+        Arguments
+        ---------
+        perturb:
+            `False` should return an exact copy. `True` should be a subject
+            with the same current `state`, but other attributes might change
+            depending on the implementation.
+        '''
+        if perturb:
+            raise NotImplementedError
+
+        if n is None:
+            return copy.deepcopy(self)
+
+        return [copy.deepcopy(self) for _ in range(n)]
