@@ -5,7 +5,7 @@ PPOLearner class
 
 '''
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -352,6 +352,9 @@ class PPONeighborEffect(PPOModel):
         critic_train_iterations: int,
         GAE_lambda: float,
         target_kl: float,
+        actor_hidden_activation: str = 'relu',
+        actor_head_activation: Optional[str] = None,
+        critic_hidden_activation: str = 'relu',
         clip_ratio: Optional[float] = None,
         critic_clip_range: Optional[float] = None,
         max_grad_norm: Optional[float] = None,
@@ -359,6 +362,7 @@ class PPONeighborEffect(PPOModel):
         entropy_loss_coef: float = 0.0,
         effect_widths: Union[int, Tuple[int, ...]] = 0,
         effect_decay_factors: Union[float, Tuple[float, ...]] = 0.,
+        effect_prob: Union[float, Callable[[], tf.Tensor]] = 1.0,
         regularizer_coef: float = 0.0
     ) -> None:
         super().__init__(
@@ -372,6 +376,9 @@ class PPONeighborEffect(PPOModel):
             critic_train_iterations=critic_train_iterations,
             GAE_lambda=GAE_lambda,
             target_kl=target_kl,
+            actor_hidden_activation=actor_hidden_activation,
+            actor_head_activation=actor_head_activation,
+            critic_hidden_activation=critic_hidden_activation,
             clip_ratio=clip_ratio,
             critic_clip_range=critic_clip_range,
             max_grad_norm=max_grad_norm,
@@ -407,6 +414,15 @@ class PPONeighborEffect(PPOModel):
         self._effect_decay_factors = tf.constant(
             _effect_decay_factors, name='effect_decay_factors',
             dtype=tf.float32)
+        if isinstance(effect_prob, float):
+            probability = tf.constant(effect_prob)
+
+            def effect_probability() -> tf.Tensor:
+                return probability
+        else:
+            effect_probability = effect_prob
+
+            self._effect_prob = effect_probability
 
     def get_config(self) -> Dict[str, Any]:
         config = super().get_config()
@@ -472,9 +488,12 @@ class PPONeighborEffect(PPOModel):
                     output_length = tf.gather(self._output_lengths, j)
 
                     j_one_hot = tf.one_hot(j, depth=m, dtype=tf.int32)
-                    effect_width = tf.dynamic_partition(  # type: ignore
-                        self._effect_widths, j_one_hot, 2)[1][0]
-
+                    effect_width = tf.cond(
+                        tf.less(tf.random.uniform([1]), self._effect_prob()),
+                        lambda: tf.dynamic_partition(  # type: ignore
+                            self._effect_widths, j_one_hot, 2)[1][0],
+                        lambda: 0
+                    )
                     new_logprobs = self.logprobs(
                         logits_slice, y_slice, output_length)
                     if tf.equal(effect_width, 0):
@@ -490,7 +509,9 @@ class PPONeighborEffect(PPOModel):
                         else:
                             actor_loss = -tf.reduce_mean(ratio * _advantage)
                     else:
-                        for diff in tf.range(-effect_width, effect_width + 1):
+                        for diff in tf.range(
+                                tf.negative(effect_width),
+                                tf.reduce_sum(effect_width, 1)):
                             temp = y_slice + diff
                             _length = tf.dynamic_partition(  # type: ignore
                                 lengths, j_one_hot, 2)[1][0]
