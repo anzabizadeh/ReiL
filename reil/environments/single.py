@@ -16,7 +16,7 @@ from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol, Observation
 from reil.datatypes.feature import FeatureSet
 from reil.environments.environment import (EntityGenType, EntityType,
-                                           Environment)
+                                           Environment, Plan)
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 
@@ -71,6 +71,7 @@ class Single(Environment):
         super().__init__(
             entity_dict=entity_dict, demon_dict=demon_dict,
             interaction_plans=interaction_plans, **kwargs)
+        self._active_plan: Plan[InteractionProtocol]
 
     def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
         '''

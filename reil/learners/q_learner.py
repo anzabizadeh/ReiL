@@ -55,8 +55,8 @@ class DeepQModel(keras.Model):
         # self._argmax = keras.Model(self._inputs, argmax_layer, name='argmax_Q')
 
         self.compile(
-            optimizer=keras.optimizers.Adam(  # type: ignore
-                learning_rate=self._learning_rate), loss='mae')
+            optimizer=keras.optimizers.Adam(
+                learning_rate=self._learning_rate), loss='mae')  # type: ignore
 
     def call(self, inputs):
         x = inputs
@@ -208,7 +208,7 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
             actions: Tuple[FeatureSet, ...]) -> Tuple[FeatureSet, FeatureSet]:
         _X = [self.convert_to_tensor(states), self.convert_to_tensor(actions)]
 
-        index = self._model.argmax(_X).numpy()[0]
+        index = self._model.argmax(_X).numpy()[0]  # type: ignore
         try:
             state = states[index]
         except IndexError:
@@ -226,12 +226,12 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
             actions: Tuple[FeatureSet, ...]) -> float:
         inputs = [
             self.convert_to_tensor(states), self.convert_to_tensor(actions)]
-        return self._model.max(inputs)
+        return self._model.max(inputs)  # type: ignore
 
     def predict(
             self, X: Tuple[Tuple[FeatureSet, ...], ...],
             training: Optional[bool] = None) -> Tuple[float, ...]:
-        return self._model(
+        return self._model(  # type: ignore
             [self.convert_to_tensor(x) for x in X])
 
     def learn(
@@ -255,7 +255,7 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
         metrics = self._model.fit(  # type: ignore
             _X, tf.convert_to_tensor(Y),  # type: ignore
             initial_epoch=self._iteration, epochs=self._iteration + 1,
-            verbose=0).history
+            verbose=0).history  # type: ignore
 
         if self._summary_writer:
             with self._summary_writer.as_default(step=self._iteration):
@@ -288,7 +288,8 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
         if self._tensorboard_path:
             self._summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
-                    str(self._tensorboard_path / self._tensorboard_filename))
+                    (self._tensorboard_path / self._tensorboard_filename
+                     ).__str__())  # type: ignore
 
 
 if tf.__version__[0] == '1':  # type: ignore

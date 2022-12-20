@@ -69,7 +69,7 @@ class Session:
                 if separate_process and context:
                     environment.save(
                         filename=filename, path=path)
-                    p = context.Process(
+                    p = context.Process(  # type: ignore
                         target=t.run_file, args=(filename, path, iteration))
                     p.start()
                 else:

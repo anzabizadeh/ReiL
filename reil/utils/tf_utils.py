@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pathlib
 import random
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, Tuple, Type, Union
 
 import tensorflow as tf
 from reil import reilbase
@@ -196,7 +196,7 @@ class TF2UtilsMixin(reilbase.ReilBase):
 
         if self._tensorboard_path is not None:
             self._tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self._tensorboard_path)
+                log_dir=self._tensorboard_path.__str__())
 
         if not isinstance(self._learning_rate,
                           ConstantLearningRate):
@@ -237,12 +237,12 @@ class TF2UtilsMixin(reilbase.ReilBase):
             for name in _models:
                 self.__dict__[name] = SerializeTF().load(
                     state[f'_serialized_{name}'])
-            del state[f'_serialized_{name}']
+                del state[f'_serialized_{name}']
         else:
             for name, model in _models.items():
                 self.__dict__[name] = SerializeTF(
                     cls=model).load(state[f'_serialized_{name}'])
-            del state[f'_serialized_{name}']
+                del state[f'_serialized_{name}']
 
         self.__dict__.update(state)
 
@@ -353,8 +353,20 @@ class MaxLayer(keras.layers.Layer):
         return config
 
 
+if TYPE_CHECKING:
+    class MetricSerializerMixinProtocol(Protocol):
+        def __init__(self, name: str, *args, **kwargs) -> None:
+            ...
+        name: str
+        variables: List[Any]
+        _unconditional_dependency_names: Dict[str, Any]
+else:
+    class MetricSerializerMixinProtocol(Protocol):
+        ...
+
+
 class MetricSerializerMixin:
-    def __getstate__(self):
+    def __getstate__(self: MetricSerializerMixinProtocol) -> Dict[str, Any]:
         variables = {v.name: v.numpy() for v in self.variables}
         state = {
             name: variables[var.name]
@@ -363,7 +375,7 @@ class MetricSerializerMixin:
         state['name'] = self.name
         return state
 
-    def __setstate__(self, state: Dict[str, Any]):
+    def __setstate__(self: MetricSerializerMixinProtocol, state: Dict[str, Any]):
         self.__init__(name=state.pop('name'))
         for name, value in state.items():
             self._unconditional_dependency_names[name].assign(value)
@@ -387,21 +399,21 @@ class ActionRank(MetricSerializerMixin, keras.metrics.Metric):
     def update_state(self, y_true, y_pred, sample_weight=None):
         shape = tf.shape(y_pred)
         ranks = tf.math.top_k(y_pred, k=shape[1]).indices
-        self.count.assign_add(shape[0])
+        self.count.assign_add(shape[0])  # type: ignore
         locs = tf.equal(ranks, tf.expand_dims(y_true, axis=1))
-        self.cumulative_rank.assign_add(
+        self.cumulative_rank.assign_add(  # type: ignore
             tf.reduce_sum(tf.gather(tf.where(locs), 1, axis=1)))
 
     @tf.function
     def result(self):
         # ranks are zero-based. Add one to make it 1-based, which is more
         # intuitive.
-        return tf.divide(
-            self.cumulative_rank, tf.cast(self.count, tf.int64)) + 1.0
+        return tf.reduce_sum(tf.divide(
+            self.cumulative_rank, tf.cast(self.count, tf.int64)), 1.0)
 
     def reset_states(self):
-        self.cumulative_rank.assign(0)
-        self.count.assign(0)
+        self.cumulative_rank.assign(0)  # type: ignore
+        self.count.assign(0)  # type: ignore
 
 
 class MeanMetric(MetricSerializerMixin, keras.metrics.Mean):

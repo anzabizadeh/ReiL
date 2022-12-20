@@ -114,7 +114,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(None)
+        return cls(None)  # type: ignore
 
     @classmethod
     def from_instance_list(

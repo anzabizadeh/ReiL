@@ -7,7 +7,7 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-from typing import (Any, Dict, Generator, NamedTuple, Optional, Tuple,
+from typing import (Any, Dict, Generator, List, NamedTuple, Optional, Tuple,
                     TypedDict, Union)
 
 import pandas as pd
@@ -15,7 +15,7 @@ from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol
 from reil.datatypes.feature import FeatureSet
 from reil.environments.environment import (EntityGenType, EntityType,
-                                           Environment)
+                                           Environment, Plan)
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
 
@@ -31,12 +31,11 @@ class StatInfo(NamedTuple):
 
 class InteractArgs(TypedDict):
     agent_id: int
+    subject_id: int
     agent_observer: Generator[
         Union[FeatureSet, None], Dict[str, Any], None]
     subject_instance: Union[Subject, SubjectDemon]
-    state_name: str
-    action_name: str
-    reward_name: str
+    protocol: InteractionProtocol
     iteration: int
 
 
@@ -71,6 +70,7 @@ class Sequential(Environment):
         super().__init__(
             entity_dict=entity_dict, demon_dict=demon_dict,
             interaction_plans=interaction_plans, **kwargs)
+        self._active_plan: Plan[List[InteractionProtocol]]
 
     def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
         '''
@@ -192,7 +192,7 @@ class Sequential(Environment):
                 agent_name = protocol.agent.name
                 a_s_name = (agent_name, subject_name)
                 agent_id, subject_id = self._assignment_list[a_s_name]
-                if agent_id is None:
+                if agent_id is None or subject_id is None:
                     raise ValueError(f'{a_s_name} are not assigned!')
 
                 subject_instance = self._subjects[subject_name]

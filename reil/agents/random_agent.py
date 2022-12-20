@@ -6,6 +6,7 @@ RandomAgent class
 An agent that randomly chooses an action
 '''
 
+import random
 from typing import Any, Tuple
 
 from reil.agents.agent_base import AgentBase
@@ -20,7 +21,8 @@ class RandomAgent(AgentBase):
     def __init__(
             self, default_actions: Tuple[FeatureSet, ...] = (),
             **kwargs: Any):
-        super().__init__(default_actions=default_actions, **kwargs)
+        super().__init__(**kwargs)
+        self._default_actions = default_actions
 
     def act(self,
             state: FeatureSet,
@@ -46,4 +48,7 @@ class RandomAgent(AgentBase):
         :
             The action
         '''
+        if self._default_actions:
+            return random.choice(self._default_actions)
+
         return actions.send('choose feature exclusive')

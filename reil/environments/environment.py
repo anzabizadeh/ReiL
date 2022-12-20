@@ -99,7 +99,7 @@ class Environment(stateful.Stateful):
             Tuple[str, str],
             Generator[Union[FeatureSet, None], Any, None]] = {}
         self._plans: Dict[str, Any] = {}
-        self._active_plan: Plan[InteractionProtocol] = Plan()
+        self._active_plan = Plan()
 
         self._stopping_criteria = stopping_criteria
 

@@ -19,7 +19,7 @@ class FeatureSetDumper:
         pathlib.Path(self._path).mkdir(parents=True, exist_ok=True)
         if columns:
             with open(self._path / self._filename, 'a+', newline='') as f:
-                pd.DataFrame([], columns=columns).to_csv(
+                pd.DataFrame([], columns=columns).to_csv(  # type: ignore
                     f, header=True)
 
     def dump(

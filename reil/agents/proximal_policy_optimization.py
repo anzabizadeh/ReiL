@@ -51,6 +51,7 @@ class PPO(A2C):
             how to choose the `action` if more than one is candidate
             to be chosen.
         '''
+        self._learner: PPOLearner
         super(A2C, self).__init__(
             learner=learner, exploration_strategy=NoExploration(),
             variable_action_count=False,

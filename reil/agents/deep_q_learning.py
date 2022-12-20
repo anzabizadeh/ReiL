@@ -140,11 +140,12 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
             return 0.0
         return sum(
             sum(
-                (gamma ** n) * obs.reward
+                (gamma ** n) * obs.reward  # type: ignore
                 for n, obs in enumerate(subject_i[:-1], 1)
             ) + (
                 gamma ** len(subject_i) * self._max_q(
-                    subject_i[-1].state, subject_i[-1].possible_actions)
+                    subject_i[-1].state,  # type: ignore
+                    subject_i[-1].possible_actions)
                 if subject_i[-1].possible_actions is not None
                 else 0.0
             )
@@ -173,7 +174,8 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
         active_history = self.get_active_history(history)
 
         discounted_next_q = [(
-            self._discount_factor * self._max_q(h.state, h.possible_actions)
+            self._discount_factor * self._max_q(
+                h.state, h.possible_actions)  # type: ignore
             if h.lookahead is None
             else self._compute_lookahead_term(h.lookahead, self._discount_factor)
         ) for h in active_history[1:]
@@ -182,7 +184,7 @@ class DeepQLearning(Agent[Tuple[FeatureSet, ...], float]):
         discounted_next_q.append(0.0)
 
         self._buffer.add_iter({
-            'state': h.state,
+            'state': h.state,  # type: ignore
             'action': h.action_taken or h.action,
             'Y': (h.reward or 0.0) + _q
         } for h, _q in zip(active_history, discounted_next_q))
