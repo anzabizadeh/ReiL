@@ -408,8 +408,8 @@ class ActionRank(MetricSerializerMixin, keras.metrics.Metric):
     def result(self):
         # ranks are zero-based. Add one to make it 1-based, which is more
         # intuitive.
-        return tf.reduce_sum(tf.divide(
-            self.cumulative_rank, tf.cast(self.count, tf.int64)), 1.0)
+        return tf.reduce_sum((tf.divide(
+            self.cumulative_rank, tf.cast(self.count, tf.int64)), 1.0))
 
     def reset_states(self):
         self.cumulative_rank.assign(0)  # type: ignore
