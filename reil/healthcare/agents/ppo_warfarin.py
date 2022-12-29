@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, Tuple
+from typing import Any, Callable, List, Literal, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -9,6 +9,7 @@ from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.dataclasses import History
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.utils.metrics import INRMetric, PTTRMetric
+from reil.utils.ricker_wavelet import RickerWavelet2
 
 
 class PPO4Warfarin(PPO):
@@ -18,6 +19,8 @@ class PPO4Warfarin(PPO):
             reward_clip: Tuple[Optional[float], Optional[float]] = ...,
             gae_lambda: float = 1, momentum_coef: float = 0.,
             momentum_mode: Literal['most recent', 'carry'] = 'most recent',
+            ricker_instances: Optional[List[
+                Tuple[RickerWavelet2, Callable[[tf.Tensor], tf.Tensor]]]] = None,
             **kwargs: Any):
         super().__init__(learner, buffer, reward_clip, gae_lambda, **kwargs)
         self._metrics['PTTR'] = PTTRMetric('PTTR')
@@ -26,6 +29,8 @@ class PPO4Warfarin(PPO):
             tf.zeros(x) for x in self._learner._model._output_lengths]
         self._momentum_coef = momentum_coef
         self._carry = momentum_mode == 'carry'
+        self._ricker_instances = ricker_instances or []
+        self._ricker_counter = tf.constant(0, dtype=tf.int32)
 
     def _update_metrics(self, **kwargs: Any) -> None:
         super()._update_metrics(**kwargs)
@@ -42,12 +47,18 @@ class PPO4Warfarin(PPO):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         training_mode = self._training_trigger != 'none'
-        logits = self._learner.predict((state,), training=training_mode)[0]
+        logits = list(self._learner.predict((state,), training=training_mode)[0])
         if training_mode:
             temp = logits
             for i, x in enumerate(self._previous_action):
                 logits[i] += self._momentum_coef * x
             self._previous_action = logits if self._carry else temp
+
+            self._ricker_counter += 1
+            for i, ricker in enumerate(self._ricker_instances):
+                if ricker is not None:
+                    r = ricker[0].f(ricker[1](self._ricker_counter))
+                    logits[i] += r
 
         mask = list(actions.send('return mask_vector'))
         mask_index = [
@@ -58,11 +69,6 @@ class PPO4Warfarin(PPO):
             tf.gather(lo, m, axis=1)
             for lo, m in zip(logits, mask_index)
         ]
-
-        # for i, l_ in enumerate(masked_logits):
-        #     if not tf.math.count_nonzero(l_):
-        #         masked_logits[i] = tf.ones_like(
-        #             logits[i]) * [j for j, m in enumerate(mask[i]) if not m]
 
         if training_mode:
             permissible_action_index = [
@@ -91,7 +97,7 @@ class PPO4Warfarin(PPO):
 
 class PPO4Warfarin2Phase(PPO4Warfarin):
     def __init__(
-        self, init_actor: AgentBase, switch_day: int,
+        self, init_agent: AgentBase, switch_day: int,
         init_state_comps: Tuple[str, ...], main_state_comps: Tuple[str, ...],
         learner: PPOLearner,
         buffer: Buffer[FeatureSet, Tuple[Tuple[int, ...], float, float]],
@@ -103,7 +109,7 @@ class PPO4Warfarin2Phase(PPO4Warfarin):
         super().__init__(
             learner, buffer, reward_clip,
             gae_lambda, momentum_coef, momentum_mode, **kwargs)
-        self._init_actor = init_actor
+        self._init_agent = init_agent
         self._switch_day = switch_day
         self._init_state_comps = init_state_comps
         self._main_state_comps = main_state_comps
@@ -116,7 +122,7 @@ class PPO4Warfarin2Phase(PPO4Warfarin):
             for f in set(val.keys()).difference(self._init_state_comps):
                 state.pop(f)
 
-            action = self._init_actor.act(state, subject_id, actions, iteration)
+            action = self._init_agent.act(state, subject_id, actions, iteration)
             return action
 
         for f in set(val.keys()).difference(self._main_state_comps):
