@@ -4,21 +4,56 @@ PPOLearner class
 ================
 
 '''
+from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras.optimizers.schedules as k_sch
+from tensorflow import Tensor, TensorSpec
+
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.utils.tf_utils import (MeanMetric, SparseCategoricalAccuracyMetric,
-                                 TF2UtilsMixin)
-from tensorflow import keras
+from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric, SparseCategoricalAccuracyMetric,
+                                 TF2UtilsMixin, entropy)
 
-ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
+keras = tf.keras
+from keras.optimizers.schedules.learning_rate_schedule import \
+    LearningRateSchedule  # noqa: E402
 
-eps = np.finfo(np.float32).eps.item()
+ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
+
+eps: Tensor = tf.constant(np.finfo(np.float32).eps.item(), dtype=tf.float32)
+zero_int32: Tensor = tf.constant(0, tf.int32)
+one_int32: Tensor = tf.constant(1, tf.int32)
+
+
+@keras.utils.register_keras_serializable(
+    package='reil.learners.ppo_learner')
+class N_over_N_plus_n:
+    def __init__(self, N: int) -> None:
+        self._N: int = N
+        self._n: int = 0
+
+    @tf.function(jit_compile=JIT_COMPILE)
+    def __call__(self) -> Tensor:
+        self._n += 1
+        return tf.cast(self._N / (self._N + self._n), tf.float32)  # type: ignore
+
+    def get_config(self) -> dict[str, Any]:
+        return {'N': self._N, 'n': self._n}
+
+    def from_config(self, config: dict[str, Any]):
+        temp = N_over_N_plus_n(config.pop('N'))
+        temp._n = config.pop('n')
+
+        return temp
+
+    def __getstate__(self) -> dict[str, Any]:
+        return self.get_config()
+
+    def __setstate__(self, config: dict[str, Any]) -> 'N_over_N_plus_n':
+        return self.from_config(config)
 
 
 @keras.utils.register_keras_serializable(
@@ -26,24 +61,21 @@ eps = np.finfo(np.float32).eps.item()
 class PPOModel(TF2UtilsMixin):
     def __init__(
             self,
-            input_shape: Tuple[int, ...],
-            output_lengths: Tuple[int, ...],
-            actor_learning_rate: Union[
-                float, k_sch.LearningRateSchedule],
-            critic_learning_rate: Union[
-                float, k_sch.LearningRateSchedule],
-            actor_layer_sizes: Tuple[int, ...],
-            critic_layer_sizes: Tuple[int, ...],
+            input_shape: tuple[int, ...],
+            output_lengths: tuple[int, ...],
+            actor_learning_rate: float | LearningRateSchedule,
+            critic_learning_rate: float | LearningRateSchedule,
+            actor_layer_sizes: tuple[int, ...],
+            critic_layer_sizes: tuple[int, ...],
             actor_train_iterations: int,
             critic_train_iterations: int,
-            GAE_lambda: float,
             target_kl: float,
             actor_hidden_activation: str = 'relu',
-            actor_head_activation: Optional[str] = None,
+            actor_head_activation: str | None = None,
             critic_hidden_activation: str = 'relu',
-            clip_ratio: Optional[float] = None,
-            critic_clip_range: Optional[float] = None,
-            max_grad_norm: Optional[float] = None,
+            clip_ratio: float | None = None,
+            critic_clip_range: float | None = None,
+            max_grad_norm: float | None = None,
             critic_loss_coef: float = 1.0,
             entropy_loss_coef: float = 0.0,
             regularizer_coef: float = 0.0) -> None:
@@ -59,19 +91,38 @@ class PPOModel(TF2UtilsMixin):
         self._critic_layer_sizes = critic_layer_sizes
         self._actor_train_iterations = actor_train_iterations
         self._critic_train_iterations = critic_train_iterations
-        self._clip_ratio = clip_ratio
-        self._critic_clip_range = critic_clip_range
-        self._max_grad_norm = max_grad_norm
-        self._GAE_lambda = GAE_lambda
+        self._clip_ratio: Tensor | None
+        self._critic_clip_range: Tensor | None
+        self._max_grad_norm: Tensor | None
+        if clip_ratio is None:
+            self._clip_ratio = None
+        else:
+            self._clip_ratio = tf.constant(
+                clip_ratio, dtype=tf.float32, name='clip_ratio')
+        if critic_clip_range is None:
+            self._critic_clip_range = None
+        else:
+            self._critic_clip_range = tf.constant(
+                critic_clip_range, dtype=tf.float32, name='critic_clip_range')
+        if max_grad_norm is None:
+            self._max_grad_norm = None
+        else:
+            self._max_grad_norm = tf.constant(
+                max_grad_norm, dtype=tf.float32, name='max_gradient_norm')
+        # self._GAE_lambda = GAE_lambda  # see proximal_policy_optimization.py
         self._target_kl = target_kl
+        self._1_5_target_kl: Tensor = tf.multiply(1.5, target_kl, name='1.5_target_kl')
         self._actor_hidden_activation = actor_hidden_activation
         self._critic_hidden_activation = critic_hidden_activation
         self._actor_head_activation = actor_head_activation
-        self._critic_loss_coef = critic_loss_coef
-        self._entropy_loss_coef = entropy_loss_coef
-        self._regularizer_coef = regularizer_coef
+        self._critic_loss_coef: Tensor = tf.constant(
+            critic_loss_coef, dtype=tf.float32, name='critic_loss_coef')
+        self._entropy_loss_coef: Tensor = tf.constant(
+            entropy_loss_coef, dtype=tf.float32, name='entropy_loss_coef')
+        self._regularizer_coef: Tensor = tf.constant(
+            regularizer_coef, dtype=tf.float32, name='regularizer_coef')
 
-        input_: tf.Tensor = keras.Input(self._input_shape)  # type: ignore
+        input_: Tensor = keras.Input(self._input_shape)  # type: ignore
         actor_layers = TF2UtilsMixin.mlp_functional(
             input_, self._actor_layer_sizes, actor_hidden_activation, 'actor_{i:0>2}')
         logit_heads = TF2UtilsMixin.mpl_layers(
@@ -108,33 +159,21 @@ class PPOModel(TF2UtilsMixin):
             'actor': type(self.actor),
             'critic': type(self.critic)}
 
-    def __call__(self, inputs, training: Optional[bool] = None) -> Any:
+    def __call__(self, inputs, training: bool | None = None) -> Any:
         logits = self.actor(inputs, training)
         values = self.critic(inputs, training)
         return logits, values
 
-    @staticmethod
-    @tf.function
-    def _entropy(logits: tf.Tensor):
-        # Adopted the code from OpenAI baseline
-        # https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/common/distributions.py
-        print('tracing PPOModel._entropy')
-        a0 = logits - tf.reduce_max(logits, axis=-1, keepdims=True)
-        ea0 = tf.exp(a0)
-        z0 = tf.reduce_sum(ea0, axis=-1, keepdims=True)
-        p0 = ea0 / z0
-
-        return tf.reduce_sum(p0 * (tf.math.log(z0) - a0), axis=-1)
-
     @tf.function(
         input_signature=(
-            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
-            tf.TensorSpec(shape=[None, None], dtype=tf.int32, name='action_indices'),
-            tf.TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
-        )
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
+            TensorSpec(shape=[None, None], dtype=tf.int32, name='action_indices'),
+            TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
+        ),
+        # jit_compile=JIT_COMPILE
     )
     def train_actor(  # noqa: C901
-        self, x: tf.Tensor, action_indices: tf.Tensor, advantage: tf.Tensor
+        self, x: Tensor, action_indices: Tensor, advantage: Tensor
     ):
         print(f'tracing {self.__class__.__qualname__}.train_actor')
         lengths = self._output_lengths
@@ -150,7 +189,7 @@ class PPOModel(TF2UtilsMixin):
                 tf.gather(action_indices, 0, axis=1),
                 tf.gather(self._output_lengths, 0)),
             axis=1)
-        for j in tf.range(1, m):
+        for j in tf.range(one_int32, m):
             initial_logprobs = tf.concat([
                 initial_logprobs,
                 tf.expand_dims(
@@ -184,18 +223,18 @@ class PPOModel(TF2UtilsMixin):
                         actor_loss = -tf.reduce_mean(ratio * _advantage)
                     else:
                         clipped_ratio = tf.clip_by_value(
-                            ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
+                            ratio, one_float32 - self._clip_ratio, one_float32 + self._clip_ratio)
                         actor_loss = -tf.reduce_mean(
                             tf.minimum(
                                 ratio * _advantage, clipped_ratio * _advantage))
 
-                    if self._entropy_loss_coef:
-                        entropy_loss = self._entropy(new_logprobs)
+                    if tf.cast(self._entropy_loss_coef, tf.bool):
+                        entropy_loss = entropy(new_logprobs)
                         entropy_loss.set_shape([])
                         # entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
                         #     new_logprobs * tf.math.exp(new_logprobs))
 
-                    if self._regularizer_coef:
+                    if tf.cast(self._regularizer_coef, tf.bool):
                         weights_concat = tf.concat([
                             self.actor.layers[-1].weights[0],
                             tf.expand_dims(self.actor.layers[-1].weights[1], axis=0)
@@ -226,7 +265,7 @@ class PPOModel(TF2UtilsMixin):
                     tf.gather(action_indices, 0, axis=1),
                     tf.gather(self._output_lengths, 0)),
                 axis=1)
-            for j in tf.range(1, m):
+            for j in tf.range(one_int32, m):
                 new_logprobs = tf.concat([
                     new_logprobs,
                     tf.expand_dims(
@@ -253,16 +292,17 @@ class PPOModel(TF2UtilsMixin):
         # self._actor_accuracy.update_state(
         #     tf.squeeze(action_indices), y[0])
         self._actor_loss.update_state(actor_loss)
-        if self._entropy_loss_coef:
+        if tf.cast(self._entropy_loss_coef, tf.bool):
             self._entropy_loss.update_state(entropy_loss)
-        if self._regularizer_coef:
+        if tf.cast(self._regularizer_coef, tf.bool):
             self._regularizer_loss.update_state(regularizer_loss)
 
     @tf.function(
         input_signature=(
-            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
-            tf.TensorSpec(shape=[None], dtype=tf.float32, name='returns'),
-        )
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
+            TensorSpec(shape=[None], dtype=tf.float32, name='returns'),
+        ),
+        # jit_compile=JIT_COMPILE
     )
     def train_critic(self, x, returns):
         print(f'tracing {self.__class__.__qualname__}.train_critic')
@@ -296,10 +336,11 @@ class PPOModel(TF2UtilsMixin):
     @staticmethod
     @tf.function(
         input_signature=(
-            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='logits'),
-            tf.TensorSpec(shape=[None], dtype=tf.int32, name='action_indices'),
-            tf.TensorSpec(shape=[], dtype=tf.int32, name='action_count'),
-        )
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='logits'),
+            TensorSpec(shape=[None], dtype=tf.int32, name='action_indices'),
+            TensorSpec(shape=[], dtype=tf.int32, name='action_count'),
+        ),
+        # jit_compile=JIT_COMPILE
     )
     def logprobs(logits, action_indices, action_count):
         print('tracing PPOModel.logprobs')
@@ -317,10 +358,10 @@ class PPOModel(TF2UtilsMixin):
             'critic_loss': self._critic_loss.result()
         }
 
-        if self._entropy_loss_coef:
+        if tf.cast(self._entropy_loss_coef, tf.bool):
             metrics['entropy_loss'] = self._entropy_loss.result()
 
-        if self._regularizer_coef:
+        if tf.cast(self._regularizer_coef, tf.bool):
             metrics['regularizer_loss'] = self._regularizer_loss.result()
 
         metrics['total_loss'] = sum(
@@ -340,29 +381,26 @@ class PPOModel(TF2UtilsMixin):
 class PPONeighborEffect(PPOModel):
     def __init__(
         self,
-        input_shape: Tuple[int, ...],
-        output_lengths: Tuple[int, ...],
-        actor_learning_rate: Union[
-            float, k_sch.LearningRateSchedule],
-        critic_learning_rate: Union[
-            float, k_sch.LearningRateSchedule],
-        actor_layer_sizes: Tuple[int, ...],
-        critic_layer_sizes: Tuple[int, ...],
+        input_shape: tuple[int, ...],
+        output_lengths: tuple[int, ...],
+        actor_learning_rate: float | LearningRateSchedule,
+        critic_learning_rate: float | LearningRateSchedule,
+        actor_layer_sizes: tuple[int, ...],
+        critic_layer_sizes: tuple[int, ...],
         actor_train_iterations: int,
         critic_train_iterations: int,
-        GAE_lambda: float,
         target_kl: float,
         actor_hidden_activation: str = 'relu',
-        actor_head_activation: Optional[str] = None,
+        actor_head_activation: str | None = None,
         critic_hidden_activation: str = 'relu',
-        clip_ratio: Optional[float] = None,
-        critic_clip_range: Optional[float] = None,
-        max_grad_norm: Optional[float] = None,
+        clip_ratio: float | None = None,
+        critic_clip_range: float | None = None,
+        max_grad_norm: float | None = None,
         critic_loss_coef: float = 1.0,
         entropy_loss_coef: float = 0.0,
-        effect_widths: Union[int, Tuple[int, ...]] = 0,
-        effect_decay_factors: Union[float, Tuple[float, ...]] = 0.,
-        effect_prob: Union[float, Callable[[], tf.Tensor]] = 1.0,
+        effect_widths: int | tuple[int, ...] = 0,
+        effect_decay_factors: float | tuple[float, ...] = 0.,
+        effect_prob: float | Callable[[], Tensor] = 1.0,
         regularizer_coef: float = 0.0
     ) -> None:
         super().__init__(
@@ -374,7 +412,6 @@ class PPONeighborEffect(PPOModel):
             critic_layer_sizes=critic_layer_sizes,
             actor_train_iterations=actor_train_iterations,
             critic_train_iterations=critic_train_iterations,
-            GAE_lambda=GAE_lambda,
             target_kl=target_kl,
             actor_hidden_activation=actor_hidden_activation,
             actor_head_activation=actor_head_activation,
@@ -415,16 +452,16 @@ class PPONeighborEffect(PPOModel):
             _effect_decay_factors, name='effect_decay_factors',
             dtype=tf.float32)
         if isinstance(effect_prob, float):
-            probability = tf.constant(effect_prob)
+            probability = tf.constant(effect_prob, dtype=tf.float32, name='constant_effect_prob')
 
-            def effect_probability() -> tf.Tensor:
+            def effect_probability() -> Tensor:
                 return probability
         else:
             effect_probability = effect_prob
 
             self._effect_prob = effect_probability
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = super().get_config()
         config.update(dict(
             effect_widths=tuple(self._effect_widths.numpy()),
@@ -435,20 +472,22 @@ class PPONeighborEffect(PPOModel):
 
     @tf.function(
         input_signature=(
-            tf.TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
-            tf.TensorSpec(shape=[None, None],
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
+            TensorSpec(shape=[None, None],
                           dtype=tf.int32, name='action_indices'),
-            tf.TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
-        )
+            TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
+        ),
+        # jit_compile=JIT_COMPILE
     )
     def train_actor(  # noqa: C901
-        self, x: tf.Tensor, action_indices: tf.Tensor, advantage: tf.Tensor
+        self, x: Tensor, action_indices: Tensor, advantage: Tensor
     ):
         print(f'tracing {self.__class__.__qualname__}.train_actor')
         lengths = self._output_lengths
         starts = tf.pad(tf.cast(lengths[:-1], tf.int32), [[1, 0]])
         ends = tf.math.cumsum(lengths)
         m = len(lengths)
+        # effect_prob = self._effect_prob()
 
         logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
 
@@ -510,8 +549,8 @@ class PPONeighborEffect(PPOModel):
                             actor_loss = -tf.reduce_mean(ratio * _advantage)
                     else:
                         for diff in tf.range(
-                                tf.negative(effect_width),
-                                tf.reduce_sum(effect_width, 1)):
+                                tf.negative(effect_width), effect_width):
+                                # tf.reduce_sum(effect_width, 1)):
                             temp = y_slice + diff
                             _length = tf.dynamic_partition(  # type: ignore
                                 lengths, j_one_hot, 2)[1][0]
@@ -558,11 +597,11 @@ class PPONeighborEffect(PPOModel):
 
                             actor_loss += effect * _loss
 
-                    if self._entropy_loss_coef:
-                        entropy_loss = self._entropy(new_logprobs)
+                    if tf.cast(self._entropy_loss_coef, tf.bool):
+                        entropy_loss = entropy(new_logprobs)
                         entropy_loss.set_shape([])
 
-                    if self._regularizer_coef:
+                    if tf.cast(self._regularizer_coef, tf.bool):
                         weights_concat = tf.concat([
                             self.actor.layers[-1].weights[0],
                             tf.expand_dims(
@@ -611,9 +650,9 @@ class PPONeighborEffect(PPOModel):
 
         self._kl.update_state(kl)
         self._actor_loss.update_state(actor_loss)
-        if self._entropy_loss_coef:
+        if tf.cast(self._entropy_loss_coef, tf.bool):
             self._entropy_loss.update_state(entropy_loss)
-        if self._regularizer_coef:
+        if tf.cast(self._regularizer_coef, tf.bool):
             self._regularizer_loss.update_state(regularizer_loss)
 
 
@@ -641,8 +680,8 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         self._iteration = 0
 
     def predict(
-            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
-    ) -> Tuple[ACLabelType, ...]:
+            self, X: tuple[FeatureSet, ...], training: bool | None = None
+    ) -> tuple[ACLabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -662,8 +701,8 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         return self._model(TF2UtilsMixin.convert_to_tensor(X), training=training)
 
     def learn(
-            self, X: Tuple[FeatureSet, ...],
-            Y: Tuple[ACLabelType, ...]) -> Dict[str, float]:
+            self, X: tuple[FeatureSet, ...],
+            Y: tuple[ACLabelType, ...]) -> dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -680,7 +719,7 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
             _X = tf.expand_dims(_X, axis=0)
 
         action_index_temp, return_temp, advantage_temp = tuple(zip(*Y))
-        action_index: tf.Tensor = tf.convert_to_tensor(action_index_temp)
+        action_index: Tensor = tf.convert_to_tensor(action_index_temp)
         returns = tf.convert_to_tensor(return_temp, dtype=tf.float32)
         advantage = tf.convert_to_tensor(advantage_temp, dtype=tf.float32)
 
