@@ -10,12 +10,12 @@ from typing import Any, Callable
 
 import numpy as np
 import tensorflow as tf
-from tensorflow import Tensor, TensorSpec
+from tensorflow import Tensor, TensorShape, TensorSpec
 
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric, SparseCategoricalAccuracyMetric,
-                                 TF2UtilsMixin, entropy)
+                                 TF2UtilsMixin, entropy, logprobs)
 
 keras = tf.keras
 from keras.optimizers.schedules.learning_rate_schedule import \
@@ -26,10 +26,16 @@ ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 eps: Tensor = tf.constant(np.finfo(np.float32).eps.item(), dtype=tf.float32)
 zero_int32: Tensor = tf.constant(0, tf.int32)
 one_int32: Tensor = tf.constant(1, tf.int32)
+zero_float32: Tensor = tf.constant(0., tf.float32)
+one_float32: Tensor = tf.constant(1., tf.float32)
 
 
-@keras.utils.register_keras_serializable(
-    package='reil.learners.ppo_learner')
+@tf.function(jit_compile=JIT_COMPILE)
+def _less_than_condition(j: Tensor, m: Tensor, *rest) -> Tensor:
+    return tf.less(j, m, name='less_than')  # type: ignore
+
+
+@keras.utils.register_keras_serializable(package='reil.learners.ppo_learner')
 class N_over_N_plus_n:
     def __init__(self, N: int) -> None:
         self._N: int = N
@@ -38,7 +44,8 @@ class N_over_N_plus_n:
     @tf.function(jit_compile=JIT_COMPILE)
     def __call__(self) -> Tensor:
         self._n += 1
-        return tf.cast(self._N / (self._N + self._n), tf.float32)  # type: ignore
+        return tf.cast(
+            self._N / (self._N + self._n), tf.float32, name='N_over_N_plus_n')  # type: ignore
 
     def get_config(self) -> dict[str, Any]:
         return {'N': self._N, 'n': self._n}
@@ -56,13 +63,12 @@ class N_over_N_plus_n:
         return self.from_config(config)
 
 
-@keras.utils.register_keras_serializable(
-    package='reil.learners.ppo_learner')
+@keras.utils.register_keras_serializable(package='reil.learners.ppo_learner')
 class PPOModel(TF2UtilsMixin):
     def __init__(
             self,
             input_shape: tuple[int, ...],
-            output_lengths: tuple[int, ...],
+            action_per_head: tuple[int, ...],
             actor_learning_rate: float | LearningRateSchedule,
             critic_learning_rate: float | LearningRateSchedule,
             actor_layer_sizes: tuple[int, ...],
@@ -83,8 +89,16 @@ class PPOModel(TF2UtilsMixin):
         super().__init__(models={})
 
         self._input_shape = input_shape
-        self._output_lengths = [
-            tf.constant(i, dtype=tf.int32) for i in output_lengths]
+        self._action_per_head: list[Tensor] = [
+            tf.constant(i, dtype=tf.int32, name=f'action_in_head_{i}')
+            for i in action_per_head
+        ]
+        self._head_count: Tensor = tf.constant(
+            len(action_per_head), dtype=tf.int32, name='head_count')
+        self._starts: Tensor = tf.pad(
+            tf.cast(action_per_head[:-1], tf.int32), [[1, 0]], name='starts')
+        self._ends: Tensor = tf.math.cumsum(action_per_head, name='ends')
+
         self._actor_learning_rate = actor_learning_rate
         self._critic_learning_rate = critic_learning_rate
         self._actor_layer_sizes = actor_layer_sizes
@@ -126,7 +140,7 @@ class PPOModel(TF2UtilsMixin):
         actor_layers = TF2UtilsMixin.mlp_functional(
             input_, self._actor_layer_sizes, actor_hidden_activation, 'actor_{i:0>2}')
         logit_heads = TF2UtilsMixin.mpl_layers(
-            output_lengths, actor_head_activation, 'actor_output_{i:0>2}')
+            action_per_head, actor_head_activation, 'actor_output_{i:0>2}')
         logits = tuple(output(actor_layers) for output in logit_heads)
 
         self.actor = keras.Model(
@@ -164,40 +178,91 @@ class PPOModel(TF2UtilsMixin):
         values = self.critic(inputs, training)
         return logits, values
 
+    @staticmethod
+    @tf.function  # (jit_compile=False) see tf_utils.logprobs
+    def _logprobs_j(
+            j: Tensor, logits_concat: Tensor, starts: Tensor, ends: Tensor,
+            action_indices: Tensor, action_per_head: Tensor, expand_dim: bool = True) -> Tensor:
+        temp = logprobs(
+            logits_concat[:, starts[j]:ends[j]],  # type: ignore
+            tf.gather(action_indices, j, axis=1),
+            tf.gather(action_per_head, j))
+        if expand_dim:
+            return tf.expand_dims(temp, axis=1)
+
+        return temp
+
+    @staticmethod
+    @tf.function(jit_compile=False)
+    def _logprobs_concat(logits_concat, starts, ends, action_indices, action_per_head, head_count):
+        def _body(
+                j, head_count, logits_concat, starts, ends,
+                action_indices, action_per_head, results):
+            return [
+                j + 1, head_count, logits_concat, starts, ends, action_indices, action_per_head,
+                tf.concat([
+                    results,
+                    PPOModel._logprobs_j(
+                        j, logits_concat, starts, ends,
+                        action_indices, action_per_head)],
+                    axis=1)
+            ]
+        result: Tensor = PPOModel._logprobs_j(  # type: ignore
+            zero_int32, logits_concat, starts, ends, action_indices, action_per_head)
+        result = tf.while_loop(  # type: ignore
+            cond=_less_than_condition,
+            body=_body,
+            loop_vars=(
+                one_int32, head_count, logits_concat, starts, ends, action_indices,
+                action_per_head, result),
+            shape_invariants=(
+                TensorShape([]), TensorShape([]), TensorShape([None, None]),
+                TensorShape([None]), TensorShape([None]), TensorShape([None, None]),
+                [o.get_shape() for o in action_per_head], TensorShape([None, None])),
+            parallel_iterations=1
+        )
+
+        return result[-1]
+
     @tf.function(
         input_signature=(
             TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
             TensorSpec(shape=[None, None], dtype=tf.int32, name='action_indices'),
             TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
         ),
-        # jit_compile=JIT_COMPILE
+        jit_compile=False
     )
     def train_actor(  # noqa: C901
         self, x: Tensor, action_indices: Tensor, advantage: Tensor
     ):
         print(f'tracing {self.__class__.__qualname__}.train_actor')
-        lengths = self._output_lengths
-        starts = tf.pad(tf.cast(lengths[:-1], tf.int32), [[1, 0]])
-        ends = tf.math.cumsum(lengths)
-        m = len(lengths)
+        action_per_head = self._action_per_head
+        head_count = self._head_count
+        starts = self._starts
+        ends = self._ends
 
         logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
 
-        initial_logprobs = tf.expand_dims(
-            self.logprobs(
-                logits_concat[:, starts[0]:ends[0]],  # type: ignore
-                tf.gather(action_indices, 0, axis=1),
-                tf.gather(self._output_lengths, 0)),
-            axis=1)
-        for j in tf.range(one_int32, m):
-            initial_logprobs = tf.concat([
-                initial_logprobs,
-                tf.expand_dims(
-                    self.logprobs(
-                        logits_concat[:, starts[j]:ends[j]],  # type: ignore
-                        tf.gather(action_indices, j, axis=1),
-                        tf.gather(self._output_lengths, j)),
-                    axis=1)], axis=1)
+        initial_logprobs = self._logprobs_concat(
+            logits_concat, starts, ends, action_indices, action_per_head, head_count)
+        # initial_logprobs = tf.expand_dims(
+        #     self.logprobs(
+        #         logits_concat[:, starts[0]:ends[0]],  # type: ignore
+        #         tf.gather(action_indices, 0, axis=1),
+        #         tf.gather(self._action_per_head, 0)),
+        #     axis=1)
+        # for j in tf.range(one_int32, self._head_count):
+        #     tf.autograph.experimental.set_loop_options(
+        #         shape_invariants=(initial_logprobs, [None, None])
+        #     )
+        #     initial_logprobs = tf.concat([
+        #         initial_logprobs,
+        #         tf.expand_dims(
+        #             self.logprobs(
+        #                 logits_concat[:, starts[j]:ends[j]],  # type: ignore
+        #                 tf.gather(action_indices, j, axis=1),
+        #                 tf.gather(self._action_per_head, j)),
+        #             axis=1)], axis=1)
 
         _advantage = tf.divide(
             advantage - tf.math.reduce_mean(advantage),
@@ -206,27 +271,22 @@ class PPOModel(TF2UtilsMixin):
 
         trainable_vars = self.actor.trainable_variables
 
-        total_loss = tf.constant(0.0, dtype=tf.float32)
-        actor_loss = entropy_loss = regularizer_loss = kl = tf.constant(
-            0.0, dtype=tf.float32)
+        total_loss = zero_float32
+        actor_loss = entropy_loss = regularizer_loss = kl = zero_float32
         for _ in tf.range(self._actor_train_iterations):
             with tf.GradientTape() as tape:
                 logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
-                for j in tf.range(m):
-                    new_logprobs = self.logprobs(
-                        logits_concat[:, starts[j]:ends[j]],  # type: ignore
-                        tf.gather(action_indices, j, axis=1),
-                        tf.gather(self._output_lengths, j))
+                for j in tf.range(head_count):
+                    new_logprobs = self._logprobs_j(
+                        j, logits_concat, starts, ends, action_indices,
+                        self._action_per_head, False)
+                    # new_logprobs = self.logprobs(
+                    #     logits_concat[:, starts[j]:ends[j]],  # type: ignore
+                    #     tf.gather(action_indices, j, axis=1),
+                    #     tf.gather(self._action_per_head, j))
 
-                    ratio = tf.exp(new_logprobs - tf.gather(initial_logprobs, j, axis=1))
-                    if self._clip_ratio is None:
-                        actor_loss = -tf.reduce_mean(ratio * _advantage)
-                    else:
-                        clipped_ratio = tf.clip_by_value(
-                            ratio, one_float32 - self._clip_ratio, one_float32 + self._clip_ratio)
-                        actor_loss = -tf.reduce_mean(
-                            tf.minimum(
-                                ratio * _advantage, clipped_ratio * _advantage))
+                    actor_loss = self._compute_actor_loss(
+                        initial_logprobs, new_logprobs, _advantage, j)
 
                     if tf.cast(self._entropy_loss_coef, tf.bool):
                         entropy_loss = entropy(new_logprobs)
@@ -235,57 +295,53 @@ class PPOModel(TF2UtilsMixin):
                         #     new_logprobs * tf.math.exp(new_logprobs))
 
                     if tf.cast(self._regularizer_coef, tf.bool):
-                        weights_concat = tf.concat([
-                            self.actor.layers[-1].weights[0],
-                            tf.expand_dims(self.actor.layers[-1].weights[1], axis=0)
-                        ], axis=0)
-                        regularizer_loss = tf.reduce_sum(
-                            tf.math.reduce_euclidean_norm(weights_concat, axis=0)
-                            # tf.reduce_max(tf.math.abs(weights_concat), axis=0)
-                        )
+                        regularizer_loss = self._compute_regularizer_loss()
 
-                    total_loss += (
-                        actor_loss
-                        + self._entropy_loss_coef * entropy_loss
-                        + self._regularizer_coef * regularizer_loss
+                    total_loss = tf.add_n(
+                        [
+                            total_loss,
+                            actor_loss,
+                            tf.multiply(self._entropy_loss_coef, entropy_loss),
+                            tf.multiply(self._regularizer_coef, regularizer_loss)
+                        ],
+                        name='total_loss'
                     )
 
             policy_grads = tape.gradient(total_loss, trainable_vars)
             if self._max_grad_norm is not None:
                 policy_grads, _ = tf.clip_by_global_norm(
-                    policy_grads, self._max_grad_norm)
-            self._actor_optimizer.apply_gradients(
-                zip(policy_grads, trainable_vars))
+                    policy_grads, self._max_grad_norm, name='clipped_policy_grads')
+            self._actor_optimizer.apply_gradients(zip(policy_grads, trainable_vars))
 
             logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
 
-            new_logprobs = tf.expand_dims(
-                self.logprobs(
-                    logits_concat[:, starts[0]:ends[0]],  # type: ignore
-                    tf.gather(action_indices, 0, axis=1),
-                    tf.gather(self._output_lengths, 0)),
-                axis=1)
-            for j in tf.range(one_int32, m):
-                new_logprobs = tf.concat([
-                    new_logprobs,
-                    tf.expand_dims(
-                        self.logprobs(
-                            logits_concat[:, starts[j]:ends[j]],  # type: ignore
-                            tf.gather(action_indices, j, axis=1),
-                            tf.gather(self._output_lengths, j)),
-                        axis=1)], axis=1)
-            # new_logprobs = tf.concat([
-            #     tf.expand_dims(
-            #         self.logprobs(
-            #             logits_concat[:, starts[j]:ends[j]],
-            #             tf.gather(action_indices, 0, axis=1),
-            #             tf.gather(self._output_lengths, j)),
-            #         axis=1)
-                # for j in tf.range(m)], axis=1)
-            kl = .5 * tf.reduce_mean(
-                tf.square(new_logprobs - initial_logprobs))  # type: ignore
+            new_logprobs = self._logprobs_concat(
+                logits_concat, starts, ends, action_indices, action_per_head, head_count)
 
-            if kl > 1.5 * self._target_kl:  # Early Stopping
+            # new_logprobs = tf.expand_dims(
+            #     self.logprobs(
+            #         logits_concat[:, starts[0]:ends[0]],  # type: ignore
+            #         tf.gather(action_indices, 0, axis=1),
+            #         tf.gather(self._action_per_head, 0)),
+            #     axis=1)
+            # for j in tf.range(one_int32, self._head_count):
+            #     tf.autograph.experimental.set_loop_options(
+            #         shape_invariants=(new_logprobs, [None, None])
+            #     )
+            #     new_logprobs = tf.concat([
+            #         new_logprobs,
+            #         tf.expand_dims(
+            #             self.logprobs(
+            #                 logits_concat[:, starts[j]:ends[j]],  # type: ignore
+            #                 tf.gather(action_indices, j, axis=1),
+            #                 tf.gather(self._action_per_head, j)),
+            #             axis=1)], axis=1)
+
+            kl = .5 * tf.reduce_mean(
+                tf.square(tf.subtract(new_logprobs, initial_logprobs, name='delta_logprobs')),
+                name='kl')
+
+            if tf.greater(kl, self._1_5_target_kl):  # Early Stopping
                 break
 
         self._kl.update_state(kl)
@@ -297,12 +353,52 @@ class PPOModel(TF2UtilsMixin):
         if tf.cast(self._regularizer_coef, tf.bool):
             self._regularizer_loss.update_state(regularizer_loss)
 
+    @tf.function  # (jit_compile=False)
+    def _compute_regularizer_loss(self):
+        weights_concat = tf.concat([
+            self.actor.layers[-1].weights[0],
+            tf.expand_dims(self.actor.layers[-1].weights[1], axis=0)
+        ], axis=0, name='actor_weights')
+        regularizer_loss = tf.reduce_sum(
+            tf.math.reduce_euclidean_norm(weights_concat, axis=0),
+            name='regularizer_loss'
+            # tf.reduce_max(tf.math.abs(weights_concat), axis=0)
+        )
+
+        return regularizer_loss
+
+    @tf.function(jit_compile=JIT_COMPILE)
+    def _compute_actor_loss(self, initial_logprobs, new_logprobs, _advantage, j):
+        ratio: Tensor = tf.exp(
+            tf.subtract(
+                new_logprobs, tf.gather(initial_logprobs, j, axis=1),
+                name='delta_logprobs'),
+            name='ratio'
+        )
+        if self._clip_ratio is None:
+            actor_loss = -tf.reduce_mean(
+                tf.multiply(ratio, _advantage), name='actor_loss')
+        else:
+            clipped_ratio = tf.clip_by_value(
+                ratio,
+                tf.subtract(one_float32, self._clip_ratio),
+                tf.add(one_float32, self._clip_ratio),
+                name='clipped_ratio')
+            actor_loss = -tf.reduce_mean(
+                tf.minimum(
+                    tf.multiply(ratio, _advantage, name='ratio_times_adv'),
+                    tf.multiply(clipped_ratio, _advantage,
+                                name='clipped_ratio_times_adv')),
+                name='actor_loss_clipped')
+
+        return actor_loss
+
     @tf.function(
         input_signature=(
             TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
             TensorSpec(shape=[None], dtype=tf.float32, name='returns'),
         ),
-        # jit_compile=JIT_COMPILE
+        jit_compile=JIT_COMPILE
     )
     def train_critic(self, x, returns):
         print(f'tracing {self.__class__.__qualname__}.train_critic')
@@ -311,42 +407,39 @@ class PPOModel(TF2UtilsMixin):
             with tf.GradientTape() as tape:
                 new_values = self.critic(x)
                 if self._critic_clip_range is not None:
-                    values_clipped = old_values + tf.clip_by_value(  # type: ignore
-                        new_values - old_values, -self._critic_clip_range,  # type: ignore
-                        self._critic_clip_range)
-                    loss_unclipped = tf.square(returns - new_values)
-                    loss_clipped = tf.square(returns - values_clipped)
-                    critic_loss = 0.5 * tf.reduce_mean(
-                        tf.maximum(loss_unclipped, loss_clipped)
+                    values_clipped = tf.add(
+                        old_values,
+                        tf.clip_by_value(
+                            tf.subtract(new_values, old_values, name='delta_values'),
+                            tf.negative(self._critic_clip_range, name='neg_critic_clip_range'),
+                            self._critic_clip_range),
+                        name='clipped_values'
+                    )
+                    loss_unclipped = tf.square(
+                        tf.subtract(returns, new_values, name='delta_return'),
+                        name='square_delta_return')
+                    loss_clipped = tf.square(
+                        tf.subtract(returns, values_clipped, name='delta_clipped_return'),
+                        name='square_delta_clipped_return')
+                    critic_loss = tf.multiply(
+                        0.5,
+                        tf.reduce_mean(tf.maximum(loss_unclipped, loss_clipped)),
+                        name='clipped_critic_loss'
                     )
                 else:
                     critic_loss = tf.reduce_mean(
-                        tf.square(returns - new_values))
+                        tf.square(tf.subtract(returns, new_values, name='delta_return')),
+                        name='critic_loss')
 
             self._critic_loss.update_state(critic_loss)
             trainable_vars = self.critic.trainable_variables
             value_grads = tape.gradient(critic_loss, trainable_vars)
             if self._max_grad_norm is not None:
                 value_grads, _ = tf.clip_by_global_norm(
-                    value_grads, self._max_grad_norm)
+                    value_grads, self._max_grad_norm, name='clipped_value_grads')
 
             self._critic_optimizer.apply_gradients(
                 zip(value_grads, trainable_vars))
-
-    @staticmethod
-    @tf.function(
-        input_signature=(
-            TensorSpec(shape=[None, None], dtype=tf.float32, name='logits'),
-            TensorSpec(shape=[None], dtype=tf.int32, name='action_indices'),
-            TensorSpec(shape=[], dtype=tf.int32, name='action_count'),
-        ),
-        # jit_compile=JIT_COMPILE
-    )
-    def logprobs(logits, action_indices, action_count):
-        print('tracing PPOModel.logprobs')
-        return -tf.nn.softmax_cross_entropy_with_logits(  # type: ignore
-            tf.one_hot(tf.squeeze(action_indices), action_count),
-            tf.squeeze(logits))
 
     def train_step(self, data):
         x, (action_indices, returns, advantage) = data
@@ -382,7 +475,7 @@ class PPONeighborEffect(PPOModel):
     def __init__(
         self,
         input_shape: tuple[int, ...],
-        output_lengths: tuple[int, ...],
+        action_per_head: tuple[int, ...],
         actor_learning_rate: float | LearningRateSchedule,
         critic_learning_rate: float | LearningRateSchedule,
         actor_layer_sizes: tuple[int, ...],
@@ -405,7 +498,7 @@ class PPONeighborEffect(PPOModel):
     ) -> None:
         super().__init__(
             input_shape=input_shape,
-            output_lengths=output_lengths,
+            action_per_head=action_per_head,
             actor_learning_rate=actor_learning_rate,
             critic_learning_rate=critic_learning_rate,
             actor_layer_sizes=actor_layer_sizes,
@@ -423,7 +516,7 @@ class PPONeighborEffect(PPOModel):
             entropy_loss_coef=entropy_loss_coef,
             regularizer_coef=regularizer_coef
         )
-        output_heads = len(output_lengths)
+        output_heads = len(action_per_head)
         if isinstance(effect_widths, int):
             _effect_widths = [effect_widths] * output_heads
         elif not effect_widths:
@@ -477,35 +570,40 @@ class PPONeighborEffect(PPOModel):
                           dtype=tf.int32, name='action_indices'),
             TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
         ),
-        # jit_compile=JIT_COMPILE
+        jit_compile=False
     )
     def train_actor(  # noqa: C901
         self, x: Tensor, action_indices: Tensor, advantage: Tensor
     ):
         print(f'tracing {self.__class__.__qualname__}.train_actor')
-        lengths = self._output_lengths
-        starts = tf.pad(tf.cast(lengths[:-1], tf.int32), [[1, 0]])
-        ends = tf.math.cumsum(lengths)
-        m = len(lengths)
+        action_per_head = self._action_per_head
+        head_count = self._head_count
+        starts = self._starts
+        ends = self._ends
         # effect_prob = self._effect_prob()
 
         logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
 
-        initial_logprobs = tf.expand_dims(
-            self.logprobs(
-                logits_concat[:, starts[0]:ends[0]],  # type: ignore
-                tf.gather(action_indices, 0, axis=1),
-                tf.gather(self._output_lengths, 0)),
-            axis=1)
-        for j in tf.range(1, m):
-            initial_logprobs = tf.concat([
-                initial_logprobs,
-                tf.expand_dims(
-                    self.logprobs(
-                        logits_concat[:, starts[j]:ends[j]],  # type: ignore
-                        tf.gather(action_indices, j, axis=1),
-                        tf.gather(self._output_lengths, j)),
-                    axis=1)], axis=1)
+        initial_logprobs = self._logprobs_concat(
+            logits_concat, starts, ends, action_indices, action_per_head, head_count)
+        # initial_logprobs = tf.expand_dims(
+        #     self.logprobs(
+        #         logits_concat[:, starts[0]:ends[0]],  # type: ignore
+        #         tf.gather(action_indices, 0, axis=1),
+        #         tf.gather(self._action_per_head, 0)),
+        #     axis=1)
+        # for j in tf.range(one_int32, m):
+        #     tf.autograph.experimental.set_loop_options(
+        #         shape_invariants=(initial_logprobs, [None, None])
+        #     )
+        #     initial_logprobs = tf.concat([
+        #         initial_logprobs,
+        #         tf.expand_dims(
+        #             self.logprobs(
+        #                 logits_concat[:, starts[j]:ends[j]],  # type: ignore
+        #                 tf.gather(action_indices, j, axis=1),
+        #                 tf.gather(self._action_per_head, j)),
+        #             axis=1)], axis=1)
 
         _advantage = tf.divide(
             advantage - tf.math.reduce_mean(advantage),
@@ -514,49 +612,53 @@ class PPONeighborEffect(PPOModel):
 
         trainable_vars = self.actor.trainable_variables
 
-        total_loss = tf.constant(0.0, dtype=tf.float32)
-        actor_loss = entropy_loss = regularizer_loss = kl = tf.constant(
-            0.0, dtype=tf.float32)
+        total_loss = zero_float32
+        actor_loss = entropy_loss = regularizer_loss = kl = zero_float32
         for _ in tf.range(self._actor_train_iterations):
             with tf.GradientTape() as tape:
                 logits_concat = tf.concat(
                     self.actor(x), axis=1, name='all_logits')
-                for j in tf.range(m):
+                for j in tf.range(head_count):
                     logits_slice = logits_concat[:, starts[j]:ends[j]]  # type: ignore
                     y_slice = tf.gather(action_indices, j, axis=1)
-                    output_length = tf.gather(self._output_lengths, j)
+                    action_in_head_j = tf.gather(self._action_per_head, j)
 
-                    j_one_hot = tf.one_hot(j, depth=m, dtype=tf.int32)
+                    j_one_hot = tf.one_hot(j, depth=head_count, dtype=tf.int32)
                     effect_width = tf.cond(
                         tf.less(tf.random.uniform([1]), self._effect_prob()),
                         lambda: tf.dynamic_partition(  # type: ignore
                             self._effect_widths, j_one_hot, 2)[1][0],
-                        lambda: 0
+                        lambda: zero_int32
                     )
-                    new_logprobs = self.logprobs(
-                        logits_slice, y_slice, output_length)
-                    if tf.equal(effect_width, 0):
-                        ratio = tf.exp(
-                            new_logprobs - tf.gather(initial_logprobs, j, axis=1))
-                        if self._clip_ratio is not None:
-                            clipped_ratio = tf.clip_by_value(
-                                ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
-                            actor_loss = -tf.reduce_mean(
-                                tf.minimum(
-                                    ratio * _advantage, clipped_ratio * _advantage))
+                    new_logprobs = self._logprobs_j(
+                        j, logits_concat, starts, ends, action_indices,
+                        self._action_per_head, False)
+                    if tf.equal(effect_width, zero_int32):
+                        actor_loss = self._compute_actor_loss(
+                            initial_logprobs, new_logprobs, _advantage, j)
+                        # ratio = tf.exp(
+                        #     new_logprobs - tf.gather(initial_logprobs, j, axis=1))
+                        # if self._clip_ratio is not None:
+                        #     clipped_ratio = tf.clip_by_value(
+                        #         ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
+                        #     actor_loss = -tf.reduce_mean(
+                        #         tf.minimum(
+                        #             ratio * _advantage, clipped_ratio * _advantage))
 
-                        else:
-                            actor_loss = -tf.reduce_mean(ratio * _advantage)
+                        # else:
+                        #     actor_loss = -tf.reduce_mean(ratio * _advantage)
                     else:
                         for diff in tf.range(
                                 tf.negative(effect_width), effect_width):
                                 # tf.reduce_sum(effect_width, 1)):
-                            temp = y_slice + diff
-                            _length = tf.dynamic_partition(  # type: ignore
-                                lengths, j_one_hot, 2)[1][0]
+                            temp = tf.add(y_slice, diff, name='y_plus_diff')
+                            action_in_head_j = tf.dynamic_partition(  # type: ignore
+                                action_per_head, j_one_hot, 2, name='action_in_head_j'
+                            )[1][0]
                             in_range_indicator = tf.logical_and(
-                                tf.greater_equal(temp, 0),
-                                tf.less(temp, _length))
+                                tf.greater_equal(temp, zero_int32),
+                                tf.less(temp, action_in_head_j),
+                                name='in_range_indicator')
 
                             # if not tf.reduce_all(in_range_indicator):
                             #     continue
@@ -565,57 +667,67 @@ class PPONeighborEffect(PPOModel):
                                 in_range_indicator, tf.int32)
 
                             advantage_in_range = tf.dynamic_partition(  # type: ignore
-                                _advantage, in_range_indices, 2)[1]
+                                _advantage, in_range_indices, 2,
+                                name='advantage_in_range')[1]
                             y_in_range = tf.dynamic_partition(  # type: ignore
-                                temp, in_range_indices, 2)[1]
+                                temp, in_range_indices, 2,
+                                name='y_in_range')[1]
                             initial_logprobs_in_range = tf.dynamic_partition(  # type: ignore
-                                initial_logprobs, in_range_indices, 2)[1]
+                                initial_logprobs, in_range_indices, 2,
+                                name='initial_logprobs_in_range')[1]
 
                             logits_in_range = tf.dynamic_partition(  # type: ignore
-                                logits_slice, in_range_indices, 2)[1]
-                            new_logprobs_in_range = self.logprobs(
-                                logits_in_range, y_in_range, output_length)
+                                logits_slice, in_range_indices, 2,
+                                name='logits_in_range')[1]
+                            new_logprobs_in_range = logprobs(
+                                logits_in_range, y_in_range, action_in_head_j)
 
-                            abs_diff = tf.cast(tf.abs(diff), dtype=tf.float32)
+                            abs_diff = tf.cast(tf.abs(diff), dtype=tf.float32, name='abs_diff')
                             effect_decay = tf.dynamic_partition(  # type: ignore
-                                self._effect_decay_factors, j_one_hot, 2)[1][0]
+                                self._effect_decay_factors, j_one_hot, 2,
+                                name='effect_decay')[1][0]
                             effect = tf.pow(effect_decay, abs_diff)
                             ratio = tf.exp(
-                                new_logprobs_in_range - tf.gather(
-                                    initial_logprobs_in_range, j, axis=1))
-                            if self._clip_ratio is not None:
+                                tf.subtract(new_logprobs_in_range, tf.gather(
+                                    initial_logprobs_in_range, j, axis=1)))
+                            if self._clip_ratio is None:
+                                _loss = -tf.reduce_mean(
+                                    tf.multiply(ratio, advantage_in_range),
+                                    name=f'actor_loss_head_j')
+                            else:
                                 clipped_ratio = tf.clip_by_value(
-                                    ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
+                                    ratio,
+                                    tf.subtract(one_float32, self._clip_ratio),
+                                    tf.add(one_float32, self._clip_ratio),
+                                    name='clipped_ratio')
                                 _loss = -tf.reduce_mean(
                                     tf.minimum(
-                                        ratio * advantage_in_range,
-                                        clipped_ratio * advantage_in_range))
+                                        tf.multiply(
+                                            ratio, advantage_in_range,
+                                            name='ratio_times_adv_in_range'),
+                                        tf.multiply(clipped_ratio, advantage_in_range,
+                                                    name='clipped_ratio_times_adv_in_range')),
+                                    name=f'actor_loss_clipped_head_j')
 
-                            else:
-                                _loss = - \
-                                    tf.reduce_mean(ratio * advantage_in_range)
-
-                            actor_loss += effect * _loss
+                            actor_loss = tf.add_n(
+                                [actor_loss, tf.multiply(effect, _loss)],
+                                name='actor_loss')
 
                     if tf.cast(self._entropy_loss_coef, tf.bool):
                         entropy_loss = entropy(new_logprobs)
                         entropy_loss.set_shape([])
 
                     if tf.cast(self._regularizer_coef, tf.bool):
-                        weights_concat = tf.concat([
-                            self.actor.layers[-1].weights[0],
-                            tf.expand_dims(
-                                self.actor.layers[-1].weights[1], axis=0)
-                        ], axis=0)
-                        regularizer_loss = tf.reduce_sum(
-                            tf.math.reduce_euclidean_norm(weights_concat, axis=0)
-                            # tf.reduce_max(tf.math.abs(weights_concat), axis=0)
-                        )
+                        regularizer_loss = self._compute_regularizer_loss()
 
-                    total_loss += (
-                        actor_loss
-                        + self._entropy_loss_coef * entropy_loss
-                        + self._regularizer_coef * regularizer_loss
+                    total_loss = tf.add_n(
+                        [
+                            total_loss,
+                            actor_loss,
+                            tf.multiply(self._entropy_loss_coef, entropy_loss),
+                            tf.multiply(self._regularizer_coef, regularizer_loss)
+                        ],
+                        name='total_loss'
                     )
 
             policy_grads = tape.gradient(total_loss, trainable_vars)
@@ -626,26 +738,14 @@ class PPONeighborEffect(PPOModel):
                 zip(policy_grads, trainable_vars))
 
             logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
+            new_logprobs = self._logprobs_concat(
+                logits_concat, starts, ends, action_indices, action_per_head, head_count)
 
-            new_logprobs = tf.expand_dims(
-                self.logprobs(
-                    logits_concat[:, starts[0]:ends[0]],  # type: ignore
-                    tf.gather(action_indices, 0, axis=1),
-                    tf.gather(self._output_lengths, 0)),
-                axis=1)
-            for j in tf.range(1, m):
-                new_logprobs = tf.concat([
-                    new_logprobs,
-                    tf.expand_dims(
-                        self.logprobs(
-                            logits_concat[:, starts[j]:ends[j]],  # type: ignore
-                            tf.gather(action_indices, j, axis=1),
-                            tf.gather(self._output_lengths, j)),
-                        axis=1)], axis=1)
             kl = .5 * tf.reduce_mean(
-                tf.square(new_logprobs - initial_logprobs))  # type: ignore
+                tf.square(tf.subtract(new_logprobs, initial_logprobs, name='delta_logprobs')),
+                name='kl')
 
-            if kl > 1.5 * self._target_kl:  # Early Stopping
+            if tf.greater(kl, self._1_5_target_kl):  # Early Stopping
                 break
 
         self._kl.update_state(kl)
