@@ -7,9 +7,10 @@ A warfarin PK/PD model proposed by Hamberg et al. (2007).
 DOI: 10.1038/sj.clpt.6100084
 '''
 import math
-from typing import Any, Dict, Final, List, NamedTuple, Optional, Union
+from typing import Any, Final, NamedTuple
 
 import numpy as np
+
 import reil
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
@@ -20,7 +21,7 @@ from reil.utils.functions import random_lognormal_truncated
 
 class DoseEffect(NamedTuple):
     dose: float
-    Cs: List[float]  # np.array
+    Cs: list[float]  # np.array
 
 
 class HambergPKPD(HealthMathModel):
@@ -169,14 +170,14 @@ class HambergPKPD(HealthMathModel):
         """
         self._randomized = randomized
         self._cache_size = math.ceil(cache_size)
-        self._cached_cs: Dict[float, List[float]] = {}
+        self._cached_cs: dict[float, list[float]] = {}
         self._age = None
 
     @classmethod
     def generate(
             cls,
             rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None,
+            input_features: FeatureSet | None = None,
             **kwargs: Any) -> FeatureSet:
         with reil.random_generator_context(*rnd_generators):
             feature_set = super(HambergPKPD, cls).generate(
@@ -208,7 +209,7 @@ class HambergPKPD(HealthMathModel):
 
     def setup(
             self, rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None) -> None:
+            input_features: FeatureSet | None = None) -> None:
         '''
         Set up the model.
 
@@ -318,12 +319,12 @@ class HambergPKPD(HealthMathModel):
         self._ktr = np.array([ktr1] * 6 + [0.0, ktr2])  # type: ignore
         self._EC_50_gamma = self._EC_50 ** self._gamma
 
-        self._A: Dict[int, np.array] = {
+        self._A: dict[int, np.array] = {
             0: np.array([0.0] + [1.0] * 8)  # type: ignore
         }
 
-        self._dose_records: Dict[int, DoseEffect] = {}
-        self._computed_INRs: Dict[int, float] = {}  # daily
+        self._dose_records: dict[int, DoseEffect] = {}
+        self._computed_INRs: dict[int, float] = {}  # daily
 
         detailed_cache_size = self._cache_size * self._per_day
 
@@ -392,7 +393,7 @@ class HambergPKPD(HealthMathModel):
             self._dose_records[day] = DoseEffect(dose, cs)
             self._total_cs += cs
 
-    def run(self, **inputs: Any) -> Dict[str, Any]:
+    def run(self, **inputs: Any) -> dict[str, Any]:
         '''
         Run the model.
 
@@ -418,7 +419,7 @@ class HambergPKPD(HealthMathModel):
         return {'INR': {}}
 
     @property
-    def dose(self) -> Dict[int, float]:
+    def dose(self) -> dict[int, float]:
         '''
         Return doses for each day.
 
@@ -430,7 +431,7 @@ class HambergPKPD(HealthMathModel):
         return {t: info.dose
                 for t, info in self._dose_records.items()}
 
-    def prescribe(self, dose: Dict[int, float]) -> None:
+    def prescribe(self, dose: dict[int, float]) -> None:
         '''
         Add warfarin doses at the specified days.
 
@@ -474,7 +475,7 @@ class HambergPKPD(HealthMathModel):
                 self._dose_records[day] = DoseEffect(new_dose, cs)
                 self._total_cs += cs
 
-    def INR(self, measurement_days: Union[int, List[int]]) -> List[float]:
+    def INR(self, measurement_days: int | list[int]) -> list[float]:
         '''
         Compute INR values for the specified days.
 
@@ -488,7 +489,7 @@ class HambergPKPD(HealthMathModel):
         :
             A list of INRs for the specified days.
         '''
-        days: List[int]
+        days: list[int]
 
         days = (measurement_days if hasattr(measurement_days, '__iter__')
                 else [measurement_days])  # type: ignore
@@ -567,8 +568,8 @@ class HambergPKPD(HealthMathModel):
 
         return padded_cs[:cs.shape[0]]  # type: ignore
 
-    def get_config(self) -> Dict[str, Any]:
-        config: Dict[str, Any] = super().get_config()
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = super().get_config()
         config.update({
             'randomized': self._randomized,
             'cache_size': self._cache_size})
@@ -589,7 +590,7 @@ class HambergPKPD(HealthMathModel):
         return config
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         instance = cls(
             randomized=config['randomized'],
             cache_size=config['cache_size'])

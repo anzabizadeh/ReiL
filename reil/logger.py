@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 CRITICAL = 50
 FATAL = CRITICAL
@@ -15,9 +15,9 @@ DEFAULT_FORMAT = ' %(name)s :: %(levelname)-8s :: %(message)s'
 
 class Logger:
     def __init__(
-            self, logger_name: str, logger_level: Optional[int] = None,
-            logger_filename: Optional[str] = None,
-            fmt: Optional[str] = None) -> None:
+            self, logger_name: str, logger_level: int | None = None,
+            logger_filename: str | None = None,
+            fmt: str | None = None) -> None:
         self._name = logger_name
         self._level = logger_level or logging.WARNING
         self._filename = logger_filename
@@ -38,10 +38,10 @@ class Logger:
                 f'logger {self._name} already has a handler.')
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         return cls(**config)
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         return self.__getstate__()
 
     def debug(self, msg: str):
@@ -73,7 +73,7 @@ class Logger:
 
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         try:
             self.__init__(
                 logger_name=state['name'], logger_level=state.get('level'),

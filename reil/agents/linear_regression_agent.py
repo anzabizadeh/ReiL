@@ -20,9 +20,9 @@ class LRAgent(AgentBase):
 
     def __init__(
             self,
-            default_actions: Tuple[FeatureSet, ...] = (),
-            models: Dict[int, LinearRegression] = {0: LinearRegression()},
-            feature_sequence: Tuple[str, ...] = (),
+            default_actions: tuple[FeatureSet, ...] = (),
+            models: dict[int, LinearRegression] = {0: LinearRegression()},
+            feature_sequence: tuple[str, ...] = (),
             value_extractor_fn: Callable[
                 [Feature], float] = lambda x: x.value,  # type: ignore
             **kwargs: Any):
@@ -72,7 +72,7 @@ class LRAgent(AgentBase):
         possible_actions = actions
 
         # find the closest allowed action
-        actions_dict: Dict[float, FeatureSet] = {
+        actions_dict: dict[float, FeatureSet] = {
             abs(a.value - action_temp): a  # type: ignore
             for a in possible_actions}
 

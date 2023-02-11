@@ -6,9 +6,9 @@ HealthMathModel class
 The base class of all mathematical models, e.g. ODE, PDE, PK/PD, etc. in
 healthcare.
 '''
-from typing import Any, Dict, Optional
-import reil
+from typing import Any
 
+import reil
 from reil.datatypes.feature import FeatureGeneratorSet, FeatureSet
 
 
@@ -22,7 +22,7 @@ class HealthMathModel:
     def generate(
             cls,
             rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None,
+            input_features: FeatureSet | None = None,
             **kwargs: Any) -> FeatureSet:
         with reil.random_generator_context(*rnd_generators):
             if input_features:
@@ -35,15 +35,15 @@ class HealthMathModel:
         return params
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         return cls()
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         return {}
 
     def setup(
             self, rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None) -> None:
+            input_features: FeatureSet | None = None) -> None:
         '''
         Set up the model.
 
@@ -54,7 +54,7 @@ class HealthMathModel:
         '''
         raise NotImplementedError
 
-    def run(self, **inputs: Any) -> Dict[str, Any]:
+    def run(self, **inputs: Any) -> dict[str, Any]:
         '''
         Run the model.
 

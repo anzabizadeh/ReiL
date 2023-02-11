@@ -7,7 +7,7 @@ This class emulates mnk game.
 '''
 
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureGeneratorType,
@@ -57,7 +57,7 @@ class MNKGame(MNKBoard, Subject):
         self.possible_actions.add_definition(
             'square', self._actions, 'board')
 
-    def is_terminated(self, _id: Optional[int] = None) -> bool:
+    def is_terminated(self, _id: int | None = None) -> bool:
         return self._board_status is not None
 
     def _actions(
@@ -93,7 +93,7 @@ class MNKGame(MNKBoard, Subject):
         return action
 
     def _default_reward_definition(
-            self, _id: Optional[int] = None) -> int:
+            self, _id: int | None = None) -> int:
         if self._board_status is None:
             r = 0
         elif self._board_status == _id:
@@ -111,8 +111,8 @@ class MNKGame(MNKBoard, Subject):
         MNKBoard.reset(self)
         self._board_status = None
 
-    def set_piece(self, player: int, index: Optional[int] = None,
-                  row: Optional[int] = None, column: Optional[int] = None
+    def set_piece(self, player: int, index: int | None = None,
+                  row: int | None = None, column: int | None = None
                   ) -> None:
         '''
         Set a piece for a player.
@@ -154,10 +154,10 @@ class MNKGame(MNKBoard, Subject):
             self._board_status = -1
 
     def _update_board_status(self, player: int,  # noqa: C901
-                             index: Optional[int] = None,
-                             row: Optional[int] = None,
-                             column: Optional[int] = None
-                             ) -> Union[int, None]:
+                             index: int | None = None,
+                             row: int | None = None,
+                             column: int | None = None
+                             ) -> int | None:
         # player wins: player | doesn't win: None | draw: 0
         '''
         Get a player and the location of the latest change and try to find
@@ -258,7 +258,7 @@ class MNKGame(MNKBoard, Subject):
 
     def _sub_comp_board(
             self, _id: int, **kwargs: Any) -> Feature:
-        board_list: List[int] = self.get_board()  # type: ignore
+        board_list: list[int] = self.get_board()  # type: ignore
         XOs = tuple(
             'X' if b == _id else ' ' if b == 0 else 'O'
             for b in board_list)
@@ -268,7 +268,7 @@ class MNKGame(MNKBoard, Subject):
 
 if __name__ == '__main__':
     board = MNKGame(m=3, n=3, k=3, players=2)
-    player: Dict[str, int] = {}
+    player: dict[str, int] = {}
     p = 0
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')

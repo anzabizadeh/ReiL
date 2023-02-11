@@ -1,7 +1,4 @@
 
-from typing import List, Optional
-
-
 class EntityRegister:
     '''
     Create and maintain a list of registered `entities`.
@@ -44,7 +41,7 @@ class EntityRegister:
         '''
         return len(self._id_list) >= self._min_entity_count
 
-    def append(self, entity_name: str, _id: Optional[int] = None) -> int:
+    def append(self, entity_name: str, _id: int | None = None) -> int:
         '''
         Add a new `entity` to the end of the list.
 
@@ -122,8 +119,8 @@ class EntityRegister:
         '''
         Clear the list.
         '''
-        self._id_list: List[int] = []
-        self._entity_list: List[str] = []
+        self._id_list: list[int] = []
+        self._entity_list: list[str] = []
 
     def __contains__(self, _id: int) -> bool:
         return _id in self._id_list

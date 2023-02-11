@@ -5,7 +5,7 @@ TicTacToe class
 
 The standard Tic-Tac-Toe game.
 '''
-from typing import Any, Dict
+from typing import Any
 
 from reil.datatypes.feature import FeatureGenerator
 from reil.subjects.mnkgame import MNKGame
@@ -30,7 +30,7 @@ class TicTacToe(MNKGame):
 
 if __name__ == '__main__':
     board = TicTacToe()
-    player: Dict[str, int] = {}
+    player: dict[str, int] = {}
     p = 0
     player['P1'] = board.register('P1')
     player['P2'] = board.register('P2')

@@ -6,7 +6,7 @@ DosingSubject class
 This `DosingSubject` class implements interaction with patients.
 '''
 
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
@@ -23,19 +23,19 @@ class DosingSubject(HealthSubject):
             self,
             patient: Patient,
             measurement_name: str,
-            measurement_range: Tuple[float, float],
+            measurement_range: tuple[float, float],
             max_day: int,
-            interval_range: Tuple[int, int],
-            dose_range: Tuple[float, float],
+            interval_range: tuple[int, int],
+            dose_range: tuple[float, float],
             decision_mode: Literal[
                 'dose', 'dose_interval', 'dose_change', 'dose_change_interval',
                 'dose_change_p', 'dose_change_interval_p'
             ],
             backfill: bool,
             interval_step: int = 1,
-            dose_step: Optional[float] = None,
-            percent_dose_change: Optional[Tuple[float, ...]] = None,
-            dose_range_p: Optional[Tuple[float, float]] = None,
+            dose_step: float | None = None,
+            percent_dose_change: tuple[float, ...] | None = None,
+            dose_range_p: tuple[float, float] | None = None,
             round_to_step: bool = True,
             **kwargs: Any):
         '''
@@ -82,7 +82,7 @@ class DosingSubject(HealthSubject):
 
         self._decision_mode = decision_mode
 
-        self._actions_taken: List[FeatureSet] = []
+        self._actions_taken: list[FeatureSet] = []
         self._full_dose_history = [0.0] * self._max_day
         self._decision_points_dose_history = [0.0] * self._max_day
 
@@ -155,7 +155,7 @@ class DosingSubject(HealthSubject):
         DosingSubject._generate_state_defs(self)
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         actions_taken = config['internal_states'].pop(
             '_actions_taken', [])
 
@@ -166,7 +166,7 @@ class DosingSubject(HealthSubject):
 
         return instance
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = super().get_config()
         config.update(dict(
             dose_range=self._dose_range,
@@ -189,7 +189,7 @@ class DosingSubject(HealthSubject):
     def generate_dose_values(
             min_dose: float = 0.0,
             max_dose: float = 15.0,
-            dose_increment: float = 0.5) -> List[float]:
+            dose_increment: float = 0.5) -> list[float]:
 
         return list(min_dose + x * dose_increment
                     for x in range(
@@ -270,7 +270,7 @@ class DosingSubject(HealthSubject):
                 '-1 for full length output.')
 
         filler: float
-        _list: List[float]
+        _list: list[float]
         if list_name == 'dose_history':
             _list = self._decision_points_dose_history
             index = self._decision_points_index

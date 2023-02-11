@@ -6,8 +6,11 @@ InteractionProtocol class
 A datatype that accepts initial value and feature generator, and generates
 new values. This datatype uses `Entity` to specify an `agent` or a `subject`.
 '''
+
+from __future__ import annotations
+
 import dataclasses
-from typing import List, Literal, Optional, Tuple
+from typing import Literal
 
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 
@@ -19,11 +22,11 @@ class Entity:
     Used in `InteractionProtocol`.
     '''
     name: str
-    demon_name: Optional[str] = None
-    statistic_name: Optional[str] = None
-    groupby: Optional[Tuple[str, ...]] = None
-    aggregators: Optional[Tuple[str, ...]] = None
-    trajectory_name: Optional[str] = None
+    demon_name: str | None = None
+    statistic_name: str | None = None
+    groupby: tuple[str, ...] | None = None
+    aggregators: tuple[str, ...] | None = None
+    trajectory_name: str | None = None
 
     def __post_init__(self):
         if self.groupby is not None:
@@ -61,24 +64,24 @@ class InteractionProtocol:
     reward_name: str
     n: int
     unit: Literal['interaction', 'instance', 'iteration']
-    lookahead: Optional[LookaheadPlan] = None
+    lookahead: LookaheadPlan | None = None
 
 
 @dataclasses.dataclass
 class Observation:
     # the state received from the subject
-    state: Optional[FeatureSet] = None
+    state: FeatureSet | None = None
     # the action generator available to the agent
-    possible_actions: Optional[FeatureGeneratorType] = None
+    possible_actions: FeatureGeneratorType | None = None
     # the action chosen by the agent
-    action: Optional[FeatureSet] = None
+    action: FeatureSet | None = None
     # the action taken by the subject
-    action_taken: Optional[FeatureSet] = None
+    action_taken: FeatureSet | None = None
     # lookahead data
-    lookahead: Optional['LookaheadData'] = None
+    lookahead: 'LookaheadData' | None = None
     # the reward of taking the action at the state
-    reward: Optional[float] = None
+    reward: float | None = None
 
 
-History = List[Observation]
-LookaheadData = List[History]
+History = list[Observation]
+LookaheadData = list[History]

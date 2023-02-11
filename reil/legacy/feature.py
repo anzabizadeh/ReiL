@@ -10,7 +10,7 @@ new values.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable
 
 from reil.datatypes import reildata
 
@@ -55,7 +55,7 @@ class Feature_old(reildata.FeatureGenerator):
         A list of probabilities corresponding to each possible value
         for categorical features.
     '''
-    # value: Optional[Any] = None
+    # value: Any | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -72,13 +72,14 @@ class Feature_old(reildata.FeatureGenerator):
                                  f'{len(self.categories)} probabilities')
 
     @classmethod
-    def categorical(cls,
-                    name,
-                    # value: Optional[Any] = None,
-                    categories: Optional[Tuple[Any, ...]] = None,
-                    probabilities: Optional[Tuple[float, ...]] = None,
-                    randomized: Optional[bool] = None,
-                    generator: Optional[Callable[[Feature_old], Any]] = None):
+    def categorical(
+            cls,
+            name,
+            # value: Any | None = None,
+            categories: tuple[Any, ...] | None = None,
+            probabilities: tuple[float, ...] | None = None,
+            randomized: bool | None = None,
+            generator: Callable[[Feature_old], Any] | None = None):
         '''
         Create a categorical Feature.
 
@@ -100,24 +101,23 @@ class Feature_old(reildata.FeatureGenerator):
         probabilities:
             A list of probabilities corresponding to each possible value.
         '''
-        instance = cls(name=name,
-                       is_numerical=False,
-                       categories=categories,
-                       probabilities=probabilities,
-                       randomized=randomized,
-                       generator=generator)
+        instance = cls(
+            name=name, is_numerical=False, categories=categories,
+            probabilities=probabilities, randomized=randomized,
+            generator=generator)
 
         return instance
 
     @classmethod
-    def numerical(cls,
-                  name,
-                  lower: Optional[Union[int, float]] = None,
-                  upper: Optional[Union[int, float]] = None,
-                  mean: Optional[Union[int, float]] = None,
-                  stdev: Optional[Union[int, float]] = None,
-                  generator: Optional[Callable[[Feature_old], Any]] = None,
-                  randomized: Optional[bool] = None):
+    def numerical(
+            cls,
+            name,
+            lower: int | float | None = None,
+            upper: int | float | None = None,
+            mean: int | float | None = None,
+            stdev: int | float | None = None,
+            generator: Callable[[Feature_old], Any] | None = None,
+            randomized: bool | None = None):
         '''
         Create a numerical Feature.
 
@@ -145,14 +145,9 @@ class Feature_old(reildata.FeatureGenerator):
         stdev:
             Standard Deviation of the distribution.
         '''
-        instance = cls(name=name,
-                       is_numerical=True,
-                       lower=lower,
-                       upper=upper,
-                       mean=mean,
-                       stdev=stdev,
-                       generator=generator,
-                       randomized=randomized)
+        instance = cls(
+            name=name, is_numerical=True, lower=lower, upper=upper,
+            mean=mean, stdev=stdev, generator=generator, randomized=randomized)
 
         return instance
 

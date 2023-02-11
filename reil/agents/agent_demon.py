@@ -8,7 +8,7 @@ AgentDemon class
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Union
 
 from reil import reilbase
 from reil.agents.agent_base import AgentBase
@@ -29,7 +29,7 @@ class AgentDemon(AgentBase):
             self,
             sub_agent: AgentBase,
             condition_fn: Callable[[FeatureSet, int], bool],
-            main_agent: Optional[AgentBase] = None,
+            main_agent: AgentBase | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -52,7 +52,7 @@ class AgentDemon(AgentBase):
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward']
 
-        self._main_agent: Optional[AgentBase] = main_agent
+        self._main_agent: AgentBase | None = main_agent
         self._sub_agent: AgentBase = sub_agent
         self._condition_fn = condition_fn
 
@@ -74,7 +74,7 @@ class AgentDemon(AgentBase):
 
     def load(
             self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]]) -> None:
+            path: Union[str, pathlib.PurePath] | None) -> None:
         _path = pathlib.Path(path or self._path)
         super().load(filename, _path)
 
@@ -87,8 +87,8 @@ class AgentDemon(AgentBase):
 
     def save(
             self,
-            filename: Optional[str] = None,
-            path: Optional[Union[str, pathlib.PurePath]] = None
+            filename: str | None = None,
+            path: Union[str, pathlib.PurePath] | None = None
     ) -> pathlib.PurePath:
 
         full_path = super().save(filename, path)
@@ -100,7 +100,7 @@ class AgentDemon(AgentBase):
 
         return full_path
 
-    def register(self, entity_name: str, _id: Optional[int] = None) -> int:
+    def register(self, entity_name: str, _id: int | None = None) -> int:
         if self._main_agent is None:
             raise ValueError('main_agent is not set.')
 

@@ -1,17 +1,18 @@
 import importlib
 import pathlib
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
-import reil
 from ruamel.yaml import YAML
 
-Parsable = Union[Dict[str, Any], Any]
+import reil
+
+Parsable = dict[str, Any] | Any
 
 
 def from_yaml_file(
-        node_reference: Tuple[str, ...],
+        node_reference: tuple[str, ...],
         filename: str,
-        path: Optional[Union[pathlib.PurePath, str]] = None):
+        path: pathlib.PurePath | str | None = None):
     '''
     Create an instance based on a yaml file.
 
@@ -38,7 +39,7 @@ def from_yaml_file(
 
     yaml = YAML()
     with open(_path / _filename, 'r') as f:
-        yaml_output: Dict[str, Any] = yaml.load(f)  # type: ignore
+        yaml_output: dict[str, Any] = yaml.load(f)  # type: ignore
 
     temp_yaml = yaml_output
     for key in node_reference:
@@ -91,7 +92,7 @@ def parse_yaml(data: Parsable) -> Parsable:  # noqa: C901
         if result is not None:
             return result
 
-    args: Dict[str, Any] = {}
+    args: dict[str, Any] = {}
     for k, v in data.items():
         if isinstance(v, dict):
             args[k] = parse_yaml(v)  # type: ignore
@@ -105,7 +106,7 @@ def parse_yaml(data: Parsable) -> Parsable:  # noqa: C901
     return args
 
 
-def create_component_from_yaml(name: str, args: Dict[str, Any]):
+def create_component_from_yaml(name: str, args: dict[str, Any]):
     '''
     Create a component from yaml data.
 

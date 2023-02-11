@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
+from typing import Any, Generic, TypeVar
 
-from reil.logger import Logger
 from reil.datatypes.feature import FeatureSet
+from reil.logger import Logger
 from reil.utils.functions import dist, in_range, interpolate, square_dist
 
 # NOTE:
@@ -23,7 +23,7 @@ TypeX = TypeVar('TypeX')
 class ReilFunction(Generic[TypeY, TypeX]):
     name: str
     y_var_name: str
-    x_var_name: Optional[str] = None
+    x_var_name: str | None = None
     length: int = -1
     multiplier: float = 1.0
     interpolate: bool = True
@@ -33,7 +33,7 @@ class ReilFunction(Generic[TypeY, TypeX]):
 
     def __call__(self, args: FeatureSet) -> float:
         temp = args.value
-        fn_args: Dict[str, Any] = {'y': temp[self.y_var_name]}
+        fn_args: dict[str, Any] = {'y': temp[self.y_var_name]}
         if self.x_var_name:
             fn_args['x'] = temp[self.x_var_name]
 
@@ -45,21 +45,21 @@ class ReilFunction(Generic[TypeY, TypeX]):
         return result
 
     # just for the compatibility with old saved models. Should not be used.
-    def _retro_inter(self, y: List[TypeY], x: List[TypeX]) -> float:
+    def _retro_inter(self, y: list[TypeY], x: list[TypeX]) -> float:
         raise NotImplementedError
 
     # just for the compatibility with old saved models. Should not be used.
-    def _retro_no_inter(self, y: List[TypeY], x: List[TypeX]) -> float:
+    def _retro_no_inter(self, y: list[TypeY], x: list[TypeX]) -> float:
         raise NotImplementedError
 
-    def _inter(self, y: List[TypeY], x: List[TypeX]) -> float:
+    def _inter(self, y: list[TypeY], x: list[TypeX]) -> float:
         raise NotImplementedError
 
-    def _no_inter(self, y: List[TypeY]) -> float:
+    def _no_inter(self, y: list[TypeY]) -> float:
         raise NotImplementedError
 
     def _default_function(
-            self, y: List[TypeY], x: Optional[List[TypeX]] = None) -> float:
+            self, y: list[TypeY], x: list[TypeX] | None = None) -> float:
         raise NotImplementedError
 
 
@@ -71,7 +71,7 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
     exclude_first: bool = False
 
     def _default_function(
-            self, y: List[float], x: Optional[List[int]] = None) -> float:
+            self, y: list[float], x: list[int] | None = None) -> float:
         len_y = len(y)
         _x = x or [1] * (len_y - 1)
 
@@ -103,7 +103,7 @@ class NormalizedDistance(ReilFunction[float, int]):
     exclude_first: bool = False
 
     def _default_function(
-            self, y: List[float], x: Optional[List[int]] = None) -> float:
+            self, y: list[float], x: list[int] | None = None) -> float:
         len_y = len(y)
         _x = x or [1] * (len_y - 1)
 
@@ -129,11 +129,11 @@ class NormalizedDistance(ReilFunction[float, int]):
 
 @dataclasses.dataclass
 class PercentInRange(ReilFunction[float, int]):
-    acceptable_range: Tuple[float, float] = (0.0, 1.0)
+    acceptable_range: tuple[float, float] = (0.0, 1.0)
     exclude_first: bool = False
 
     def _default_function(
-            self, y: List[float], x: Optional[List[int]] = None) -> float:
+            self, y: list[float], x: list[int] | None = None) -> float:
         len_y = len(y)
         _x = x or [1] * (len_y - 1)
         if len_y != len(_x) + 1:
@@ -162,7 +162,7 @@ class NotEqual(ReilFunction[float, int]):
     interpolate: bool = False
 
     def _no_inter(
-            self, y: List[float], x: Optional[List[int]] = None) -> float:
+            self, y: list[float], x: list[int] | None = None) -> float:
         if x:
             reil_func_logger.info(
                 'x is provided, but is not used in `NotEqual` function.')
@@ -199,7 +199,7 @@ class NotEqual(ReilFunction[float, int]):
 #     interpolation_method: str = 'linear'
 
 # def _default_function(
-#         self, y: List[Any], x: Optional[List[Any]] = None) -> float:
+#         self, y: list[Any], x: list[Any] | None = None) -> float:
 #     if self.op == 'count':
 #         result = sum(yi != y[i+1]
 #                     for i, yi in enumerate(y[:-1]))
@@ -209,22 +209,22 @@ class NotEqual(ReilFunction[float, int]):
 
 # class Functions:
 #     @staticmethod
-#     def dose_change_count(dose_list: List[float],
-#                           intervals: Optional[List[int]] = None) -> int:
+#     def dose_change_count(dose_list: list[float],
+#                           intervals: list[int] | None = None) -> int:
 #         # assuming dose is fixed during each interval
 #         return sum(x != dose_list[i+1]
 #                    for i, x in enumerate(dose_list[:-1]))
 
 #     @staticmethod
-#     def delta_dose(dose_list: List[float],
-#                    intervals: Optional[List[int]] = None) -> float:
+#     def delta_dose(dose_list: list[float],
+#                    intervals: list[int] | None = None) -> float:
 #         # assuming dose is fixed during each interval
 #         return sum(abs(x-dose_list[i+1])
 #                    for i, x in enumerate(dose_list[:-1]))
 
 #     @staticmethod
-#     def total_dose(dose_list: List[float],
-#                    intervals: Optional[List[int]] = None) -> float:
+#     def total_dose(dose_list: list[float],
+#                    intervals: list[int] | None = None) -> float:
 #         if intervals is None:
 #             result = sum(dose_list)
 #         else:
@@ -239,8 +239,8 @@ class NotEqual(ReilFunction[float, int]):
 #         return result
 
 #     @staticmethod
-#     def average_dose(dose_list: List[float],
-#                      intervals: Optional[List[int]] = None) -> float:
+#     def average_dose(dose_list: list[float],
+#                      intervals: list[int] | None = None) -> float:
 #         total_dose = Functions.total_dose(dose_list, intervals)
 #         total_interval = len(
 #             dose_list) if intervals is None else sum(intervals)

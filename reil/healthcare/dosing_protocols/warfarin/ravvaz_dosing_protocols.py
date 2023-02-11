@@ -29,7 +29,7 @@ class AAA(ThreePhaseDosingProtocol):
         super().__init__(aurora_instance, aurora_instance, aurora_instance)
 
     def prescribe(
-            self, patient: Dict[str, Any]) -> DosingDecision:
+            self, patient: dict[str, Any]) -> DosingDecision:
         dosing_decision, self._additional_info = \
             self._initial_protocol.prescribe(patient, self._additional_info)
 
@@ -51,7 +51,7 @@ class CAA(ThreePhaseDosingProtocol):
         super().__init__(iwpc_instance, aurora_instance, aurora_instance)
 
     def prescribe(
-            self, patient: Dict[str, Any]) -> DosingDecision:
+            self, patient: dict[str, Any]) -> DosingDecision:
         day: int = patient['day']
         if day <= 2:
             temp, self._additional_info = self._initial_protocol.prescribe(
@@ -81,7 +81,7 @@ class PGAA(ThreePhaseDosingProtocol):
         super().__init__(iwpc_instance, aurora_instance, aurora_instance)
 
     def prescribe(
-            self, patient: Dict[str, Any]) -> DosingDecision:
+            self, patient: dict[str, Any]) -> DosingDecision:
         day: int = patient['day']
         if day <= 2:
             temp, self._additional_info = self._initial_protocol.prescribe(
@@ -112,7 +112,7 @@ class PGPGA(ThreePhaseDosingProtocol):
         super().__init__(iwpc_instance, lenzini_instance, aurora_instance)
 
     def prescribe(
-            self, patient: Dict[str, Any]) -> DosingDecision:
+            self, patient: dict[str, Any]) -> DosingDecision:
         if patient['day'] <= 3:
             temp, self._additional_info = \
                 self._initial_protocol.prescribe(
@@ -149,7 +149,7 @@ class PGPGI(ThreePhaseDosingProtocol):
             iwpc_instance, lenzini_instance, intermountain_instance)
 
     def prescribe(
-            self, patient: Dict[str, Any]) -> DosingDecision:
+            self, patient: dict[str, Any]) -> DosingDecision:
         if patient['day'] <= 3:
             temp, self._additional_info = \
                 self._initial_protocol.prescribe(

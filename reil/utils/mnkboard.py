@@ -7,8 +7,7 @@ This class creates a board for players to play the mnk game.
 '''
 
 import math
-from typing import (Any, Dict, Generic, Iterator, List, Optional, Tuple,
-                    TypeVar, Union, cast, overload)
+from typing import Any, Generic, Iterator, TypeVar, cast, overload
 
 from reil.datatypes.feature import FeatureSet, FeatureGenerator
 
@@ -22,8 +21,8 @@ class MNKBoard(Generic[T]):
 
     def __init__(
             self, m: int = 3, n: int = 3, k: int = 3,
-            player_names: Optional[Dict[int, T]] = None, players: int = 2,
-            blank_val: T = 0, init_board: Optional[List[T]] = None,
+            player_names: dict[int, T] | None = None, players: int = 2,
+            blank_val: T = 0, init_board: list[T] | None = None,
             can_recapture: bool = True, **kwargs: Any):
         '''
         Arguments
@@ -53,7 +52,7 @@ class MNKBoard(Generic[T]):
         self._blank_val = blank_val
         self._init_board = init_board
         self._player_names = (
-            player_names or {i: cast(T, i) for i in range(1, players+1)})
+            player_names or {i: cast(T, i) for i in range(1, players + 1)})
 
         self._board_state_gen = FeatureGenerator.categorical(
             name='state', categories=tuple(
@@ -112,9 +111,8 @@ class MNKBoard(Generic[T]):
         ...
 
     def set_piece(  # type: ignore
-            self, player: int, index: Optional[int] = None,
-            row: Optional[int] = None, column: Optional[int] = None
-            ) -> None:
+            self, player: int, index: int | None = None,
+            row: int | None = None, column: int | None = None) -> None:
         '''
         Set a piece for a player.
 
@@ -201,9 +199,8 @@ class MNKBoard(Generic[T]):
         ...
 
     def get_square(  # type: ignore
-            self, index: Optional[int] = None,
-            row: Optional[int] = None, column: Optional[int] = None
-            ) -> T:
+            self, index: int | None = None,
+            row: int | None = None, column: int | None = None) -> T:
         '''
         Get the piece on a given position.
 
@@ -278,8 +275,8 @@ class MNKBoard(Generic[T]):
         ...
 
     def clear_square(  # type: ignore
-            self, index: Optional[int] = None,
-            row: Optional[int] = None, column: Optional[int] = None) -> None:
+            self, index: int | None = None,
+            row: int | None = None, column: int | None = None) -> None:
         '''
         Set a piece for a player.
 
@@ -326,8 +323,7 @@ class MNKBoard(Generic[T]):
         ''' Return the state of the board as a FeatureSet.'''
         return FeatureSet(self._board_state_gen(tuple(self._board)))
 
-    def get_board(
-            self, as_list: bool = True) -> Union[List[T], List[List[T]]]:
+    def get_board(self, as_list: bool = True) -> list[T] | list[list[T]]:
         '''
         Return the board.
 
@@ -348,7 +344,7 @@ class MNKBoard(Generic[T]):
 
     def get_action_set(
             self, as_list: bool = True
-    ) -> Union[Iterator[int], Iterator[Tuple[int, int]]]:
+    ) -> Iterator[int] | Iterator[tuple[int, int]]:
         '''
         Return a list of indexes of empty squares.
 
@@ -358,7 +354,7 @@ class MNKBoard(Generic[T]):
             Whether to return the board as a list or a matrix.
         '''
         index = (
-            i for i in range(self._m*self._n)
+            i for i in range(self._m * self._n)
             if self._board[i] == self._blank_val)
         for action in index:
             if as_list:
@@ -371,7 +367,7 @@ class MNKBoard(Generic[T]):
         if self._init_board:
             self._board = [x for x in self._init_board]
         else:
-            self._board = [self._blank_val]*(self._m*self._n)
+            self._board = [self._blank_val] * (self._m * self._n)
 
     def __str__(self):
         '''Return a printable format string of the board.'''
@@ -381,8 +377,8 @@ class MNKBoard(Generic[T]):
 
     @staticmethod
     def list_to_matrix(
-            board: List[T],
-            m: int, n: Optional[int] = None) -> List[List[T]]:
+            board: list[T],
+            m: int, n: int | None = None) -> list[list[T]]:
         '''
         Covert a list to a 2D matrix.
 
@@ -400,7 +396,7 @@ class MNKBoard(Generic[T]):
         '''
         _n = n or math.ceil(len(board) / m)
 
-        return [board[row*_n:(row+1)*_n] for row in range(m)]
+        return [board[row * _n:(row + 1) * _n] for row in range(m)]
 
     def __repr__(self):
         return (self.__class__.__qualname__ + f', {self._m} x {self._n} board,'

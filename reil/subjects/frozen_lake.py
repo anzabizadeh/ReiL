@@ -12,7 +12,7 @@ the goal. Some locations are holes.
 '''
 
 from random import choice
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureGeneratorType,
@@ -46,7 +46,7 @@ class FrozenLake(MNKBoard, Subject):
         reset: clears the grid.
     '''
     def __init__(
-            self, _map: Optional[List[List[str]]] = None,
+            self, _map: list[list[str]] | None = None,
             terminate_on_hole: bool = False, **kwargs: Any):
         '''
         Arguments
@@ -98,7 +98,7 @@ class FrozenLake(MNKBoard, Subject):
         self.reset()
 
     @staticmethod
-    def _locate(_map: List[List[Any]], element: Any) -> Tuple[int, int]:
+    def _locate(_map: list[list[Any]], element: Any) -> tuple[int, int]:
         row = [element in m_i for m_i in _map].index(True)
         col = _map[row].index(element)
         return (row, col)
@@ -106,14 +106,14 @@ class FrozenLake(MNKBoard, Subject):
     def _actions(self, board: Feature) -> FeatureGeneratorType:
         return self._action_gen.make_generator()
 
-    def is_terminated(self, _id: Optional[int] = None) -> bool:
+    def is_terminated(self, _id: int | None = None) -> bool:
         '''Return True if the player get to the goal or falls into a hole.'''
         if self._init_board:
             return self._init_board[self._board.index('P')] in ('H', 'G')
         return self._player_location == self._goal
 
     def _default_reward_definition(
-            self, _id: Optional[int] = None) -> float:
+            self, _id: int | None = None) -> float:
         if self._player_location == self._goal:
             return 10.0
         if (
@@ -175,7 +175,7 @@ class FrozenLake(MNKBoard, Subject):
 
     def _sub_comp_full_map(
             self, _id: int, **kwargs: Any) -> Feature:
-        board_list: Tuple[str, ...] = tuple(self.get_board())  # type: ignore
+        board_list: tuple[str, ...] = tuple(self.get_board())  # type: ignore
 
         return self._board_gen(board_list)
 
@@ -186,23 +186,23 @@ class FrozenLake(MNKBoard, Subject):
         # tl, tc, tr, _l, _c, _r, bl, bc, br
         if r > 0:
             if c > 0:
-                board_list[0] = self.get_square(row=r-1, column=c-1)
-            board_list[1] = self.get_square(row=r-1, column=c)
+                board_list[0] = self.get_square(row=r - 1, column=c - 1)
+            board_list[1] = self.get_square(row=r - 1, column=c)
             if c < self._n - 1:
-                board_list[2] = self.get_square(row=r-1, column=c+1)
+                board_list[2] = self.get_square(row=r - 1, column=c + 1)
 
         if c > 0:
-            board_list[3] = self.get_square(row=r, column=c-1)
+            board_list[3] = self.get_square(row=r, column=c - 1)
         board_list[4] = self.get_square(row=r, column=c)
         if c < self._n - 1:
-            board_list[5] = self.get_square(row=r, column=c+1)
+            board_list[5] = self.get_square(row=r, column=c + 1)
 
         if r < self._m - 1:
             if c > 0:
-                board_list[6] = self.get_square(row=r+1, column=c-1)
-            board_list[7] = self.get_square(row=r+1, column=c)
+                board_list[6] = self.get_square(row=r + 1, column=c - 1)
+            board_list[7] = self.get_square(row=r + 1, column=c)
             if c < self._n - 1:
-                board_list[8] = self.get_square(row=r+1, column=c+1)
+                board_list[8] = self.get_square(row=r + 1, column=c + 1)
 
         return self._board_gen(tuple(board_list))
 

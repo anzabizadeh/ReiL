@@ -6,10 +6,10 @@ HambergPKPD class
 A warfarin PK/PD model proposed by Hamberg et al. (2007).
 DOI: 10.1038/sj.clpt.6100084
 '''
-from typing import Any, Dict, Final, List, NamedTuple, Optional, Union
-import numpy as np
+from typing import Any, Final, NamedTuple
 
 import tensorflow as tf
+
 from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorSet,
                                     FeatureSet)
 from reil.healthcare.mathematical_models.health_math_model import \
@@ -93,13 +93,13 @@ def two_compartment(
     #       + c_{\alpha}\exp{-\alpha t}
     #       + c_{\beta}\exp{-\beta t}
     coef_alpha = tf.multiply(
-        (k21 - alpha) / ((k_aS - alpha)*(beta - alpha)), kaF_2V1,
+        (k21 - alpha) / ((k_aS - alpha) * (beta - alpha)), kaF_2V1,
         name='coef_alpha')
     coef_beta = tf.multiply(
-        (k21 - beta) / ((k_aS - beta)*(alpha - beta)), kaF_2V1,
+        (k21 - beta) / ((k_aS - beta) * (alpha - beta)), kaF_2V1,
         name='coef_beta')
     coef_k_a = tf.multiply(
-        (k21 - k_aS) / ((k_aS - alpha)*(k_aS - beta)), kaF_2V1,
+        (k21 - k_aS) / ((k_aS - alpha) * (k_aS - beta)), kaF_2V1,
         name='coef_k_a')
 
     # ---- End of the implementation of the two compartment model -------
@@ -146,6 +146,7 @@ def base_concentration(
 
     return tf.squeeze(base_cs)
 
+
 @tf.function(
     input_signature=(
         tf.TensorSpec(shape=[None], dtype=tf.float32, name='cs'),
@@ -159,6 +160,7 @@ def pad_and_dose(
     padded_cs = tf.pad(cs, [[pad, 0]], 'constant')
 
     return padded_cs[:tf.shape(cs)[0]]
+
 
 @tf.function(
     input_signature=(
@@ -213,7 +215,7 @@ def _INR(
         result = result.write(d2 - start_day, tf.squeeze(
             tf.multiply(
                 HambergPKPD._baseINR + HambergPKPD._INR_max * tf.pow(
-                    1.0 - A[6]*A[8], HambergPKPD._lambda),
+                    1.0 - A[6] * A[8], HambergPKPD._lambda),
                 err_INR_list[d2], name='INR')))
 
     return result.stack()
@@ -357,7 +359,7 @@ class HambergPKPD(HealthMathModel):
     @classmethod
     def generate(
             cls,
-            input_features: Optional[FeatureSet] = None,
+            input_features: FeatureSet | None = None,
             **kwargs: Any) -> FeatureSet:
 
         feature_set = super(HambergPKPD, cls).generate(
@@ -398,7 +400,7 @@ class HambergPKPD(HealthMathModel):
 
     def setup(
             self, arguments: FeatureSet,
-            random_seed: Optional[int] = None) -> None:
+            random_seed: int | None = None) -> None:
         '''
         Set up the model.
 
@@ -462,8 +464,8 @@ class HambergPKPD(HealthMathModel):
         # However, Ravvaz set it to $6/MTT_1$. It must be because we have
         # 6 compartment amounts, and total $MTT_1$ for the whole chain is
         # 11.6 h (Figure 2), so each should take $\frac{1}{6} MTT_1$
-        ktr1 = 6.0/MTT_1  # (1/hours)
-        ktr2 = 1.0/MTT_2  # (1/hours)
+        ktr1 = 6.0 / MTT_1  # (1/hours)
+        ktr2 = 1.0 / MTT_2  # (1/hours)
         self._ktr = tf.constant([ktr1] * 6 + [0.0, ktr2], dtype=tf.float32)
         self._EC_50_gamma = tf.pow(EC_50, self._gamma)
 
@@ -471,8 +473,8 @@ class HambergPKPD(HealthMathModel):
 
         self._last_computed_day = 0
 
-        self._dose_records: Dict[int, DoseEffect] = {}
-        self._computed_INRs: Dict[int, tf.Tensor] = {}  # daily
+        self._dose_records: dict[int, DoseEffect] = {}
+        self._computed_INRs: dict[int, tf.Tensor] = {}  # daily
 
         # define random generators
         detailed_cache_size = self._cache_size * self._per_day
@@ -484,9 +486,11 @@ class HambergPKPD(HealthMathModel):
                     random_seed)
 
             gen_err, gen_exp_e_INR = self._random_generator.split(count=2)
+
             def _gen_err():
                 return tf.exp(
                     gen_err.normal([detailed_cache_size], 0.0, self._sigma_ss))
+
             def _gen_exp_e_INR():
                 return tf.exp(
                     gen_exp_e_INR.normal(
@@ -544,12 +548,12 @@ class HambergPKPD(HealthMathModel):
 
         for day, (dose, _) in self._dose_records.items():
             cs = pad_and_dose(
-                    cs=self._cached_cs, dose=dose,
-                    pad=tf.constant(day * per_day))
+                cs=self._cached_cs, dose=dose,
+                pad=tf.constant(day * per_day))
             self._dose_records[day] = DoseEffect(dose, cs)
             self._total_cs.assign_add(cs)
 
-    def run(self, **inputs: Any) -> Dict[str, Any]:
+    def run(self, **inputs: Any) -> dict[str, Any]:
         '''
         Run the model.
 
@@ -575,7 +579,7 @@ class HambergPKPD(HealthMathModel):
         return {'INR': {}}
 
     @property
-    def dose(self) -> Dict[int, float]:
+    def dose(self) -> dict[int, float]:
         '''
         Return doses for each day.
 
@@ -588,7 +592,7 @@ class HambergPKPD(HealthMathModel):
             t: info.dose.numpy()[0]  # type: ignore
             for t, info in self._dose_records.items()}
 
-    def prescribe(self, dose: Dict[int, float]) -> None:
+    def prescribe(self, dose: dict[int, float]) -> None:
         '''
         Add warfarin doses at the specified days.
 
@@ -626,12 +630,12 @@ class HambergPKPD(HealthMathModel):
 
                 new_dose = tf.constant(new_dose, dtype=tf.float32)
                 cs = pad_and_dose(
-                        cs=self._cached_cs, dose=new_dose,
-                        pad=tf.constant(day * self._per_day))
+                    cs=self._cached_cs, dose=new_dose,
+                    pad=tf.constant(day * self._per_day))
                 self._dose_records[day] = DoseEffect(new_dose, cs)
                 self._total_cs.assign_add(cs)
 
-    def INR(self, measurement_days: Union[int, List[int]]) -> List[float]:
+    def INR(self, measurement_days: int | list[int]) -> list[float]:
         '''
         Compute INR values for the specified days.
 
@@ -645,7 +649,7 @@ class HambergPKPD(HealthMathModel):
         :
             A list of INRs for the specified days.
         '''
-        days: List[int]
+        days: list[int]
 
         days = (measurement_days if hasattr(measurement_days, '__iter__')
                 else [measurement_days])  # type: ignore
@@ -756,4 +760,3 @@ class HambergPKPD(HealthMathModel):
     #         HambergPKPD._baseINR + HambergPKPD._INR_max * tf.pow(
     #             1.0 - A[6]*A[8], HambergPKPD._lambda),  # type: ignore
     #         error, name='INR'))
-

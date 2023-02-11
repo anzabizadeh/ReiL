@@ -9,9 +9,9 @@ The base class for reinforcement learning
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Dict, List, Optional, Union
-import reil
+from typing import Any
 
+import reil
 from reil.logger import Logger
 from reil.serialization import PickleMe, deserialize
 
@@ -24,13 +24,13 @@ class ReilBase:
 
     def __init__(
             self,
-            name: Optional[str] = None,
-            path: Optional[pathlib.PurePath] = None,
-            logger_name: Optional[str] = None,
-            logger_level: Optional[int] = None,
-            logger_filename: Optional[str] = None,
-            persistent_attributes: Optional[List[str]] = None,
-            save_zipped: Optional[bool] = None):
+            name: str | None = None,
+            path: pathlib.PurePath | None = None,
+            logger_name: str | None = None,
+            logger_level: int | None = None,
+            logger_filename: str | None = None,
+            persistent_attributes: list[str] | None = None,
+            save_zipped: bool | None = None):
         '''
         Arguments
         ---------
@@ -92,7 +92,7 @@ class ReilBase:
     @classmethod
     def from_pickle(
             cls, filename: str,
-            path: Optional[Union[pathlib.PurePath, str]] = None):
+            path: pathlib.PurePath | str | None = None):
         '''
         Load a pickled instance.
 
@@ -117,7 +117,7 @@ class ReilBase:
         return instance
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         internal_states = config.pop('internal_states', {})
         args = deserialize(config)
         instance = cls(**args)
@@ -125,8 +125,8 @@ class ReilBase:
 
         return instance
 
-    def get_config(self) -> Dict[str, Any]:
-        config: Dict[str, Any] = dict(
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = dict(
             name=self._name, path=self._path, save_zipped=self._save_zipped)
 
         config.update(self._logger.get_config())
@@ -138,7 +138,7 @@ class ReilBase:
 
     def load(
             self, filename: str,
-            path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+            path: str | pathlib.PurePath | None = None) -> None:
         '''
         Load an object from a file.
 
@@ -171,8 +171,8 @@ class ReilBase:
 
     def save(
         self,
-        filename: Optional[str] = None,
-        path: Optional[Union[str, pathlib.PurePath]] = None
+        filename: str | None = None,
+        path: str | pathlib.PurePath | None = None
     ) -> pathlib.PurePath:
         '''
         Save the object to a file.
@@ -208,7 +208,7 @@ class ReilBase:
     def __getstate__(self):
         return self.__dict__.copy()
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         # if '_object_version' not in state:
         #     state['_object_version'] = ReilBase._object_version
         self.__dict__.update(state)

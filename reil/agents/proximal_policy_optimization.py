@@ -6,10 +6,11 @@ PPO class
 A Proximal Policy Optimization Policy Gradient `agent`.
 '''
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
+
 from reil.agents.actor_critic import A2C
 from reil.agents.agent import TrainingData
 from reil.datatypes import History
@@ -20,7 +21,7 @@ from reil.utils.exploration_strategies import NoExploration
 from reil.utils.metrics import MetricProtocol
 from reil.utils.tf_utils import ActionRank, MeanMetric
 
-ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
+ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
 
 class PPO(A2C):
@@ -31,8 +32,8 @@ class PPO(A2C):
     def __init__(
             self,
             learner: PPOLearner,
-            buffer: Buffer[FeatureSet, Tuple[Tuple[int, ...], float, float]],
-            reward_clip: Tuple[Optional[float], Optional[float]] = (None, None),
+            buffer: Buffer[FeatureSet, tuple[tuple[int, ...], float, float]],
+            reward_clip: tuple[float | None, float | None] = (None, None),
             gae_lambda: float = 1.0,
             **kwargs: Any):
         '''
@@ -61,7 +62,7 @@ class PPO(A2C):
         self._buffer.setup(buffer_names=['state', 'y_r_a'])
         self._reward_clip = reward_clip
         self._gae_lambda = gae_lambda
-        self._metrics: Dict[str, MetricProtocol] = {  # type: ignore
+        self._metrics: dict[str, MetricProtocol] = {  # type: ignore
             'action_rank': ActionRank(),
             'advantage_mean': MeanMetric('advantage_mean', dtype=tf.float32),
             'rewards': MeanMetric('rewards', dtype=tf.float32)
@@ -93,7 +94,7 @@ class PPO(A2C):
             active_history, *self._reward_clip) + [0.0]
         dis_reward = self.discounted_cum_sum(rewards, discount_factor)
 
-        state_list: Tuple[FeatureSet, ...] = tuple(  # type: ignore
+        state_list: tuple[FeatureSet, ...] = tuple(  # type: ignore
             h.state for h in active_history)
         # add zero to the end to have the correct length of `deltas`
         y, values = self._learner.predict(state_list)
@@ -102,10 +103,10 @@ class PPO(A2C):
             list((h.action_taken or h.action).index.values())  # type: ignore
             for h in active_history)
         deltas = (
-            rewards[:-1] + discount_factor * values[1:]  # type: ignore
+            rewards[:-1] + discount_factor * values[1:]
             - values[:-1])
         advantage = self.discounted_cum_sum(
-            deltas, discount_factor * self._gae_lambda)
+            deltas, discount_factor * self._gae_lambda)  # type: ignore
 
         self._buffer.add_iter({
             'state': h.state,

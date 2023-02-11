@@ -6,16 +6,16 @@ Sink class
 A dummy buffer that does nothing!
 '''
 
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Iterator
 
-from reil.datatypes.buffers.buffer import Buffer, T1, T2, PickModes
+from reil.datatypes.buffers.buffer import T1, T2, Buffer, PickModes
 
 
 class Sink(Buffer[T1, T2]):
     '''
     A sink class.
     '''
-    def __init__(self, buffer_names: Optional[List[str]] = None) -> None:
+    def __init__(self, buffer_names: list[str] | None = None) -> None:
         '''
         Arguments
         ---------
@@ -26,10 +26,10 @@ class Sink(Buffer[T1, T2]):
         self.setup(buffer_names=buffer_names)
 
     def setup(
-            self, buffer_size: Optional[int] = None,
-            buffer_names: Optional[List[str]] = None,
-            pick_mode: Optional[PickModes] = None,
-            clear_buffer: Optional[bool] = None) -> None:
+            self, buffer_size: int | None = None,
+            buffer_names: list[str] | None = None,
+            pick_mode: PickModes | None = None,
+            clear_buffer: bool | None = None) -> None:
         '''
         Set up the buffer.
 
@@ -68,7 +68,7 @@ class Sink(Buffer[T1, T2]):
         '''
         super().setup(buffer_names=buffer_names)
 
-    def add(self, data: Dict[str, Union[T1, T2]]) -> None:
+    def add(self, data: dict[str, T1 | T2]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -85,14 +85,14 @@ class Sink(Buffer[T1, T2]):
         '''
         return
 
-    def add_iter(self, iter: Iterator[Dict[str, Union[T1, T2]]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, T1 | T2]]) -> None:
         return
 
     def pick(
             self,
-            count: Optional[int] = None,
-            mode: Optional[PickModes] = None
-    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
+            count: int | None = None,
+            mode: PickModes | None = None
+    ) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
         '''
         Raises an exception.
 

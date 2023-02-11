@@ -7,8 +7,7 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-from typing import (Any, Dict, Generator, List, NamedTuple, Optional, Tuple,
-                    TypedDict, Union)
+from typing import Any, Generator, NamedTuple, TypedDict
 
 import pandas as pd
 
@@ -25,17 +24,16 @@ class StatInfo(NamedTuple):
     obj: str
     entity_name: str
     assigned_to: str
-    a_s_name: Tuple[str, str]
-    aggregators: Optional[Tuple[str, ...]]
-    groupby: Optional[Tuple[str, ...]]
+    a_s_name: tuple[str, str]
+    aggregators: tuple[str, ...] | None
+    groupby: tuple[str, ...] | None
 
 
 class InteractArgs(TypedDict):
     agent_id: int
     subject_id: int
-    agent_observer: Generator[
-        Union[FeatureSet, None], Dict[str, Any], None]
-    subject_instance: Union[Subject, SubjectDemon]
+    agent_observer: Generator[FeatureSet | None, dict[str, Any], None]
+    subject_instance: Subject | SubjectDemon
     protocol: InteractionProtocol
     iteration: int
 
@@ -49,12 +47,9 @@ class Single(Environment):
 
     def __init__(
             self,
-            entity_dict: Optional[Dict[str, Union[
-                EntityType, EntityGenType, str]]] = None,
-            demon_dict: Optional[Dict[str, Union[
-                AgentDemon, SubjectDemon, str]]] = None,
-            interaction_plans: Optional[
-                Dict[str, InteractionProtocol]] = None,
+            entity_dict: dict[str, EntityType | EntityGenType | str] | None = None,
+            demon_dict: dict[str, AgentDemon | SubjectDemon | str] | None = None,
+            interaction_plans: dict[str, InteractionProtocol] | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -73,7 +68,7 @@ class Single(Environment):
             interaction_plans=interaction_plans, **kwargs)
         self._active_plan: Plan[InteractionProtocol]
 
-    def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
+    def remove_entity(self, entity_names: tuple[str, ...]) -> None:
         '''
         Extends `Environment.remove_entity`.
 
@@ -106,7 +101,7 @@ class Single(Environment):
 
         super().remove_entity(entity_names)
 
-    def remove_demon(self, demon_names: Tuple[str, ...]) -> None:
+    def remove_demon(self, demon_names: tuple[str, ...]) -> None:
         '''
         Extends `Environment.remove_demon`.
 
@@ -141,7 +136,7 @@ class Single(Environment):
         super().remove_demon(demon_names)
 
     def add_plans(
-            self, interaction_plans: Dict[str, InteractionProtocol]) -> None:
+            self, interaction_plans: dict[str, InteractionProtocol]) -> None:
         for protocol in interaction_plans.values():
             self.assert_protocol(protocol)
 
@@ -156,8 +151,8 @@ class Single(Environment):
             self,
             agent_id: int,
             subject_id: int,
-            agent_observer: Generator[Union[FeatureSet, None], Any, None],
-            subject_instance: Union[Subject, SubjectDemon],
+            agent_observer: Generator[FeatureSet | None, Any, None],
+            subject_instance: Subject | SubjectDemon,
             protocol: InteractionProtocol,
             iteration: int,
             times: int = 1) -> None:
@@ -249,7 +244,7 @@ class Single(Environment):
                 if lookahead is None:
                     lookahead_data = None
                 else:
-                    subject_pool: Union[List[Subject], List[SubjectDemon]] = \
+                    subject_pool: list[Subject] | list[SubjectDemon] = \
                         subject_instance.copy(  # type: ignore
                             perturb=lookahead.perturb_subject, n=subject_count)
                     lookahead_data = [
@@ -515,7 +510,7 @@ class Single(Environment):
             self,
             unstack: bool = True,
             reset_history: bool = True,
-    ) -> Dict[Tuple[str, str], pd.DataFrame]:
+    ) -> dict[tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
         Parameters

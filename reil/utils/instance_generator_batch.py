@@ -12,9 +12,10 @@ from __future__ import annotations
 import pathlib
 import time
 from copy import deepcopy
-from typing import Any, Dict, Iterable, Optional, Tuple, TypeVar, Union
+from typing import Any, Iterable, TypeVar
 
 import dill as pickle
+
 from reil import stateful
 from reil.datatypes.feature_set_dumper import FeatureSetDumper
 from reil.serialization import PickleMe
@@ -35,17 +36,17 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
     def __init__(
             self,
             obj: T,
-            instance_counter_stops: Tuple[int, ...] = (0,),
+            instance_counter_stops: tuple[int, ...] = (0,),
             first_instance_number: int = 0,
             auto_rewind: bool = False,
             save_instances: bool = False,
             overwrite_instances: bool = False,
             use_existing_instances: bool = True,
-            save_path: Union[pathlib.PurePath, str] = '',
+            save_path: pathlib.PurePath | str = '',
             instance_name_pattern: str = '{n:04}',
             filename_pattern: str = '{n:04}',
             pre_generate_all: bool = False,
-            state_dumper: Optional[FeatureSetDumper] = None,
+            state_dumper: FeatureSetDumper | None = None,
             **kwargs: Any):
         '''
         Attributes
@@ -110,8 +111,8 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
         self._instance_name_pattern = instance_name_pattern
         self._pre_generate_all = pre_generate_all
 
-        self._instances: Dict[str, T] = {}
-        self._enumerate: enumerate[Tuple[str, T]] = enumerate(
+        self._instances: dict[str, T] = {}
+        self._enumerate: enumerate[tuple[str, T]] = enumerate(
             self._instances.items())
 
         if self._object is not None:
@@ -120,8 +121,8 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
     @staticmethod
     def generate_instances(
             obj: T, from_number: int, to_number: int,
-            instance_name_pattern: str) -> Dict[str, T]:
-        result: Dict[str, T] = {}
+            instance_name_pattern: str) -> dict[str, T]:
+        result: dict[str, T] = {}
         for i in range(from_number, to_number):
             name = instance_name_pattern.format(n=i)
             obj.reset()
@@ -134,17 +135,17 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
     def from_instance_list(
             cls,
             obj: T,
-            instance_name_lists: Tuple[Iterable[str], ...],
+            instance_name_lists: tuple[Iterable[str], ...],
             save_instances: bool = False,
             overwrite_instances: bool = False,
             use_existing_instances: bool = True,
-            save_path: Union[pathlib.PurePath, str] = '',
+            save_path: pathlib.PurePath | str = '',
             auto_rewind: bool = False,
-            state_dumper: Optional[FeatureSetDumper] = None,
+            state_dumper: FeatureSetDumper | None = None,
             **kwargs: Any) -> InstanceGeneratorBatch[T]:
         raise NotImplementedError('Use `InstanceGenerator` instead.')
 
-    def __next__(self) -> Tuple[int, T]:
+    def __next__(self) -> tuple[int, T]:
         try:
             self._instance_counter, obj_instance = next(self._enumerate)
         except StopIteration:
@@ -242,7 +243,7 @@ class InstanceGeneratorBatch(InstanceGenerator[T]):
 
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         # TODO: This is a hack! remove it after the experiments!
         # if 'trajectory' in state['_save_path']:
         #     state['_instance_counter_stops'] = [10000]

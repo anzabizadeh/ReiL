@@ -5,10 +5,11 @@ subject class
 
 This `subject` class is the base class of all subject classes.
 '''
+from __future__ import annotations
 
 import copy
 from abc import abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable
 
 from reil import stateful
 from reil.datatypes.components import ActionSet, Reward
@@ -65,18 +66,18 @@ class Subject(stateful.Stateful):
 
     def _action_def_reference(
         self, name: str
-    ) -> Optional[Tuple[Callable[..., FeatureGeneratorType], str]]:
+    ) -> tuple[Callable[..., FeatureGeneratorType], str] | None:
         return None
 
     def _state_def_reference(
-            self, name: str) -> Optional[Tuple[Tuple[str, Dict[str, Any]], ...]]:
+            self, name: str) -> tuple[tuple[str, dict[str, Any]], ...] | None:
         if name == 'default':
             return ('none', {}),
 
         return None
 
     @abstractmethod
-    def is_terminated(self, _id: Optional[int] = None) -> bool:
+    def is_terminated(self, _id: int | None = None) -> bool:
         '''
         Determine if the `subject` is terminated for the given `agent` ID.
 
@@ -118,8 +119,8 @@ class Subject(stateful.Stateful):
         return taken_action
 
     def copy(
-        self, perturb: bool = False, n: Optional[int] = None
-    ) -> Union['Subject', List['Subject']]:
+        self, perturb: bool = False, n: int | None = None
+    ) -> 'Subject' | list['Subject']:
         '''
         Returns a copy of the subject.
 
@@ -165,7 +166,7 @@ class Subject(stateful.Stateful):
         super().reset()
         self.reward.disable()
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         super().__setstate__(state)
         try:
             self.reward.set_state(self.state)

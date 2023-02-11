@@ -6,10 +6,10 @@ SubjectDemon class
 `SubjectDemon` class changes the behavior of a given subject.
 '''
 from __future__ import annotations
-import copy
 
+import copy
 import dataclasses
-from typing import Any, Callable, Generic, List, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, TypeVar
 
 from reil.datatypes.components import Reward, Statistic
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
@@ -22,8 +22,8 @@ T = TypeVar('T', FeatureSet, FeatureGeneratorType)
 @dataclasses.dataclass
 class Modifier(Generic[T]):
     name: str
-    cond_state_def: Optional[str]
-    condition_fn: Optional[Callable[[FeatureSet], bool]]
+    cond_state_def: str | None
+    condition_fn: Callable[[FeatureSet], bool] | None
     modifier_fn: Callable[[T], T]
 
     def __post_init__(self):
@@ -43,10 +43,9 @@ class SubjectDemon(ReilBase):
 
     def __init__(
             self,
-            subject: Optional[Subject] = None,
-            action_modifier: Optional[
-                Modifier[FeatureGeneratorType]] = None,
-            state_modifier: Optional[Modifier[FeatureSet]] = None,
+            subject: Subject | None = None,
+            action_modifier: Modifier[FeatureGeneratorType] | None = None,
+            state_modifier: Modifier[FeatureSet] | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -89,7 +88,7 @@ class SubjectDemon(ReilBase):
 
     def state(
             self, name: str,
-            _id: Optional[int] = None) -> FeatureSet:
+            _id: int | None = None) -> FeatureSet:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -124,8 +123,8 @@ class SubjectDemon(ReilBase):
 
     def possible_actions(
             self, name: str,
-            _id: Optional[int] = None
-    ) -> Union[FeatureGeneratorType, None]:
+            _id: int | None = None
+    ) -> FeatureGeneratorType | None:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
@@ -161,13 +160,13 @@ class SubjectDemon(ReilBase):
 
     # def load(
     #         self, filename: str,
-    #         path: Optional[Union[str, pathlib.PurePath]]) -> None:
+    #         path: Union[str, pathlib.PurePath] | None) -> None:
     #     super().load(filename, path)
 
     # def save(
     #         self,
-    #         filename: Optional[str] = None,
-    #         path: Optional[Union[str, pathlib.PurePath]] = None
+    #         filename: str | None = None,
+    #         path: Union[str, pathlib.PurePath] | None = None
     # ) -> pathlib.PurePath:
     #     return super().save(filename, path)
 
@@ -179,15 +178,15 @@ class SubjectDemon(ReilBase):
     def _entity_list(self, arg):
         self._subject._entity_list = arg
 
-    def register(self, entity_name: str, _id: Optional[int] = None) -> int:
+    def register(self, entity_name: str, _id: int | None = None) -> int:
         return self._subject.register(entity_name, _id)
 
     def deregister(self, entity_id: int) -> None:
         return self._subject.deregister(entity_id)
 
     def copy(
-        self, perturb: bool = False, n: Optional[int] = None
-    ) -> Union['SubjectDemon', List['SubjectDemon']]:
+        self, perturb: bool = False, n: int | None = None
+    ) -> 'SubjectDemon' | list['SubjectDemon']:
         '''
         Returns a copy of the subject.
 

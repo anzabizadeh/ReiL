@@ -23,7 +23,7 @@ Features included in this model are:
 * V2
 * EC_50
 '''
-from typing import Any, Dict, Optional
+from typing import Any
 
 from reil.datatypes.feature import FeatureGenerator, FeatureGeneratorSet
 from reil.healthcare.mathematical_models import HealthMathModel
@@ -36,7 +36,7 @@ class PatientWarfarinRavvaz(Patient):
     def __init__(
             self,
             model: HealthMathModel,
-            random_seed: Optional[int] = None,
+            random_seed: int | None = None,
             randomized: bool = True,
             allow_missing_genotypes: bool = True,
             **feature_values: Any) -> None:
@@ -161,7 +161,7 @@ class PatientWarfarinRavvaz(Patient):
 
         self.feature_set += self._sensitivity_gen(s)
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = super().get_config()
         config.update({'randomized': self._randomized})
         config['internal_states'].update(
@@ -174,7 +174,7 @@ class PatientWarfarinBalanced(PatientWarfarinRavvaz):
     def __init__(
             self,
             model: HealthMathModel,
-            random_seed: Optional[int] = None,
+            random_seed: int | None = None,
             randomized: bool = True,
             allow_missing_genotypes: bool = True,
             **feature_values: Any) -> None:
@@ -278,7 +278,7 @@ class PatientWarfarinOversampled(PatientWarfarinRavvaz):
     def __init__(
             self,
             model: HealthMathModel,
-            random_seed: Optional[int] = None,
+            random_seed: int | None = None,
             randomized: bool = True,
             allow_missing_genotypes: bool = True,
             **feature_values: Any) -> None:

@@ -1,6 +1,6 @@
 import pathlib
 from math import ceil, log10
-from typing import Dict, Literal, Optional, Union
+from typing import Literal
 
 from reil.environments.single import Single
 from reil.utils.output_writer import OutputWriter
@@ -11,13 +11,13 @@ from reil.utils.output_writer import OutputWriter
 
 class Task:
     def __init__(
-            self, name: str, path: Union[pathlib.PurePath, str],
-            agent_training_triggers: Dict[str, Literal[
+            self, name: str, path: pathlib.PurePath | str,
+            agent_training_triggers: dict[str, Literal[
                 'none', 'termination',
                 'state', 'action', 'reward']],
             plan_name: str,
             start_iteration: int = 0, max_iterations: int = 1,
-            writer: Optional[OutputWriter] = None,
+            writer: OutputWriter | None = None,
             save_iterations: bool = True):
         self._name = name
         self._path = path

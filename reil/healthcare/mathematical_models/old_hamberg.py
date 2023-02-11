@@ -7,10 +7,10 @@ A warfarin PK/PD model proposed by Hamberg et al. (2007).
 DOI: 10.1038/sj.clpt.6100084
 '''
 import math
-from typing import (Any, Callable, Dict, Final, Iterable, List, NamedTuple,
-                    NewType, Optional, Union)
+from typing import Any, Callable, Final, Iterable, NamedTuple, NewType
 
 import numpy as np
+
 import reil
 from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorSet,
                                     FeatureSet)
@@ -25,7 +25,7 @@ dT = NewType('dT', int)
 
 class DoseEffect(NamedTuple):
     dose: float
-    Cs: Callable[[Iterable[dT]], List[float]]
+    Cs: Callable[[Iterable[dT]], list[float]]
 
 
 class HambergPKPD(HealthMathModel):
@@ -131,13 +131,13 @@ class HambergPKPD(HealthMathModel):
         self._randomized = randomized
         self._cache_size = math.ceil(cache_size)
         self._last_computed_day: Day = Day(0)
-        self._cached_cs: Dict[float, List[float]] = {}
+        self._cached_cs: dict[float, list[float]] = {}
 
     @classmethod
     def generate(
             cls,
             rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None,
+            input_features: FeatureSet | None = None,
             **kwargs: Any) -> FeatureSet:
 
         feature_set = super(HambergPKPD, cls).generate(
@@ -179,7 +179,7 @@ class HambergPKPD(HealthMathModel):
 
     def setup(
             self, rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None) -> None:
+            input_features: FeatureSet | None = None) -> None:
         '''
         Set up the model.
 
@@ -257,8 +257,8 @@ class HambergPKPD(HealthMathModel):
 
         # Alpha: distribution phase slope (-alpha)
         # Beta: elimination phase slope (-beta)
-        self._alpha = (b + math.sqrt(b ** 2 - 4*c)) / 2
-        self._beta = (b - math.sqrt(b ** 2 - 4*c)) / 2
+        self._alpha = (b + math.sqrt(b ** 2 - 4 * c)) / 2
+        self._beta = (b - math.sqrt(b ** 2 - 4 * c)) / 2
 
         # Note: Here we halved the value for KaF_2V1, because half of the
         # warfarin is S, and only S affects the INR.
@@ -269,15 +269,15 @@ class HambergPKPD(HealthMathModel):
         #       + c_{\beta}\exp{-\beta t}
         self._coef_alpha = (
             (k21 - self._alpha)
-            / ((self._k_aS - self._alpha)*(self._beta - self._alpha))
+            / ((self._k_aS - self._alpha) * (self._beta - self._alpha))
         ) * kaF_2V1
         self._coef_beta = (
             (k21 - self._beta)
-            / ((self._k_aS - self._beta)*(self._alpha - self._beta))
+            / ((self._k_aS - self._beta) * (self._alpha - self._beta))
         ) * kaF_2V1
         self._coef_k_a = (
             (k21 - self._k_aS)
-            / ((self._k_aS - self._alpha)*(self._k_aS - self._beta))
+            / ((self._k_aS - self._alpha) * (self._k_aS - self._beta))
         ) * kaF_2V1
 
         # ---- End of the implementation of the two compartment model -------
@@ -291,14 +291,14 @@ class HambergPKPD(HealthMathModel):
         self._ktr = np.array([0.0] + [ktr1] * 6 + [0.0, ktr2])  # type: ignore
         self._EC_50_gamma = EC_50 ** self._gamma
 
-        self._dose_records: Dict[Day, DoseEffect] = {}
+        self._dose_records: dict[Day, DoseEffect] = {}
         cs_size = self._cache_size * 24 * self._per_hour
         self._total_cs = np.array([0.0] * cs_size)  # type: ignore  hourly
         # self._computed_INRs = [0.0] * (self._cache_size + 1)  # daily
-        self._computed_INRs: Dict[Day, float] = {}  # daily
-        self._err_list: List[List[float]] = []  # hourly
-        self._err_ss_list: List[List[float]] = []  # hourly
-        self._exp_e_INR_list: List[List[float]] = []  # daily
+        self._computed_INRs: dict[Day, float] = {}  # daily
+        self._err_list: list[list[float]] = []  # hourly
+        self._err_ss_list: list[list[float]] = []  # hourly
+        self._exp_e_INR_list: list[list[float]] = []  # daily
 
         day_0 = Day(0)
         dt_0 = dT(0)
@@ -315,7 +315,7 @@ class HambergPKPD(HealthMathModel):
         self._err(dt_0, True)
         self._computed_INRs[day_0] = self._INR(self._A, day_0)
 
-    def run(self, **inputs: Any) -> Dict[str, Any]:
+    def run(self, **inputs: Any) -> dict[str, Any]:
         '''
         Run the model.
 
@@ -341,7 +341,7 @@ class HambergPKPD(HealthMathModel):
         return {'INR': {}}
 
     @property
-    def dose(self) -> Dict[Day, float]:
+    def dose(self) -> dict[Day, float]:
         '''
         Return doses for each day.
 
@@ -354,7 +354,7 @@ class HambergPKPD(HealthMathModel):
                 for t, info in self._dose_records.items()}
 
     @dose.setter
-    def dose(self, dose: Dict[Day, float]) -> None:
+    def dose(self, dose: dict[Day, float]) -> None:
         '''
         Add warfarin doses at the specified days.
 
@@ -387,7 +387,7 @@ class HambergPKPD(HealthMathModel):
                     )
                 )
 
-    def INR(self, measurement_days: Union[Day, List[Day]]) -> List[float]:
+    def INR(self, measurement_days: Day | list[Day]) -> list[float]:
         '''
         Compute INR values for the specified days.
 
@@ -401,7 +401,7 @@ class HambergPKPD(HealthMathModel):
         :
             A list of INRs for the specified days.
         '''
-        days: List[Day]
+        days: list[Day]
 
         days = (measurement_days if hasattr(measurement_days, '__iter__')
                 else [measurement_days])  # type: ignore
@@ -432,7 +432,7 @@ class HambergPKPD(HealthMathModel):
 
     def _CS_function_generator(
             self, dt_dose: dT, dose: float
-    ) -> Callable[[Iterable[dT]], List[float]]:
+    ) -> Callable[[Iterable[dT]], list[float]]:
         '''
         Generate a Cs function.
 
@@ -464,7 +464,7 @@ class HambergPKPD(HealthMathModel):
                                          for cs in self._cached_cs[1.0]]
             cached_cs_temp = self._cached_cs[dose]
 
-        def Cs(dts: Iterable[dT]) -> List[float]:
+        def Cs(dts: Iterable[dT]) -> list[float]:
             '''
             Get delta_t list and return the warfarin concentration of
             those times.
@@ -655,5 +655,5 @@ class HambergPKPD(HealthMathModel):
         # Note: we defined `A` in such a way to compute changes in `A`s
         # easier. In our implementation, `A8` is the `A7` in Hamberg et al.
         return (self._baseINR +
-                (self._INR_max * ((1 - A[6]*A[8]) ** self._lambda))
+                (self._INR_max * ((1 - A[6] * A[8]) ** self._lambda))
                 ) * self._exp_e_INR(d)

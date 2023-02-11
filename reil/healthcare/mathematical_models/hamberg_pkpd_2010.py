@@ -8,7 +8,7 @@ A warfarin PK/PD model proposed by Hamberg et al. (2010).
 DOI: 10.1038/clpt.2010.37
 '''
 import math
-from typing import Any, Dict, Final, List, Optional, Union
+from typing import Any, Final
 
 import numpy as np
 import reil
@@ -138,14 +138,14 @@ class HambergPKPD2010(HealthMathModel):
         self._randomized = randomized
         self._cache_size = math.ceil(cache_size)
         self._last_computed_day: int = 0
-        self._cached_A: Dict[float, List[float]] = {}
+        self._cached_A: dict[float, list[float]] = {}
         self._age = None
 
     @classmethod
     def generate(
             cls,
             rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None,
+            input_features: FeatureSet | None = None,
             **kwargs: Any) -> FeatureSet:
         with reil.random_generator_context(*rnd_generators):
             feature_set = super(HambergPKPD2010, cls).generate(
@@ -175,7 +175,7 @@ class HambergPKPD2010(HealthMathModel):
 
     def setup(
             self, rnd_generators: reil.RandomGeneratorsType,
-            input_features: Optional[FeatureSet] = None) -> None:
+            input_features: FeatureSet | None = None) -> None:
         '''
         Set up the model.
 
@@ -255,8 +255,8 @@ class HambergPKPD2010(HealthMathModel):
         self._C = np.ones([4, 2])
         self._last_computed_day = 0
 
-        self._dose_records: Dict[int, float] = {}
-        self._computed_INRs: Dict[int, float] = {}  # daily
+        self._dose_records: dict[int, float] = {}
+        self._computed_INRs: dict[int, float] = {}  # daily
 
         self._current_cache_size = self._cache_size
         detailed_cache_size = self._cache_size * self._per_day
@@ -320,7 +320,7 @@ class HambergPKPD2010(HealthMathModel):
             self._dose_records[day] = dose
             self._total_A += cs
 
-    def run(self, **inputs: Any) -> Dict[str, Any]:
+    def run(self, **inputs: Any) -> dict[str, Any]:
         '''
         Run the model.
 
@@ -346,7 +346,7 @@ class HambergPKPD2010(HealthMathModel):
         return {'INR': {}}
 
     @property
-    def dose(self) -> Dict[int, float]:
+    def dose(self) -> dict[int, float]:
         '''
         Return doses for each day.
 
@@ -358,7 +358,7 @@ class HambergPKPD2010(HealthMathModel):
         return {t: dose
                 for t, dose in self._dose_records.items()}
 
-    def prescribe(self, dose: Dict[int, float]) -> None:
+    def prescribe(self, dose: dict[int, float]) -> None:
         '''
         Add warfarin doses at the specified days.
 
@@ -400,7 +400,7 @@ class HambergPKPD2010(HealthMathModel):
                 self._dose_records[day] = new_dose
                 self._total_A += cs
 
-    def INR(self, measurement_days: Union[int, List[int]]) -> List[float]:
+    def INR(self, measurement_days: int | list[int]) -> list[float]:
         '''
         Compute INR values for the specified days.
 
@@ -414,7 +414,7 @@ class HambergPKPD2010(HealthMathModel):
         :
             A list of INRs for the specified days.
         '''
-        days: List[int]
+        days: list[int]
 
         days = (measurement_days if hasattr(measurement_days, '__iter__')
                 else [measurement_days])  # type: ignore
@@ -493,8 +493,8 @@ class HambergPKPD2010(HealthMathModel):
 
         return padded_cs[:cs.shape[0]]  # type: ignore
 
-    def get_config(self) -> Dict[str, Any]:
-        config: Dict[str, Any] = super().get_config()
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = super().get_config()
         config.update({
             'randomized': self._randomized,
             'cache_size': self._cache_size})
@@ -514,7 +514,7 @@ class HambergPKPD2010(HealthMathModel):
         return config
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         instance = cls(
             randomized=config['randomized'],
             cache_size=config['cache_size'])

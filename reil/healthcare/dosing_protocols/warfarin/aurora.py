@@ -19,9 +19,9 @@ class Aurora(dp.DosingProtocol):
     '''
 
     def prescribe(self,  # noqa: C901
-                  patient: Dict[str, Any],
+                  patient: dict[str, Any],
                   additional_info: dp.AdditionalInfo
-                  ) -> Tuple[dp.DosingDecision, dp.AdditionalInfo]:
+                  ) -> tuple[dp.DosingDecision, dp.AdditionalInfo]:
         '''
         Prescribe a dose for the given `patient` and `additional_info`.
 
@@ -46,7 +46,7 @@ class Aurora(dp.DosingProtocol):
             A `DosingDecision` along with updated `additional_info`.
         '''
         today: int = patient['day']
-        INRs: List[float] = patient['INR_history']
+        INRs: list[float] = patient['INR_history']
         previous_INR = INRs[-1]
 
         # to suppress Pylance's unbound variable error.
@@ -184,7 +184,7 @@ class Aurora(dp.DosingProtocol):
 
     @staticmethod
     def aurora_dosing_table(
-            current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
+            current_INR: float, dose: float) -> tuple[float, int, int, bool]:
         '''
         Determine the dosing information, based on Aurora dosing table.
 

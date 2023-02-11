@@ -5,7 +5,7 @@ UserAgent class
 
 An agent that prints the state and asks the user for action.
 '''
-from typing import Any, Tuple
+from typing import Any
 
 from reil.agents.agent_base import AgentBase
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
@@ -18,7 +18,7 @@ class UserAgent(AgentBase):
 
     def __init__(
             self,
-            default_actions: Tuple[FeatureSet, ...] = (),
+            default_actions: tuple[FeatureSet, ...] = (),
             **kwargs: Any):
         super().__init__(default_actions=default_actions, **kwargs)
 

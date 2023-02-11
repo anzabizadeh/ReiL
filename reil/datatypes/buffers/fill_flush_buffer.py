@@ -6,7 +6,7 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import Dict, List, Optional, Tuple, TypeVar, Union
+from typing import TypeVar
 
 from reil.datatypes.buffers.endless_buffer import EndlessBuffer, PickModes
 
@@ -21,26 +21,24 @@ class FillFlushBuffer(EndlessBuffer[T1, T2]):
     '''
 
     def __init__(
-            self, buffer_names: Optional[List[str]] = None,
-            buffer_size: Optional[int] = None,
-            pick_mode: Optional[PickModes] = None) -> None:
+            self, buffer_names: list[str] | None = None,
+            buffer_size: int | None = None,
+            pick_mode: PickModes | None = None) -> None:
         super(EndlessBuffer, self).__init__(
             buffer_size=buffer_size, buffer_names=buffer_names,
             pick_mode=pick_mode, clear_buffer=True)
 
     def setup(
-            self, buffer_size: Optional[int] = None,
-            buffer_names: Optional[List[str]] = None,
-            pick_mode: Optional[PickModes] = None,
-            clear_buffer: Optional[bool] = None) -> None:
+            self, buffer_size: int | None = None,
+            buffer_names: list[str] | None = None,
+            pick_mode: PickModes | None = None,
+            clear_buffer: bool | None = None) -> None:
         return super(EndlessBuffer, self).setup(
             buffer_size, buffer_names, pick_mode, clear_buffer)
 
     def pick(
-            self,
-            count: Optional[int] = None,
-            mode: Optional[PickModes] = None
-    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
+            self, count: int | None = None, mode: PickModes | None = None
+    ) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
         '''
         Return items from the buffer.
 

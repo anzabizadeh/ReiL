@@ -1,9 +1,10 @@
 import unittest
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-from openpyxl.workbook.workbook import Workbook
+from typing import Any, Iterator
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.workbook.workbook import Workbook
+
 from reil.healthcare.dosing_protocols.warfarin import Aurora
 
 
@@ -13,21 +14,21 @@ class DummyPatients:
         self._trajectories = self.read_table(
             wb, 'trajectories', 'trajectories')
         self._trajectories['INR'] = (  # type: ignore
-            self._trajectories.INR.apply(  # type: ignore
-                round, args=(2,)))
+            self._trajectories.INR.apply(
+                round, args=(2,)))  # type: ignore
         self._patient_info = self.read_table(
             wb, 'patient_info', 'patient_info', 'ID')
 
     @staticmethod
     def read_table(
             workbook: Workbook, sheet_name: str, table_name: str,
-            index: Optional[str] = None) -> pd.DataFrame:
+            index: str | None = None) -> pd.DataFrame:
         ref = workbook[sheet_name]._tables[table_name].ref  # type: ignore
-        content: List[List[Any]] = [
+        content: list[list[Any]] = [
             [cell.value for cell in ent]  # type: ignore
             for ent in workbook[sheet_name][ref]  # type: ignore
         ]
-        header: List[str] = content[0]
+        header: list[str] = content[0]
         rest = content[1:]
 
         df = pd.DataFrame(rest, columns=header)
@@ -38,9 +39,9 @@ class DummyPatients:
 
     def simulate(
         self, dose: float = -1, interval: int = -1
-    ) -> Iterator[Tuple[Dict[Union[str, int], Any], float, int]]:
+    ) -> Iterator[tuple[dict[str | int, Any], float, int]]:
         for _id, info in self._patient_info.iterrows():
-            patient: Dict[Union[str, int], Any] = dict(info.items())
+            patient: dict[str | int, Any] = dict(info.items())
             patient['ID'] = _id
             trajectory = self._trajectories[  # type: ignore
                 self._trajectories.ID == _id][  # type: ignore

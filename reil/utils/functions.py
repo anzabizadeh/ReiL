@@ -7,12 +7,13 @@ Contains some useful functions.
 '''
 
 import math
-from typing import Any, Callable, Iterable, Optional, Tuple, TypeVar
+from typing import Any, Callable, Iterable, TypeVar
 
 import numpy as np
+from scipy.stats import lognorm  # type: ignore
+
 from reil import random_generator, random_generator_np
 from reil.datatypes.feature import FeatureGenerator, FeatureSet
-from scipy.stats import lognorm  # type: ignore
 
 Categorical = TypeVar('Categorical')
 T = TypeVar('T')
@@ -118,7 +119,7 @@ def square_dist(x: float, y: Iterable[float]) -> float:
     return sum((x - yi) ** 2 for yi in y)
 
 
-def in_range(r: Tuple[float, float], x: Iterable[float]) -> int:
+def in_range(r: tuple[float, float], x: Iterable[float]) -> int:
     return sum(r[0] <= xi <= r[1] for xi in x)
 
 
@@ -130,7 +131,7 @@ def interpolate(start: float, end: float, steps: int) -> Iterable[float]:
 
 def generate_modifier(
         operation: Callable[[T], T],
-        condition: Optional[Callable[[FeatureSet], bool]] = None
+        condition: Callable[[FeatureSet], bool] | None = None
 ) -> Callable[[FeatureSet, T], T]:
     '''Generate a modifier function for states or actions
 

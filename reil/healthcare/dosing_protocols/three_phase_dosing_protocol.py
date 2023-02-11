@@ -42,7 +42,7 @@ class ThreePhaseDosingProtocol:
         self._additional_info: AdditionalInfo = {}
 
     def prescribe(
-            self, patient: Dict[str, Any]) -> DosingDecision:
+            self, patient: dict[str, Any]) -> DosingDecision:
         '''
         Prescribe a dose and next test (in days) for the given `patient`.
 

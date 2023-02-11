@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import pathlib
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import pandas as pd
+
 from reil.datatypes.feature import FeatureSet
 from reil.datatypes.feature_set_dumper import FeatureSetDumper
 
@@ -12,7 +14,7 @@ class TrajectoryDumper(FeatureSetDumper):
     @staticmethod
     def _dump(
             component: FeatureSet,
-            additional_info: Optional[Dict[str, Any]],
+            additional_info: dict[str, Any] | None,
             filename: str, path: pathlib.PurePath) -> bool:
         '''Write stats to file.'''
 
@@ -24,11 +26,11 @@ class TrajectoryDumper(FeatureSetDumper):
                              for m in measure_names})
         temp.drop(temp.tail(1).index, inplace=True)  # type: ignore
         temp['dose'] = component_dict['daily_dose_history']
-        interval_history: List[int] = \
+        interval_history: list[int] = \
             component_dict['interval_history']  # type: ignore
         temp['decision_points'] = [
             a for t in interval_history
-            for a in ([1] + [0] * (t-1))]
+            for a in ([1] + [0] * (t - 1))]
 
         temp['day'] = temp.index + 1  # type: ignore
 

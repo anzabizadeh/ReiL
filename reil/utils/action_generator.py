@@ -8,10 +8,9 @@ of `FeatureSet` objects using the product of these components.
 '''
 import dataclasses
 import itertools
-from typing import (Any, Dict, Generic, Iterator, Optional, Tuple, TypeVar,
-                    Union)
+from typing import Any, Generic, Iterator, TypeVar
 
-from reil.datatypes.feature import Feature, FeatureSet, FeatureGenerator
+from reil.datatypes.feature import Feature, FeatureGenerator, FeatureSet
 from reil.reilbase import ReilBase
 
 Categorical = TypeVar('Categorical')
@@ -21,8 +20,8 @@ Numerical = TypeVar('Numerical', int, float)
 @dataclasses.dataclass(frozen=True)
 class CategoricalComponent(Generic[Categorical]):
     name: str
-    possible_values: Tuple[Tuple[Categorical, ...], ...]
-    categories: Tuple[Categorical, ...]
+    possible_values: tuple[tuple[Categorical, ...], ...]
+    categories: tuple[Categorical, ...]
     length: int = dataclasses.field(init=False, hash=False, compare=False)
     feature_generator: FeatureGenerator = dataclasses.field(
         init=False, hash=False, compare=False)
@@ -43,7 +42,7 @@ class CategoricalComponent(Generic[Categorical]):
 @dataclasses.dataclass(frozen=True)
 class NumericalComponent(Generic[Numerical]):
     name: str
-    possible_values: Tuple[Tuple[Numerical, ...], ...]
+    possible_values: tuple[tuple[Numerical, ...], ...]
     lower: Numerical
     upper: Numerical
     length: int = dataclasses.field(init=False, hash=False, compare=False)
@@ -71,10 +70,9 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
 
     def __init__(
             self,
-            components: Optional[Dict[
-                str, Union[
-                    CategoricalComponent[Categorical],
-                    NumericalComponent[Numerical]]]] = None,
+            components: dict[
+                str, CategoricalComponent[Categorical] | NumericalComponent[Numerical]
+            ] | None = None,
             **kwargs: Any) -> None:
         '''
         Initializes the `ActionGenerator` instance.
@@ -84,18 +82,16 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
         if components is not None:
             self._components = components
         else:
-            self._components: Dict[
-                str, Union[
-                    CategoricalComponent[Categorical],
-                    NumericalComponent[Numerical]]] = {}
+            self._components: dict[
+                str, CategoricalComponent[Categorical] | NumericalComponent[Numerical]] = {}
         self._max_index: int = 0
         self.reset()
 
     def add_categorical(
             self,
             component_name: str,
-            possible_values: Tuple[Tuple[Categorical, ...], ...],
-            categories: Tuple[Categorical, ...]) -> None:
+            possible_values: tuple[tuple[Categorical, ...], ...],
+            categories: tuple[Categorical, ...]) -> None:
         '''
         Add a categorical component.
 
@@ -136,7 +132,7 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
     def add_numerical(
             self,
             component_name: str,
-            possible_values: Tuple[Tuple[Numerical, ...]],
+            possible_values: tuple[tuple[Numerical, ...]],
             lower: Numerical,
             upper: Numerical) -> None:
         '''
@@ -180,7 +176,7 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
 
     def possible_actions(
             self,
-            state: Optional[FeatureSet] = None) -> Tuple[FeatureSet, ...]:
+            state: FeatureSet | None = None) -> tuple[FeatureSet, ...]:
         '''
         Generate and return a list of possible actions.
 
@@ -246,19 +242,19 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
         return self._components.keys()
 
     @property
-    def lower(self) -> Dict[str, Numerical]:
+    def lower(self) -> dict[str, Numerical]:
         return {component.name: component.lower  # type: ignore
                 for component in self._components.values()
                 if hasattr(component, 'lower')}
 
     @property
-    def upper(self) -> Dict[str, Numerical]:
+    def upper(self) -> dict[str, Numerical]:
         return {component.name: component.upper  # type: ignore
                 for component in self._components.values()
                 if hasattr(component, 'upper')}
 
     @property
-    def categories(self) -> Dict[str, Tuple[Categorical, ...]]:
+    def categories(self) -> dict[str, tuple[Categorical, ...]]:
         return {component.name: component.categories  # type: ignore
                 for component in self._components.values()
                 if hasattr(component, 'categories')}
@@ -266,7 +262,7 @@ class ActionGenerator(ReilBase, Generic[Categorical, Numerical]):
     def reset(self) -> None:
         ''' Resets the generator.'''
         self._index: int = 0
-        self._recent_possible_actions: Tuple[FeatureSet, ...] = ()
+        self._recent_possible_actions: tuple[FeatureSet, ...] = ()
 
 
 if __name__ == "__main__":

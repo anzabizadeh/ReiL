@@ -7,16 +7,16 @@ The base class for all basic dosing protocols.
 '''
 
 import dataclasses
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 
 @dataclasses.dataclass
 class DosingDecision:
     dose: float
-    duration: Optional[int] = None
+    duration: int | None = None
 
 
-AdditionalInfo = Dict[str, Any]
+AdditionalInfo = dict[str, Any]
 
 
 class DosingProtocol:
@@ -28,9 +28,9 @@ class DosingProtocol:
         pass
 
     def prescribe(self,
-                  patient: Dict[str, Any],
+                  patient: dict[str, Any],
                   additional_info: AdditionalInfo
-                  ) -> Tuple[DosingDecision, AdditionalInfo]:
+                  ) -> tuple[DosingDecision, AdditionalInfo]:
         '''
         Prescribe a dose for the given `patient` and `additional_info`.
 

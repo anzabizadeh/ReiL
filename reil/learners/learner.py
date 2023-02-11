@@ -6,7 +6,7 @@ Learner class
 The base class for all `learner` classes.
 '''
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Protocol, Tuple, TypeVar, Union
+from typing import Any, Protocol, TypeVar
 
 from reil import reilbase
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
@@ -25,8 +25,8 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
 
     @abstractmethod
     def predict(
-            self, X: Tuple[InputType, ...], training: Optional[bool] = None
-    ) -> Tuple[LabelType, ...]:
+            self, X: tuple[InputType, ...], training: bool | None = None
+    ) -> tuple[LabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -47,8 +47,8 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
 
     @abstractmethod
     def learn(
-            self, X: Tuple[InputType, ...], Y: Tuple[LabelType, ...],
-    ) -> Dict[str, float]:
+            self, X: tuple[InputType, ...], Y: tuple[LabelType, ...],
+    ) -> dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -85,8 +85,7 @@ class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
     The base class for all `learner` classes.
     '''
     def __init__(
-            self, learning_rate: Optional[Union[
-                float, LearningRateScheduler]] = None,
+            self, learning_rate: float | LearningRateScheduler | None = None,
             **kwargs: Any) -> None:
         '''
         Arguments

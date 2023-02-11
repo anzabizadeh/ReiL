@@ -8,7 +8,7 @@ A Q-learning `agent`.
 
 '''
 
-from typing import Any, Tuple, Optional, Union
+from typing import Any
 
 import numpy as np
 from reil.agents.agent import Agent, TrainingData
@@ -20,7 +20,7 @@ from reil.learners.learner import Learner, LearnerProtocol
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
-Feature_or_Tuple_of_Feature = Union[Tuple[FeatureSet, ...], FeatureSet]
+Feature_or_Tuple_of_Feature = tuple[FeatureSet, ...] | FeatureSet
 
 
 class QLearning(Agent[FeatureSet, float]):
@@ -32,9 +32,9 @@ class QLearning(Agent[FeatureSet, float]):
             self,
             learner: LearnerProtocol[FeatureSet, float],
             buffer: Buffer[FeatureSet, float],
-            exploration_strategy: Union[float, ExplorationStrategy],
+            exploration_strategy: float | ExplorationStrategy,
             # method: Literal['forward', 'backward'] = 'backward',
-            default_actions: Tuple[FeatureSet, ...] = (),
+            default_actions: tuple[FeatureSet, ...] = (),
             **kwargs: Any):
         '''
         Arguments
@@ -87,7 +87,7 @@ class QLearning(Agent[FeatureSet, float]):
 
     def _q(
             self, state: Feature_or_Tuple_of_Feature,
-            action: Feature_or_Tuple_of_Feature) -> Tuple[float, ...]:
+            action: Feature_or_Tuple_of_Feature) -> tuple[float, ...]:
         '''
         Return the Q-value of `state` `action` pairs.
 
@@ -141,7 +141,7 @@ class QLearning(Agent[FeatureSet, float]):
 
     def _max_q(
             self, state: Feature_or_Tuple_of_Feature,
-            possible_actions: Optional[FeatureGeneratorType] = None) -> float:
+            possible_actions: FeatureGeneratorType | None = None) -> float:
         '''
         Return `max(Q)` of one state or a list of states.
 
@@ -166,7 +166,7 @@ class QLearning(Agent[FeatureSet, float]):
         return max_q
 
     def _compute_lookahead_term(
-            self, lookahead_data: Optional[LookaheadData], gamma: float):
+            self, lookahead_data: LookaheadData | None, gamma: float):
         if lookahead_data is None:
             return 0.0
         return sum(
@@ -256,8 +256,8 @@ class QLearning(Agent[FeatureSet, float]):
     def best_actions(
             self,
             state: FeatureSet,
-            actions: Tuple[FeatureSet, ...]
-    ) -> Tuple[FeatureSet, ...]:
+            actions: tuple[FeatureSet, ...]
+    ) -> tuple[FeatureSet, ...]:
         '''
         Find the best `action`s for the given `state`.
 

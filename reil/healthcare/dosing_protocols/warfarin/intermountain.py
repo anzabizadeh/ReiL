@@ -11,18 +11,18 @@ supplements Appendix B
 # on future days. The correct implementation should be fully "functional", with
 # no memory keeping! (no `additional_info`)
 import functools
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 import reil.healthcare.dosing_protocols.dosing_protocol as dp
 
-
-Zone = Literal['action point low',
-               'red zone low',
-               'yellow zone low',
-               'green zone',
-               'yellow zone high',
-               'red zone high',
-               'action point high']
+Zone = Literal[
+    'action point low',
+    'red zone low',
+    'yellow zone low',
+    'green zone',
+    'yellow zone high',
+    'red zone high',
+    'action point high']
 
 
 class Intermountain(dp.DosingProtocol):
@@ -36,10 +36,11 @@ class Intermountain(dp.DosingProtocol):
         super().__init__()
         self._enforce_day_ge_8 = enforce_day_ge_8
 
-    def prescribe(self,
-                  patient: Dict[str, Any],
-                  additional_info: dp.AdditionalInfo
-                  ) -> Tuple[dp.DosingDecision, dp.AdditionalInfo]:
+    def prescribe(
+        self,
+        patient: dict[str, Any],
+        additional_info: dp.AdditionalInfo
+    ) -> tuple[dp.DosingDecision, dp.AdditionalInfo]:
         '''
         Prescribe a dose for the given `patient` and `additional_info`.
 
@@ -62,7 +63,7 @@ class Intermountain(dp.DosingProtocol):
         :
             A `DosingDecision` along with updated `additional_info`.
         '''
-        dosing_decisions_list: List[dp.DosingDecision] = additional_info.get(
+        dosing_decisions_list: list[dp.DosingDecision] = additional_info.get(
             'dosing_decisions_list', [])
         last_zone: Zone = additional_info.get('last_zone', '')
         previous_INR = patient['INR_history'][-1]
@@ -77,8 +78,8 @@ class Intermountain(dp.DosingProtocol):
                 dose_history = patient['dose_history']
                 interval_history = patient['interval_history']
                 all_doses = functools.reduce(
-                    lambda x, y: x+y,
-                    ([dose_history[-i]]*interval_history[-i]
+                    lambda x, y: x + y,
+                    ([dose_history[-i]] * interval_history[-i]
                      for i in range(len(interval_history), 0, -1)))
 
                 if len(all_doses) < 3:
@@ -86,7 +87,7 @@ class Intermountain(dp.DosingProtocol):
                         'Intermountain requires doses for days 5 to 7 '
                         'for dosing on day 8.')
 
-                previous_dose = sum(all_doses[-3:])/3
+                previous_dose = sum(all_doses[-3:]) / 3
             else:
                 previous_dose = patient['dose_history'][-1]
 
@@ -108,7 +109,7 @@ class Intermountain(dp.DosingProtocol):
     def intermountain_dosing_table(  # noqa: C901
             INR: float,
             last_zone: Zone,
-            daily_dose: float) -> Tuple[List[dp.DosingDecision], Zone]:
+            daily_dose: float) -> tuple[list[dp.DosingDecision], Zone]:
         '''
         Determine the dosing information, based on Intermountain dosing table.
 
@@ -144,17 +145,17 @@ class Intermountain(dp.DosingProtocol):
         weekly_dose = daily_dose * 7
 
         immediate_dose: float = -1.0
-        immediate_duration: Optional[int] = None
+        immediate_duration: int | None = None
         same_zone = zone == last_zone
 
         # -1s below are added to compensate for immediate_duration = 1
-        next_duration: Optional[int] = {
-            'action point low': (5-1, 14-1),
-            'red zone low': (7-1, 14-1),
+        next_duration: int | None = {
+            'action point low': (5 - 1, 14 - 1),
+            'red zone low': (7 - 1, 14 - 1),
             'yellow zone low': (14, 14),
             'green zone': (14, 28),
             'yellow zone high': (14, 14),
-            'red zone high': (7-1, 14-1),
+            'red zone high': (7 - 1, 14 - 1),
             'action point high': (7, 14)
         }[zone][same_zone]
 
@@ -225,6 +226,7 @@ class Intermountain(dp.DosingProtocol):
             * red zone high
             * action point high
         '''
+        z: Zone
         if INR < 1.60:
             z = 'action point low'
         elif INR < 1.80:

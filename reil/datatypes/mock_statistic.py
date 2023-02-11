@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List,
-                    Optional, Tuple, Union)
+from typing import TYPE_CHECKING, Any, Callable, DefaultDict
 
 import pandas as pd
+
 from reil.datatypes.components import State
 from reil.datatypes.feature import FeatureSet
 
@@ -26,9 +26,9 @@ class MockStatistic:
             The object that provides actual `Statistic` capabilities.
         '''
         self._obj = obj
-        self._history: Dict[
-            Optional[int],
-            List[Tuple[FeatureSet, float]]] = DefaultDict(list)
+        self._history: dict[
+            int | None,
+            list[tuple[FeatureSet, float]]] = DefaultDict(list)
 
     def set_object(self, obj: Stateful) -> None:
         self._obj = obj
@@ -54,16 +54,11 @@ class MockStatistic:
             name, fn, stat_component, aggregation_component)
 
     def __call__(
-            self,
-            name: str,
-            _id: Optional[int] = None
-    ) -> Union[Tuple[FeatureSet, float], None]:
+            self, name: str, _id: int | None = None
+    ) -> tuple[FeatureSet, float] | None:
         return self._obj.statistic.__call__(name, _id)
 
-    def append(
-            self,
-            name: str,
-            _id: Optional[int] = None) -> None:
+    def append(self, name: str, _id: int | None = None) -> None:
         '''
         Generate the stat and append it to the history.
 
@@ -86,9 +81,9 @@ class MockStatistic:
 
     def aggregate(
             self,
-            aggregators: Optional[Tuple[str, ...]] = None,
-            groupby: Optional[Tuple[str, ...]] = None,
-            _id: Optional[int] = None,
+            aggregators: tuple[str, ...] | None = None,
+            groupby: tuple[str, ...] | None = None,
+            _id: int | None = None,
             reset_history: bool = False):
         temp = self._history[_id]
         if not temp:
@@ -107,8 +102,8 @@ class MockStatistic:
             aggregators or no_change)  # type: ignore
 
         if reset_history:
-            self._history: Dict[
-                Optional[int],
-                List[Tuple[FeatureSet, float]]] = DefaultDict(list)
+            self._history: dict[
+                int | None,
+                list[tuple[FeatureSet, float]]] = DefaultDict(list)
 
         return result

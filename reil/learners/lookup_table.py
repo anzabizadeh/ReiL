@@ -9,7 +9,7 @@ type of inputs to be `TableEntry`.
 `QLookupTable` is a lookup table for `Q-learning`.
 '''
 import dataclasses
-from typing import Any, Dict, Generic, Hashable, Optional, Tuple, TypeVar, Union
+from typing import Any, Generic, Hashable, TypeVar
 
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
@@ -27,7 +27,7 @@ class TableEntry(Generic[T]):
     N: int = 0
 
 
-class LookupTable(Dict[Any, TableEntry[T]]):
+class LookupTable(dict[Any, TableEntry[T]]):
     '''
     A simple lookup table based on `dict` that checks for the type of inputs
     to be `TableEntry`.
@@ -47,7 +47,7 @@ class QLookupTable(Learner[FeatureSet, float]):
     '''
     def __init__(
             self,
-            learning_rate: Union[float, LearningRateScheduler],
+            learning_rate: float | LearningRateScheduler,
             initial_estimate: float = 0.0,
             minimum_visits: int = 0) -> None:
         '''
@@ -77,8 +77,8 @@ class QLookupTable(Learner[FeatureSet, float]):
         self._table: LookupTable[float] = LookupTable()
 
     def predict(
-            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
-    ) -> Tuple[float, ...]:
+            self, X: tuple[FeatureSet, ...], training: bool | None = None
+    ) -> tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -105,8 +105,8 @@ class QLookupTable(Learner[FeatureSet, float]):
         return result
 
     def learn(
-        self, X: Tuple[FeatureSet, ...], Y: Tuple[float, ...],
-    ) -> Dict[str, float]:
+        self, X: tuple[FeatureSet, ...], Y: tuple[float, ...],
+    ) -> dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -135,7 +135,7 @@ class QLookupTable(Learner[FeatureSet, float]):
         pass
 
     # def load(self, filename: str,
-    #          path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+    #          path: Union[str, pathlib.PurePath] | None = None) -> None:
     #     temp = defaultdict(
     #         lambda: {'value': self._initial_estimate,
     #                  'N': 0})
@@ -146,8 +146,8 @@ class QLookupTable(Learner[FeatureSet, float]):
 
     # def save(self,
     #          filename: str,
-    #          path: Optional[Union[str, pathlib.PurePath]] = None
-    #          ) -> Tuple[pathlib.PurePath, str]:
+    #          path: Union[str, pathlib.PurePath] | None = None
+    #          ) -> tuple[pathlib.PurePath, str]:
     #     _path = pathlib.Path(path if path is not None else '')
     #     with open(_path / f'{filename}.csv', 'w') as f:
     #         w = csv.writer(f)

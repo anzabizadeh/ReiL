@@ -40,9 +40,9 @@ class Gage(dp.DosingProtocol):
                 'Acceptable methods are clinical and pharmacogenetic.')
 
     def prescribe(self,  # noqa: C901
-                  patient: Dict[str, Any],
+                  patient: dict[str, Any],
                   additional_info: dp.AdditionalInfo
-                  ) -> Tuple[dp.DosingDecision, dp.AdditionalInfo]:
+                  ) -> tuple[dp.DosingDecision, dp.AdditionalInfo]:
         '''
         Prescribe a dose for the given `patient` and `additional_info`.
 
@@ -79,7 +79,7 @@ class Gage(dp.DosingProtocol):
         return dp.DosingDecision(dose), additional_info
 
     @staticmethod
-    def clinical(patient: Dict[str, Any]) -> float:
+    def clinical(patient: dict[str, Any]) -> float:
         '''
         Determine warfarin dose using clinical Gage formula.
 
@@ -134,7 +134,7 @@ class Gage(dp.DosingProtocol):
         return dose
 
     @staticmethod
-    def pg(patient: Dict[str, Any]) -> float:
+    def pg(patient: dict[str, Any]) -> float:
         '''
         Determine warfarin dose using pharmacogenetic Gage formula.
 

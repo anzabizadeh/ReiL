@@ -168,7 +168,7 @@ class testHambergPKPD(unittest.TestCase):
     def fig_4_generator(
         n: int,
         days: int = 60,
-        measurement_days: List[float] = [0, 0.5, 1.5, 2.5],
+        measurement_days: list[float] = [0, 0.5, 1.5, 2.5],
         INR: bool = False,
         random_parameters: bool = True,
         random_demographic: bool = True,

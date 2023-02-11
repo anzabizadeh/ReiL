@@ -18,8 +18,7 @@ import random
 from copy import copy
 from functools import cached_property
 from math import isclose
-from typing import (Any, Callable, Dict, Generator, Iterable, Iterator, List,
-                    Literal, Optional, Tuple, Union)
+from typing import Any, Callable, Generator, Iterable, Iterator, Literal
 
 from reil.serialization import deserialize, full_qualname
 
@@ -56,21 +55,20 @@ class Feature:
         The upper limit for numerical values.
     '''
     name: str
-    value: Optional[Union[Any, Tuple[Any, ...], MissingType]] = None
-    is_numerical: Optional[bool] = dataclasses.field(
+    value: Any | tuple[Any, ...] | MissingType | None = None
+    is_numerical: bool | None = dataclasses.field(
         default=None, repr=False, compare=False)
-    categories: Optional[Tuple[Any, ...]] = dataclasses.field(
+    categories: tuple[Any, ...] | None = dataclasses.field(
         default=None, repr=False, compare=False)
-    lower: Optional[Any] = dataclasses.field(
+    lower: Any | None = dataclasses.field(
         default=None, repr=False, compare=False)
-    upper: Optional[Any] = dataclasses.field(
+    upper: Any | None = dataclasses.field(
         default=None, repr=False, compare=False)
-    index: Optional[int] = dataclasses.field(
+    index: int | None = dataclasses.field(
         default=None, repr=False, compare=False)
-    normalized: Optional[
-        Union[Tuple[float, ...], Tuple[int, ...]]] = dataclasses.field(
-            default=None, repr=False, compare=False)
-    dict_fields: Tuple[str, ...] = dataclasses.field(
+    normalized: tuple[float, ...] | tuple[int, ...] | None = dataclasses.field(
+        default=None, repr=False, compare=False)
+    dict_fields: tuple[str, ...] = dataclasses.field(
         default=('name', 'value'), init=False, repr=False, compare=False)
 
     def __post_init__(self):
@@ -92,10 +90,10 @@ class Feature:
     @classmethod
     def numerical(
             cls, name: str,
-            value: Optional[Union[Any, Tuple[Any, ...]]] = None,
-            lower: Optional[Any] = None, upper: Optional[Any] = None,
-            normalized: Optional[Tuple[float, ...]] = None,
-            index: Optional[int] = None):
+            value: Any | tuple[Any, ...] | None = None,
+            lower: Any | None = None, upper: Any | None = None,
+            normalized: tuple[float, ...] | None = None,
+            index: int | None = None):
         '''Create a numerical instance of `Feature`.'''
         return cls(
             name=name, value=value, is_numerical=True,
@@ -104,17 +102,17 @@ class Feature:
     @classmethod
     def categorical(
             cls, name: str,
-            value: Optional[Union[Any, Tuple[Any, ...], MissingType]] = None,
-            categories: Optional[Tuple[Any, ...]] = None,
-            normalized: Optional[Tuple[float, ...]] = None,
-            index: Optional[int] = None):
+            value: Any | tuple[Any, ...] | MissingType | None = None,
+            categories: tuple[Any, ...] | None = None,
+            normalized: tuple[float, ...] | None = None,
+            index: int | None = None):
         '''Create a categorical instance of `Feature`.'''
         return cls(
             name=name, value=value, is_numerical=False,
             categories=categories, normalized=normalized, index=index)
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         try:
             is_numerical = config.pop('is_numerical')
             if is_numerical:
@@ -123,7 +121,7 @@ class Feature:
         except KeyError:
             return cls(**config)
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = {
             key: value
             for key, value in self.__dict__.items()
@@ -229,33 +227,32 @@ class FeatureGenerator:
     name: str
     is_numerical: bool = dataclasses.field(
         default=False, repr=False, compare=False)
-    categories: Optional[Tuple[Any, ...]] = None
-    probabilities: Optional[Tuple[float, ...]] = None
-    mean: Optional[Any] = None
-    stdev: Optional[Any] = None
-    lower: Optional[Any] = None
-    upper: Optional[Any] = None
-    step: Optional[Any] = None
-    fixed_values: Optional[Tuple[Any, ...]] = None
-    normalizer: Optional[Any] = dataclasses.field(
+    categories: tuple[Any, ...] | None = None
+    probabilities: tuple[float, ...] | None = None
+    mean: Any | None = None
+    stdev: Any | None = None
+    lower: Any | None = None
+    upper: Any | None = None
+    step: Any | None = None
+    fixed_values: tuple[Any, ...] | None = None
+    normalizer: Any | None = dataclasses.field(
         default=None, init=False, repr=False, compare=False)
-    randomized: Optional[bool] = True
-    generator: Optional[
-        Callable[[FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None
+    randomized: bool | None = True
+    generator: Callable[[FeatureGenerator], Any | tuple[Any, ...]] | None = None
     allow_missing: bool = False
-    count: Optional[int] = dataclasses.field(
+    count: int | None = dataclasses.field(
         default=None, init=False, repr=False, compare=False)
-    recent_value: Tuple[Any, Feature] = dataclasses.field(
+    recent_value: tuple[Any, Feature] = dataclasses.field(
         default=(None, Feature('')), init=False, repr=False, compare=False)
 
     @classmethod
     def continuous(
             cls, name: str,
-            mean: Optional[float] = None, stdev: Optional[float] = None,
-            lower: Optional[float] = None, upper: Optional[float] = None,
-            generator: Optional[Callable[
-                [FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None,
-            randomized: Optional[bool] = None):
+            mean: float | None = None, stdev: float | None = None,
+            lower: float | None = None, upper: float | None = None,
+            generator: Callable[
+                [FeatureGenerator], Any | tuple[Any, ...]] | None = None,
+            randomized: bool | None = None):
         return cls(
             name=name, is_numerical=True, lower=lower, upper=upper, mean=mean,
             stdev=stdev, generator=generator, randomized=randomized,
@@ -264,11 +261,11 @@ class FeatureGenerator:
     @classmethod
     def discrete(
             cls, name: str,
-            lower: Optional[float] = None, upper: Optional[float] = None,
+            lower: float | None = None, upper: float | None = None,
             step: float = 1.0,
-            generator: Optional[Callable[
-                [FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None,
-            randomized: Optional[bool] = None):
+            generator: Callable[
+                [FeatureGenerator], Any | tuple[Any, ...]] | None = None,
+            randomized: bool | None = None):
         return cls(
             name=name, is_numerical=True, lower=lower, upper=upper, step=step,
             generator=generator, randomized=randomized,
@@ -277,11 +274,11 @@ class FeatureGenerator:
     @classmethod
     def numerical_fixed_values(
             cls, name: str,
-            fixed_values: Tuple[float, ...],
-            lower: Optional[float] = None, upper: Optional[float] = None,
-            generator: Optional[Callable[
-                [FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None,
-            randomized: Optional[bool] = None):
+            fixed_values: tuple[float, ...],
+            lower: float | None = None, upper: float | None = None,
+            generator: Callable[
+                [FeatureGenerator], Any | tuple[Any, ...]] | None = None,
+            randomized: bool | None = None):
         return cls(
             name=name, is_numerical=True, lower=lower, upper=upper,
             fixed_values=fixed_values, generator=generator,
@@ -290,11 +287,11 @@ class FeatureGenerator:
     @classmethod
     def categorical(
             cls, name: str,
-            categories: Optional[Tuple[Any, ...]] = None,
-            probabilities: Optional[Tuple[float, ...]] = None,
-            generator: Optional[Callable[
-                [FeatureGenerator], Union[Any, Tuple[Any, ...]]]] = None,
-            randomized: Optional[bool] = None, allow_missing: bool = False):
+            categories: tuple[Any, ...] | None = None,
+            probabilities: tuple[float, ...] | None = None,
+            generator: Callable[
+                [FeatureGenerator], Any | tuple[Any, ...]] | None = None,
+            randomized: bool | None = None, allow_missing: bool = False):
         return cls(
             name=name, is_numerical=False,
             categories=categories, probabilities=probabilities,
@@ -302,7 +299,7 @@ class FeatureGenerator:
             allow_missing=allow_missing)
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         step = config.get('step')
         is_numerical = config.pop('is_numerical')
         if is_numerical:
@@ -311,7 +308,7 @@ class FeatureGenerator:
             return cls.continuous(**config)
         return cls.categorical(**config)
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = {
             key: value
             for key, value in self.__dict__.items()
@@ -370,7 +367,7 @@ class FeatureGenerator:
             self._process_categorical()
 
     def __call__(
-        self, value: Optional[Union[Any, Tuple[Any, ...], MissingType]] = None
+        self, value: Any | tuple[Any, ...] | MissingType | None = None
     ) -> Feature:
         if value is None:
             if (gen := self.generator) is None:
@@ -419,9 +416,9 @@ class FeatureGenerator:
         self.__dict__['normalizer'] = normalizer
 
     def _process_numerical(self):
-        lower: Optional[float] = self.lower  # type: ignore
-        upper: Optional[float] = self.upper  # type: ignore
-        step: Optional[float] = self.step  # type: ignore
+        lower: float | None = self.lower  # type: ignore
+        upper: float | None = self.upper  # type: ignore
+        step: float | None = self.step  # type: ignore
 
         if lower is None or upper is None or upper == lower:
             self.__dict__['normalizer'] = lambda _: None  # type: ignore
@@ -445,7 +442,7 @@ class FeatureGenerator:
                     self.__dict__['count'] = len(self.fixed_values)
 
     def _call_categorical(
-            self, value: Union[Any, Tuple[Any, ...], MissingType]
+            self, value: Any | tuple[Any, ...] | MissingType
     ) -> Feature:
         normalizer = self.normalizer
         categories = self.categories or ()
@@ -480,7 +477,7 @@ class FeatureGenerator:
         return instance
 
     def _call_numerical(  # noqa: C901
-            self, value: Union[Any, Tuple[Any, ...]]
+            self, value: Any | tuple[Any, ...]
     ) -> Feature:
         normalizer = self.normalizer
         lower = self.lower
@@ -537,7 +534,7 @@ class FeatureGenerator:
         return instance
 
     def generate_all(
-            self, mask_dict: Optional[Dict[Any, Any]] = None,
+            self, mask_dict: dict[Any, Any] | None = None,
             exclude_masked_values: bool = False) -> Iterator[Feature]:
         mask = mask_dict or {}
         if self.count is None:
@@ -552,7 +549,7 @@ class FeatureGenerator:
                     for i in range(count)
                 )
             else:
-                iterator: Tuple[Any, ...] = self.fixed_values  # type: ignore
+                iterator: tuple[Any, ...] = self.fixed_values  # type: ignore
         else:
             iterator = self.categories or ()
 
@@ -567,7 +564,7 @@ class FeatureGenerator:
             for v in iterator)
 
     def generate_indexes(
-            self, mask_dict: Optional[Dict[Any, Any]] = None,
+            self, mask_dict: dict[Any, Any] | None = None,
             exclude_masked_values: bool = False) -> Iterator[int]:
         mask = mask_dict or {}
         if self.count is None:
@@ -613,8 +610,8 @@ class FeatureSet:
     '''
 
     def __init__(
-            self, data: Union[Feature, Iterable[Feature], FeatureSet],
-            index: Optional[int] = None):
+            self, data: Feature | Iterable[Feature] | FeatureSet,
+            index: int | None = None):
         '''
         Arguments
         ---------
@@ -625,7 +622,7 @@ class FeatureSet:
             An integer value for the index. If omitted, the index will be a
             tuple of indices of Features of the FeatureSet.
         '''
-        temp: Dict[str, Feature] = {}
+        temp: dict[str, Feature] = {}
         _data: Iterable[Any] = (
             data if hasattr(data, '__iter__') else [data])  # type: ignore
 
@@ -643,13 +640,13 @@ class FeatureSet:
         self._index = index
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         return cls(
             data=(
                 deserialize(feature)  # type: ignore
                 for feature in config.get('data', {})))
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         return {'data': [
             {
                 'class_name': full_qualname(feature),
@@ -762,7 +759,7 @@ class FeatureSet:
         self._data.update(other._data)
         self.__reset_cached_properties()
 
-    def get(self, key: str, return_val: Optional[Feature] = None):
+    def get(self, key: str, return_val: Feature | None = None):
         return self._data.get(key, return_val)
 
     def split(self):
@@ -876,16 +873,16 @@ class FeatureSet:
         return f"[{', '.join((d.__str__() for d in self._data.items()))}]"
 
 
-Index = Tuple[int, ...]
+Index = tuple[int, ...]
 
 FeatureGeneratorType = Generator[
     # Union[
     #     Iterator[FeatureSet],  # return feature
-    #     Tuple[Iterator[FeatureSet], ...],  # return feature split
+    #     tuple[Iterator[FeatureSet], ...],  # return feature split
     #     Iterator[Index],  # return index
-    #     Tuple[Iterator[int], ...],  # return index split
+    #     tuple[Iterator[int], ...],  # return index split
     #     int,  # return count
-    #     Tuple[int, ...],  # return count split | choose index
+    #     tuple[int, ...],  # return count split | choose index
     #     FeatureSet,  # choose feature | lookup ...
     #     None],
     Any, str, None]
@@ -893,15 +890,14 @@ FeatureGeneratorType = Generator[
 
 class FeatureGeneratorSet:
     def __init__(
-            self, feature_generators: Union[
-                FeatureGenerator, Iterable[FeatureGenerator]] = ()):
+            self, feature_generators: FeatureGenerator | Iterable[FeatureGenerator] = ()):
         '''
         Arguments
         ---------
         feature_generators:
             One or a sequence of `FeatureGenerator`s.
         '''
-        temp: Dict[str, FeatureGenerator] = {}
+        temp: dict[str, FeatureGenerator] = {}
         fgs: Iterable[Any] = (
             feature_generators if hasattr(feature_generators, '__iter__')
             else [feature_generators])  # type: ignore
@@ -918,14 +914,14 @@ class FeatureGeneratorSet:
                     f'Unknown input type {type(fg)} for item: {fg}')
 
         self._generators = temp
-        self._masked_values: Dict[str, Dict[Any, Any]] = {
+        self._masked_values: dict[str, dict[Any, Any]] = {
             name: {} for name in temp
         }
 
         self.count = tuple(g.count for g in temp.values())
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         instance = cls(
             feature_generators=(
                 deserialize(feature_gen)  # type: ignore
@@ -934,7 +930,7 @@ class FeatureGeneratorSet:
 
         return instance
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         return {
             'feature_generators': [
                 {
@@ -947,7 +943,7 @@ class FeatureGeneratorSet:
         }
 
     def __call__(
-            self, value: Optional[Dict[str, Any]] = None) -> FeatureSet:
+            self, value: dict[str, Any] | None = None) -> FeatureSet:
         _value = {} if value is None else value
 
         try:
@@ -961,14 +957,14 @@ class FeatureGeneratorSet:
 
         return return_value
 
-    def mask(self, feature_name: str, mask_dict: Dict[Any, Any]):
+    def mask(self, feature_name: str, mask_dict: dict[Any, Any]):
         try:
             for k, v in mask_dict.items():
                 self._masked_values[feature_name][k] = v
         except KeyError:
             raise ValueError(f'Feature {feature_name} not found.')
 
-    def unmask(self, feature_name: str, values: Optional[List[Any]] = None):
+    def unmask(self, feature_name: str, values: list[Any] | None = None):
         if feature_name not in self._generators:
             raise ValueError(f'Feature {feature_name} not found.')
 
@@ -980,7 +976,7 @@ class FeatureGeneratorSet:
 
     def generate_all(
             self, exclude_masked_values: bool = False, split: bool = False
-    ) -> Union[Iterator[FeatureSet], Tuple[Iterator[FeatureSet], ...]]:
+    ) -> Iterator[FeatureSet] | tuple[Iterator[FeatureSet], ...]:
         gens = self._generators
         masked = self._masked_values
 
@@ -1003,7 +999,7 @@ class FeatureGeneratorSet:
 
     def generate_indexes(
             self, exclude_masked_values: bool = False, split: bool = False
-    ) -> Union[Iterator[Index], Tuple[Iterator[int], ...]]:
+    ) -> Iterator[Index] | tuple[Iterator[int], ...]:
         gens = self._generators
         masked = self._masked_values
 
@@ -1024,7 +1020,7 @@ class FeatureGeneratorSet:
                     masked.get(name), exclude_masked_values))
                 for name, gen in gens.items()))
 
-    def generate_mask_vector(self) -> Union[Iterator[Index], Tuple[Iterator[int], ...]]:
+    def generate_mask_vector(self) -> Iterator[Index] | tuple[Iterator[int], ...]:
         gens = self._generators
         masked = {
             name: tuple(self._masked_values.get(name, {}).keys())
@@ -1073,7 +1069,7 @@ class FeatureGeneratorSet:
             query = yield result
 
     def byindex(
-            self, index: Union[int, Tuple[int, ...], Dict[str, int]]
+            self, index: int | tuple[int, ...] | dict[str, int]
     ) -> FeatureSet:
         if [x for x in self.count if x is None]:
             raise TypeError('This FeatureGeneratorSet is not iterable.')
@@ -1107,7 +1103,7 @@ class FeatureGeneratorSet:
         return temp
 
     @staticmethod
-    def parse_query(q: str) -> Dict[str, Any]:  # noqa: C901
+    def parse_query(q: str) -> dict[str, Any]:  # noqa: C901
         _q = q.strip().casefold()
         words = _q.split()
         command = words[0]
@@ -1116,7 +1112,7 @@ class FeatureGeneratorSet:
             ('feature', 'index', 'count', 'mask_vector'),
         )
 
-        parsed: Dict[str, Any] = {'command': command}
+        parsed: dict[str, Any] = {'command': command}
         if command == 'return':
             if words[1] not in allowed_words[1]:
                 raise RuntimeError(

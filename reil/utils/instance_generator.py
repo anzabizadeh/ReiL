@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import pathlib
-from typing import Any, Generic, Iterable, Optional, Tuple, TypeVar, Union
+from typing import Any, Generic, Iterable, TypeVar
 
 from reil import reilbase, stateful
 from reil.datatypes.feature_set_dumper import FeatureSetDumper
@@ -32,15 +32,15 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     def __init__(
             self,
             obj: T,
-            instance_counter_stops: Tuple[int, ...] = (-1,),  # -1: infinite
+            instance_counter_stops: tuple[int, ...] = (-1,),  # -1: infinite
             first_instance_number: int = 0,
             auto_rewind: bool = False,
             save_instances: bool = False,
             overwrite_instances: bool = False,
             use_existing_instances: bool = True,
-            save_path: Union[pathlib.PurePath, str] = '',
+            save_path: pathlib.PurePath | str = '',
             filename_pattern: str = '{n:04}',
-            state_dumper: Optional[FeatureSetDumper] = None,
+            state_dumper: FeatureSetDumper | None = None,
             **kwargs: Any):
         '''
         Attributes
@@ -82,9 +82,9 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
         self._object = obj
 
-        self._instance_name_lists: Tuple[Iterable[str], ...] = ()
+        self._instance_name_lists: tuple[Iterable[str], ...] = ()
         self._enumerate: enumerate[Any] = enumerate([''])
-        self._instance_name_index: Union[int, None] = None
+        self._instance_name_index: int | None = None
 
         self._save_instances = save_instances
         self._use_existing_instances = use_existing_instances
@@ -120,13 +120,13 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     def from_instance_list(
             cls,
             obj: T,
-            instance_name_lists: Tuple[Iterable[str], ...],
+            instance_name_lists: tuple[Iterable[str], ...],
             save_instances: bool = False,
             overwrite_instances: bool = False,
             use_existing_instances: bool = True,
-            save_path: Union[pathlib.PurePath, str] = '',
+            save_path: pathlib.PurePath | str = '',
             auto_rewind: bool = False,
-            state_dumper: Optional[FeatureSetDumper] = None,
+            state_dumper: FeatureSetDumper | None = None,
             **kwargs: Any):
         '''
         Attributes
@@ -174,7 +174,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
     def __iter__(self):
         return self
 
-    def __next__(self) -> Tuple[int, T]:
+    def __next__(self) -> tuple[int, T]:
         if self._instance_name_index is not None:
             if self._instance_name_index == -1:
                 if self._auto_rewind:
@@ -243,7 +243,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         else:
             self._stop_check = self._do_stop
 
-    def _generate_new_instance(self, filename: Optional[str] = None):
+    def _generate_new_instance(self, filename: str | None = None):
         if filename:
             current_instance = filename
         else:

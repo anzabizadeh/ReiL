@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import pathlib
 import time
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
 import pandas as pd
+
 from reil.datatypes.feature import FeatureSet
 
 
 class FeatureSetDumper:
     def __init__(
             self, filename: str,
-            path: Union[str, pathlib.PurePath] = '.',
-            columns: Optional[Tuple[str]] = None) -> None:
+            path: str | pathlib.PurePath = '.',
+            columns: tuple[str] | None = None) -> None:
         self._path = pathlib.PurePath(path)
         self._filename = filename if filename.endswith(
             '.csv') else f'{filename}.csv'
@@ -24,7 +25,7 @@ class FeatureSetDumper:
 
     def dump(
             self, component: FeatureSet,
-            additional_info: Optional[Dict[str, Any]] = None,
+            additional_info: dict[str, Any] | None = None,
     ) -> None:
         '''Write stats to file.'''
         attempts = 0
@@ -41,7 +42,7 @@ class FeatureSetDumper:
     @staticmethod
     def _dump(
             component: FeatureSet,
-            additional_info: Optional[Dict[str, Any]],
+            additional_info: dict[str, Any] | None,
             filename: str, path: pathlib.PurePath) -> bool:
         '''Write stats to file.'''
         raise NotImplementedError

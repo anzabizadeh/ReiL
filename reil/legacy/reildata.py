@@ -13,17 +13,16 @@ from __future__ import annotations
 import dataclasses
 import itertools
 from dataclasses import field
-from typing import (Any, Callable, Dict, Generic, Iterable, Iterator, List,
-                    Literal, Mapping, Optional, Sequence, Tuple, TypeVar,
-                    Union, cast, overload)
+from typing import (Any, Callable, Generic, Iterable, Iterator, Literal,
+                    Mapping, Sequence, TypeVar, cast, overload)
 
 T = TypeVar('T')
 
 Categorical = TypeVar('Categorical')
 Numerical = TypeVar('Numerical', int, float)
 
-Normal = Union[Literal[0], Literal[1], float]
-Normalized = Union[Normal, Sequence[Normal], None]
+Normal = Literal[0] | Literal[1] | float
+Normalized = Normal | Sequence[Normal] | None
 Normalizer = Callable[..., Normalized]
 
 
@@ -52,10 +51,10 @@ class BaseData(Generic[T]):
     :meta private:
     '''
     name: str
-    value: Optional[Union[T, Sequence[T]]] = None
-    normalizer: Optional[Normalizer] = lambda _: None
-    lazy_evaluation: Optional[bool] = field(default=None, compare=False)
-    is_numerical: Optional[bool] = field(
+    value: T | Sequence[T] | None = None
+    normalizer: Normalizer | None = lambda _: None
+    lazy_evaluation: bool | None = field(default=None, compare=False)
+    is_numerical: bool | None = field(
         default=None, init=False, repr=False, compare=False)
     _normalized: Normalized = field(
         default=None, init=False, repr=False, compare=False)
@@ -116,7 +115,7 @@ class BaseData(Generic[T]):
 
         return self._normalized
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         '''
         Return the data as a dictionary.
 
@@ -152,7 +151,7 @@ class CategoricalData(BaseData[Categorical]):
     categories:
         A list of all categories.
     '''
-    categories: Optional[Tuple[Categorical, ...]] = None
+    categories: tuple[Categorical, ...] | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -166,12 +165,14 @@ class CategoricalData(BaseData[Categorical]):
             return None
 
         if isinstance(value, type(categories[0])):
-            return tuple(int(x_i == value)
-                         for x_i in categories)
+            return tuple(
+                int(x_i == value)
+                for x_i in categories)
 
-        return tuple(int(x_i == v)
-                     for v in value
-                     for x_i in categories)
+        return tuple(
+            int(x_i == v)
+            for v in value
+            for x_i in categories)
 
     @staticmethod
     def _validate(data: CategoricalData) -> None:
@@ -188,7 +189,7 @@ class CategoricalData(BaseData[Categorical]):
                         f'value={value} is '
                         f'in the categories={categories}.')
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {'name': self.name, 'value': self.value,
                 'categories': self.categories,
                 'is_numerical': self.is_numerical}
@@ -221,8 +222,8 @@ class NumericalData(BaseData[Numerical]):
     upper:
         The upper bound of value.
     '''
-    lower: Optional[Numerical] = None
-    upper: Optional[Numerical] = None
+    lower: Numerical | None = None
+    upper: Numerical | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -271,16 +272,14 @@ class NumericalData(BaseData[Numerical]):
                         f'value={value} is '
                         f'greater than upper={upper}.')
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {'name': self.name, 'value': self.value,
                 'lower': self.lower, 'upper': self.upper,
                 'is_numerical': self.is_numerical}
 
 
-ReilDataInput = Union[Mapping[str, Any],
-                      BaseData[Any],
-                      CategoricalData[Categorical],
-                      NumericalData[Numerical]]
+ReilDataInput = Mapping[str, Any] | BaseData[
+    Any] | CategoricalData[Categorical] | NumericalData[Numerical]
 
 
 class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
@@ -290,10 +289,8 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
     '''
 
     def __init__(self,
-                 data: Union[ReilDataInput,
-                             Sequence[ReilDataInput],
-                             Iterator[ReilDataInput]],
-                 lazy_evaluation: Optional[bool] = None):
+                 data: ReilDataInput | Sequence[ReilDataInput] | Iterator[ReilDataInput],
+                 lazy_evaluation: bool | None = None):
         '''
         Arguments
         ---------
@@ -308,9 +305,8 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
             at the time of the first access. If not provided, `ReilData` looks
             for `lazy_evaluation` in each item. If failed, True is assumed.
         '''
-        temp: List[Union[BaseData[Any],
-                         CategoricalData[Categorical],
-                         NumericalData[Numerical]]] = []
+        temp: list[
+            BaseData[Any] | CategoricalData[Categorical] | NumericalData[Numerical]] = []
         _data = data if isinstance(data, (Sequence, Iterator)) else [data]
         for d in _data:
             if isinstance(d, BaseData):
@@ -353,9 +349,9 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
     def single_base(
             cls,
             name: str,
-            value: Optional[Union[T, Sequence[T]]] = None,
-            normalizer: Optional[Normalizer] = None,
-            lazy_evaluation: Optional[bool] = None) -> ReilData:
+            value: T | Sequence[T] | None = None,
+            normalizer: Normalizer | None = None,
+            lazy_evaluation: bool | None = None) -> ReilData:
         '''
         Create a `ReilData` instance.
 
@@ -377,10 +373,8 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         '''
         instance = cls([])
         instance._data = (
-            BaseData(name=name,
-                     value=value,
-                     normalizer=normalizer,
-                     lazy_evaluation=lazy_evaluation),)
+            BaseData(
+                name=name, value=value, normalizer=normalizer, lazy_evaluation=lazy_evaluation),)
 
         return instance
 
@@ -388,10 +382,10 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
     def single_categorical(
             cls,
             name: str,
-            value: Optional[Union[Categorical, Sequence[Categorical]]] = None,
-            normalizer: Optional[Normalizer] = None,
-            lazy_evaluation: Optional[bool] = None,
-            categories: Optional[Tuple[Categorical, ...]] = None) -> ReilData:
+            value: Categorical | Sequence[Categorical] | None = None,
+            normalizer: Normalizer | None = None,
+            lazy_evaluation: bool | None = None,
+            categories: tuple[Categorical, ...] | None = None) -> ReilData:
         '''
         Create a `ReilData` instance.
 
@@ -429,11 +423,11 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
     def single_numerical(
             cls,
             name: str,
-            value: Optional[Union[Numerical, Sequence[Numerical]]] = None,
-            normalizer: Optional[Normalizer] = None,
-            lazy_evaluation: Optional[bool] = None,
-            lower: Optional[Numerical] = None,
-            upper: Optional[Numerical] = None) -> ReilData:
+            value: Numerical | Sequence[Numerical] | None = None,
+            normalizer: Normalizer | None = None,
+            lazy_evaluation: bool | None = None,
+            lower: Numerical | None = None,
+            upper: Numerical | None = None) -> ReilData:
         '''
         Create a `ReilData` instance.
 
@@ -475,14 +469,13 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
     def single_item(
             cls,
             name: str,
-            value: Optional[Union[
-                Numerical, Sequence[Numerical],
-                Categorical, Sequence[Categorical]]] = None,
-            normalizer: Optional[Normalizer] = None,
-            lazy_evaluation: Optional[bool] = None,
-            categories: Optional[Tuple[Categorical, ...]] = None,
-            lower: Optional[Numerical] = None,
-            upper: Optional[Numerical] = None) -> ReilData:
+            value: Numerical | Sequence[Numerical] | Categorical | Sequence[
+                Categorical] | None = None,
+            normalizer: Normalizer | None = None,
+            lazy_evaluation: bool | None = None,
+            categories: tuple[Categorical, ...] | None = None,
+            lower: Numerical | None = None,
+            upper: Numerical | None = None) -> ReilData:
         '''
         Create a `ReilData` instance.
 
@@ -541,14 +534,14 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         return instance
 
     def _clear_temps(self):
-        self._value: Optional[Dict[str, Any]] = None
-        self._lower: Optional[Dict[str, Numerical]] = None
-        self._upper: Optional[Dict[str, Numerical]] = None
-        self._categories: Optional[Dict[str, Tuple[Categorical, ...]]] = None
-        self._is_numerical: Optional[Dict[str, bool]] = None
+        self._value: dict[str, Any] | None = None
+        self._lower: dict[str, Numerical] | None = None
+        self._upper: dict[str, Numerical] | None = None
+        self._categories: dict[str, tuple[Categorical, ...]] | None = None
+        self._is_numerical: dict[str, bool] | None = None
 
     def index(self, value: Any,
-              start: int = 0, stop: Optional[int] = None) -> int:
+              start: int = 0, stop: int | None = None) -> int:
         _stop = stop if stop is not None else len(self._data)
         if isinstance(value, BaseData):
             for i in range(start, _stop):
@@ -568,7 +561,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
             raise ValueError(f'{value} is not on the list.')
 
     @property
-    def value(self) -> Dict[str, Any]:
+    def value(self) -> dict[str, Any]:
         '''
         Return a dictionary with elements' names as keys and
         their respective values as values.
@@ -585,7 +578,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         return self._value
 
     @property
-    def lower(self) -> Dict[str, Numerical]:
+    def lower(self) -> dict[str, Numerical]:
         '''
         Return all `lower` attributes.
 
@@ -603,7 +596,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         return self._lower
 
     @property
-    def upper(self) -> Dict[str, Numerical]:
+    def upper(self) -> dict[str, Numerical]:
         '''
         Return all `upper` attributes.
 
@@ -621,7 +614,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         return self._upper
 
     @property
-    def categories(self) -> Dict[str, Tuple[Categorical, ...]]:
+    def categories(self) -> dict[str, tuple[Categorical, ...]]:
         '''
         Return all `categories` attributes.
 
@@ -633,7 +626,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         '''
         if self._categories is None:
             self._categories = {v.name:
-                                cast(Tuple[Categorical, ...],
+                                cast(tuple[Categorical, ...],
                                      v.categories)  # type: ignore
                                 for v in self._data
                                 if hasattr(v, 'categories')}
@@ -656,7 +649,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
                           lower=0, upper=1, lazy_evaluation=True)
             for v in self._data)
 
-    def flatten(self) -> List[BaseData]:
+    def flatten(self) -> list[BaseData]:
         """Combine values of all items in the instance.
 
         Returns
@@ -670,7 +663,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         return list(itertools.chain(*[make_iterable(sublist)
                                       for sublist in self.value.values()]))
 
-    def split(self) -> Union[ReilData, List[ReilData]]:
+    def split(self) -> ReilData | list[ReilData]:
         """Split the `ReilData` into a list of `ReilData`.
 
         Returns
@@ -697,7 +690,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
                     for v in value]
 
         else:
-            splitted_list = cast(List[ReilData], list(self._data))
+            splitted_list = cast(list[ReilData], list(self._data))
 
         return splitted_list
 
@@ -706,7 +699,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
         ...
 
     @overload
-    def __getitem__(self, s: slice) -> Tuple[BaseData, ...]:
+    def __getitem__(self, s: slice) -> tuple[BaseData, ...]:
         ...
 
     def __getitem__(self, x):
@@ -721,7 +714,7 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
     def __eq__(self, other) -> bool:
         return isinstance(other, type(self)) and (self._data == other._data)
 
-    def __add__(self, other: Union[BaseData[T], ReilData]) -> ReilData:
+    def __add__(self, other: BaseData[T] | ReilData) -> ReilData:
         if isinstance(other, BaseData):
             if other.name in self._data:
                 raise ValueError(
@@ -755,41 +748,3 @@ class ReilData(Sequence[ReilDataInput], Generic[Categorical, Numerical]):
 
     def __str__(self) -> str:
         return f"[{', '.join((d.__str__() for d in self._data))}]"
-
-
-if __name__ == "__main__":
-    # from timeit import timeit
-
-    def f1():
-        t1 = ReilData.single_categorical(name='test A', value=['a', 'b'],
-                                         categories=('a', 'b'))
-        t1 = ReilData.single_numerical(name='test A', value=[1, 2])
-        t1 = ReilData.single_base(name='test A', value=['a', 'b'])
-        return t1
-
-    def f2():
-        t2 = ReilData(({'name': x, 'value': x,
-                        'categories': list('abcdefghijklmnopqrstuvwxyz')}
-                       for x in 'abcdefghijklmnopqrstuvwxyz'),
-                      lazy_evaluation=True)
-        return t2.normalized.flatten()
-
-    def f3():
-        t2 = ReilData([{'name': 'A', 'value': 'a', 'categories': ['a', 'b']},
-                       {'name': 'B', 'value': [10, 20],
-                        'lower': 0, 'upper': 100}], lazy_evaluation=True)
-        return t2
-
-    # t1 = f1()
-    # t2 = ReilData(t1)
-    print(f1() + f3())
-    # test = f1().split()
-    # print(test)
-    # print(timeit(f1, number=1000))
-    # print(timeit(f2, number=100))
-    # print(timeit(f3, number=1000))
-    # print(f2().normalized.as_list())
-    # print(a.values)
-    # print(a.lower)
-    # print(a.categories)
-    # a.values = {'test A':'b'}

@@ -6,9 +6,10 @@ CircularBuffer class
 A `Buffer` that overflows!
 '''
 
-from typing import Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Callable, Iterator
 
-from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2, Funcs, funcs_dict
+from reil.datatypes.buffers.buffer import (T1, T2, Buffer, Funcs, PickModes,
+                                           funcs_dict)
 
 
 class CircularBuffer(Buffer[T1, T2]):
@@ -19,16 +20,16 @@ class CircularBuffer(Buffer[T1, T2]):
     '''
 
     def __init__(
-            self, buffer_size: Optional[int] = None,
-            buffer_names: Optional[List[str]] = None,
-            pick_mode: Optional[PickModes] = None) -> None:
+            self, buffer_size: int | None = None,
+            buffer_names: list[str] | None = None,
+            pick_mode: PickModes | None = None) -> None:
         self._buffer_full: bool = False
         super().__init__(
             buffer_size=buffer_size, buffer_names=buffer_names,
             pick_mode=pick_mode)
         self._buffer_index = 0
 
-    def add(self, data: Dict[str, Union[T1, T2]]) -> None:
+    def add(self, data: dict[str, T1 | T2]) -> None:
         '''
         Add a new item to the buffer.
 
@@ -51,7 +52,7 @@ class CircularBuffer(Buffer[T1, T2]):
         # the size does not change if buffer is full.
         self._count -= self._buffer_full
 
-    def add_iter(self, iter: Iterator[Dict[str, Union[T1, T2]]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, T1 | T2]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -84,14 +85,13 @@ class CircularBuffer(Buffer[T1, T2]):
             self._count = self._buffer_size
 
     def aggregate(
-        self, func: Union[
-            Funcs, Callable[[Union[List[T1], List[T2]]], Union[T1, T2]]],
-        names: Optional[Union[str, List[str]]] = None
-    ) -> Dict[str, Union[T1, T2]]:
+        self, func: Funcs | Callable[[list[T1] | list[T2]], T1 | T2],
+        names: str | list[str] | None = None
+    ) -> dict[str, T1 | T2]:
         if not self._buffer_full:
             return {}
 
-        _names: List[str]
+        _names: list[str]
         if names is None:
             _names = self._buffer_names  # type: ignore
         elif isinstance(names, str):
@@ -106,9 +106,7 @@ class CircularBuffer(Buffer[T1, T2]):
             for name in _names
         }
 
-    def _pick_old(
-        self, count: int
-    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
+    def _pick_old(self, count: int) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
         '''
         Return the oldest items in the buffer.
 
@@ -133,7 +131,7 @@ class CircularBuffer(Buffer[T1, T2]):
 
     def _pick_recent(
         self, count: int
-    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
+    ) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
         '''
         Return the most recent items in the buffer.
 
@@ -153,12 +151,12 @@ class CircularBuffer(Buffer[T1, T2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def _pick_all(self) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
+    def _pick_all(self) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
         '''
         Return all items in the buffer.
         '''
         if self._buffer_full:
-            self._buffer: Dict[str, Union[List[T1], List[T2]]]
+            self._buffer: dict[str, list[T1] | list[T2]]
             slice_pre = slice(self._buffer_index + 1, None)
             slice_post = slice(self._buffer_index + 1)
             return {name: tuple(

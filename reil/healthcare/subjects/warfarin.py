@@ -5,17 +5,17 @@ warfarin class
 
 This `warfarin` class implements a two compartment PK/PD model for warfarin.
 '''
+from __future__ import annotations
 
 import functools
-from typing import (Any, Callable, Dict, List, Literal, Optional, Tuple, Union,
-                    cast)
+from typing import Any, Callable, Literal, cast
 
 from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
 from reil.healthcare.patient import Patient
 from reil.healthcare.subjects.dosing_subject import DosingSubject
 from reil.utils import reil_functions
 
-DefComponents = Tuple[Tuple[str, Dict[str, Any]], ...]
+DefComponents = tuple[tuple[str, dict[str, Any]], ...]
 
 patient_basic: DefComponents = (
     ('age', {}), ('CYP2C9', {}),
@@ -31,7 +31,7 @@ sensitivity: DefComponents = (('sensitivity', {}),)
 patient_w_sensitivity: DefComponents = (
     *patient_basic, *sensitivity, *patient_extra)
 
-state_definitions: Dict[str, DefComponents] = {
+state_definitions: dict[str, DefComponents] = {
     'age': (('age', {}),),
     'patient_basic': patient_basic,
     'patient_w_sensitivity_basic': (*patient_basic, *sensitivity),
@@ -93,7 +93,7 @@ state_definitions: Dict[str, DefComponents] = {
 action_definition_names = [
     '237_15', 'daily_15', 'free_15', 'semi_15', 'weekly_15', 'delta', 'percent']
 
-reward_definitions: Dict[str, Tuple[reil_functions.ReilFunction[float, int], str]] = dict(
+reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str]] = dict(
     sq_dist=(
         reil_functions.NormalizedSquareDistance(
             name='sq_dist', y_var_name='daily_INR_history',
@@ -162,18 +162,18 @@ class Warfarin(DosingSubject):
     def __init__(
             self,
             patient: Patient,
-            INR_range: Tuple[float, float] = (0.0, 15.0),
-            dose_range: Tuple[float, float] = (0.0, 15.0),
+            INR_range: tuple[float, float] = (0.0, 15.0),
+            dose_range: tuple[float, float] = (0.0, 15.0),
             dose_step: float = 0.5,
-            interval_range: Tuple[int, int] = (1, 28),
+            interval_range: tuple[int, int] = (1, 28),
             interval_step: int = 1,
             max_day: int = 90,
             decision_mode: Literal[
                 'dose', 'dose_interval', 'dose_change', 'dose_change_interval',
                 'dose_change_p', 'dose_change_interval_p'
             ] = 'dose_interval',
-            percent_dose_change: Optional[Tuple[float, ...]] = None,
-            dose_range_p: Optional[Tuple[float, float]] = None,
+            percent_dose_change: tuple[float, ...] | None = None,
+            dose_range_p: tuple[float, float] | None = None,
             round_to_step: bool = True,
             backfill: bool = True,
             **kwargs: Any):
@@ -228,7 +228,7 @@ class Warfarin(DosingSubject):
             f=self._statistic_def_reference,
             available_definitions=list(statistic_definition_names))
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = super().get_config()
         del config['measurement_name']
         config['INR_range'] = config.pop('measurement_range')
@@ -236,8 +236,8 @@ class Warfarin(DosingSubject):
         return config
 
     def copy(
-        self, perturb: bool = False, n: Optional[int] = None
-    ) -> Union['Warfarin', List['Warfarin']]:
+        self, perturb: bool = False, n: int | None = None
+    ) -> 'Warfarin' | list['Warfarin']:
         copied_subjects_temp = super().copy(perturb=False, n=n)
 
         if perturb:
@@ -247,13 +247,13 @@ class Warfarin(DosingSubject):
                     copied_subjects._patient._model.perturb(  # type: ignore
                         day=self._day)
             else:
-                copied_subjects = cast(List[Warfarin], copied_subjects_temp)
+                copied_subjects = cast(list[Warfarin], copied_subjects_temp)
                 for c in copied_subjects:
                     if c._patient is not None:
                         c._patient._model.perturb(day=self._day)  # type: ignore
         else:
             copied_subjects = cast(
-                Union[Warfarin, List[Warfarin]], copied_subjects_temp)
+                Warfarin | list[Warfarin], copied_subjects_temp)
 
         return copied_subjects
 
@@ -287,9 +287,9 @@ class Warfarin(DosingSubject):
 
         def _generate(
             feature: FeatureSet,
-            ops: Tuple[Callable[[FeatureSet], bool], ...],
-            dose_masks: Tuple[Dict[float, float], ...],
-            interval_masks: Tuple[Dict[int, int], ...]
+            ops: tuple[Callable[[FeatureSet], bool], ...],
+            dose_masks: tuple[dict[float, float], ...],
+            interval_masks: tuple[dict[int, int], ...]
         ) -> FeatureGeneratorType:
             self.action_gen_set.unmask('dose')
             if not self._interval_mode:
@@ -343,6 +343,7 @@ class Warfarin(DosingSubject):
             for i in range(min_interval, max_interval + 1, self._interval_step)
             if i not in (7, 14, 21, 28)}
 
+        name: str
         for cap in caps[:-1]:
             name = f'237_{int(cap):02}'
             if name not in current_action_definitions:
@@ -529,7 +530,7 @@ class Warfarin(DosingSubject):
                 name, percent_dose, 'day_and_last_dose')
 
     def _state_def_reference(
-            self, name: str) -> Optional[DefComponents]:
+            self, name: str) -> DefComponents | None:
         try:
             return state_definitions[name]
         except KeyError:
@@ -537,12 +538,12 @@ class Warfarin(DosingSubject):
 
     def _action_def_reference(  # noqa: C901
         self, name: str
-    ) -> Optional[Tuple[Callable[..., FeatureGeneratorType], str]]:
+    ) -> tuple[Callable[..., FeatureGeneratorType], str] | None:
         def _generate(
                 feature: FeatureSet,
-                ops: Tuple[Callable[[FeatureSet], bool], ...],
-                dose_masks: Tuple[Dict[float, float], ...],
-                interval_masks: Tuple[Dict[int, int], ...]
+                ops: tuple[Callable[[FeatureSet], bool], ...],
+                dose_masks: tuple[dict[float, float], ...],
+                interval_masks: tuple[dict[int, int], ...]
         ) -> FeatureGeneratorType:
             self.action_gen_set.unmask('dose')
             if not self._interval_mode:
@@ -741,7 +742,7 @@ class Warfarin(DosingSubject):
                     feature['daily_dose_history'].value[-1]  # type: ignore
                 day: int = feature['day'].value  # type: ignore
                 min_dose, max_dose = self._dose_range
-                all_ps: Tuple[float, ...] = \
+                all_ps: tuple[float, ...] = \
                     self.feature_gen_set['dose_change_p'].fixed_values  # type: ignore
                 permissibles = [
                     p for p in all_ps
@@ -778,7 +779,7 @@ class Warfarin(DosingSubject):
                 last_dose: float = \
                     feature['daily_dose_history'].value[-1]  # type: ignore
                 min_dose, max_dose = self._dose_range
-                all_ps: Tuple[float, ...] = \
+                all_ps: tuple[float, ...] = \
                     self.feature_gen_set['dose_change_p'].fixed_values  # type: ignore
                 permissibles = [
                     p for p in all_ps
@@ -799,7 +800,7 @@ class Warfarin(DosingSubject):
 
     def _reward_def_reference(
         self, name: str
-    ) -> Optional[Tuple[reil_functions.ReilFunction, str]]:
+    ) -> tuple[reil_functions.ReilFunction, str] | None:
         try:
             return reward_definitions[name]
         except KeyError:

@@ -39,15 +39,15 @@ class Lenzini(dp.DosingProtocol):
                 'Acceptable methods are clinical and pharmacogenetic.')
 
     def prescribe(self,  # noqa: C901
-                  patient: Dict[str, Any],
+                  patient: dict[str, Any],
                   additional_info: dp.AdditionalInfo
-                  ) -> Tuple[dp.DosingDecision, dp.AdditionalInfo]:
+                  ) -> tuple[dp.DosingDecision, dp.AdditionalInfo]:
         dose = self._method(patient)
 
         return dp.DosingDecision(dose), additional_info
 
     @staticmethod
-    def clinical(patient: Dict[str, Any]) -> float:
+    def clinical(patient: dict[str, Any]) -> float:
         '''
         Determine warfarin dose using clinical Lenzini formula.
 
@@ -132,7 +132,7 @@ class Lenzini(dp.DosingProtocol):
         return dose
 
     @staticmethod
-    def pg(patient: Dict[str, Any]) -> float:
+    def pg(patient: dict[str, Any]) -> float:
         '''
         Determine warfarin dose using pharmacogenetic Lenzini formula.
 

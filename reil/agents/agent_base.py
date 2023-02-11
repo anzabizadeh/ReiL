@@ -7,8 +7,7 @@ The base class of all `agent` classes.
 '''
 
 import random
-from typing import (Any, Dict, Generator, Literal, Optional, Tuple, TypeVar,
-                    Union)
+from typing import Any, Generator, Literal, TypeVar
 
 from reil.datatypes.dataclasses import History, Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
@@ -85,7 +84,7 @@ class AgentBase(Stateful):
         :
             The action
         '''
-        possible_actions: Tuple[FeatureSet, ...]
+        possible_actions: tuple[FeatureSet, ...]
         query = (
             'return feature exclusive' if self._variable_action_count
             else 'return feature')
@@ -108,8 +107,8 @@ class AgentBase(Stateful):
 
     def best_actions(
             self, state: FeatureSet,
-            actions: Tuple[FeatureSet, ...]
-    ) -> Tuple[FeatureSet, ...]:
+            actions: tuple[FeatureSet, ...]
+    ) -> tuple[FeatureSet, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -129,8 +128,8 @@ class AgentBase(Stateful):
         raise NotImplementedError
 
     def observe(
-            self, subject_id: int, stat_name: Optional[str]
-    ) -> Generator[Union[FeatureSet, None], Dict[str, Any], None]:
+            self, subject_id: int, stat_name: str | None
+    ) -> Generator[FeatureSet | None, dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
 
@@ -161,7 +160,7 @@ class AgentBase(Stateful):
         while True:
             try:
                 new_observation = Observation()
-                temp: Dict[str, Any] = yield
+                temp: dict[str, Any] = yield
                 state: FeatureSet = temp['state']
                 actions: FeatureGeneratorType = temp['actions']
                 iteration: int = temp['iteration']
@@ -197,7 +196,7 @@ class AgentBase(Stateful):
 
     @staticmethod
     def _break_tie(
-            input_tuple: Tuple[T, ...],
+            input_tuple: tuple[T, ...],
             method: Literal['first', 'last', 'random']) -> T:
         '''
         Choose one item from the supplied list of options, based on the method.

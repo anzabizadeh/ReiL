@@ -9,8 +9,7 @@ an iterator.
 
 from __future__ import annotations
 
-from typing import (Any, Callable, Dict, Generic, Iterable, Iterator, Optional,
-                    Tuple, Type, TypeVar, Union)
+from typing import Any, Callable, Generic, Iterable, Iterator, Type, TypeVar
 
 from reil import reilbase, stateful
 from reil.datatypes.feature_set_dumper import FeatureSetDumper
@@ -32,14 +31,13 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
     def __init__(
             self,
             cls: Type[T],
-            args_generator: Union[
-                Callable[[], Tuple[int, Dict[str, Any]]],
-                Iterator[Tuple[int, Dict[str, Any]]]],
+            args_generator: Callable[[], tuple[int, dict[str, Any]]] | Iterator[
+                tuple[int, dict[str, Any]]],
             is_finite: bool = False,
             # save_instances: bool = False,
             # save_path: Union[pathlib.PurePath, str] = '',
             instance_name_pattern: str = '{n:04}',
-            state_dumper: Optional[FeatureSetDumper] = None,
+            state_dumper: FeatureSetDumper | None = None,
             **kwargs: Any):
         '''
         Attributes
@@ -135,7 +133,7 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
         except AttributeError:
             return self.__class__.__qualname__
 
-    def __next__(self) -> Tuple[int, T]:
+    def __next__(self) -> tuple[int, T]:
         try:
             instance_counter, args = self._args_generator()
         except (StopIteration):
@@ -163,7 +161,7 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
 
     #     return state
 
-    # def __setstate__(self, state: Dict[str, Any]) -> None:
+    # def __setstate__(self, state: dict[str, Any]) -> None:
     #     # TODO: This is a hack! remove it after the experiments!
     #     # if 'trajectory' in state['_save_path']:
     #     #     state['_instance_counter_stops'] = [10000]

@@ -6,7 +6,7 @@ HealthSubject class
 This `HealthSubject` class implements interaction with patients.
 '''
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from reil.datatypes.feature import (MISSING, Feature, FeatureGenerator,
                                     FeatureGeneratorSet)
@@ -23,14 +23,14 @@ class HealthSubject(Subject):
 
     def __init__(
             self,
-            patient: Optional[Patient],
+            patient: Patient | None,
             measurement_name: str,
-            measurement_range: Tuple[float, float],
+            measurement_range: tuple[float, float],
             max_day: int,
-            interval_range: Tuple[int, int],
+            interval_range: tuple[int, int],
             backfill: bool,
             interval_step: int = 1,
-            default_interval: Optional[int] = None,
+            default_interval: int | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -107,7 +107,7 @@ class HealthSubject(Subject):
         self._day: int = 0
         self._full_measurement_history = [0.0] * self._max_day
         self._decision_points_measurement_history = [0.0] * (self._max_day + 1)
-        self._decision_points_interval_history: List[int] = [1] * self._max_day
+        self._decision_points_interval_history: list[int] = [1] * self._max_day
         self._decision_points_index: int = 0
 
         self._full_measurement_history[0] = self._patient.model(
@@ -116,7 +116,7 @@ class HealthSubject(Subject):
             self._full_measurement_history[0]
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         patient_info = config['patient']
         if patient_info is not None:
             config['patient'] = deserialize(patient_info)
@@ -125,7 +125,7 @@ class HealthSubject(Subject):
 
         return instance
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = super().get_config()
         if self._patient is None:
             config.update({'patient': None})
@@ -147,7 +147,7 @@ class HealthSubject(Subject):
                 'day', ('day', {}))
 
     def _reward_def_reference(
-            self, name: str) -> Optional[Tuple[reil_functions.ReilFunction, str]]:
+            self, name: str) -> tuple[reil_functions.ReilFunction, str] | None:
         raise NotImplementedError
 
     @classmethod
@@ -158,11 +158,11 @@ class HealthSubject(Subject):
     def generate_interval_values(
             min_interval: int = 1,
             max_interval: int = 28,
-            interval_increment: int = 1) -> List[int]:
+            interval_increment: int = 1) -> list[int]:
 
         return list(range(min_interval, max_interval, interval_increment))
 
-    def is_terminated(self, _id: Optional[int] = None) -> bool:
+    def is_terminated(self, _id: int | None = None) -> bool:
         return self._day >= self._max_day
 
     def reset(self) -> None:
@@ -171,7 +171,7 @@ class HealthSubject(Subject):
         self._day: int = 0
         self._full_measurement_history = [0.0] * self._max_day
         self._decision_points_measurement_history = [0.0] * (self._max_day + 1)
-        self._decision_points_interval_history: List[int] = [1] * self._max_day
+        self._decision_points_interval_history: list[int] = [1] * self._max_day
         self._decision_points_index: int = 0
 
         if self._patient is not None:
@@ -204,8 +204,8 @@ class HealthSubject(Subject):
                 'length should be a positive integer, or '
                 '-1 for full length output.')
 
-        filler: Union[float, int]
-        _list: Union[List[float], List[int]]
+        filler: float | int
+        _list: list[float] | list[int]
         if list_name == f'{self._measurement_name}_history':
             _list = self._decision_points_measurement_history
             index = self._decision_points_index + 1

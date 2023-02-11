@@ -34,11 +34,10 @@ deregister:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from reil import reilbase
-from reil.datatypes.components import (State, Statistic,
-                                       SubComponentInfo)
+from reil.datatypes.components import State, Statistic, SubComponentInfo
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import Feature, NoneFeature
 from reil.datatypes.feature_set_dumper import FeatureSetDumper
@@ -56,14 +55,14 @@ class Stateful(reilbase.ReilBase):
             min_entity_count: int = 1,
             max_entity_count: int = -1,
             unique_entities: bool = True,
-            state_dumper: Optional[FeatureSetDumper] = None,
-            summary_writer: Optional[SummaryWriter] = None,
+            state_dumper: FeatureSetDumper | None = None,
+            summary_writer: SummaryWriter | None = None,
             **kwargs: Any):
 
         super().__init__(**kwargs)
 
-        self._metrics: Dict[str, MetricProtocol] = {}
-        self._computed_metrics: Dict[str, float] = {}
+        self._metrics: dict[str, MetricProtocol] = {}
+        self._computed_metrics: dict[str, float] = {}
         self._summary_writer = summary_writer
 
         sub_comp_list = self._extract_sub_components()
@@ -85,14 +84,14 @@ class Stateful(reilbase.ReilBase):
             self.state.add_definition('none', ('none', {}))
 
     def _state_def_reference(
-            self, name: str) -> Optional[Tuple[Tuple[str, Dict[str, Any]], ...]]:
+            self, name: str) -> tuple[tuple[str, dict[str, Any]], ...] | None:
         if name == 'none':
             return (('none', {}),)
 
     def _generate_statistic_defs(self) -> None:
         raise NotImplementedError
 
-    def _extract_sub_components(self) -> Dict[str, SubComponentInfo]:
+    def _extract_sub_components(self) -> dict[str, SubComponentInfo]:
         '''
         Extract all sub components.
 
@@ -137,7 +136,7 @@ class Stateful(reilbase.ReilBase):
         {'sub_comp_01': 'something', 'sub_comp_02':
         'new valuenew valuenew value'}
         '''
-        sub_comp_list: Dict[str, SubComponentInfo] = {}
+        sub_comp_list: dict[str, SubComponentInfo] = {}
         for func_name, func in ((f, getattr(self, f).__func__)
                                 for f in dir(self)
                                 if f.startswith('_sub_comp_')):
@@ -169,7 +168,7 @@ class Stateful(reilbase.ReilBase):
     def _update_metrics(self, **kwargs: Any) -> None:
         pass
 
-    def register(self, entity_name: str, _id: Optional[int] = None) -> int:
+    def register(self, entity_name: str, _id: int | None = None) -> int:
         '''
         Register an `entity` and return its ID. If the `entity` is new, a new
         ID is generated and the `entity_name` is added to the list of
@@ -217,7 +216,7 @@ class Stateful(reilbase.ReilBase):
         super().reset()
         self._entity_list.clear()
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         super().__setstate__(state)
 
         self.state.object_ref = self

@@ -6,16 +6,18 @@ Dense class
 The Dense learner.
 '''
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
+
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
                                                     LearningRateScheduler)
 from reil.utils.tf_utils import TF2UtilsMixin
-from tensorflow import keras
+
+keras = tf.keras
 
 
 class Dense_tf_1(Learner[FeatureSet, float]):
@@ -28,11 +30,11 @@ class Dense_tf_1(Learner[FeatureSet, float]):
 
     def __init__(
             self,
-            learning_rate: Union[float, LearningRateScheduler],
+            learning_rate: float | LearningRateScheduler,
             validation_split: float = 0.0,
-            hidden_layer_sizes: Tuple[int, ...] = (1,),
-            input_length: Optional[int] = None,
-            tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
+            hidden_layer_sizes: tuple[int, ...] = (1,),
+            input_length: int | None = None,
+            tensorboard_path: str | pathlib.PurePath | None = None,
             **kwargs: Any) -> None:
         '''
         Arguments
@@ -76,8 +78,8 @@ class Dense_tf_1(Learner[FeatureSet, float]):
 
         self._validation_split = validation_split
 
-        self._callbacks: List[Any] = []
-        self._tensorboard_path: Optional[pathlib.PurePath] = None
+        self._callbacks: list[Any] = []
+        self._tensorboard_path: pathlib.PurePath | None = None
         self._model: keras.models.Sequential
 
         self._graph = tf.Graph()
@@ -132,8 +134,8 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         self._no_model = False
 
     def predict(
-            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
-    ) -> Tuple[float, ...]:
+            self, X: tuple[FeatureSet, ...], training: bool | None = None
+    ) -> tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -150,7 +152,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         :
             The predicted `y`.
         '''
-        _X: List[List[Any]] = [x.normalized.flattened for x in X]
+        _X: list[list[Any]] = [x.normalized.flattened for x in X]
         if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -163,8 +165,8 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         return result  # type: ignore
 
     def learn(
-            self, X: Tuple[FeatureSet, ...],
-            Y: Tuple[float, ...]) -> Dict[str, float]:
+            self, X: tuple[FeatureSet, ...],
+            Y: tuple[float, ...]) -> dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -176,7 +178,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X: List[List[Any]] = [x.normalized.flattened for x in X]
+        _X: list[list[Any]] = [x.normalized.flattened for x in X]
         if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -197,9 +199,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         self._iteration += 1
 
     def save(
-        self,
-        filename: Optional[str] = None,
-        path: Optional[Union[str, pathlib.PurePath]] = None
+        self, filename: str | None = None, path: str | pathlib.PurePath | None = None
     ) -> pathlib.PurePath:
         '''
         Extends `ReilBase.save` to handle `TF` objects.
@@ -237,9 +237,7 @@ class Dense_tf_1(Learner[FeatureSet, float]):
         return _path
 
     def load(
-            self,
-            filename: str,
-            path: Optional[Union[str, pathlib.PurePath]] = None) -> None:
+            self, filename: str, path: str | pathlib.PurePath | None = None) -> None:
         '''
         Extends `ReilBase.load` to handle `TF` objects.
 
@@ -300,11 +298,11 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
 
     def __init__(
             self,
-            learning_rate: Union[float, LearningRateScheduler],
+            learning_rate: float | LearningRateScheduler,
             validation_split: float = 0.,
-            hidden_layer_sizes: Tuple[int, ...] = (1,),
-            input_length: Optional[int] = None,
-            tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
+            hidden_layer_sizes: tuple[int, ...] = (1,),
+            input_length: int | None = None,
+            tensorboard_path: str | pathlib.PurePath | None = None,
             **kwargs: Any) -> None:
         '''
         Arguments
@@ -350,8 +348,8 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
 
         self._validation_split = validation_split
 
-        self._callbacks: List[Any] = []
-        self._tensorboard_path: Optional[pathlib.PurePath] = None
+        self._callbacks: list[Any] = []
+        self._tensorboard_path: pathlib.PurePath | None = None
         self._model = keras.models.Sequential()
 
         if tensorboard_path is not None:
@@ -396,8 +394,8 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
         self._no_model = False
 
     def predict(
-            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
-    ) -> Tuple[float, ...]:
+            self, X: tuple[FeatureSet, ...], training: bool | None = None
+    ) -> tuple[float, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -414,7 +412,7 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
         :
             The predicted `y`.
         '''
-        _X: List[List[float]] = [x.normalized.flattened for x in X]
+        _X: list[list[float]] = [x.normalized.flattened for x in X]
         if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()
@@ -424,8 +422,8 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
         return result  # type: ignore
 
     def learn(
-            self, X: Tuple[FeatureSet, ...],
-            Y: Tuple[float, ...]) -> Dict[str, float]:
+            self, X: tuple[FeatureSet, ...],
+            Y: tuple[float, ...]) -> dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -437,7 +435,7 @@ class Dense_tf_2(TF2UtilsMixin, Learner[FeatureSet, float]):
         Y:
             A list of float labels for the learning model.
         '''
-        _X: List[List[float]] = [x.normalized.flattened for x in X]
+        _X: list[list[float]] = [x.normalized.flattened for x in X]
         if self._no_model:
             self._input_length = len(_X[0])
             self._generate_network()

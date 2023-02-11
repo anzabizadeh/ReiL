@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import List, Protocol, Tuple
+from typing import Protocol
 
 from reil.datatypes.feature import FeatureSet
 
@@ -34,7 +34,7 @@ class PTTRMetric(MetricProtocol):
         self.name = name
         self.reset_states()
 
-    def update_state(self, states: Tuple[FeatureSet, ...]):
+    def update_state(self, states: tuple[FeatureSet, ...]):
         in_range_list = [
             2.0 <= state['INR_history'].value[-1] <= 3.0  # type: ignore
             for state in states
@@ -56,8 +56,8 @@ class INRMetric(MetricProtocol):
         self.name = name
         self.reset_states()
 
-    def update_state(self, states: Tuple[FeatureSet, ...]):
-        INRs: List[float] = [
+    def update_state(self, states: tuple[FeatureSet, ...]):
+        INRs: list[float] = [
             state['INR_history'].value[-1]  # type: ignore
             for state in states
         ]

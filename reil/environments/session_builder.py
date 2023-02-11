@@ -1,5 +1,4 @@
 import pathlib
-from typing import Dict, List, Optional, Union
 
 from reil.environments.session import Session
 from reil.environments.task import Task
@@ -11,9 +10,9 @@ from reil.utils.output_writer import OutputWriter
 
 class SessionBuilder:
     def __init__(
-            self, config_filenames: Dict[str, str],
-            config_path: Optional[Union[pathlib.Path, str]],
-            vars_dict: Optional[Dict[str, str]]) -> None:
+            self, config_filenames: dict[str, str],
+            config_path: pathlib.Path | str | None,
+            vars_dict: dict[str, str] | None) -> None:
         self._parser = ConfigParser(
             config_filenames=config_filenames, config_path=config_path,
             vars_dict=vars_dict)
@@ -58,7 +57,7 @@ class SessionBuilder:
     def create_session(
             self,
             session_name: str,
-            parent_session_path: Union[pathlib.PurePath, str] = '.'
+            parent_session_path: pathlib.PurePath | str = '.'
     ) -> Session:
 
         try:
@@ -66,7 +65,7 @@ class SessionBuilder:
         except KeyError:
             raise ValueError(f'Session {session_name} not found.')
 
-        components: Dict[str, List[Task]] = {
+        components: dict[str, list[Task]] = {
             'main_task': [],
             'tasks_before': [],
             'tasks_after': [],

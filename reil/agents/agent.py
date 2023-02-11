@@ -7,8 +7,7 @@ This `agent` class is the base class of all agent classes that can learn from
 `history`.
 '''
 
-from typing import (Any, Dict, Generator, Generic, List, Literal, Optional, Tuple,
-                    TypeVar, Union)
+from typing import Any, Generator, Generic, Literal, TypeVar
 
 import scipy.signal
 
@@ -21,8 +20,8 @@ from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
 InputType = TypeVar('InputType')
-TrainingData = Tuple[
-    Tuple[InputType, ...], Tuple[LabelType, ...], Dict[str, Any]]
+TrainingData = tuple[
+    tuple[InputType, ...], tuple[LabelType, ...], dict[str, Any]]
 
 
 class Agent(AgentBase, Generic[InputType, LabelType]):
@@ -33,7 +32,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
     def __init__(
             self,
             learner: LearnerProtocol[InputType, LabelType],
-            exploration_strategy: Union[float, ExplorationStrategy],
+            exploration_strategy: float | ExplorationStrategy,
             discount_factor: float = 1.0,
             tie_breaker: Literal['first', 'last', 'random'] = 'random',
             training_trigger: Literal[
@@ -91,7 +90,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         return cls(Learner._empty_instance(), ConstantEpsilonGreedy())
 
     @staticmethod
-    def discounted_cum_sum(r: List[float], discount: float) -> List[float]:
+    def discounted_cum_sum(r: list[float], discount: float) -> list[float]:
         # Copied from OpenAI SpinUp: algos/tf1/ppo/core.py
         return scipy.signal.lfilter(  # type: ignore
             [1], [1, float(-discount)], r[::-1], axis=0)[::-1]
@@ -99,9 +98,9 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
     @staticmethod
     def extract_reward(
             history: History,
-            min_clip: Optional[float] = None,
-            max_clip: Optional[float] = None) -> List[float]:
-        rewards: List[float] = [
+            min_clip: float | None = None,
+            max_clip: float | None = None) -> list[float]:
+        rewards: list[float] = [
             a.reward for a in history
             if a.reward is not None]
 
@@ -206,7 +205,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         '''
         raise NotImplementedError
 
-    def learn(self, history: History) -> Dict[str, float]:
+    def learn(self, history: History) -> dict[str, float]:
         '''
         Learn using history.
 
@@ -235,8 +234,8 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         return metrics
 
     def observe(  # noqa: C901
-            self, subject_id: int, stat_name: Optional[str],
-    ) -> Generator[Union[FeatureSet, None], Dict[str, Any], None]:
+            self, subject_id: int, stat_name: str | None,
+    ) -> Generator[FeatureSet | None, dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
         Extends `AgentBase.observe`.
@@ -274,7 +273,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         while True:
             try:
                 new_observation = Observation()
-                temp: Dict[str, Any] = yield
+                temp: dict[str, Any] = yield
                 state: FeatureSet = temp['state']
                 possible_actions: FeatureGeneratorType = temp['possible_actions']
                 iteration: int = temp['iteration']

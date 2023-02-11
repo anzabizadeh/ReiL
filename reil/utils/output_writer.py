@@ -1,6 +1,5 @@
 import pathlib
 import time
-from typing import Dict, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -8,8 +7,8 @@ import pandas as pd
 class OutputWriter:
     def __init__(
             self, filename: str,
-            path: Union[str, pathlib.PurePath] = '.',
-            columns: Optional[Tuple[str, ...]] = None) -> None:
+            path: str | pathlib.PurePath = '.',
+            columns: tuple[str, ...] | None = None) -> None:
 
         self._path = pathlib.PurePath(path)
         self._csv_filename = filename if filename.endswith(
@@ -21,7 +20,7 @@ class OutputWriter:
                     f, header=True)
 
     def write_stats_output(
-            self, stats_output: Dict[Tuple[str, str], pd.DataFrame]) -> None:
+            self, stats_output: dict[tuple[str, str], pd.DataFrame]) -> None:
         '''Write stats to file.'''
         attempts = 0
         while attempts < 5 and not self._write_stats_output(
@@ -35,7 +34,7 @@ class OutputWriter:
 
     @staticmethod
     def _write_stats_output(
-            stats_output: Dict[Tuple[str, str], pd.DataFrame],
+            stats_output: dict[tuple[str, str], pd.DataFrame],
             filename: str, path: pathlib.PurePath) -> bool:
         '''Write stats to file.'''
         try:

@@ -7,10 +7,10 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-from typing import (Any, Dict, Generator, List, NamedTuple, Optional, Tuple,
-                    TypedDict, Union)
+from typing import Any, Generator, NamedTuple, TypedDict
 
 import pandas as pd
+
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol
 from reil.datatypes.feature import FeatureSet
@@ -24,17 +24,16 @@ class StatInfo(NamedTuple):
     obj: str
     entity_name: str
     assigned_to: str
-    a_s_name: Tuple[str, str]
-    aggregators: Optional[Tuple[str, ...]]
-    groupby: Optional[Tuple[str, ...]]
+    a_s_name: tuple[str, str]
+    aggregators: tuple[str, ...] | None
+    groupby: tuple[str, ...] | None
 
 
 class InteractArgs(TypedDict):
     agent_id: int
     subject_id: int
-    agent_observer: Generator[
-        Union[FeatureSet, None], Dict[str, Any], None]
-    subject_instance: Union[Subject, SubjectDemon]
+    agent_observer: Generator[FeatureSet | None, dict[str, Any], None]
+    subject_instance: Subject | SubjectDemon
     protocol: InteractionProtocol
     iteration: int
 
@@ -48,12 +47,9 @@ class Sequential(Environment):
 
     def __init__(
             self,
-            entity_dict: Optional[Dict[str, Union[
-                EntityType, EntityGenType, str]]] = None,
-            demon_dict: Optional[Dict[str, Union[
-                AgentDemon, SubjectDemon, str]]] = None,
-            interaction_plans: Optional[
-                Dict[str, Tuple[InteractionProtocol, ...]]] = None,
+            entity_dict: dict[str, EntityType | EntityGenType | str] | None = None,
+            demon_dict: dict[str, AgentDemon | SubjectDemon | str] | None = None,
+            interaction_plans: dict[str, tuple[InteractionProtocol, ...]] | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -70,9 +66,9 @@ class Sequential(Environment):
         super().__init__(
             entity_dict=entity_dict, demon_dict=demon_dict,
             interaction_plans=interaction_plans, **kwargs)
-        self._active_plan: Plan[List[InteractionProtocol]]
+        self._active_plan: Plan[list[InteractionProtocol]]
 
-    def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
+    def remove_entity(self, entity_names: tuple[str, ...]) -> None:
         '''
         Extends `Environment.remove_entity`.
 
@@ -107,7 +103,7 @@ class Sequential(Environment):
 
         super().remove_entity(entity_names)
 
-    def remove_demon(self, demon_names: Tuple[str, ...]) -> None:
+    def remove_demon(self, demon_names: tuple[str, ...]) -> None:
         '''
         Extends `Environment.remove_demon`.
 
@@ -142,7 +138,7 @@ class Sequential(Environment):
 
         super().remove_demon(demon_names)
 
-    def add_plans(self, interaction_plans: Dict[str, Any]) -> None:
+    def add_plans(self, interaction_plans: dict[str, Any]) -> None:
         for seq in interaction_plans.values():
             for protocol in seq:
                 self.assert_protocol(protocol)
@@ -155,12 +151,12 @@ class Sequential(Environment):
             self.register_protocol(protocol, get_agent_observer=True)
 
     # @property
-    # def interaction_sequence(self) -> Tuple[InteractionProtocol, ...]:
+    # def interaction_sequence(self) -> tuple[InteractionProtocol, ...]:
     #     return self._interaction_sequence
 
     # @interaction_sequence.setter
     # def interaction_sequence(
-    #         self, seq: Tuple[InteractionProtocol, ...]) -> None:
+    #         self, seq: tuple[InteractionProtocol, ...]) -> None:
     #     self._agent_observers = {}
     #     for protocol in seq:
     #         self.assert_protocol(protocol)
@@ -366,7 +362,7 @@ class Sequential(Environment):
             self,
             unstack: bool = True,
             reset_history: bool = True,
-    ) -> Dict[Tuple[str, str], pd.DataFrame]:
+    ) -> dict[tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
         Parameters

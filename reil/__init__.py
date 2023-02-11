@@ -46,7 +46,7 @@ legacy
 import logging
 import random
 from contextlib import contextmanager
-from typing import Literal, Optional, Tuple
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -59,10 +59,10 @@ del get_versions
 
 FILE_FORMAT: Literal['pbz2', 'pkl'] = 'pkl'
 
-RandomGeneratorsType = Tuple[
+RandomGeneratorsType = tuple[
     random.Random, np.random.Generator, tf.random.Generator]
 
-RANDOM_SEED: Optional[int] = None
+RANDOM_SEED: int | None = None
 RANDOM_GENERATOR: random.Random = random.Random()
 RANDOM_GENERATOR_NP: np.random.Generator = np.random.default_rng()
 RANDOM_GENERATOR_TF: tf.random.Generator = tf.random.get_global_generator()
@@ -81,7 +81,7 @@ def random_generator_tf():
 
 
 def random_generators_from_seed(
-        seed: Optional[int] = None) -> RandomGeneratorsType:
+        seed: int | None = None) -> RandomGeneratorsType:
     if seed is None:
         return (RANDOM_GENERATOR, RANDOM_GENERATOR_NP, RANDOM_GENERATOR_TF)
 
@@ -93,7 +93,7 @@ def random_generators_from_seed(
     return random_gen, random_gen_np, random_gen_tf
 
 
-def set_reil_random_seed(seed: Optional[int]):
+def set_reil_random_seed(seed: int | None):
     global RANDOM_SEED
     global RANDOM_GENERATOR
     global RANDOM_GENERATOR_NP
@@ -112,9 +112,9 @@ def set_reil_random_seed(seed: Optional[int]):
 
 @contextmanager
 def random_generator_context(
-        gen: Optional[random.Random] = None,
-        gen_np: Optional[np.random.Generator] = None,
-        gen_tf: Optional[tf.random.Generator] = None):
+        gen: random.Random | None = None,
+        gen_np: np.random.Generator | None = None,
+        gen_tf: tf.random.Generator | None = None):
     global RANDOM_GENERATOR
     global RANDOM_GENERATOR_NP
     global RANDOM_GENERATOR_TF

@@ -6,10 +6,8 @@ VanillaExperienceReplay class
 A `Buffer` with random pick that picks only if it is full.
 '''
 
-from typing import Dict, List, Optional, Tuple, Union
-
-from reil.datatypes.buffers.circular_buffer import CircularBuffer
 from reil.datatypes.buffers.buffer import T1, T2, PickModes
+from reil.datatypes.buffers.circular_buffer import CircularBuffer
 
 
 class VanillaExperienceReplay(CircularBuffer[T1, T2]):
@@ -21,9 +19,9 @@ class VanillaExperienceReplay(CircularBuffer[T1, T2]):
 
     def __init__(
             self,
-            buffer_size: Optional[int] = None,
-            batch_size: Optional[int] = None,
-            buffer_names: Optional[List[str]] = None,
+            buffer_size: int | None = None,
+            batch_size: int | None = None,
+            buffer_names: list[str] | None = None,
             clear_buffer: bool = False) -> None:
         '''
         Initialize the buffer.
@@ -54,11 +52,11 @@ class VanillaExperienceReplay(CircularBuffer[T1, T2]):
             buffer_names=buffer_names, clear_buffer=clear_buffer)
 
     def setup(
-            self, buffer_size: Optional[int] = None,
-            buffer_names: Optional[List[str]] = None,
-            pick_mode: Optional[PickModes] = None,
-            clear_buffer: Optional[bool] = None,
-            batch_size: Optional[int] = None) -> None:
+            self, buffer_size: int | None = None,
+            buffer_names: list[str] | None = None,
+            pick_mode: PickModes | None = None,
+            clear_buffer: bool | None = None,
+            batch_size: int | None = None) -> None:
         '''
         Set up the buffer.
 
@@ -110,10 +108,8 @@ class VanillaExperienceReplay(CircularBuffer[T1, T2]):
         self._clear_buffer = clear_buffer
 
     def pick(
-        self,
-        count: Optional[int] = None,
-        mode: Optional[PickModes] = None
-    ) -> Dict[str, Union[Tuple[T1, ...], Tuple[T2, ...]]]:
+        self, count: int | None = None, mode: PickModes | None = None
+    ) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
         '''
         Return items from the buffer.
 

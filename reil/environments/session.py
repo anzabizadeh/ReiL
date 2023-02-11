@@ -3,7 +3,7 @@
 import multiprocessing
 import pathlib
 from multiprocessing.context import BaseContext
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from reil.agents.agent import Agent
 from reil.agents.agent_demon import AgentDemon
@@ -17,24 +17,22 @@ from reil.subjects.subject_demon import SubjectDemon
 
 class Session:
     def __init__(
-            self, name: str, path: Union[pathlib.PurePath, str],
+            self, name: str, path: pathlib.PurePath | str,
             main_task: Task,
-            agents: Dict[str, Union[Agent[Any, Any], str]],
-            subjects: Dict[str, Union[Subject, str]],
-            plans: Dict[str, Any],
-            demons: Optional[Dict[
-                str, Union[AgentDemon, SubjectDemon, str]]] = None,
-            tasks_before: Optional[List[Task]] = None,
-            tasks_after: Optional[List[Task]] = None,
-            tasks_before_iteration: Optional[List[Task]] = None,
-            tasks_after_iteration: Optional[List[Task]] = None,
-            separate_process: Optional[List[Literal[
+            agents: dict[str, Agent[Any, Any] | str],
+            subjects: dict[str, Subject | str],
+            plans: dict[str, Any],
+            demons: dict[str, AgentDemon | SubjectDemon | str] | None = None,
+            tasks_before: list[Task] | None = None,
+            tasks_after: list[Task] | None = None,
+            tasks_before_iteration: list[Task] | None = None,
+            tasks_after_iteration: list[Task] | None = None,
+            separate_process: list[Literal[
                 'tasks_before',
                 'tasks_after',
                 'tasks_before_iteration',
-                'tasks_after_iteration']]] = None,
-            process_type: Optional[Literal[
-                'spawn', 'fork', 'forkserver']] = None):
+                'tasks_after_iteration']] | None = None,
+            process_type: Literal['spawn', 'fork', 'forkserver'] | None = None):
 
         self._environment = Single(
             name=name, path=pathlib.PurePath(path),
@@ -57,10 +55,10 @@ class Session:
 
     @staticmethod
     def _run_tasks(
-            task_list: Optional[List[Task]],
+            task_list: list[Task] | None,
             environment: Single,
             iteration: int, separate_process: bool,
-            context: Optional[BaseContext] = None):
+            context: BaseContext | None = None):
         path = environment._path / environment._name
         p = None
         if task_list:

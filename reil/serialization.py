@@ -6,7 +6,7 @@ import logging
 import sys
 import time
 from pathlib import Path, PurePath
-from typing import Any, Callable, Dict, List, Protocol, Union
+from typing import Any, Callable, Protocol
 
 import dill as pickle
 
@@ -38,21 +38,13 @@ class CustomUnPickler(pickle.Unpickler):
 class LowLevelPickler(Protocol):
     ext: str
 
-    def dump(
-            self, obj: Any, filename: str,
-            path: Union[str, PurePath]) -> PurePath:
+    def dump(self, obj: Any, filename: str, path: str | PurePath) -> PurePath:
         raise NotImplementedError
 
-    def load(
-            self, filename: str,
-            path: Union[str, PurePath]) -> Any:
+    def load(self, filename: str, path: str | PurePath) -> Any:
         raise NotImplementedError
 
-    def resolve_path(
-            self,
-            filename: str,
-            path: Union[str, PurePath]
-    ) -> PurePath:
+    def resolve_path(self, filename: str, path: str | PurePath) -> PurePath:
         _filename = (
             filename if filename.endswith(self.ext)
             else f'{filename}.{self.ext}')
@@ -111,18 +103,13 @@ class DefaultPickler(LowLevelPickler):
         if err:
             raise err
 
-    def dump(
-        self, obj: Any,
-        filename: str, path: Union[str, PurePath]
-    ) -> PurePath:
+    def dump(self, obj: Any, filename: str, path: str | PurePath) -> PurePath:
         return self._dump(
             obj=obj,
             full_path=self.resolve_path(filename, path),
             file_fn=open, mode='wb+')
 
-    def load(
-            self, filename: str,
-            path: Union[str, PurePath]) -> Any:
+    def load(self, filename: str, path: str | PurePath) -> Any:
         return self._load(
             full_path=self.resolve_path(filename, path),
             file_fn=open, mode='rb')
@@ -131,17 +118,12 @@ class DefaultPickler(LowLevelPickler):
 class ZippedPickler(DefaultPickler):
     ext: str = 'pbz2'
 
-    def dump(
-        self, obj: Any,
-        filename: str, path: Union[str, PurePath]
-    ) -> PurePath:
+    def dump(self, obj: Any, filename: str, path: str | PurePath) -> PurePath:
         return self._dump(
             obj=obj, full_path=self.resolve_path(filename, path),
             file_fn=bz2.BZ2File, mode='w')
 
-    def load(
-            self, filename: str,
-            path: Union[str, PurePath]) -> Any:
+    def load(self, filename: str, path: str | PurePath) -> Any:
         return self._load(
             full_path=self.resolve_path(filename, path),
             file_fn=bz2.BZ2File, mode='r')
@@ -150,7 +132,7 @@ class ZippedPickler(DefaultPickler):
 class PicklerManager:
     def __init__(
             self,
-            low_level_picklers: List[LowLevelPickler]) -> None:
+            low_level_picklers: list[LowLevelPickler]) -> None:
         self._low_level_picklers = {p.ext: p for p in low_level_picklers}
 
     def get(self, ext: str) -> LowLevelPickler:
@@ -188,7 +170,7 @@ def serialize(obj: Any):
             f'{obj.__class__.__qualname__}')
 
 
-def deserialize(object_info: Dict[str, Any]):
+def deserialize(object_info: dict[str, Any]):
     # The commented section only goes one layer down which might not be enough.
     # So, better not rely on it, and implement per class instead!
     # for key, value in object_info.items():

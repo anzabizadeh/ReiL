@@ -53,9 +53,9 @@ class IWPC(dp.DosingProtocol):
         self.reset()
 
     def prescribe(self,
-                  patient: Dict[str, Any],
+                  patient: dict[str, Any],
                   additional_info:  dp.AdditionalInfo
-                  ) -> Tuple[dp.DosingDecision, dp.AdditionalInfo]:
+                  ) -> tuple[dp.DosingDecision, dp.AdditionalInfo]:
         day = patient['day']
 
         if self._method is self.loading_dose:
@@ -78,7 +78,7 @@ class IWPC(dp.DosingProtocol):
         return dosing_decision, additional_info
 
     @staticmethod
-    def clinical(patient: Dict[str, Any]) -> float:
+    def clinical(patient: dict[str, Any]) -> float:
         '''
         Determine warfarin dose using clinical IWPC formula.
 
@@ -124,7 +124,7 @@ class IWPC(dp.DosingProtocol):
         return weekly_dose / 7.0
 
     @staticmethod
-    def pharmacogenetic(patient: Dict[str, Any]) -> float:
+    def pharmacogenetic(patient: dict[str, Any]) -> float:
         '''
         Determine warfarin dose using pharmacogenetic IWPC formula.
 
@@ -195,7 +195,7 @@ class IWPC(dp.DosingProtocol):
         return weekly_dose / 7.0
 
     @staticmethod
-    def modified_pharmacogenetic(patient: Dict[str, Any]) -> float:
+    def modified_pharmacogenetic(patient: dict[str, Any]) -> float:
         '''
         Determine warfarin dose using the modified pharmacogenetic IWPC
         formula.
@@ -249,7 +249,7 @@ class IWPC(dp.DosingProtocol):
         return weekly_dose / 7.0
 
     @staticmethod
-    def loading_dose(patient: Dict[str, Any]) -> Tuple[float, float, float]:
+    def loading_dose(patient: dict[str, Any]) -> tuple[float, float, float]:
         '''
         Determine warfarin dose using the modified pharmacogenetic IWPC
         formula.

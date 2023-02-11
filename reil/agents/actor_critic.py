@@ -6,7 +6,7 @@ A2C class
 An Actor-Critic Policy Gradient `agent`.
 '''
 
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
@@ -17,7 +17,7 @@ from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.learner import Learner, LearnerProtocol
 from reil.utils.exploration_strategies import NoExploration
 
-ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
+ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
 
 class A2C(Agent[FeatureSet, ACLabelType]):
@@ -28,8 +28,8 @@ class A2C(Agent[FeatureSet, ACLabelType]):
     def __init__(
             self,
             learner: LearnerProtocol[FeatureSet, ACLabelType],
-            buffer: Buffer[FeatureSet, Tuple[Tuple[int, ...], float]],
-            reward_clip: Tuple[Optional[float], Optional[float]] = (None, None),
+            buffer: Buffer[FeatureSet, tuple[tuple[int, ...], float]],
+            reward_clip: tuple[float | None, float | None] = (None, None),
             **kwargs: Any):
         '''
         Arguments
@@ -62,7 +62,7 @@ class A2C(Agent[FeatureSet, ACLabelType]):
 
     def _prepare_training(
             self, history: History) -> TrainingData[
-                FeatureSet, Tuple[Tuple[int, ...], float]]:
+                FeatureSet, tuple[tuple[int, ...], float]]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.

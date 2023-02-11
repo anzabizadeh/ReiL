@@ -9,8 +9,7 @@ on one or more `subjects`.
 import dataclasses
 import inspect
 from collections import defaultdict
-from typing import (Any, Callable, Dict, Generator, Generic, Optional, Tuple,
-                    TypeVar, Union)
+from typing import Any, Callable, Generator, Generic, TypeVar
 
 import pandas as pd
 
@@ -24,18 +23,13 @@ from reil.subjects.subject_demon import SubjectDemon
 from reil.utils.instance_generator import InstanceGenerator
 from reil.utils.instance_generator_v2 import InstanceGeneratorV2
 
-AgentSubjectTuple = Tuple[str, str]
-EntityType = Union[AgentBase, Subject]
-EntityGenType = Union[
-    InstanceGenerator[AgentBase],
-    InstanceGenerator[AgentDemon],
-    InstanceGenerator[Subject],
-    InstanceGenerator[SubjectDemon],  # type: ignore
-    InstanceGeneratorV2[AgentBase],
-    InstanceGeneratorV2[AgentDemon],
-    InstanceGeneratorV2[Subject],
-    InstanceGeneratorV2[SubjectDemon],  # type: ignore
-]
+AgentSubjectTuple = tuple[str, str]
+EntityType = AgentBase | Subject
+EntityGenType = InstanceGenerator[AgentBase] | InstanceGenerator[
+    AgentDemon] | InstanceGenerator[Subject] | InstanceGenerator[
+        SubjectDemon] | InstanceGeneratorV2[AgentBase] | InstanceGeneratorV2[  # type: ignore
+            AgentDemon] | InstanceGeneratorV2[Subject] | InstanceGeneratorV2[
+                SubjectDemon]  # type: ignore
 
 
 PlanDetails = TypeVar('PlanDetails')
@@ -43,8 +37,8 @@ PlanDetails = TypeVar('PlanDetails')
 
 @dataclasses.dataclass
 class Plan(Generic[PlanDetails]):
-    name: Optional[str] = None
-    plan: Optional[PlanDetails] = None
+    name: str | None = None
+    plan: PlanDetails | None = None
 
 
 class Environment(stateful.Stateful):
@@ -68,13 +62,10 @@ class Environment(stateful.Stateful):
 
     def __init__(
             self,
-            entity_dict: Optional[Dict[str, Union[
-                EntityType, EntityGenType, str]]] = None,
-            demon_dict: Optional[Dict[str, Union[
-                AgentDemon, SubjectDemon, str]]] = None,
-            interaction_plans: Optional[Dict[str, Any]] = None,
-            stopping_criteria: Optional[
-                Callable[[Dict[str, float], Optional[Any]], bool]] = None,
+            entity_dict: dict[str, EntityType | EntityGenType | str] | None = None,
+            demon_dict: dict[str, AgentDemon | SubjectDemon | str] | None = None,
+            interaction_plans: dict[str, Any] | None = None,
+            stopping_criteria: Callable[[dict[str, float], Any | None], bool] | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -85,20 +76,20 @@ class Environment(stateful.Stateful):
         '''
         super().__init__(**kwargs)
 
-        self._agents: Dict[str, AgentBase] = {}
-        self._subjects: Dict[str, Subject] = {}
-        self._agent_demons: Dict[str, AgentDemon] = {}
-        self._subject_demons: Dict[str, SubjectDemon] = {}
-        self._instance_generators: Dict[str, EntityGenType] = {}
-        self._assignment_list: Dict[
+        self._agents: dict[str, AgentBase] = {}
+        self._subjects: dict[str, Subject] = {}
+        self._agent_demons: dict[str, AgentDemon] = {}
+        self._subject_demons: dict[str, SubjectDemon] = {}
+        self._instance_generators: dict[str, EntityGenType] = {}
+        self._assignment_list: dict[
             AgentSubjectTuple,
-            Tuple[Union[int, None], Union[int, None]]] = \
+            tuple[int | None, int | None]] = \
             defaultdict(lambda: (None, None))
-        self._iterations: Dict[str, int] = defaultdict(int)
-        self._agent_observers: Dict[
-            Tuple[str, str],
-            Generator[Union[FeatureSet, None], Any, None]] = {}
-        self._plans: Dict[str, Any] = {}
+        self._iterations: dict[str, int] = defaultdict(int)
+        self._agent_observers: dict[
+            tuple[str, str],
+            Generator[FeatureSet | None, Any, None]] = {}
+        self._plans: dict[str, Any] = {}
         self._active_plan = Plan()
 
         self._stopping_criteria = stopping_criteria
@@ -118,8 +109,7 @@ class Environment(stateful.Stateful):
 
     def add_entities(
             self,
-            entity_dict: Dict[str, Union[
-                EntityType, EntityGenType, str]]) -> None:
+            entity_dict: dict[str, EntityType | EntityGenType | str]) -> None:
         '''
         Add `agents` and `subjects` to the environment.
 
@@ -184,7 +174,7 @@ class Environment(stateful.Stateful):
                 raise TypeError(
                     f'entity {name} is niether an agent nor a subject.')
 
-    def remove_entity(self, entity_names: Tuple[str, ...]) -> None:
+    def remove_entity(self, entity_names: tuple[str, ...]) -> None:
         '''
         Remove `agents`, `subjects`, or `instance_generators` from
         the environment.
@@ -210,8 +200,7 @@ class Environment(stateful.Stateful):
 
     def add_demons(
             self,
-            demon_dict: Dict[str, Union[
-                AgentDemon, SubjectDemon, str]]) -> None:
+            demon_dict: dict[str, AgentDemon | SubjectDemon | str]) -> None:
         '''
         Add `AgentDemon`s and `SubjectDemon`s to the environment.
 
@@ -258,7 +247,7 @@ class Environment(stateful.Stateful):
                     f'entity {name} is niether an agent demon nor '
                     'a subject demon.')
 
-    def remove_demon(self, demon_names: Tuple[str, ...]) -> None:
+    def remove_demon(self, demon_names: tuple[str, ...]) -> None:
         '''
         Remove `agent demons` or `subject demons` from
         the environment.
@@ -281,13 +270,13 @@ class Environment(stateful.Stateful):
             if name in self._subject_demons:
                 del self._subject_demons[name]
 
-    def add_plans(self, interaction_plans: Dict[str, Any]) -> None:
+    def add_plans(self, interaction_plans: dict[str, Any]) -> None:
         for name, plan in interaction_plans.items():
             if name in self._plans:
                 raise ValueError(f'plan {name} already exists.')
             self._plans[name] = plan
 
-    def remove_plans(self, plan_names: Tuple[str, ...]) -> None:
+    def remove_plans(self, plan_names: tuple[str, ...]) -> None:
         for name in plan_names:
             del self._plans[name]
 
@@ -331,8 +320,8 @@ class Environment(stateful.Stateful):
             self,
             agent_id: int,
             subject_id: int,
-            agent_observer: Generator[Union[FeatureSet, None], Any, None],
-            subject_instance: Union[Subject, SubjectDemon],
+            agent_observer: Generator[FeatureSet | None, Any, None],
+            subject_instance: Subject | SubjectDemon,
             protocol: InteractionProtocol,
             iteration: int,
             times: int = 1) -> None:
@@ -418,9 +407,8 @@ class Environment(stateful.Stateful):
             self,
             agent_id: int,
             subject_id: int,
-            agent_observer: Generator[
-                Union[FeatureSet, None], Any, None],
-            subject_instance: Union[Subject, SubjectDemon],
+            agent_observer: Generator[FeatureSet | None, Any, None],
+            subject_instance: Subject | SubjectDemon,
             protocol: InteractionProtocol,
             iteration: int) -> None:
         '''
@@ -568,7 +556,7 @@ class Environment(stateful.Stateful):
                 agent_instance.observe(s_id, a_stat)
 
     def close_agent_observer(
-            self, protocol: InteractionProtocol) -> Dict[str, float]:
+            self, protocol: InteractionProtocol) -> dict[str, float]:
         '''
         Close an `agent_observer` corresponding to `protocol`.
 
@@ -676,7 +664,7 @@ class Environment(stateful.Stateful):
             self,
             unstack: bool = True,
             reset_history: bool = True,
-    ) -> Dict[Tuple[str, str], pd.DataFrame]:
+    ) -> dict[tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
         Parameters

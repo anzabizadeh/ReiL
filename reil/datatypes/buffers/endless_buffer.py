@@ -6,9 +6,9 @@ EndlessBuffer class
 A `Buffer` without size limit.
 '''
 
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Iterator
 
-from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2
+from reil.datatypes.buffers.buffer import T1, T2, Buffer, PickModes
 
 
 class EndlessBuffer(Buffer[T1, T2]):
@@ -20,8 +20,8 @@ class EndlessBuffer(Buffer[T1, T2]):
 
     def __init__(
             self,
-            buffer_names: Optional[List[str]] = None,
-            pick_mode: Optional[PickModes] = None) -> None:
+            buffer_names: list[str] | None = None,
+            pick_mode: PickModes | None = None) -> None:
         '''
         Arguments
         ---------
@@ -36,10 +36,10 @@ class EndlessBuffer(Buffer[T1, T2]):
         self._buffer_size = -1
 
     def setup(
-            self, buffer_size: Optional[int] = None,
-            buffer_names: Optional[List[str]] = None,
-            pick_mode: Optional[PickModes] = None,
-            clear_buffer: Optional[bool] = None) -> None:
+            self, buffer_size: int | None = None,
+            buffer_names: list[str] | None = None,
+            pick_mode: PickModes | None = None,
+            clear_buffer: bool | None = None) -> None:
         '''
         Set up the buffer.
 
@@ -76,7 +76,7 @@ class EndlessBuffer(Buffer[T1, T2]):
             buffer_names=buffer_names, pick_mode=pick_mode,
             clear_buffer=clear_buffer)
 
-    def add(self, data: Dict[str, Union[T1, T2]]) -> None:
+    def add(self, data: dict[str, T1 | T2]) -> None:
         '''
         Add a new item to the buffer.
 
@@ -94,7 +94,7 @@ class EndlessBuffer(Buffer[T1, T2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def add_iter(self, iter: Iterator[Dict[str, Union[T1, T2]]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, T1 | T2]]) -> None:
         '''
         Append a new item to the buffer.
 

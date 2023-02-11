@@ -7,7 +7,7 @@ An agent for warfarin modeling based on the protocols defined
 in Ravvaz et al (2017).
 '''
 
-from typing import Any, Literal, Optional, Tuple
+from typing import Any, Literal
 
 from reil.agents.agent_base import AgentBase
 from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorType,
@@ -25,8 +25,8 @@ class WarfarinAgent(AgentBase):
     def __init__(self,
                  study_arm: Literal['aaa', 'caa', 'pgaa',
                                     'pgpgi', 'pgpga'] = 'aaa',
-                 dose_range: Tuple[float, float] = (0.0, 15.0),
-                 interval_range: Tuple[int, int] = (1, 28),
+                 dose_range: tuple[float, float] = (0.0, 15.0),
+                 interval_range: tuple[int, int] = (1, 28),
                  **kwargs: Any):
         '''
         Arguments
@@ -56,7 +56,7 @@ class WarfarinAgent(AgentBase):
             state: FeatureSet,
             subject_id: int,
             actions: FeatureGeneratorType,
-            iteration: Optional[int] = 0) -> FeatureSet:
+            iteration: int | None = 0) -> FeatureSet:
         '''
         Generate the dosing `action` based on the `state` and current dosing
         protocol.
@@ -106,7 +106,7 @@ class WarfarinAgent(AgentBase):
 # Implementation that matches RAVVAZ dataset.
 # -------------------------------------------
 #
-# def aurora(self, patient: Dict[str, Any]) -> float:
+# def aurora(self, patient: dict[str, Any]) -> float:
 #     if self._red_flag:
 #         if self._retest_day > patient['day']:
 #             return_value = 0.0
@@ -155,7 +155,7 @@ class WarfarinAgent(AgentBase):
 #     return self._dose if self._skip_dose == 0 else 0.0
 
 # def _aurora_dosing_table(self,
-#     current_INR: float, dose: float) -> Tuple[float, int, int, bool]:
+#     current_INR: float, dose: float) -> tuple[float, int, int, bool]:
 #     skip_dose = 0
 #     red_flag = False
 #     if current_INR < 1.50:
@@ -188,7 +188,7 @@ class WarfarinAgent(AgentBase):
 
 # def _aurora_retesting_table(self,
 #   current_INR: float, number_of_stable_days: int,
-#   early_therapeutic: bool = False) -> Tuple[int, int]:
+#   early_therapeutic: bool = False) -> tuple[int, int]:
 #     # next_test = {0: 1, 1: 1, 2: 5, 7: 7, 14: 14, 28: 28}
 #     # NOTE: When patient gets into the range early on
 #     #      (before the maintenance period), we have 1: 2,

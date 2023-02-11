@@ -1,5 +1,5 @@
 import operator as op
-from typing import Any, Callable, Dict, Literal, Optional, Tuple
+from typing import Any, Callable, Literal
 
 from reil.datatypes.buffers.circular_buffer import CircularBuffer
 
@@ -33,8 +33,8 @@ class StoppingCriteria:
             buffer_size=average_every, buffer_names=[monitor])
 
     def __call__(
-            self, logs: Dict[str, float],
-            weights_fn: Optional[Callable[[], Any]] = None) -> bool:
+            self, logs: dict[str, float],
+            weights_fn: Callable[[], Any] | None = None) -> bool:
         self._call_counter += 1
         if self._monitor not in logs:
             return False
@@ -64,5 +64,5 @@ class StoppingCriteria:
 
         return False
 
-    def get_best(self) -> Tuple[float, Optional[Any]]:
+    def get_best(self) -> tuple[float, Any] | None:
         return self._best, self._best_weights

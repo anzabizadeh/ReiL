@@ -1,7 +1,6 @@
 import logging
 import pathlib
 import random
-from typing import Dict, List, Optional, Union
 
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import Entity, InteractionProtocol
@@ -18,15 +17,14 @@ class Trajectory:
     def __init__(
             self,
             env_filename: str,
-            env_path: Optional[Union[pathlib.Path, str]],
-            parser: Optional[ConfigParser] = None,
-            state_dumper: Optional[FeatureSetDumper] = None,
-            agent_entity: Optional[Entity] = None,
-            subject_entity: Optional[Entity] = None,
-            demons: Optional[
-                Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
-            state_name: Optional[str] = None,
-            action_name: Optional[str] = None):
+            env_path: pathlib.Path | str | None,
+            parser: ConfigParser | None = None,
+            state_dumper: FeatureSetDumper | None = None,
+            agent_entity: Entity | None = None,
+            subject_entity: Entity | None = None,
+            demons: dict[str, AgentDemon | SubjectDemon | str] | None = None,
+            state_name: str | None = None,
+            action_name: str | None = None):
         self._parser = parser
         self._env_filename = env_filename
         self._env_path = env_path
@@ -40,17 +38,16 @@ class Trajectory:
 
     def run(  # noqa: C901
             self,
-            trajectory_subjects: Union[InstanceGenerator[Subject], str],
+            trajectory_subjects: InstanceGenerator[Subject] | str,
             iteration: int,
-            subject_list: Optional[List[str]] = None,
+            subject_list: list[str] | None = None,
             subject_save_path: str = '.',
-            state_dumper: Optional[FeatureSetDumper] = None,
-            agent_entity: Optional[Entity] = None,
-            subject_entity: Optional[Entity] = None,
-            demons: Optional[
-                Dict[str, Union[AgentDemon, SubjectDemon, str]]] = None,
-            state_name: Optional[str] = None,
-            action_name: Optional[str] = None) -> None:
+            state_dumper: FeatureSetDumper | None = None,
+            agent_entity: Entity | None = None,
+            subject_entity: Entity | None = None,
+            demons: dict[str, AgentDemon | SubjectDemon | str] | None = None,
+            state_name: str | None = None,
+            action_name: str | None = None) -> None:
 
         subjects: InstanceGenerator[Subject]
         dumper = state_dumper or self._state_dumper

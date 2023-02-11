@@ -8,9 +8,9 @@ This class is the base class to model patients with different characteristics.
 '''
 
 from copy import deepcopy
-from typing import Any, Dict, Optional
-import reil
+from typing import Any
 
+import reil
 from reil.datatypes.feature import FeatureGeneratorSet
 from reil.healthcare.mathematical_models import HealthMathModel
 from reil.serialization import deserialize, serialize
@@ -21,7 +21,7 @@ class Patient:
     Base class for patients in healthcare.
     '''
     def __init__(
-            self, model: HealthMathModel, random_seed: Optional[int] = None,
+            self, model: HealthMathModel, random_seed: int | None = None,
             **feature_values: Any) -> None:
         '''
         Parameters
@@ -50,7 +50,7 @@ class Patient:
         self._model.setup(self._rnd_generators, self.feature_set)
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]):
+    def from_config(cls, config: dict[str, Any]):
         # Created a model first to initiate the Patient. Then here replace
         # it with the loaded model.
         internal_states = config.pop('internal_states', {})
@@ -69,7 +69,7 @@ class Patient:
 
         return instance
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = dict(
             model=serialize(self._model),
             internal_states={
@@ -94,7 +94,7 @@ class Patient:
             self._model.generate(self._rnd_generators, self.feature_set))
         self._model.setup(self._rnd_generators, self.feature_set)
 
-    def model(self, **inputs: Any) -> Dict[str, Any]:
+    def model(self, **inputs: Any) -> dict[str, Any]:
         '''Model patient's behavior.
 
         Arguments

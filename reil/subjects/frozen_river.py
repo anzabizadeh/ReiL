@@ -12,7 +12,7 @@ until you reach the goal. There are holes that you should avoid.
 '''
 
 from random import choice
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureGeneratorType,
@@ -45,9 +45,9 @@ class FrozenRiver(Subject):
         reset: clears the grid.
     '''
     def __init__(
-            self, _map: Optional[List[str]] = None,
+            self, _map: list[str] | None = None,
             terminate_on_hole: bool = False,
-            max_moves: int = -1, map_size: Optional[int] = None,
+            max_moves: int = -1, map_size: int | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -92,7 +92,7 @@ class FrozenRiver(Subject):
             FeatureGenerator.discrete(
                 name='steps', lower=0, upper=3, step=1)))
 
-        self._default_actions_dict: Dict[str, FeatureSet] = {  # type: ignore
+        self._default_actions_dict: dict[str, FeatureSet] = {  # type: ignore
             action.value['move']: action  # type: ignore
             for action in self._action_gen.generate_all()
         }
@@ -142,7 +142,7 @@ class FrozenRiver(Subject):
 
         return self._action_gen_2.make_generator()
 
-    def is_terminated(self, _id: Optional[int] = None) -> bool:
+    def is_terminated(self, _id: int | None = None) -> bool:
         '''Return True if the player get to the goal or falls into a hole.'''
         temp = self._board[self._player_loc]
         return (
@@ -150,7 +150,7 @@ class FrozenRiver(Subject):
             (self._max_moves > 0 and self._move_counter >= self._max_moves))
 
     def _default_reward_definition(
-            self, _id: Optional[int] = None) -> float:
+            self, _id: int | None = None) -> float:
         if self._player_loc == self._goal:
             return 10.0
         if self._terminate_on_hole and self._board[self._player_loc] == 'H':
@@ -219,7 +219,7 @@ class FrozenRiver(Subject):
         self._previous_loc: int = 0
         self._move_counter: int = 0
 
-    def _generate_map(self) -> List[str]:
+    def _generate_map(self) -> list[str]:
         map_size: int = self._map_size  # type: ignore
         temp = ['H'] * map_size
         moves = [
@@ -242,7 +242,7 @@ class FrozenRiver(Subject):
         board_list = tuple(
             self._board[:self._player_loc] +
             ['P'] +
-            self._board[self._player_loc+1:]
+            self._board[self._player_loc + 1:]
         )
 
         return self._board_gen(board_list)
@@ -253,7 +253,7 @@ class FrozenRiver(Subject):
         loc = self._player_loc
 
         temp = ['H'] * before + self._board + ['H'] * after
-        board_list = temp[loc:loc+before+after+1]
+        board_list = temp[loc:loc + before + after + 1]
         del board_list[before]
 
         return self._board_gen(tuple(board_list))
@@ -262,7 +262,7 @@ class FrozenRiver(Subject):
         return str(
             self._board[:self._player_loc] +
             ['P'] +
-            self._board[self._player_loc+1:])
+            self._board[self._player_loc + 1:])
 
 
 if __name__ == '__main__':
