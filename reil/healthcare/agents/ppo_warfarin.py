@@ -1,7 +1,8 @@
-from typing import Any, Callable, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 import numpy as np
 import tensorflow as tf
+from tensorflow import Tensor
 
 from reil.agents.agent import AgentBase, TrainingData
 from reil.agents.proximal_policy_optimization import PPO, PPOLearner
@@ -9,28 +10,26 @@ from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.dataclasses import History
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.utils.metrics import INRMetric, PTTRMetric
-from reil.utils.ricker_wavelet import RickerWavelet2
+from reil.utils.action_dist_modifier import ActionModifier
 
 
 class PPO4Warfarin(PPO):
     def __init__(
             self, learner: PPOLearner,
-            buffer: Buffer[FeatureSet, Tuple[Tuple[int, ...], float, float]],
-            reward_clip: Tuple[Optional[float], Optional[float]] = ...,
+            buffer: Buffer[FeatureSet, tuple[tuple[int, ...], float, float]],
+            reward_clip: tuple[float | None, float | None] = ...,
             gae_lambda: float = 1, momentum_coef: float = 0.,
-            momentum_mode: Literal['most recent', 'carry'] = 'most recent',
-            ricker_instances: Optional[List[
-                Tuple[RickerWavelet2, Callable[[tf.Tensor], tf.Tensor]]]] = None,
+            momentum_mode: Literal['most recent', 'carry'] | None = None,
+            action_modifiers: list[ActionModifier] | None = None,
             **kwargs: Any):
         super().__init__(learner, buffer, reward_clip, gae_lambda, **kwargs)
         self._metrics['PTTR'] = PTTRMetric('PTTR')
         self._metrics['INR'] = INRMetric('INR')
         self._previous_action = [
-            tf.zeros(x) for x in self._learner._model._output_lengths]
+            tf.zeros(x) for x in self._learner._model._action_per_head]
         self._momentum_coef = momentum_coef
         self._carry = momentum_mode == 'carry'
-        self._ricker_instances = ricker_instances or []
-        self._ricker_counter = tf.constant(0, dtype=tf.int32)
+        self._action_modifiers = action_modifiers or []
 
     def _update_metrics(self, **kwargs: Any) -> None:
         super()._update_metrics(**kwargs)
@@ -47,18 +46,17 @@ class PPO4Warfarin(PPO):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         training_mode = self._training_trigger != 'none'
-        logits = list(self._learner.predict((state,), training=training_mode)[0])
+        logits: list[Tensor] = list(  # type: ignore
+            self._learner.predict((state,), training=training_mode)[0])
         if training_mode:
             temp = logits
             for i, x in enumerate(self._previous_action):
-                logits[i] += self._momentum_coef * x
+                logits[i] += tf.multiply(self._momentum_coef, x)
             self._previous_action = logits if self._carry else temp
 
-            self._ricker_counter += 1
-            for i, ricker in enumerate(self._ricker_instances):
-                if ricker is not None:
-                    r = ricker[0].f(ricker[1](self._ricker_counter))
-                    logits[i] += r
+            for i, modifier in enumerate(self._action_modifiers):
+                if modifier is not None:
+                    logits[i] = modifier(logits[i])
 
         mask = list(actions.send('return mask_vector'))
         mask_index = [
@@ -91,19 +89,19 @@ class PPO4Warfarin(PPO):
 
     def reset(self) -> None:
         self._previous_action = [
-            tf.zeros(x) for x in self._learner._model._output_lengths]
+            tf.zeros(x) for x in self._learner._model._action_per_head]
         return super().reset()
 
 
 class PPO4Warfarin2Phase(PPO4Warfarin):
     def __init__(
         self, init_agent: AgentBase, switch_day: int,
-        init_state_comps: Tuple[str, ...], main_state_comps: Tuple[str, ...],
+        init_state_comps: tuple[str, ...], main_state_comps: tuple[str, ...],
         learner: PPOLearner,
-        buffer: Buffer[FeatureSet, Tuple[Tuple[int, ...], float, float]],
-        reward_clip: Tuple[Optional[float], Optional[float]] = ...,
+        buffer: Buffer[FeatureSet, tuple[tuple[int, ...], float, float]],
+        reward_clip: tuple[float | None, float | None] = ...,
         gae_lambda: float = 1, momentum_coef: float = 0,
-        momentum_mode: Literal['most recent', 'carry'] = 'most recent',
+        momentum_mode: Literal['most recent', 'carry'] | None = None,
         **kwargs: Any
     ):
         super().__init__(
