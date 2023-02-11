@@ -36,34 +36,6 @@ def _less_than_condition(j: Tensor, m: Tensor, *rest) -> Tensor:
 
 
 @keras.utils.register_keras_serializable(package='reil.learners.ppo_learner')
-class N_over_N_plus_n:
-    def __init__(self, N: int) -> None:
-        self._N: int = N
-        self._n: int = 0
-
-    @tf.function(jit_compile=JIT_COMPILE)
-    def __call__(self) -> Tensor:
-        self._n += 1
-        return tf.cast(
-            self._N / (self._N + self._n), tf.float32, name='N_over_N_plus_n')  # type: ignore
-
-    def get_config(self) -> dict[str, Any]:
-        return {'N': self._N, 'n': self._n}
-
-    def from_config(self, config: dict[str, Any]):
-        temp = N_over_N_plus_n(config.pop('N'))
-        temp._n = config.pop('n')
-
-        return temp
-
-    def __getstate__(self) -> dict[str, Any]:
-        return self.get_config()
-
-    def __setstate__(self, config: dict[str, Any]) -> 'N_over_N_plus_n':
-        return self.from_config(config)
-
-
-@keras.utils.register_keras_serializable(package='reil.learners.ppo_learner')
 class PPOModel(TF2UtilsMixin):
     def __init__(
             self,
@@ -271,9 +243,9 @@ class PPOModel(TF2UtilsMixin):
 
         trainable_vars = self.actor.trainable_variables
 
-        total_loss = zero_float32
         actor_loss = entropy_loss = regularizer_loss = kl = zero_float32
         for _ in tf.range(self._actor_train_iterations):
+            total_loss = zero_float32
             with tf.GradientTape() as tape:
                 logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
                 for j in tf.range(head_count):
@@ -612,9 +584,9 @@ class PPONeighborEffect(PPOModel):
 
         trainable_vars = self.actor.trainable_variables
 
-        total_loss = zero_float32
         actor_loss = entropy_loss = regularizer_loss = kl = zero_float32
         for _ in tf.range(self._actor_train_iterations):
+            total_loss = zero_float32
             with tf.GradientTape() as tape:
                 logits_concat = tf.concat(
                     self.actor(x), axis=1, name='all_logits')
