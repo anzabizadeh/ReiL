@@ -9,24 +9,27 @@ segment with softmax outputs, and a critic output.
 
 import datetime
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras.optimizers.schedules as k_sch
 import tensorflow_probability as tfp
+
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.utils.tf_utils import (ActionRank, MeanMetric,
                                  SparseCategoricalAccuracyMetric,
                                  TF2UtilsMixin)
-from tensorflow import keras
 
-ACLabelType = Tuple[Tuple[Tuple[int, ...], ...], float]
+keras = tf.keras
+from keras.optimizers.schedules.learning_rate_schedule import (  # noqa: E402
+    LearningRateSchedule, deserialize, serialize)
+
+ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
 huber_loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
 
-eps = np.finfo(np.float32).eps.item()
+eps = tf.constant(np.finfo(np.float32).eps.item(), dtype=tf.float32)
 
 
 @keras.utils.register_keras_serializable(
@@ -34,12 +37,11 @@ eps = np.finfo(np.float32).eps.item()
 class DeepA2CModel(keras.Model):
     def __init__(
         self,
-        output_lengths: Tuple[int, ...],
-        learning_rate: Union[
-            float, k_sch.LearningRateSchedule],
-        shared_layer_sizes: Tuple[int, ...],
-        actor_layer_sizes: Tuple[int, ...] = (),
-        critic_layer_sizes: Tuple[int, ...] = (),
+        output_lengths: tuple[int, ...],
+        learning_rate: float | LearningRateSchedule,
+        shared_layer_sizes: tuple[int, ...],
+        actor_layer_sizes: tuple[int, ...] = (),
+        critic_layer_sizes: tuple[int, ...] = (),
         critic_loss_coef: float = 1.0,
         entropy_loss_coef: float = 0.0,
     ):
@@ -62,7 +64,7 @@ class DeepA2CModel(keras.Model):
         self._action_rank = ActionRank('action_rank')
         self._return = MeanMetric('return', dtype=tf.float32)
 
-    def build(self, input_shape: Tuple[int, ...]):
+    def build(self, input_shape: tuple[int, ...]):
         self._input_shape = [None, *input_shape[1:]]
 
         self._shared = TF2UtilsMixin.mpl_layers(
@@ -79,8 +81,8 @@ class DeepA2CModel(keras.Model):
         self.compile(optimizer=keras.optimizers.Adam(
             learning_rate=self._learning_rate))  # type: ignore
 
-    def get_config(self) -> Dict[str, Any]:
-        config: Dict[str, Any] = dict(
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = dict(
             output_lengths=self._output_lengths,
             shared_layer_sizes=self._shared_layer_sizes,
             actor_layer_sizes=self._actor_layer_sizes,
@@ -90,9 +92,9 @@ class DeepA2CModel(keras.Model):
             learning_rate=self._learning_rate)
 
         if isinstance(
-                self._learning_rate, k_sch.LearningRateSchedule):
+                self._learning_rate, LearningRateSchedule):
             config.update(
-                {'learning_rate': k_sch.serialize(self._learning_rate)})
+                {'learning_rate': serialize(self._learning_rate)})
 
         return config
 
@@ -100,7 +102,7 @@ class DeepA2CModel(keras.Model):
     def from_config(cls, config, custom_objects=None):
         if 'learning_rate' in config:
             if isinstance(config['learning_rate'], dict):
-                config['learning_rate'] = k_sch.deserialize(
+                config['learning_rate'] = deserialize(
                     config['learning_rate'], custom_objects=custom_objects)
         return cls(**config)
 
@@ -114,7 +116,7 @@ class DeepA2CModel(keras.Model):
     #         tf.TensorSpec(shape=[None, None]), tf.TensorSpec(shape=[])))
     def call(
         self, inputs: tf.Tensor, training=None
-    ) -> Tuple[List[tf.Tensor], List[tf.Tensor]]:
+    ) -> tuple[list[tf.Tensor], list[tf.Tensor]]:
         x = inputs
         x.set_shape(self._input_shape)
         for layer in self._shared:
@@ -125,13 +127,13 @@ class DeepA2CModel(keras.Model):
         for layer in self._actor_layers:
             x_actor = layer(x_actor, training=training)
 
-        action_probs: List[tf.Tensor] = [
+        action_probs: list[tf.Tensor] = [
             layer(x_actor) for layer in self._actor_outputs]  # type: ignore
 
         for layer in self._critic_layers:
             x_critic = layer(x_critic, training=training)
 
-        values: List[tf.Tensor] = self._critic_output(x_critic)  # type: ignore
+        values: list[tf.Tensor] = self._critic_output(x_critic)  # type: ignore
 
         return action_probs, values
 
@@ -157,7 +159,7 @@ class DeepA2CModel(keras.Model):
         with tf.GradientTape() as tape:
             action_probs, values = self(x, training=True)  # type: ignore
             logits_concat = tf.math.log(
-                tf.concat(action_probs, axis=1, name='all_logits') + eps)
+                tf.add(tf.concat(action_probs, axis=1, name='all_logits'), eps))
             values: tf.Tensor = tf.squeeze(values, name='values', axis=1)
 
             if self._entropy_loss_coef:
@@ -314,15 +316,15 @@ class DeepA2CModel(keras.Model):
 class DeepA2CActionProximityModel(DeepA2CModel):
     def __init__(
             self,
-            output_lengths: Tuple[int, ...],
-            learning_rate: Union[float, k_sch.LearningRateSchedule],
-            shared_layer_sizes: Tuple[int, ...],
-            actor_layer_sizes: Tuple[int, ...] = (),
-            critic_layer_sizes: Tuple[int, ...] = (),
+            output_lengths: tuple[int, ...],
+            learning_rate: float | LearningRateSchedule,
+            shared_layer_sizes: tuple[int, ...],
+            actor_layer_sizes: tuple[int, ...] = (),
+            critic_layer_sizes: tuple[int, ...] = (),
             critic_loss_coef: float = 1.,
             entropy_loss_coef: float = 0.,
-            effect_widths: Union[int, Tuple[int, ...]] = 0,
-            effect_decay_factors: Union[float, Tuple[float, ...]] = 0.,
+            effect_widths: int | tuple[int, ...] = 0,
+            effect_decay_factors: float | tuple[float, ...] = 0.,
     ):
         super().__init__(
             output_lengths=output_lengths,
@@ -363,7 +365,7 @@ class DeepA2CActionProximityModel(DeepA2CModel):
             _effect_decay_factors, name='effect_decay_factors',
             dtype=tf.float32)
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         config = super().get_config()
         config.update(dict(
             effect_widths=tuple(self._effect_widths.numpy()),
@@ -592,8 +594,8 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
     def __init__(
             self,
             model: DeepA2CModel,
-            tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
-            tensorboard_filename: Optional[str] = None,
+            tensorboard_path: str | pathlib.PurePath | None = None,
+            tensorboard_filename: str | None = None,
             **kwargs: Any) -> None:
         '''
         Arguments
@@ -609,7 +611,7 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
 
         self._iteration = 0
 
-        self._tensorboard_path: Optional[pathlib.PurePath] = None
+        self._tensorboard_path: pathlib.PurePath | None = None
         if (tensorboard_path or tensorboard_filename) is not None:
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             self._tensorboard_path = pathlib.PurePath(
@@ -621,8 +623,8 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
                     str(self._tensorboard_path / self._tensorboard_filename))
 
     def predict(
-            self, X: Tuple[FeatureSet, ...], training: Optional[bool] = None
-    ) -> Tuple[ACLabelType, ...]:
+            self, X: tuple[FeatureSet, ...], training: bool | None = None
+    ) -> tuple[ACLabelType, ...]:
         '''
         predict `y` for a given input list `X`.
 
@@ -643,8 +645,8 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
             self.convert_to_tensor(X), training=training)
 
     def learn(
-            self, X: Tuple[FeatureSet, ...],
-            Y: Tuple[ACLabelType, ...]) -> Dict[str, float]:
+            self, X: tuple[FeatureSet, ...],
+            Y: tuple[ACLabelType, ...]) -> dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -688,7 +690,7 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
 
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         super().__setstate__(state)
 
         if self._tensorboard_path:
