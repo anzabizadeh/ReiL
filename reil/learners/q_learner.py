@@ -7,24 +7,27 @@ The Dense learner.
 '''
 import datetime
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import tensorflow as tf
-import tensorflow.keras.optimizers.schedules as k_sch
+
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.utils.tf_utils import (ArgMaxLayer, BroadcastAndConcatLayer,
                                  MaxLayer, TF2UtilsMixin)
-from tensorflow import keras
+
+keras = tf.keras
+
+from keras.optimizers.schedules.learning_rate_schedule import (  # noqa: E402
+    LearningRateSchedule, deserialize, serialize)
 
 
 class DeepQModel(keras.Model):
     def __init__(
             self,
-            learning_rate: Union[
-                float, keras.optimizers.schedules.LearningRateSchedule],
+            learning_rate: float | LearningRateSchedule,
             validation_split: float = 0.0,
-            hidden_layer_sizes: Tuple[int, ...] = (1,)):
+            hidden_layer_sizes: tuple[int, ...] = (1,)):
         super().__init__()
 
         if not 0.0 <= validation_split < 1.0:
@@ -37,7 +40,7 @@ class DeepQModel(keras.Model):
         self._max_layer = MaxLayer(name='max')
         self._argmax_layer = ArgMaxLayer(name='argmax')
 
-    def build(self, input_shape: Tuple[Tuple[int, ...], Tuple[int, ...]]):
+    def build(self, input_shape: tuple[tuple[int, ...], tuple[int, ...]]):
         self._state_shape = [None, *input_shape[0][1:]]
         self._action_shape = [None, *input_shape[1][1:]]
 
@@ -111,15 +114,15 @@ class DeepQModel(keras.Model):
                 validation_steps, validation_batch_size, validation_freq,
                 max_queue_size, workers, use_multiprocessing)
 
-    def get_config(self) -> Dict[str, Any]:
-        config: Dict[str, Any] = dict(
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = dict(
             validation_split=self._validation_split,
             hidden_layer_sizes=self._hidden_layer_sizes)
 
         if isinstance(
-                self._learning_rate, k_sch.LearningRateSchedule):
+                self._learning_rate, LearningRateSchedule):
             config.update(
-                {'learning_rate': k_sch.serialize(self._learning_rate)})
+                {'learning_rate': serialize(self._learning_rate)})
         else:
             config['learning_rate'] = self._learning_rate
 
@@ -129,13 +132,13 @@ class DeepQModel(keras.Model):
     def from_config(cls, config, custom_objects=None):
         if 'learning_rate' in config:
             if isinstance(config['learning_rate'], dict):
-                config['learning_rate'] = k_sch.deserialize(
+                config['learning_rate'] = deserialize(
                     config['learning_rate'], custom_objects=custom_objects)
 
         return cls(**config)
 
 
-class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
+class QLearner(TF2UtilsMixin, Learner[tuple[FeatureSet, ...], float]):
     '''
     The Dense learner for Q learning.
 
@@ -146,8 +149,8 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
     def __init__(
             self,
             model: DeepQModel,
-            tensorboard_path: Optional[Union[str, pathlib.PurePath]] = None,
-            tensorboard_filename: Optional[str] = None,
+            tensorboard_path: str | pathlib.PurePath | None = None,
+            tensorboard_filename: str | None = None,
             **kwargs: Any) -> None:
         '''
         Arguments
@@ -186,8 +189,8 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
 
         self._model = model
 
-        self._callbacks: List[Any] = []
-        self._tensorboard_path: Optional[pathlib.PurePath] = None
+        self._callbacks: list[Any] = []
+        self._tensorboard_path: pathlib.PurePath | None = None
         self._tensorboard_filename = tensorboard_filename
         if (tensorboard_path or tensorboard_filename) is not None:
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -204,8 +207,8 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
         return cls(keras.Model())  # type: ignore
 
     def argmax(
-            self, states: Tuple[FeatureSet, ...],
-            actions: Tuple[FeatureSet, ...]) -> Tuple[FeatureSet, FeatureSet]:
+            self, states: tuple[FeatureSet, ...],
+            actions: tuple[FeatureSet, ...]) -> tuple[FeatureSet, FeatureSet]:
         _X = [self.convert_to_tensor(states), self.convert_to_tensor(actions)]
 
         index = self._model.argmax(_X).numpy()[0]  # type: ignore
@@ -222,21 +225,21 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
         return state, action
 
     def max(
-            self, states: Tuple[FeatureSet, ...],
-            actions: Tuple[FeatureSet, ...]) -> float:
+            self, states: tuple[FeatureSet, ...],
+            actions: tuple[FeatureSet, ...]) -> float:
         inputs = [
             self.convert_to_tensor(states), self.convert_to_tensor(actions)]
         return self._model.max(inputs)  # type: ignore
 
     def predict(
-            self, X: Tuple[Tuple[FeatureSet, ...], ...],
-            training: Optional[bool] = None) -> Tuple[float, ...]:
+            self, X: tuple[tuple[FeatureSet, ...], ...],
+            training: bool | None = None) -> tuple[float, ...]:
         return self._model(  # type: ignore
             [self.convert_to_tensor(x) for x in X])
 
     def learn(
-            self, X: Tuple[Tuple[FeatureSet, ...], ...],
-            Y: Tuple[float, ...]) -> Dict[str, float]:
+            self, X: tuple[tuple[FeatureSet, ...], ...],
+            Y: tuple[float, ...]) -> dict[str, float]:
         '''
         Learn using the training set `X` and `Y`.
 
@@ -282,7 +285,7 @@ class QLearner(TF2UtilsMixin, Learner[Tuple[FeatureSet, ...], float]):
 
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         super().__setstate__(state)
 
         if self._tensorboard_path:
