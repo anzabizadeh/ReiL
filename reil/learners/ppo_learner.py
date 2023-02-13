@@ -249,7 +249,7 @@ class PPOModel(TF2UtilsMixin):
             with tf.GradientTape() as tape:
                 logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
                 for j in tf.range(head_count):
-                    new_logprobs = self._logprobs_j(
+                    new_logprobs_j = self._logprobs_j(
                         j, logits_concat, starts, ends, action_indices,
                         self._action_per_head, False)
                     # new_logprobs = self.logprobs(
@@ -258,10 +258,10 @@ class PPOModel(TF2UtilsMixin):
                     #     tf.gather(self._action_per_head, j))
 
                     actor_loss = self._compute_actor_loss(
-                        initial_logprobs, new_logprobs, _advantage, j)
+                        initial_logprobs, new_logprobs_j, _advantage, j)
 
                     if tf.cast(self._entropy_loss_coef, tf.bool):
-                        entropy_loss = entropy(new_logprobs)
+                        entropy_loss = entropy(new_logprobs_j)
                         entropy_loss.set_shape([])
                         # entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
                         #     new_logprobs * tf.math.exp(new_logprobs))
@@ -538,8 +538,7 @@ class PPONeighborEffect(PPOModel):
     @tf.function(
         input_signature=(
             TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
-            TensorSpec(shape=[None, None],
-                          dtype=tf.int32, name='action_indices'),
+            TensorSpec(shape=[None, None], dtype=tf.int32, name='action_indices'),
             TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
         ),
         jit_compile=False
@@ -622,7 +621,6 @@ class PPONeighborEffect(PPOModel):
                     else:
                         for diff in tf.range(
                                 tf.negative(effect_width), effect_width):
-                                # tf.reduce_sum(effect_width, 1)):
                             temp = tf.add(y_slice, diff, name='y_plus_diff')
                             action_in_head_j = tf.dynamic_partition(  # type: ignore
                                 action_per_head, j_one_hot, 2, name='action_in_head_j'
@@ -665,7 +663,7 @@ class PPONeighborEffect(PPOModel):
                             if self._clip_ratio is None:
                                 _loss = -tf.reduce_mean(
                                     tf.multiply(ratio, advantage_in_range),
-                                    name=f'actor_loss_head_j')
+                                    name='actor_loss_head_j')
                             else:
                                 clipped_ratio = tf.clip_by_value(
                                     ratio,
@@ -679,7 +677,7 @@ class PPONeighborEffect(PPOModel):
                                             name='ratio_times_adv_in_range'),
                                         tf.multiply(clipped_ratio, advantage_in_range,
                                                     name='clipped_ratio_times_adv_in_range')),
-                                    name=f'actor_loss_clipped_head_j')
+                                    name='actor_loss_clipped_head_j')
 
                             actor_loss = tf.add_n(
                                 [actor_loss, tf.multiply(effect, _loss)],
@@ -798,6 +796,12 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         metrics = self._model.train_step(
             (_X, (action_index, returns, advantage)))
 
+        if self._iteration % 100 == 0:
+            metrics['last_layer_w'] = tf.concat([
+                self._model.actor.layers[-1].weights[0],
+                tf.expand_dims(self._model.actor.layers[-1].weights[1], axis=0)
+            ], axis=0, name='actor_weights')
+
         self._iteration += 1
 
         return metrics  # type: ignore
@@ -809,3 +813,6 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
     def set_parameters(self, parameters: Any):
         self._model.actor.set_weights(parameters[0])
         self._model.critic.set_weights(parameters[1])
+
+    def reset(self) -> None:
+        pass

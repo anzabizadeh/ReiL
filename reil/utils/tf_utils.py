@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Type
 
 import tensorflow as tf
-from tensorflow import Tensor, TensorSpec
+from tensorflow import Tensor, TensorShape, TensorSpec
 
 from reil import reilbase
 from reil.datatypes.feature import FeatureSet
@@ -61,8 +61,6 @@ def entropy(logits: Tensor) -> Tensor:
 def logprobs(logits: Tensor, indices: Tensor, index_count: Tensor) -> Tensor:
     return -tf.nn.softmax_cross_entropy_with_logits(  # type: ignore
         tf.one_hot(indices, index_count), logits, name='logprobs')
-        # tf.one_hot(tf.squeeze(action_indices), action_count),
-        # tf.squeeze(logits))
 
 
 class SerializeTF:
@@ -97,7 +95,7 @@ class SerializeTF:
             path.rmdir()
         except (AttributeError, TypeError):  # model not compiled.
             cls = self.cls or keras.models.Model
-            model = cls.from_config(data)
+            model = cls.from_config(data)  # type: ignore
 
         return model  # type: ignore
 
@@ -438,7 +436,7 @@ class MetricSerializerMixin:
     package='reil.utils.tf_utils')
 class ActionRank(MetricSerializerMixin, keras.metrics.Metric):
     def __init__(self, name='action_rank', **kwargs):
-        super().__init__(name=name, **kwargs)
+        super().__init__(name=name, **kwargs)  # type: ignore
         self.cumulative_rank = self.add_weight(
             name='cumulative_rank', initializer='zeros', dtype=tf.int64)
         self.count = self.add_weight(
@@ -485,12 +483,13 @@ class SummaryWriter:
             tensorboard_path: str | pathlib.PurePath | None = None,
             tensorboard_filename: str | None = None):
 
+        self._data_types = {}
         self._tensorboard_path: pathlib.PurePath | None = None
         if (tensorboard_path or tensorboard_filename) is not None:
             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
             self._tensorboard_path = pathlib.PurePath(
                 tensorboard_path or './logs')
-            self._tensorboard_filename = current_time + (
+            self._tensorboard_filename: str = current_time + (
                 f'-{tensorboard_filename}' or '')
             self._summary_writer = \
                 tf.summary.create_file_writer(  # type: ignore
@@ -498,28 +497,43 @@ class SummaryWriter:
         else:
             self._summary_writer = tf.summary.create_noop_writer()  # type: ignore
 
+    def set_data_types(
+            self, data_types: dict[str, Literal['scalar', 'histogram']]):
+        for k, v in data_types.items():
+            if v == 'scalar':
+                self._data_types[k] = tf.summary.scalar
+            elif v == 'histogram':
+                self._data_types[k] = tf.summary.histogram
+            else:
+                raise ValueError(f'Unsupported type: {v}.')
+
     def __getstate__(self):
         state = dict(
-            _tensorboard_filename=self._tensorboard_filename,
-            _tensorboard_path=self._tensorboard_path
+            tensorboard_filename=self._tensorboard_filename,
+            tensorboard_path=self._tensorboard_path,
+            data_types={k: v.__name__ for k, v in self._data_types.items()}
         )
 
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        self._tensorboard_filename = state['_tensorboard_filename']
-        self._tensorboard_path = state['_tensorboard_path']
+        self.__init__(
+            tensorboard_filename=state.pop('tensorboard_filename'),
+            tensorboard_path=state.pop('tensorboard_path'))
+        self.set_data_types(state.pop('data_types'))
+        # self._tensorboard_filename = state['_tensorboard_filename']
+        # self._tensorboard_path = state['_tensorboard_path']
 
-        if self._tensorboard_path:
-            self._summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                    str(
-                        self._tensorboard_path /
-                        self._tensorboard_filename))
-        else:
-            self._summary_writer = tf.summary.create_noop_writer()  # type: ignore
+        # if self._tensorboard_path:
+        #     self._summary_writer = \
+        #         tf.summary.create_file_writer(  # type: ignore
+        #             str(
+        #                 self._tensorboard_path /
+        #                 self._tensorboard_filename))
+        # else:
+        #     self._summary_writer = tf.summary.create_noop_writer()  # type: ignore
 
     def write(self, data: dict[str, float], iteration: int | None = None):
         with self._summary_writer.as_default(step=iteration):
             for name, value in data.items():
-                tf.summary.scalar(name, value)
+                self._data_types.get(name, tf.summary.scalar)(name, value)
