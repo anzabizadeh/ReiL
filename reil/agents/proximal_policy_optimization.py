@@ -67,6 +67,8 @@ class PPO(A2C):
             'advantage_mean': MeanMetric('advantage_mean', dtype=tf.float32),
             'rewards': MeanMetric('rewards', dtype=tf.float32)
         }
+        if self._summary_writer:
+            self._summary_writer.set_data_types({'last_layer_w': 'histogram'})
 
     def _prepare_training(
             self, history: History) -> TrainingData[FeatureSet, int]:
