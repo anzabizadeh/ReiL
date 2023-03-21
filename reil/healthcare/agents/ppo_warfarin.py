@@ -76,13 +76,16 @@ class PPO4Warfarin(PPO):
             permissible_action_index = [
                 int(np.argmax(lo)) for lo in masked_logits]
 
-        action_index = [
-            mask_index[i][permissible_action_index[i]]
-            for i, masked_logit in enumerate(masked_logits)
-        ]
+        if len(permissible_action_index) == 1:
+            # In the implementation of feature.byindex(), if index is one dimensional
+            # it excludes masked values. Hence, the following:
+            action_index = permissible_action_index[0]
+        else:
+            action_index = [
+                mask_index[i][permissible_action_index[i]]
+                for i, masked_logit in enumerate(masked_logits)
+            ]
 
-        if len(action_index) == 1:
-            action_index = action_index[0]
         action: FeatureSet = actions.send(f'lookup {action_index}')
 
         return action
