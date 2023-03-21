@@ -87,7 +87,10 @@ state_definitions: dict[str, DefComponents] = {
         ('INR_history', {'length': 2}),
         ('interval_history', {'length': 1})),
     'measured_dose_2': (('daily_dose_history', {'length': 2}),),
-    'day_and_last_dose': (('day', {}), ('daily_dose_history', {'length': 1}))
+    'day_and_last_dose': (('day', {}), ('daily_dose_history', {'length': 1})),
+    'day_and_last_dose_INR': (
+        ('day', {}), ('daily_dose_history', {'length': 1}),
+        ('daily_INR_history', {'length': 1}))
 }
 
 action_definition_names = [
@@ -797,6 +800,43 @@ class Warfarin(DosingSubject):
                 return self.action_gen_set.make_generator()
 
             return percent_dose, 'day_and_last_dose'
+
+        if name == 'percent_guided':
+            def percent_dose_guided(feature: FeatureSet) -> FeatureGeneratorType:
+                self.action_gen_set.unmask('dose_change_p')
+                last_dose: float = \
+                    feature['daily_dose_history'].value[-1]  # type: ignore
+                last_INR: float = \
+                    feature['daily_INR_history'].value[-1]  # type: ignore
+                min_dose, max_dose = self._dose_range
+                all_ps: tuple[float, ...] = \
+                    self.feature_gen_set['dose_change_p'].fixed_values  # type: ignore
+                permissibles = [
+                    p for p in all_ps
+                    if (min_dose <= last_dose * (1 + p) <= max_dose)
+                ]
+                if last_INR > 3.0:
+                    permissibles = [
+                        p for p in permissibles
+                        if p <= 0.0
+                    ]
+                elif last_INR < 2.0:
+                    permissibles = [
+                        p for p in permissibles
+                        if p >= 0.0
+                    ]
+                min_p = min(permissibles)
+                max_p = max(permissibles)
+                p_mask = {
+                    p: min_p if p < min_p else max_p
+                    for p in all_ps
+                    if p not in permissibles
+                }
+                self.action_gen_set.mask('dose_change_p', p_mask)
+
+                return self.action_gen_set.make_generator()
+
+            return percent_dose_guided, 'day_and_last_dose_INR'
 
     def _reward_def_reference(
         self, name: str
