@@ -551,7 +551,7 @@ class PPONeighborEffect(PPOModel):
         head_count = self._head_count
         starts = self._starts
         ends = self._ends
-        # effect_prob = self._effect_prob()
+        effect_prob = tf.less(tf.random.uniform([1]), self._effect_prob())
 
         logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
 
@@ -596,7 +596,7 @@ class PPONeighborEffect(PPOModel):
 
                     j_one_hot = tf.one_hot(j, depth=head_count, dtype=tf.int32)
                     effect_width = tf.cond(
-                        tf.less(tf.random.uniform([1]), self._effect_prob()),
+                        effect_prob,
                         lambda: tf.dynamic_partition(  # type: ignore
                             self._effect_widths, j_one_hot, 2)[1][0],
                         lambda: zero_int32
