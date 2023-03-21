@@ -7,7 +7,7 @@ Study arms in `Ravvaz et al. (2017)
 <https://doi.org/10.1161/circgenetics.117.001804>`_
 '''
 
-from typing import Any, Dict
+from typing import Any
 
 from reil.healthcare.dosing_protocols.dosing_protocol import DosingDecision
 from reil.healthcare.dosing_protocols.three_phase_dosing_protocol import \

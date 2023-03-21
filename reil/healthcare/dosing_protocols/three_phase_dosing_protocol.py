@@ -7,7 +7,7 @@ A dosing protocol class that can contain three dosing protocols for
 `initial`, `adjustment` and `maintenance` phases of dosing.
 '''
 
-from typing import Any, Dict
+from typing import Any
 
 from reil.healthcare.dosing_protocols.dosing_protocol import (
     AdditionalInfo, DosingDecision, DosingProtocol)

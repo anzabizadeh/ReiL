@@ -7,7 +7,7 @@ Aurora Dosing Protocol, based on `Ravvaz et al. (2017)
 <https://doi.org/10.1161/circgenetics.117.001804>`_
 '''
 
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import reil.healthcare.dosing_protocols.dosing_protocol as dp
 
