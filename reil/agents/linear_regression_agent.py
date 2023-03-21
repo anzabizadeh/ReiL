@@ -6,7 +6,7 @@ LRAgent class
 An agent that uses a given `scikitlearn` model, and parameter list, and
 specifies action using that.
 '''
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable
 
 from reil.agents.agent_base import AgentBase
 from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
