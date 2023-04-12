@@ -9,6 +9,7 @@ in Ravvaz et al (2017).
 
 from typing import Any, Literal
 
+from reil.healthcare.dosing_protocols.three_phase_dosing_protocol import ThreePhaseDosingProtocol
 from reil.agents.agent_base import AgentBase
 from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorType,
                                     FeatureSet)
@@ -22,12 +23,13 @@ class WarfarinAgent(AgentBase):
     based on the dosing protocols defined in Ravvaz et al (2017).
     '''
 
-    def __init__(self,
-                 study_arm: Literal['aaa', 'caa', 'pgaa',
-                                    'pgpgi', 'pgpga'] = 'aaa',
-                 dose_range: tuple[float, float] = (0.0, 15.0),
-                 interval_range: tuple[int, int] = (1, 28),
-                 **kwargs: Any):
+    def __init__(
+            self,
+            study_arm: Literal[
+                'aaa', 'caa', 'pgaa', 'pgpgi', 'pgpga'] | ThreePhaseDosingProtocol = 'aaa',
+            dose_range: tuple[float, float] = (0.0, 15.0),
+            interval_range: tuple[int, int] = (1, 28),
+            **kwargs: Any):
         '''
         Arguments
         ---------
@@ -36,16 +38,20 @@ class WarfarinAgent(AgentBase):
         '''
         super().__init__(**kwargs)
 
-        if study_arm.lower() in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
-            self._protocol = AAA()
-        elif study_arm.lower() in ['caa', 'ravvaz caa', 'ravvaz_caa']:
-            self._protocol = CAA()
-        elif study_arm.lower() in ['pgaa', 'ravvaz pgaa', 'ravvaz_pgaa']:
-            self._protocol = PGAA()
-        elif study_arm.lower() in ['pgpgi', 'ravvaz pgpgi', 'ravvaz_pgpgi']:
-            self._protocol = PGPGI()
-        elif study_arm.lower() in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
-            self._protocol = PGPGA()
+        if isinstance(study_arm, ThreePhaseDosingProtocol):
+            self._protocol = study_arm
+        else:
+            study_arm_lower = study_arm.lower()
+            if study_arm_lower in ['aaa', 'ravvaz aaa', 'ravvaz_aaa']:
+                self._protocol = AAA()
+            elif study_arm_lower in ['caa', 'ravvaz caa', 'ravvaz_caa']:
+                self._protocol = CAA()
+            elif study_arm_lower in ['pgaa', 'ravvaz pgaa', 'ravvaz_pgaa']:
+                self._protocol = PGAA()
+            elif study_arm_lower in ['pgpgi', 'ravvaz pgpgi', 'ravvaz_pgpgi']:
+                self._protocol = PGPGI()
+            elif study_arm_lower in ['pgpga', 'ravvaz pgpga', 'ravvaz_pgpga']:
+                self._protocol = PGPGA()
 
         self._dose_gen = FeatureGenerator.continuous(
             name='dose', lower=dose_range[0], upper=dose_range[1])
