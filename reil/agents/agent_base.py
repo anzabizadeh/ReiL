@@ -162,7 +162,7 @@ class AgentBase(Stateful):
                 new_observation = Observation()
                 temp: dict[str, Any] = yield
                 state: FeatureSet = temp['state']
-                actions: FeatureGeneratorType = temp['actions']
+                actions: FeatureGeneratorType = temp['possible_actions']
                 iteration: int = temp['iteration']
 
                 new_observation.state = state

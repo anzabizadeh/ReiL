@@ -13,7 +13,7 @@ IWPC warfarin dosing protocols.
 '''
 
 from math import exp
-from typing import Any, Dict, Literal, Tuple
+from typing import Any, Literal
 
 import reil.healthcare.dosing_protocols.dosing_protocol as dp
 from reil.datatypes import feature
@@ -69,7 +69,7 @@ class IWPC(dp.DosingProtocol):
                     'loading_dose method is only available for '
                     'days 1, 2, and 3.')
 
-            dosing_decision = dp.DosingDecision(doses[day-1], 1)
+            dosing_decision = dp.DosingDecision(doses[day - 1], 1)
         else:
             dosing_decision = dp.DosingDecision(
                 self._method(patient))  # type: ignore
@@ -111,15 +111,16 @@ class IWPC(dp.DosingProtocol):
         amiodarone = patient.get('amiodarone') == 'Yes'
         enzyme_inducer = patient.get('enzyme_inducer') == 'Yes'
 
-        weekly_dose = (4.0376
-                       - 0.2546 * age_in_decades
-                       + 0.0118 * height_in_cm
-                       + 0.0134 * weight_in_kg
-                       - 0.6752 * asian
-                       + 0.4060 * african_american
-                       + 0.0443 * missing_or_mixed_race
-                       + 1.2799 * enzyme_inducer
-                       - 0.5695 * amiodarone) ** 2
+        weekly_dose = (
+            4.0376
+            - 0.2546 * age_in_decades
+            + 0.0118 * height_in_cm
+            + 0.0134 * weight_in_kg
+            - 0.6752 * asian
+            + 0.4060 * african_american
+            + 0.0443 * missing_or_mixed_race
+            + 1.2799 * enzyme_inducer
+            - 0.5695 * amiodarone) ** 2
 
         return weekly_dose / 7.0
 
@@ -173,24 +174,25 @@ class IWPC(dp.DosingProtocol):
         amiodarone = patient.get('amiodarone') == 'Yes'
         enzyme_inducer = patient.get('enzyme_inducer') == 'Yes'
 
-        weekly_dose = (5.6044
-                       - 0.2614 * age_in_decades
-                       + 0.0087 * height_in_cm
-                       + 0.0128 * weight_in_kg
-                       - 0.8677 * vkorc1_ga
-                       - 1.6974 * vkorc1_aa
-                       - 0.4854 * vkorc1_unknown
-                       - 0.5211 * cyp2c9_12
-                       - 0.9357 * cyp2c9_13
-                       - 1.0616 * cyp2c9_22
-                       - 1.9206 * cyp2c9_23
-                       - 2.3312 * cyp2c9_33
-                       - 0.2188 * cyp2c9_unknown
-                       - 0.1092 * asian
-                       - 0.2760 * african_american
-                       - 0.1032 * missing_or_mixed_race
-                       + 1.1816 * enzyme_inducer
-                       - 0.5503 * amiodarone) ** 2
+        weekly_dose = (
+            5.6044
+            - 0.2614 * age_in_decades
+            + 0.0087 * height_in_cm
+            + 0.0128 * weight_in_kg
+            - 0.8677 * vkorc1_ga
+            - 1.6974 * vkorc1_aa
+            - 0.4854 * vkorc1_unknown
+            - 0.5211 * cyp2c9_12
+            - 0.9357 * cyp2c9_13
+            - 1.0616 * cyp2c9_22
+            - 1.9206 * cyp2c9_23
+            - 2.3312 * cyp2c9_33
+            - 0.2188 * cyp2c9_unknown
+            - 0.1092 * asian
+            - 0.2760 * african_american
+            - 0.1032 * missing_or_mixed_race
+            + 1.1816 * enzyme_inducer
+            - 0.5503 * amiodarone) ** 2
 
         return weekly_dose / 7.0
 
@@ -233,18 +235,19 @@ class IWPC(dp.DosingProtocol):
 
         amiodarone = patient.get('amiodarone') == 'Yes'
 
-        weekly_dose = (5.6044
-                       - 0.02614 * age
-                       + 0.0087 * height_in_cm
-                       + 0.0128 * weight_in_kg
-                       - 0.8677 * vkorc1_ga
-                       - 1.6974 * vkorc1_aa
-                       - 0.5211 * cyp2c9_12
-                       - 0.9357 * cyp2c9_13
-                       - 1.0616 * cyp2c9_22
-                       - 1.9206 * cyp2c9_23
-                       - 2.3312 * cyp2c9_33
-                       - 0.5503 * amiodarone) ** 2
+        weekly_dose = (
+            5.6044
+            - 0.02614 * age
+            + 0.0087 * height_in_cm
+            + 0.0128 * weight_in_kg
+            - 0.8677 * vkorc1_ga
+            - 1.6974 * vkorc1_aa
+            - 0.5211 * cyp2c9_12
+            - 0.9357 * cyp2c9_13
+            - 1.0616 * cyp2c9_22
+            - 1.9206 * cyp2c9_23
+            - 2.3312 * cyp2c9_33
+            - 0.5503 * amiodarone) ** 2
 
         return weekly_dose / 7.0
 
@@ -282,7 +285,7 @@ class IWPC(dp.DosingProtocol):
                }[cyp2c9] * 24
 
         LD3 = maintenance_dose / ((1 - exp(-k24)) *
-                                  (1 + exp(-k24) + exp(-2*k24)))
+                                  (1 + exp(-k24) + exp(-2 * k24)))
         # The following dose calculation is based on EU-PACT report page 19
         # Ravvaz uses the same formula, but uses weekly dose. However,
         # EU-PACT explicitly mentions "predicted daily dose (D)"
