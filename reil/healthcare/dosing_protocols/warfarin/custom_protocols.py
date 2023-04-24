@@ -24,7 +24,7 @@ class CustomProtocol(dp.DosingProtocol):
         Arguments
         ---------
         method:
-            One of 'pharmacogenetic', 'clinical', 'modified', 'loading_dose'.
+            ID of the trained models.
         '''
         self._method: Callable[[dict[str, Any]], float]
         if method == '123':
@@ -64,7 +64,7 @@ class CustomFullProtocol(dp.ThreePhaseDosingProtocol):
     A composite dosing protocol with modified `IWPC` in the initial phase
     (days 1, 2, and 3), and custom protocol in the rest.
     '''
-    def __init__(self, method: Literal[123]) -> None:
+    def __init__(self, method: Literal['123']) -> None:
         self._method = str(method)
         iwpc_instance = IWPC('modified')
         custom_protocol_instance = CustomProtocol(method)
