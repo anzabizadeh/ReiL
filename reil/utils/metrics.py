@@ -1,7 +1,8 @@
 from abc import abstractmethod
-from typing import Protocol
+from typing import Any, Protocol
 
 from reil.datatypes.feature import FeatureSet
+from reil.utils.reil_functions import PercentInRange, interpolate
 
 
 class MetricProtocol(Protocol):
@@ -29,25 +30,30 @@ class MetricProtocol(Protocol):
 
 
 class PTTRMetric(MetricProtocol):
-
     def __init__(self, name: str, **kwargs):
         self.name = name
         self.reset_states()
+        self.in_range_fn = PercentInRange(
+            name='PTTR', y_var_name='INR_history', x_var_name='interval_history',
+            acceptable_range=(2.0, 3.0), exclude_first=True)
 
     def update_state(self, states: tuple[FeatureSet, ...]):
-        in_range_list = [
-            2.0 <= state['INR_history'].value[-1] <= 3.0  # type: ignore
-            for state in states
-        ]
-        self.count = len(in_range_list)
-        self.in_range = sum(in_range_list)
+        self.inrs.append(states[0]['INR_history'].value[0])  # type: ignore
 
-    def result(self):
-        return self.in_range / self.count
+        for state in states:
+            s: dict[str, list[Any]] = state.value  # type: ignore
+            self.inrs.append(s['INR_history'][-1])
+            self.intervals.append(s['interval_history'][-1])
+
+        self.intervals.append(1)  # end of the trajectory
+
+    def result(self) -> float:
+        return self.in_range_fn._default_function(
+            self.inrs, self.intervals[:-1])
 
     def reset_states(self):
-        self.count: int = 0
-        self.in_range: int = 0
+        self.inrs: list[float] = []
+        self.intervals: list[int] = []
 
 
 class INRMetric(MetricProtocol):
@@ -57,16 +63,22 @@ class INRMetric(MetricProtocol):
         self.reset_states()
 
     def update_state(self, states: tuple[FeatureSet, ...]):
-        INRs: list[float] = [
-            state['INR_history'].value[-1]  # type: ignore
-            for state in states
-        ]
-        self.count += len(INRs)
-        self.INR += sum(INRs)
+        self.inrs.append(states[0]['INR_history'].value[0])  # type: ignore
 
-    def result(self):
-        return self.INR / self.count
+        for state in states:
+            s: dict[str, list[Any]] = state.value  # type: ignore
+            self.inrs.append(s['INR_history'][-1])
+            self.intervals.append(s['interval_history'][-1])
+
+        self.intervals.append(1)  # end of the trajectory
+
+    def result(self) -> float:
+        _y = self.inrs
+        _x = self.intervals[:-1]
+        return sum(sum(
+            interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x)) / sum(_x)
 
     def reset_states(self):
-        self.count: int = 0
-        self.INR = 0.0
+        self.inrs: list[float] = []
+        self.intervals: list[int] = []
