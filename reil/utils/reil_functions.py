@@ -26,6 +26,7 @@ class ReilFunction(Generic[TypeY, TypeX]):
     x_var_name: str | None = None
     length: int = -1
     multiplier: float = 1.0
+    constant: float = 0.0
     interpolate: bool = True
 
     def __post_init__(self):
@@ -42,7 +43,7 @@ class ReilFunction(Generic[TypeY, TypeX]):
         except NotImplementedError:
             result = self.multiplier * self._default_function(**fn_args)
 
-        return result
+        return result + self.constant
 
     # just for the compatibility with old saved models. Should not be used.
     def _retro_inter(self, y: list[TypeY], x: list[TypeX]) -> float:
@@ -69,6 +70,7 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
     band_width: float = 1.0
     amplifying_factor: float = 1.0
     exclude_first: bool = False
+    average: bool = False
 
     def _default_function(
             self, y: list[float], x: list[int] | None = None) -> float:
@@ -81,7 +83,7 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
 
         if not self.exclude_first:
             _x = [1] + _x
-            _y = [0.0] + y
+            _y = [0.0, *y]
         else:
             _y = y
 
@@ -92,6 +94,9 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
 
         # normalize
         result *= (2.0 / self.band_width) ** 2
+
+        if self.average:
+            result /= len_y
 
         return result
 
