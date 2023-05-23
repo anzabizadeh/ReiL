@@ -149,7 +149,7 @@ class TF2UtilsMixin(reilbase.ReilBase):
         return tf.convert_to_tensor([x.normalized.flattened for x in data])
 
     @staticmethod
-    def mpl_layers(
+    def mlp_layers(
             layer_sizes: tuple[int, ...],
             activation: str | Callable[[Tensor], Tensor] | None,
             layer_name_format: str,
@@ -166,15 +166,44 @@ class TF2UtilsMixin(reilbase.ReilBase):
             layer_sizes: tuple[int, ...],
             activation: str | Callable[[Tensor], Tensor],
             layer_name_format: str = 'layer_{i:0>2}',
-            start_index: int = 1, **kwargs):
+            start_index: int = 1, **kwargs) -> Tensor:
         '''Build a feedforward dense network.'''
-        layers = TF2UtilsMixin.mpl_layers(
-            layer_sizes[:-1], activation, layer_name_format,
+        layers = TF2UtilsMixin.mlp_layers(
+            layer_sizes, activation, layer_name_format,
             start_index, **kwargs)
         x = input_
         for layer in layers:
             x = layer(x)
-        return x
+
+        return x  # type: ignore
+
+    @staticmethod
+    def mlp_functional_w_concat(
+            input_: Tensor,
+            layer_sizes: tuple[tuple[int, ...], ...],
+            activation: str | Callable[[Tensor], Tensor],
+            layer_name_format: str = 'layer_{i:0>2}',
+            start_index: int = 1, full_backprop: bool = True, **kwargs):
+        '''Build a feedforward dense network.'''
+        layers = [
+            TF2UtilsMixin.mlp_functional(
+                input_, layer_sizes[0], activation, layer_name_format + '_01',
+                start_index, **kwargs)
+        ]
+
+        for i, layer_sizes_i in enumerate(layer_sizes[1:], 1):
+            if full_backprop:
+                temp = tf.concat([input_, layers[-1]], axis=-1)
+            else:
+                temp = tf.concat([input_, tf.stop_gradient(layers[-1])], axis=-1)
+            layers.append(
+                TF2UtilsMixin.mlp_functional(
+                    temp, layer_sizes_i,
+                    activation, layer_name_format + f'_{i:<02}',
+                    start_index + i, **kwargs)
+            )
+
+        return layers[-1]
 
     def save(
             self,
