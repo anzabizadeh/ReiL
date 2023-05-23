@@ -67,13 +67,13 @@ class DeepA2CModel(keras.Model):
     def build(self, input_shape: tuple[int, ...]):
         self._input_shape = [None, *input_shape[1:]]
 
-        self._shared = TF2UtilsMixin.mpl_layers(
+        self._shared = TF2UtilsMixin.mlp_layers(
             self._shared_layer_sizes, 'relu', 'shared_{i:0>2}')
-        self._actor_layers = TF2UtilsMixin.mpl_layers(
+        self._actor_layers = TF2UtilsMixin.mlp_layers(
             self._actor_layer_sizes, 'relu', 'actor_{i:0>2}')
-        self._critic_layers = TF2UtilsMixin.mpl_layers(
+        self._critic_layers = TF2UtilsMixin.mlp_layers(
             self._critic_layer_sizes, 'relu', 'critic_{i:0>2}')
-        self._actor_outputs = TF2UtilsMixin.mpl_layers(
+        self._actor_outputs = TF2UtilsMixin.mlp_layers(
             self._output_lengths, 'softmax', 'actor_output_{i:0>2}')
 
         self._critic_output = keras.layers.Dense(1, name='critic_output')

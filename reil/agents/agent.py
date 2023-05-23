@@ -218,7 +218,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
             The new `state` of the `subject` after taking `agent`'s action.
             Some methods
         '''
-        training_data: TrainingData[Any] = (), (), {}
+        training_data: TrainingData[Any, Any] = (), (), {}
         if history is not None:
             training_data = self._prepare_training(history)
 

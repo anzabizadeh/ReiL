@@ -111,7 +111,7 @@ class PPOModel(TF2UtilsMixin):
         input_: Tensor = keras.Input(self._input_shape)  # type: ignore
         actor_layers = TF2UtilsMixin.mlp_functional(
             input_, self._actor_layer_sizes, actor_hidden_activation, 'actor_{i:0>2}')
-        logit_heads = TF2UtilsMixin.mpl_layers(
+        logit_heads = TF2UtilsMixin.mlp_layers(
             action_per_head, actor_head_activation, 'actor_output_{i:0>2}')
         logits = tuple(output(actor_layers) for output in logit_heads)
 
