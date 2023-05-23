@@ -94,28 +94,46 @@ state_definitions: dict[str, DefComponents] = {
 }
 
 action_definition_names = [
-    '237_15', 'daily_15', 'free_15', 'semi_15', 'weekly_15', 'delta', 'percent']
+    '237_15', 'daily_15', 'free_15', 'semi_15', 'weekly_15', 'delta', 'percent', 'percent_semi']
 
 reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str]] = dict(
     sq_dist=(
         reil_functions.NormalizedSquareDistance(
             name='sq_dist', y_var_name='daily_INR_history',
             length=-1, multiplier=-1.0,  interpolate=False,
-            center=2.5, band_width=1.0, exclude_first=True),
+            center=2.5, band_width=1.0, exclude_first=False),
         'recent_daily_INR'
     ),
     sq_dist_modified=(
         reil_functions.NormalizedSquareDistance(
             name='sq_dist_modified', y_var_name='daily_INR_history',
             length=-1, multiplier=-1.0,  interpolate=False,
-            center=2.5, band_width=1.0, exclude_first=True, amplifying_factor=1.05),
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05),
+        'recent_daily_INR'
+    ),
+    sq_dist_modified_w_constant=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified_w_constant', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, constant=-100.0),
+        'recent_daily_INR'
+    ),
+    average_sq_dist_modified_w_constant=(
+        reil_functions.NormalizedSquareDistance(
+            name='average_sq_dist_modified_w_constant',
+            y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, average=True, constant=-10.0),
         'recent_daily_INR'
     ),
     dist=(
         reil_functions.NormalizedDistance(
             name='dist', y_var_name='daily_INR_history',
             length=-1, multiplier=-1.0,  interpolate=False,
-            center=2.5, band_width=1.0, exclude_first=True),
+            center=2.5, band_width=1.0, exclude_first=False),
         'recent_daily_INR'
     ),
     sq_dist_interpolation=(
@@ -837,6 +855,34 @@ class Warfarin(DosingSubject):
                 return self.action_gen_set.make_generator()
 
             return percent_dose_guided, 'day_and_last_dose_INR'
+
+        if name == 'percent_semi':
+            def percent_dose(feature: FeatureSet) -> FeatureGeneratorType:
+                self.action_gen_set.unmask('dose_change_p')
+                self.action_gen_set.unmask('interval')
+                last_dose: float = \
+                    feature['daily_dose_history'].value[-1]  # type: ignore
+                # day: int = feature['day'].value  # type: ignore
+                min_dose, max_dose = self._dose_range
+                all_ps: tuple[float, ...] = \
+                    self.feature_gen_set['dose_change_p'].fixed_values  # type: ignore
+                permissibles = [
+                    p for p in all_ps
+                    if (min_dose <= last_dose * (1 + p) <= max_dose)
+                ]
+                min_p = min(permissibles)
+                max_p = max(permissibles)
+                p_mask = {
+                    p: min_p if p < min_p else max_p
+                    for p in all_ps
+                    if p not in permissibles
+                }
+                self.action_gen_set.mask('dose_change_p', p_mask)
+                self.action_gen_set.mask('interval', int_semi_free)
+
+                return self.action_gen_set.make_generator()
+
+            return percent_dose, 'day_and_last_dose'
 
     def _reward_def_reference(
         self, name: str
