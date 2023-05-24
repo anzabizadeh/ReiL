@@ -28,7 +28,7 @@ class WarfarinAgent(AgentBase):
             study_arm: Literal[
                 'aaa', 'caa', 'pgaa', 'pgpgi', 'pgpga'] | ThreePhaseDosingProtocol = 'aaa',
             dose_range: tuple[float, float] = (0.0, 15.0),
-            interval_range: tuple[int, int] = (1, 28),
+            duration_range: tuple[int, int] = (1, 28),
             **kwargs: Any):
         '''
         Arguments
@@ -55,8 +55,8 @@ class WarfarinAgent(AgentBase):
 
         self._dose_gen = FeatureGenerator.continuous(
             name='dose', lower=dose_range[0], upper=dose_range[1])
-        self._interval_gen = FeatureGenerator.discrete(
-            name='interval', lower=interval_range[0], upper=interval_range[1])
+        self._duration_gen = FeatureGenerator.discrete(
+            name='duration', lower=duration_range[0], upper=duration_range[1])
 
     def act(self,
             state: FeatureSet,
@@ -88,15 +88,15 @@ class WarfarinAgent(AgentBase):
 
         decision = self._protocol.prescribe(patient)
         dose = decision.dose
-        interval = decision.duration
+        duration = decision.duration
 
-        if interval is None:
+        if duration is None:
             raise ValueError(f'None duration received from {self._protocol}.')
 
         return FeatureSet([
             self._dose_gen(min(dose, self._dose_gen.upper or dose)),
-            self._interval_gen(
-                min(interval, self._interval_gen.upper or interval))
+            self._duration_gen(
+                min(duration, self._duration_gen.upper or duration))
         ])
 
     def reset(self):

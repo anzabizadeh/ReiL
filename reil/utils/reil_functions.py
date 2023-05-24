@@ -157,9 +157,9 @@ class PercentInRange(ReilFunction[float, int]):
                 interpolate(_y[i], _y[i + 1], x_i))
             for i, x_i in enumerate(_x))
 
-        total_intervals = sum(_x)
+        total_durations = sum(_x)
 
-        return result / total_intervals
+        return result / total_durations
 
 
 @dataclasses.dataclass
@@ -215,39 +215,39 @@ class NotEqual(ReilFunction[float, int]):
 # class Functions:
 #     @staticmethod
 #     def dose_change_count(dose_list: list[float],
-#                           intervals: list[int] | None = None) -> int:
-#         # assuming dose is fixed during each interval
+#                           durations: list[int] | None = None) -> int:
+#         # assuming dose is fixed during each duration
 #         return sum(x != dose_list[i+1]
 #                    for i, x in enumerate(dose_list[:-1]))
 
 #     @staticmethod
 #     def delta_dose(dose_list: list[float],
-#                    intervals: list[int] | None = None) -> float:
-#         # assuming dose is fixed during each interval
+#                    durations: list[int] | None = None) -> float:
+#         # assuming dose is fixed during each duration
 #         return sum(abs(x-dose_list[i+1])
 #                    for i, x in enumerate(dose_list[:-1]))
 
 #     @staticmethod
 #     def total_dose(dose_list: list[float],
-#                    intervals: list[int] | None = None) -> float:
-#         if intervals is None:
+#                    durations: list[int] | None = None) -> float:
+#         if durations is None:
 #             result = sum(dose_list)
 #         else:
-#             if len(dose_list) != len(intervals):
+#             if len(dose_list) != len(durations):
 #                 raise ValueError(
-#                     'dose_list and intervals should '
+#                     'dose_list and durations should '
 #                     'have the same number of items.')
 
-#             result = sum(dose*interval
-#                          for dose, interval in zip(dose_list, intervals))
+#             result = sum(dose*duration
+#                          for dose, duration in zip(dose_list, durations))
 
 #         return result
 
 #     @staticmethod
 #     def average_dose(dose_list: list[float],
-#                      intervals: list[int] | None = None) -> float:
-#         total_dose = Functions.total_dose(dose_list, intervals)
-#         total_interval = len(
-#             dose_list) if intervals is None else sum(intervals)
+#                      durations: list[int] | None = None) -> float:
+#         total_dose = Functions.total_dose(dose_list, durations)
+#         total_duration = len(
+#             dose_list) if durations is None else sum(durations)
 
-#         return total_dose / total_interval
+#         return total_dose / total_duration

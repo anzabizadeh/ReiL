@@ -38,14 +38,14 @@ class DummyPatients:
         return df
 
     def simulate(
-        self, dose: float = -1, interval: int = -1
+        self, dose: float = -1, duration: int = -1
     ) -> Iterator[tuple[dict[str | int, Any], float, int]]:
         for _id, info in self._patient_info.iterrows():
             patient: dict[str | int, Any] = dict(info.items())
             patient['ID'] = _id
             trajectory = self._trajectories[  # type: ignore
                 self._trajectories.ID == _id][  # type: ignore
-                ['day', 'INR', 'dose', 'interval']]
+                ['day', 'INR', 'dose', 'duration']]
             # print(f'patient: {_id}')
 
             for i in trajectory.index:  # type: ignore
@@ -55,12 +55,12 @@ class DummyPatients:
                 patient['INR_history'] = list(data.INR)  # type: ignore
                 patient['dose_history'] = list(
                     data.dose.iloc[:-1])  # type: ignore
-                patient['interval_history'] = list(
-                    data.interval.iloc[:-1])  # type: ignore
+                patient['duration_history'] = list(
+                    data.duration.iloc[:-1])  # type: ignore
 
                 yield (
                     patient,
-                    data.dose.iat[-1], data.interval.iat[-1])  # type: ignore
+                    data.dose.iat[-1], data.duration.iat[-1])  # type: ignore
 
 
 class testAurora(unittest.TestCase):
@@ -70,10 +70,10 @@ class testAurora(unittest.TestCase):
         patients = DummyPatients('./tests/data/aurora_sample_dosing.xlsx')
 
         additional_info = {}
-        dose, interval = -1, -1
+        dose, duration = -1, -1
         _id = -1
         for p, d, i in patients.simulate(
-                dose=dose, interval=interval):
+                dose=dose, duration=duration):
             if p['ID'] != _id:
                 _id = p['ID']
                 additional_info = {}
@@ -87,7 +87,7 @@ class testAurora(unittest.TestCase):
                 self.assertAlmostEqual(d, dosing_decision.dose)
                 self.assertEqual(i, dosing_decision.duration)
             except AssertionError:
-                print(d, dose, i, interval, '\n', p, '\n', additional_info)
+                print(d, dose, i, duration, '\n', p, '\n', additional_info)
                 raise
 
 

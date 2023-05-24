@@ -50,7 +50,7 @@ class Intermountain(dp.DosingProtocol):
             A dictionary of patient characteristics including:
             - day
             - dose_history
-            - interval_history (only for day 8)
+            - duration_history (only for day 8)
 
         additional_info:
             A dictionary of information being communicated between protocols,
@@ -76,11 +76,11 @@ class Intermountain(dp.DosingProtocol):
 
             if self._enforce_day_ge_8 and today == 8:
                 dose_history = patient['dose_history']
-                interval_history = patient['interval_history']
+                duration_history = patient['duration_history']
                 all_doses = functools.reduce(
                     lambda x, y: x + y,
-                    ([dose_history[-i]] * interval_history[-i]
-                     for i in range(len(interval_history), 0, -1)))
+                    ([dose_history[-i]] * duration_history[-i]
+                     for i in range(len(duration_history), 0, -1)))
 
                 if len(all_doses) < 3:
                     raise ValueError(
@@ -134,7 +134,7 @@ class Intermountain(dp.DosingProtocol):
         Returns
         -------
         :
-            * A list of `DoseInterval`s. It always includes the new daily dose
+            * A list of `DoseDuration`s. It always includes the new daily dose
               and the new next test (in days). If an immediate dose is
               necessary, the first item will be the immediate dose and the next
               test day.

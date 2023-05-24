@@ -33,7 +33,7 @@ class Aurora(dp.DosingProtocol):
             - day
             - INR_history
             - dose_history
-            - interval_history
+            - duration_history
 
         additional_info:
             A dictionary of information being communicated between protocols at
@@ -51,12 +51,12 @@ class Aurora(dp.DosingProtocol):
 
         # to suppress Pylance's unbound variable error.
         previous_dose = 0.0
-        previous_interval: int = 1
-        next_interval: int
+        previous_duration: int = 1
+        next_duration: int
 
         if today > 1:
             previous_dose: float = patient['dose_history'][-1]
-            previous_interval: int = patient['interval_history'][-1]
+            previous_duration: int = patient['duration_history'][-1]
 
         red_flag: bool = additional_info.get('red_flag', False)
         skip_dose: int = additional_info.get('skip_dose', 0)
@@ -67,39 +67,39 @@ class Aurora(dp.DosingProtocol):
         if red_flag:
             if previous_INR > 3.0:
                 next_dose = 0.0
-                next_interval = 2
+                next_duration = 2
             else:
                 red_flag = False
                 next_dose = new_dose
-                next_interval = 7
+                next_duration = 7
         elif skip_dose:
             skip_dose = 0
             next_dose = new_dose
-            next_interval = 7
+            next_duration = 7
         elif today <= 2:  # initial dosing
             # Note: in the actual described protocol, INR>1.1 and some other
             # conditions should get 5.0, but in their simulation, Ravvaz et al,
             # assumed all <65 get 10.0. (Footnote on page 10 of paper's
             # appendix)
             next_dose = 10.0 if patient['age'] < 65.0 else 5.0
-            next_interval = 3 - today
+            next_duration = 3 - today
         elif today == 3:  # adjustment dosing
-            # Note: the paper is a bit vague on interval, since it has provided
+            # Note: the paper is a bit vague on duration, since it has provided
             # the whole dosing table for days 3 and 4 (which says retest in 7
             # and 28 days), but at the same time says dose for days 3 and 4 are
-            # based on the table. Here I assume that the interval is not
+            # based on the table. Here I assume that the duration is not
             # determined by the table, and only the dose is adjusted.
-            next_interval = 2
+            next_duration = 2
 
             if previous_INR >= 2.0:
                 next_dose = 5.0
                 if previous_INR <= 3.0:
                     if 2.0 <= INRs[-2] <= 3.0:
-                        number_of_stable_days = previous_interval
+                        number_of_stable_days = previous_duration
                     else:
                         number_of_stable_days = 1
                     # number_of_stable_days = self._stable_days(
-                    #     INRs[-2], previous_INR, previous_interval)
+                    #     INRs[-2], previous_INR, previous_duration)
             else:
                 next_dose, _, _, _ = self.aurora_dosing_table(
                     previous_INR, previous_dose)
@@ -112,25 +112,25 @@ class Aurora(dp.DosingProtocol):
                 if (previous_dose == patient['dose_history'][-2]) and (
                         2.0 <= INRs[-2] <= 3.0):
                     # stable dose and therapeutic INR
-                    number_of_stable_days += previous_interval
+                    number_of_stable_days += previous_duration
                     # number_of_stable_days += self._stable_days(
-                    #     INRs[-2], previous_INR, previous_interval)
+                    #     INRs[-2], previous_INR, previous_duration)
                 else:
                     number_of_stable_days = 1
 
                 next_dose = previous_dose
-                next_interval = self.aurora_retesting_table(
+                next_duration = self.aurora_retesting_table(
                     number_of_stable_days)
             else:
                 number_of_stable_days = 0
-                new_dose, next_interval, skip_dose, red_flag = \
+                new_dose, next_duration, skip_dose, red_flag = \
                     self.aurora_dosing_table(previous_INR, previous_dose)
                 if red_flag:
                     next_dose = 0.0
-                    next_interval = 2
+                    next_duration = 2
                 elif skip_dose:
                     next_dose = 0.0
-                    next_interval = skip_dose
+                    next_duration = skip_dose
                 else:
                     next_dose = new_dose
 
@@ -140,10 +140,10 @@ class Aurora(dp.DosingProtocol):
             'new_dose': new_dose,
             'number_of_stable_days': number_of_stable_days})
 
-        return dp.DosingDecision(next_dose, next_interval), additional_info
+        return dp.DosingDecision(next_dose, next_duration), additional_info
 
     @staticmethod
-    def _stable_days(INR_start: float, INR_end: float, interval: int) -> int:
+    def _stable_days(INR_start: float, INR_end: float, duration: int) -> int:
         '''
         Compute the number of stable days.
 
@@ -155,7 +155,7 @@ class Aurora(dp.DosingProtocol):
         INR_end:
             INR at the end of the period.
 
-        interval:
+        duration:
             The number of days from start to end.
 
         Returns
@@ -169,14 +169,14 @@ class Aurora(dp.DosingProtocol):
         get the number of stable days, but it does not seem to be the case.
         So, in the updated implementation, if INR_end is not in the range,
         it returns 0, if it is in the range, but INR_start is not in the range,
-        it returns 1, otherwise, it returns `interval`.
+        it returns 1, otherwise, it returns `duration`.
 
         '''
-        # return sum(2 <= INR_end + (INR_start - INR_end) * i / interval <= 3
-        #            for i in range(1, interval+1))
+        # return sum(2 <= INR_end + (INR_start - INR_end) * i / duration <= 3
+        #            for i in range(1, duration+1))
         if 2.0 <= INR_end <= 3.0:
             if 2.0 <= INR_start <= 3.0:
-                return interval
+                return duration
             else:
                 return 1
 

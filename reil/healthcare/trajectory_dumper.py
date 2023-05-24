@@ -26,17 +26,17 @@ class TrajectoryDumper(FeatureSetDumper):
                              for m in measure_names})
         temp.drop(temp.tail(1).index, inplace=True)  # type: ignore
         temp['dose'] = component_dict['daily_dose_history']
-        interval_history: list[int] = \
-            component_dict['interval_history']  # type: ignore
+        duration_history: list[int] = \
+            component_dict['duration_history']  # type: ignore
         temp['decision_points'] = [
-            a for t in interval_history
+            a for t in duration_history
             for a in ([1] + [0] * (t - 1))]
 
         temp['day'] = temp.index + 1  # type: ignore
 
         for k, v in component_dict.items():
             if k not in ['daily_dose_history',
-                         'interval_history',
+                         'duration_history',
                          'day'] + [f'daily_{m}_history'
                                    for m in measure_names]:
                 temp[k] = v

@@ -9,7 +9,7 @@ Lenzini warfarin dosing protocol based on `Lenzini et al. (2010)
 
 import functools
 from math import exp, log, sqrt
-from typing import Any, Dict, Literal, Tuple
+from typing import Any, Literal
 
 import reil.healthcare.dosing_protocols.dosing_protocol as dp
 
@@ -20,9 +20,9 @@ class Lenzini(dp.DosingProtocol):
     <https://doi.org/10.1038/clpt.2010.13>`_
     '''
 
-    def __init__(self,
-                 method: Literal['pharmacogenetic',
-                                 'clinical'] = 'pharmacogenetic') -> None:
+    def __init__(
+            self,
+            method: Literal['pharmacogenetic', 'clinical'] = 'pharmacogenetic'):
         '''
         Arguments
         ---------
@@ -38,10 +38,9 @@ class Lenzini(dp.DosingProtocol):
                 f'Unknown method {method}.\n'
                 'Acceptable methods are clinical and pharmacogenetic.')
 
-    def prescribe(self,  # noqa: C901
-                  patient: dict[str, Any],
-                  additional_info: dp.AdditionalInfo
-                  ) -> tuple[dp.DosingDecision, dp.AdditionalInfo]:
+    def prescribe(
+        self, patient: dict[str, Any], additional_info: dp.AdditionalInfo
+    ) -> tuple[dp.DosingDecision, dp.AdditionalInfo]:
         dose = self._method(patient)
 
         return dp.DosingDecision(dose), additional_info
@@ -65,7 +64,7 @@ class Lenzini(dp.DosingProtocol):
             - amiodarone ('Yes', 'No')
             - fluvastatin ('Yes', 'No')
             - dose_history (A list of previous doses at decision points)
-            - interval_history (A list of previous intervals between decision
+            - duration_history (A list of previous durations between decision
                 points)
         Returns
         -------
@@ -84,8 +83,9 @@ class Lenzini(dp.DosingProtocol):
 
         if (bsa := patient.get('BSA')) is None:
             try:
-                bsa = sqrt(patient['height'] * 2.54 *
-                           patient['weight'] * 0.454 / 3600)
+                bsa = sqrt(
+                    patient['height'] * 2.54 *
+                    patient['weight'] * 0.454 / 3600)
             except KeyError:
                 raise KeyError(
                     'Either `BSA` in m^2, or `weight` in lb and `height` in in'
@@ -103,11 +103,11 @@ class Lenzini(dp.DosingProtocol):
         fluvastatin = patient.get('fluvastatin') == 'Yes'
 
         dose_history = patient['dose_history']
-        interval_history = patient['interval_history']
+        duration_history = patient['duration_history']
         all_doses = functools.reduce(
             lambda x, y: x + y,
-            ([dose_history[-i]] * interval_history[-i]
-             for i in range(len(interval_history), 0, -1)))
+            ([dose_history[-i]] * duration_history[-i]
+             for i in range(len(duration_history), 0, -1)))
 
         # Since on day 4, we don't have dose-4, a zero is padded to avoid
         # producing error in the run time.
@@ -201,22 +201,23 @@ class Lenzini(dp.DosingProtocol):
         # producing error in the run time.
         dose_4, dose_3, dose_2 = ([0] + list(patient['dose_history']))[-4:-1]
 
-        dose = exp(3.10894
-                   - 0.00767 * age
-                   - 0.51611 * ln_INR
-                   - 0.23032 * vkorc1_a
-                   - 0.14745 * cyp2c9_2
-                   - 0.30770 * cyp2c9_3
-                   + 0.24597 * bsa
-                   + 0.26729 * target_INR
-                   - 0.09644 * african_american
-                   - 0.20590 * stroke
-                   - 0.11216 * diabetes
-                   - 0.10350 * amiodarone
-                   - 0.19275 * fluvastatin
-                   + 0.01690 * dose_2
-                   + 0.02018 * dose_3
-                   + 0.01065 * dose_4
-                   ) / 7
+        dose = exp(
+            3.10894
+            - 0.00767 * age
+            - 0.51611 * ln_INR
+            - 0.23032 * vkorc1_a
+            - 0.14745 * cyp2c9_2
+            - 0.30770 * cyp2c9_3
+            + 0.24597 * bsa
+            + 0.26729 * target_INR
+            - 0.09644 * african_american
+            - 0.20590 * stroke
+            - 0.11216 * diabetes
+            - 0.10350 * amiodarone
+            - 0.19275 * fluvastatin
+            + 0.01690 * dose_2
+            + 0.02018 * dose_3
+            + 0.01065 * dose_4
+        ) / 7
 
         return dose

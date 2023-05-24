@@ -27,7 +27,7 @@ class WarfarinIncrementalAction(Warfarin):
     '''
     A warfarin subject based on Hamberg's two compartment PK/PD model.
     The actions in this class is limited to a handful of actions, and the
-    object updates the action values at intervals until convergence.
+    object updates the action values at durations until convergence.
     '''
 
     def __init__(
@@ -39,8 +39,8 @@ class WarfarinIncrementalAction(Warfarin):
             INR_range: tuple[float, float] = (0.0, 15.0),
             dose_range: tuple[float, float] = (0.0, 15.0),
             dose_step: float = 0.5,
-            interval_range: tuple[int, int] = (1, 28),
-            interval_step: int = 1,
+            duration_range: tuple[int, int] = (1, 28),
+            duration_step: int = 1,
             max_day: int = 90,
             dose_only: bool = False,
             backfill: bool = True,
@@ -58,7 +58,7 @@ class WarfarinIncrementalAction(Warfarin):
         dose_range:
             A tuple that specifies min and max dose.
 
-        interval_range:
+        duration_range:
             A tuple that specifies min and max number of days between two
             measurements.
 
@@ -73,8 +73,8 @@ class WarfarinIncrementalAction(Warfarin):
             measurement_range=INR_range,
             dose_range=dose_range,
             dose_step=dose_step,
-            interval_range=interval_range,
-            interval_step=interval_step,
+            duration_range=duration_range,
+            duration_step=duration_step,
             max_day=max_day,
             **kwargs)
 
@@ -88,7 +88,7 @@ class WarfarinIncrementalAction(Warfarin):
             fixed_values=self._action_values)
 
         if not dose_only:
-            self.action_gen_set += self.feature_gen_set['interval']
+            self.action_gen_set += self.feature_gen_set['duration']
 
         WarfarinIncrementalAction._generate_state_defs(self)
         WarfarinIncrementalAction._generate_action_defs(self)
@@ -104,7 +104,7 @@ class WarfarinIncrementalAction(Warfarin):
         del config['measurement_name']
         config['INR_range'] = config.pop('measurement_range')
         config['action_increment'] = (
-            'additive' if isinstance(config.pop('_op'), additive)
+            'additive' if config.pop('_op') is additive
             else 'multiplicative')
 
         return config
@@ -131,7 +131,7 @@ class WarfarinIncrementalAction(Warfarin):
                 feature: FeatureSet,
                 ops: tuple[Callable[[FeatureSet], bool], ...],
                 dose_masks: tuple[dict[float, float], ...],
-                interval_masks: tuple[dict[int, int], ...]
+                duration_masks: tuple[dict[int, int], ...]
         ) -> FeatureGeneratorType:
             self.action_gen_set.unmask('dose_change')
             if self._dose_only:
@@ -142,26 +142,26 @@ class WarfarinIncrementalAction(Warfarin):
                         return self.action_gen_set.make_generator()
 
             else:
-                self.action_gen_set.unmask('interval')
-                for op, d_mask, i_mask in zip(ops, dose_masks, interval_masks):
+                self.action_gen_set.unmask('duration')
+                for op, d_mask, i_mask in zip(ops, dose_masks, duration_masks):
                     if op(feature):
                         self.action_gen_set.mask('dose_change', d_mask)
-                        self.action_gen_set.mask('interval', i_mask)
+                        self.action_gen_set.mask('duration', i_mask)
 
                         return self.action_gen_set.make_generator()
 
-                self.action_gen_set.mask('interval', interval_masks[-1])
+                self.action_gen_set.mask('duration', duration_masks[-1])
 
             self.action_gen_set.mask('dose_change', dose_masks[-1])
 
             return self.action_gen_set.make_generator()
 
-        min_interval, max_interval = self._interval_range
+        min_duration, max_duration = self._duration_range
         int_fixed = {
             d: {
                 i: d
                 for i in range(
-                    min_interval, max_interval + 1, self._interval_step)
+                    min_duration, max_duration + 1, self._duration_step)
                 if i != d}
             for d in (1, 2, 3, 7)}
 
@@ -173,17 +173,19 @@ class WarfarinIncrementalAction(Warfarin):
             '237', functools.partial(
                 _generate,
                 ops=(
-                    lambda f: f['day'].value >= 5,
+                    lambda f: f['day'].value >= 5,  # type: ignore
                     lambda f: f['day'].value == 2,
                     lambda f: f['day'].value == 0),
                 dose_masks=({}, {}, {}),
-                interval_masks=(
+                duration_masks=(
                     int_fixed[7], int_fixed[3], int_fixed[2])), 'day'
         )
 
     def _take_effect(
             self, action: FeatureSet, _id: int = 0
     ) -> FeatureSet:
+        assert self._patient is not None
+
         self._actions_taken.append(action)
 
         action_temp = action.value
@@ -197,31 +199,31 @@ class WarfarinIncrementalAction(Warfarin):
         if not (self._dose_range[0] <= current_dose <= self._dose_range[1]):
             raise ValueError('Dose out of range.')
 
-        current_interval = min(
-            int(action_temp['interval']),  # type: ignore
+        current_duration = min(
+            int(action_temp['duration']),  # type: ignore
             self._max_day - self._day)
 
         measurements_temp = self._patient.model(
             dose={
                 i: current_dose
-                for i in range(self._day, self._day + current_interval)
+                for i in range(self._day, self._day + current_duration)
             },
             measurement_days=list(
-                range(self._day + 1, self._day + current_interval + 1)
+                range(self._day + 1, self._day + current_duration + 1)
             )
         )[self._measurement_name]
 
         self._decision_points_dose_history[self._decision_points_index] = \
             current_dose
-        self._decision_points_interval_history[self._decision_points_index] = \
-            current_interval
+        self._decision_points_duration_history[self._decision_points_index] = \
+            current_duration
         self._decision_points_index += 1
 
         day_temp = self._day
-        self._day += current_interval
+        self._day += current_duration
 
         self._full_dose_history[day_temp:self._day] = \
-            [current_dose] * current_interval
+            [current_dose] * current_duration
         self._full_measurement_history[day_temp +
                                        1:self._day + 1] = measurements_temp
 

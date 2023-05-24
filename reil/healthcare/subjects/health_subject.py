@@ -27,10 +27,10 @@ class HealthSubject(Subject):
             measurement_name: str,
             measurement_range: tuple[float, float],
             max_day: int,
-            interval_range: tuple[int, int],
+            duration_range: tuple[int, int],
             backfill: bool,
-            interval_step: int = 1,
-            default_interval: int | None = None,
+            duration_step: int = 1,
+            default_duration: int | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -50,7 +50,7 @@ class HealthSubject(Subject):
         max_day:
             Maximum duration of each trial.
 
-        interval_range:
+        duration_range:
             A tuple that shows the minimum and maximum duration of each measurement
             decision.
 
@@ -58,11 +58,11 @@ class HealthSubject(Subject):
             If `True`, components such as measurement_history
             will be backfilled with the first value in the list.
 
-        interval_step:
+        duration_step:
             Minimum number of days between two measurements.
 
-        default_interval:
-            Used if the interval is not provided as part of the action.
+        default_duration:
+            Used if the duration is not provided as part of the action.
         '''
 
         super().__init__(max_entity_count=1, **kwargs)
@@ -71,9 +71,9 @@ class HealthSubject(Subject):
         if not self._patient:
             return
 
-        self._interval_range = interval_range
-        self._interval_step = interval_step
-        self._default_interval = default_interval
+        self._duration_range = duration_range
+        self._duration_step = duration_step
+        self._default_duration = default_duration
         self._measurement_range = measurement_range
         self._measurement_name = measurement_name
 
@@ -92,9 +92,9 @@ class HealthSubject(Subject):
             FeatureGenerator.discrete(
                 name=name, lower=lower, upper=upper, step=step)
             for name, lower, upper, step in (
-                ('interval_history', *self._interval_range,
-                    self._interval_step),
-                ('interval', *self._interval_range, self._interval_step),
+                ('duration_history', *self._duration_range,
+                    self._duration_step),
+                ('duration', *self._duration_range, self._duration_step),
             )
         ) + FeatureGenerator.discrete(
             name='day', lower=0, upper=self._max_day - 1,
@@ -107,7 +107,7 @@ class HealthSubject(Subject):
         self._day: int = 0
         self._full_measurement_history = [0.0] * self._max_day
         self._decision_points_measurement_history = [0.0] * (self._max_day + 1)
-        self._decision_points_interval_history: list[int] = [1] * self._max_day
+        self._decision_points_duration_history: list[int] = [1] * self._max_day
         self._decision_points_index: int = 0
 
         self._full_measurement_history[0] = self._patient.model(
@@ -134,8 +134,8 @@ class HealthSubject(Subject):
         config.update(dict(
             measurement_name=self._measurement_name,
             measurement_range=self._measurement_range,
-            interval_range=self._interval_range,
-            interval_step=self._interval_step,
+            duration_range=self._duration_range,
+            duration_step=self._duration_step,
             max_day=self._max_day
         ))
 
@@ -155,12 +155,12 @@ class HealthSubject(Subject):
         return cls(None, '', (0, 1), 1, (1, 2), True)
 
     @staticmethod
-    def generate_interval_values(
-            min_interval: int = 1,
-            max_interval: int = 28,
-            interval_increment: int = 1) -> list[int]:
+    def generate_duration_values(
+            min_duration: int = 1,
+            max_duration: int = 28,
+            duration_increment: int = 1) -> list[int]:
 
-        return list(range(min_interval, max_interval, interval_increment))
+        return list(range(min_duration, max_duration, duration_increment))
 
     def is_terminated(self, _id: int | None = None) -> bool:
         return self._day >= self._max_day
@@ -171,7 +171,7 @@ class HealthSubject(Subject):
         self._day: int = 0
         self._full_measurement_history = [0.0] * self._max_day
         self._decision_points_measurement_history = [0.0] * (self._max_day + 1)
-        self._decision_points_interval_history: list[int] = [1] * self._max_day
+        self._decision_points_duration_history: list[int] = [1] * self._max_day
         self._decision_points_index: int = 0
 
         if self._patient is not None:
@@ -214,8 +214,8 @@ class HealthSubject(Subject):
             _list = self._full_measurement_history
             index = self._day + 1
             filler = 0.0
-        elif list_name == 'interval_history':
-            _list = self._decision_points_interval_history
+        elif list_name == 'duration_history':
+            _list = self._decision_points_duration_history
             index = self._decision_points_index
             filler = int(1)
         else:
@@ -241,12 +241,12 @@ class HealthSubject(Subject):
         return self._get_history(  # type: ignore
             f'{self._measurement_name}_history', length, backfill)
 
-    def _sub_comp_interval_history(
+    def _sub_comp_duration_history(
             self, _id: int, length: int = 1, backfill: bool = False,
             **kwargs: Any
     ) -> Feature:
         return self._get_history(  # type: ignore
-            'interval_history', length, backfill)
+            'duration_history', length, backfill)
 
     def _sub_comp_day(self, _id: int, **kwargs: Any) -> Feature:
         return self.feature_gen_set['day'](  # type: ignore
