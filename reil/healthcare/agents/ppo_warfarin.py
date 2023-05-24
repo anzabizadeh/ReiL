@@ -9,7 +9,7 @@ from reil.agents.proximal_policy_optimization import PPO, PPOLearner
 from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.dataclasses import History
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
-from reil.utils.metrics import INRMetric, PTTRMetric
+from reil.utils.metrics import ActionMetric, INRMetric, PTTRMetric
 from reil.utils.action_dist_modifier import ActionModifier
 
 
@@ -24,12 +24,19 @@ class PPO4Warfarin(PPO):
             **kwargs: Any):
         super().__init__(learner, buffer, reward_clip, gae_lambda, **kwargs)
         self._metrics['PTTR'] = PTTRMetric('PTTR')
-        self._metrics['INR'] = INRMetric('INR')
+        self._metrics['INR'] = INRMetric('INR', mode='histogram')
+        self._metrics['dose'] = ActionMetric('dose', 0)
+        self._metrics['duration'] = ActionMetric('duration', 1)
+
         self._previous_action = [
             tf.zeros(x) for x in self._learner._model._action_per_head]
         self._momentum_coef = momentum_coef
         self._carry = momentum_mode == 'carry'
         self._action_modifiers = action_modifiers or []
+
+        if self._summary_writer:
+            self._summary_writer.set_data_types(
+                {'INR': 'histogram', 'dose': 'histogram', 'duration': 'histogram'})
 
     def _update_metrics(self, **kwargs: Any) -> None:
         super()._update_metrics(**kwargs)
@@ -38,6 +45,11 @@ class PPO4Warfarin(PPO):
         if state_list:
             self._metrics['PTTR'].update_state(state_list)
             self._metrics['INR'].update_state(state_list)
+
+        action_indices = kwargs.get('action_indices')
+        if action_indices:
+            self._metrics['dose'].update_state(action_indices)
+            self._metrics['duration'].update_state(action_indices)
 
     def act(
             self, state: FeatureSet, subject_id: int,
