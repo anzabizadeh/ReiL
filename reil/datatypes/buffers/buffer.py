@@ -19,8 +19,15 @@ PickModes = Literal['all', 'random', 'recent', 'old']
 Funcs = Literal['sum', 'min', 'max', 'mean']
 
 
-def mean(x: list[T1] | list[T2]) -> T1 | T2:
-    return sum(x) / len(x)  # type: ignore
+def mean(x: list[int | float] | list[tuple[int | float, ...]]) -> float:
+    if isinstance(x[0], (int, float)):
+        return sum(x) / len(x)  # type: ignore
+
+    if isinstance(x[0], (list, tuple)):
+        return sum(
+            sum(x_i) for x_i in x) / sum(len(x_i) for x_i in x)  # type: ignore
+
+    raise TypeError(f'Unsupported type: {type(x[0])}')
 
 
 funcs_dict = {
