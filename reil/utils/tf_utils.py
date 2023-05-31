@@ -48,7 +48,8 @@ def entropy(logits: Tensor) -> Tensor:
     z0 = tf.reduce_sum(ea0, axis=-1, keepdims=True)
     p0 = tf.divide(ea0, z0)
 
-    return tf.reduce_sum(tf.multiply(p0, tf.subtract(tf.math.log(z0), a0)), axis=-1)
+    return tf.reduce_sum(  # type: ignore
+        tf.multiply(p0, tf.subtract(tf.math.log(z0), a0)), axis=-1)
 
 
 @tf.function(
@@ -192,10 +193,12 @@ class TF2UtilsMixin(reilbase.ReilBase):
         ]
 
         for i, layer_sizes_i in enumerate(layer_sizes[1:], 1):
-            if full_backprop:
-                temp = tf.concat([input_, layers[-1]], axis=-1)
-            else:
-                temp = tf.concat([input_, tf.stop_gradient(layers[-1])], axis=-1)
+            normalized_previous_layer = tf.math.l2_normalize(layers[-1])
+            if not full_backprop:
+                normalized_previous_layer = tf.stop_gradient(normalized_previous_layer)
+
+            temp = tf.concat([input_, normalized_previous_layer], axis=-1)
+
             layers.append(
                 TF2UtilsMixin.mlp_functional(
                     temp, layer_sizes_i,
