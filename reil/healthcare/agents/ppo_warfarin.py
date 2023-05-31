@@ -23,7 +23,7 @@ class PPO4Warfarin(PPO):
             action_modifiers: list[ActionModifier] | None = None,
             **kwargs: Any):
         super().__init__(learner, buffer, reward_clip, gae_lambda, **kwargs)
-        self._metrics['PTTR'] = PTTRMetric('PTTR')
+        self._metrics['PTTR'] = PTTRMetric('PTTR', mode='histogram')
         self._metrics['INR'] = INRMetric('INR', mode='histogram')
         self._metrics['dose'] = ActionMetric('dose', 0)
         self._metrics['duration'] = ActionMetric('duration', 1)
@@ -35,8 +35,10 @@ class PPO4Warfarin(PPO):
         self._action_modifiers = action_modifiers or []
 
         if self._summary_writer:
-            self._summary_writer.set_data_types(
-                {'INR': 'histogram', 'dose': 'histogram', 'duration': 'histogram'})
+            self._summary_writer.set_data_types({
+                'PTTR': 'histogram', 'INR': 'histogram',
+                'dose': 'histogram', 'duration': 'histogram'
+            })
 
     def _update_metrics(self, **kwargs: Any) -> None:
         super()._update_metrics(**kwargs)
@@ -63,7 +65,7 @@ class PPO4Warfarin(PPO):
         if training_mode:
             temp = logits
             for i, x in enumerate(self._previous_action):
-                logits[i] += tf.multiply(self._momentum_coef, x)
+                logits[i] += tf.multiply(self._momentum_coef, x)  # type: ignore
             self._previous_action = logits if self._carry else temp
 
             for i, modifier in enumerate(self._action_modifiers):
@@ -82,11 +84,12 @@ class PPO4Warfarin(PPO):
 
         if training_mode:
             permissible_action_index = [
-                int(tf.random.categorical(logits=lo, num_samples=1))
+                int(tf.random.categorical(logits=lo, num_samples=1))  # type: ignore
                 for lo in masked_logits]
         else:
             permissible_action_index = [
-                int(np.argmax(lo)) for lo in masked_logits]
+                int(np.argmax(lo))  # type: ignore
+                for lo in masked_logits]
 
         if len(permissible_action_index) == 1:
             # In the implementation of feature.byindex(), if index is one dimensional
