@@ -6,17 +6,15 @@ PPOLearner class
 '''
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Literal
 
 import numpy as np
 import tensorflow as tf
 from tensorflow import Tensor, TensorShape, TensorSpec
 
-from reil.datatypes.feature import FeatureSet
-from reil.learners.learner import Learner
-from reil.utils.tf_utils import (JIT_COMPILE, BroadcastAndConcatLayer, MeanMetric, SparseCategoricalAccuracyMetric,
+from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric,
+                                 SparseCategoricalAccuracyMetric,
                                  TF2UtilsMixin, entropy, logprobs)
-
 
 keras = tf.keras
 from keras.optimizers.schedules.learning_rate_schedule import \
@@ -49,7 +47,8 @@ class PPOTandemModel(TF2UtilsMixin):
             actor_train_iterations: int,
             critic_train_iterations: int,
             target_kl: float,
-            full_backprop: bool = False,
+            backprop_mode: Literal['separate', 'shared', 'all'] = 'all',
+            # full_backprop: bool = False,
             actor_hidden_activation: str = 'relu',
             actor_head_activation: str | None = None,
             critic_hidden_activation: str = 'relu',
@@ -79,7 +78,7 @@ class PPOTandemModel(TF2UtilsMixin):
         self._critic_layer_sizes = critic_layer_sizes
         self._actor_train_iterations = actor_train_iterations
         self._critic_train_iterations = critic_train_iterations
-        self._full_backprop = full_backprop
+        self._backprop_mode = backprop_mode
         self._clip_ratio: Tensor | None
         self._critic_clip_range: Tensor | None
         self._max_grad_norm: Tensor | None
@@ -113,10 +112,14 @@ class PPOTandemModel(TF2UtilsMixin):
         input_: Tensor = keras.Input(self._input_shape)  # type: ignore
         actor_layers = TF2UtilsMixin.mlp_functional_w_concat(
             input_, self._actor_layer_sizes, actor_hidden_activation,
-            'actor_{i:0>2}', full_backprop=self._full_backprop)
+            'actor_{i:0>2}', full_backprop=(self._backprop_mode != 'separate'))
         logit_heads = TF2UtilsMixin.mlp_layers(
             action_per_head, actor_head_activation, 'actor_output_{i:0>2}')
-        logits = tuple(output(actor_layers) for output in logit_heads)
+        if self._backprop_mode == 'shared':
+            logits = tuple(output(tf.stop_gradient(actor_layers)) for output in logit_heads[:-1])
+            logits = (*logits, logit_heads[-1](actor_layers))  # type: ignore
+        else:
+            logits = tuple(output(actor_layers) for output in logit_heads)
 
         self.actor = keras.Model(
             inputs=input_,
