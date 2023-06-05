@@ -25,17 +25,21 @@ class DosingSubject(HealthSubject):
             measurement_name: str,
             measurement_range: tuple[float, float],
             max_day: int,
-            interval_range: tuple[int, int],
+            duration_range: tuple[int, int],
             dose_range: tuple[float, float],
             decision_mode: Literal[
-                'dose', 'dose_interval', 'dose_change', 'dose_change_interval',
-                'dose_change_p', 'dose_change_interval_p'
+                'dose', 'dose_change', 'dose_percent_change',
+                'dose_duration', 'dose_change_duration', 'dose_percent_change_duration',
+                'dose_duration_combined', 'dose_change_duration_combined',
+                'dose_percent_change_duration_combined',
             ],
             backfill: bool,
-            interval_step: int = 1,
+            duration_step: int = 1,
             dose_step: float | None = None,
-            percent_dose_change: tuple[float, ...] | None = None,
-            dose_range_p: tuple[float, float] | None = None,
+            decision_values: tuple[float, ...] | tuple[
+                tuple[float, int], ...] | None = None,
+            decision_range: tuple[float, float] | tuple[
+                tuple[float, float], tuple[int, int]] | None = None,
             round_to_step: bool = True,
             **kwargs: Any):
         '''
@@ -53,7 +57,7 @@ class DosingSubject(HealthSubject):
             A tuple that shows the minimum and maximum amount of dose of
             the medication.
 
-        interval_range:
+        duration_range:
             A tuple that shows the minimum and maximum duration of each dosing
             decision.
 
@@ -71,86 +75,205 @@ class DosingSubject(HealthSubject):
             measurement_range=measurement_range,
             max_day=max_day,
             backfill=backfill,
-            interval_range=interval_range,
-            interval_step=interval_step, **kwargs)
+            duration_range=duration_range,
+            duration_step=duration_step, **kwargs)
 
         self._dose_range = dose_range
-        self._dose_range_p = dose_range_p
+        self._decision_range = decision_range
         self._dose_step = dose_step
-        self._percent_dose_change = percent_dose_change
+        self._decision_values = decision_values
         self._round_to_step = round_to_step
 
         self._decision_mode = decision_mode
+        self._duration_mode = 'duration' in decision_mode
+        self._combined = 'combined' in decision_mode
 
         self._actions_taken: list[FeatureSet] = []
         self._full_dose_history = [0.0] * self._max_day
         self._decision_points_dose_history = [0.0] * self._max_day
 
-        if '_p' in decision_mode:
-            self._dose_mode = 'dose_change_p'
-        elif 'change' in decision_mode:
-            self._dose_mode = 'dose_change'
-        else:
-            self._dose_mode = 'dose'
+        if self._combined:
+            if 'dose_percent_change' in decision_mode:
+                self._dose_mode = 'dose_percent_change_combined'
 
-        self._interval_mode = 'interval' in decision_mode
-
-        if self._dose_mode in ('dose', 'dose_change'):
-            if not self._dose_step:
-                raise ValueError(
-                    f'`dose_step` missing for `decision_mode`={decision_mode}.')
-            self.feature_gen_set += FeatureGeneratorSet(
-                FeatureGenerator.discrete(
-                    name=name, lower=lower, upper=upper, step=step)
-                for name, lower, upper, step in (
-                    ('dose', *self._dose_range, self._dose_step),
-                    ('dose_change', -max(self._dose_range),
-                     max(self._dose_range), self._dose_step),
-                    ('dose_history', *self._dose_range, self._dose_step),
-                    ('daily_dose_history', *self._dose_range, self._dose_step),
-                )
-            )
-
-        elif self._dose_mode == 'dose_change_p':
-            if self._dose_range_p is None:
-                raise ValueError(
-                    f'`dose_range_p` missing for `decision_mode`={decision_mode}.')
-            if self._percent_dose_change is None:
-                raise ValueError(
-                    f'`_percent_dose_change` missing for `decision_mode`={decision_mode}.')
-
-            self.feature_gen_set += FeatureGeneratorSet(
-                FeatureGenerator.numerical_fixed_values(
-                    name='dose_change_p', fixed_values=self._percent_dose_change,
-                    lower=self._dose_range_p[0], upper=self._dose_range_p[1])
-            )
-
-            if self._round_to_step:
-                if self._dose_step is None:
+                if self._decision_values is None:
                     raise ValueError(
-                        '`round_to_step` is `True`. `dose_step` is required.')
+                        '`decision_values` missing for '
+                        '`decision_mode`=dose_percent_change_combined.')
+
+                if not isinstance(self._decision_values[0], tuple):
+                    raise ValueError(
+                        '`decision_values` should be of type '
+                        '`tuple[tuple[float, int], ...]` for '
+                        '`decision_mode`=dose_percent_change_combined.')
+
+                # if self._decision_range is None:
+                #     raise ValueError(
+                #         '`decision_range` missing for '
+                #         '`decision_mode`=dose_percent_change.')
+
+                # if isinstance(self._decision_range[0], tuple):
+                #     raise ValueError(
+                #         '`decision_range` should be a tuple of floats for '
+                #         '`decision_mode`=dose_percent_change.')
+
+                # self.feature_gen_set += FeatureGeneratorSet(
+                #     FeatureGenerator.numerical_fixed_values(
+                #         name='dose_percent_change',
+                #         fixed_values=self._decision_values,
+                #         lower=self._decision_range[0],
+                #         upper=self._decision_range[1])
+                # )
+                self.feature_gen_set += FeatureGeneratorSet(
+                    FeatureGenerator.categorical(
+                        name='dose_percent_change_combined',
+                        categories=self._decision_values
+                    )
+                )
+
+                if self._round_to_step:
+                    if self._dose_step is None:
+                        raise ValueError(
+                            '`round_to_step` is `True`. `dose_step` is required.')
+                    self.feature_gen_set += FeatureGeneratorSet(
+                        FeatureGenerator.discrete(
+                            name=name, lower=lower, upper=upper, step=self._dose_step)
+                        for name, lower, upper in (
+                            ('dose_history', *self._dose_range),
+                            ('daily_dose_history', *self._dose_range),
+                        )
+                    )
+                else:
+                    self.feature_gen_set += FeatureGeneratorSet(
+                        FeatureGenerator.continuous(
+                            name=name, lower=lower, upper=upper)
+                        for name, lower, upper in (
+                            ('dose_history', *self._dose_range),
+                            ('daily_dose_history', *self._dose_range),
+                        )
+                    )
+
+            # elif 'dose_change' in decision_mode:
+            #     self._dose_mode = 'dose_change'
+            #     if not self._dose_step:
+            #         raise ValueError(
+            #             '`dose_step` missing for `decision_mode`=dose_change.')
+            #     self.feature_gen_set += FeatureGeneratorSet(
+            #         FeatureGenerator.discrete(
+            #             name=name, lower=lower, upper=upper, step=self._dose_step)
+            #         for name, lower, upper in (
+            #             ('dose_change', -max(self._dose_range),
+            #              max(self._dose_range)),
+            #             ('dose_history', *self._dose_range),
+            #             ('daily_dose_history', *self._dose_range),
+            #         )
+            #     )
+            # else:
+            #     self._dose_mode = 'dose'
+            #     if not self._dose_step:
+            #         raise ValueError(
+            #             '`dose_step` missing for `decision_mode`=dose.')
+            #     self.feature_gen_set += FeatureGeneratorSet(
+            #         FeatureGenerator.discrete(
+            #             name=name, lower=lower, upper=upper, step=self._dose_step)
+            #         for name, lower, upper in (
+            #             ('dose', *self._dose_range),
+            #             ('dose_history', *self._dose_range),
+            #             ('daily_dose_history', *self._dose_range),
+            #         )
+            #     )
+
+            self.action_gen_set += self.feature_gen_set['dose_percent_change_combined']
+
+            # if self._duration_mode:
+            #     self.action_gen_set += self.feature_gen_set['duration']
+
+        else:
+            if 'dose_percent_change' in decision_mode:
+                self._dose_mode = 'dose_percent_change'
+
+                if self._decision_values is None:
+                    raise ValueError(
+                        '`decision_values` missing for '
+                        '`decision_mode`=dose_percent_change.')
+
+                if isinstance(self._decision_values[0], tuple):
+                    raise ValueError(
+                        '`decision_values` should be a tuple of floats for '
+                        '`decision_mode`=dose_percent_change.')
+
+                if self._decision_range is None:
+                    raise ValueError(
+                        '`decision_range` missing for '
+                        '`decision_mode`=dose_percent_change.')
+
+                if isinstance(self._decision_range[0], tuple):
+                    raise ValueError(
+                        '`decision_range` should be a tuple of floats for '
+                        '`decision_mode`=dose_percent_change.')
+
+                self.feature_gen_set += FeatureGeneratorSet(
+                    FeatureGenerator.numerical_fixed_values(
+                        name='dose_percent_change',
+                        fixed_values=self._decision_values,
+                        lower=self._decision_range[0],
+                        upper=self._decision_range[1])
+                )
+
+                if self._round_to_step:
+                    if self._dose_step is None:
+                        raise ValueError(
+                            '`round_to_step` is `True`. `dose_step` is required.')
+                    self.feature_gen_set += FeatureGeneratorSet(
+                        FeatureGenerator.discrete(
+                            name=name, lower=lower, upper=upper, step=self._dose_step)
+                        for name, lower, upper in (
+                            ('dose_history', *self._dose_range),
+                            ('daily_dose_history', *self._dose_range),
+                        )
+                    )
+                else:
+                    self.feature_gen_set += FeatureGeneratorSet(
+                        FeatureGenerator.continuous(
+                            name=name, lower=lower, upper=upper)
+                        for name, lower, upper in (
+                            ('dose_history', *self._dose_range),
+                            ('daily_dose_history', *self._dose_range),
+                        )
+                    )
+
+            elif 'dose_change' in decision_mode:
+                self._dose_mode = 'dose_change'
+                if not self._dose_step:
+                    raise ValueError(
+                        '`dose_step` missing for `decision_mode`=dose_change.')
                 self.feature_gen_set += FeatureGeneratorSet(
                     FeatureGenerator.discrete(
-                        name=name, lower=lower, upper=upper, step=step)
-                    for name, lower, upper, step in (
-                        ('dose_history', *self._dose_range, self._dose_step),
-                        ('daily_dose_history', *self._dose_range, self._dose_step),
+                        name=name, lower=lower, upper=upper, step=self._dose_step)
+                    for name, lower, upper in (
+                        ('dose_change', -max(self._dose_range), max(self._dose_range)),
+                        ('dose_history', *self._dose_range),
+                        ('daily_dose_history', *self._dose_range),
                     )
                 )
             else:
+                self._dose_mode = 'dose'
+                if not self._dose_step:
+                    raise ValueError('`dose_step` missing for `decision_mode`=dose.')
                 self.feature_gen_set += FeatureGeneratorSet(
-                    FeatureGenerator.continuous(
-                        name=name, lower=lower, upper=upper)
+                    FeatureGenerator.discrete(
+                        name=name, lower=lower, upper=upper, step=self._dose_step)
                     for name, lower, upper in (
+                        ('dose', *self._dose_range),
                         ('dose_history', *self._dose_range),
                         ('daily_dose_history', *self._dose_range),
                     )
                 )
 
-        self.action_gen_set += self.feature_gen_set[self._dose_mode]
+            self.action_gen_set += self.feature_gen_set[self._dose_mode]
 
-        if self._interval_mode:
-            self.action_gen_set += self.feature_gen_set['interval']
+            if self._duration_mode:
+                self.action_gen_set += self.feature_gen_set['duration']
 
         DosingSubject._generate_state_defs(self)
 
@@ -204,48 +327,60 @@ class DosingSubject(HealthSubject):
         self._actions_taken.append(action)
 
         action_temp = action.value
+        duration = None
         if 'dose' in action_temp:
             current_dose = float(action_temp['dose'])  # type: ignore
         elif 'dose_change' in action_temp:
             current_dose = (
                 self._decision_points_dose_history[self._decision_points_index - 1] +
                 action_temp['dose_change'])  # type: ignore
-        elif 'dose_change_p' in action_temp:
+        elif 'dose_percent_change' in action_temp:
             current_dose = (
                 self._decision_points_dose_history[self._decision_points_index - 1] *
-                (1 + action_temp['dose_change_p']))  # type: ignore
+                (1 + action_temp['dose_percent_change']))  # type: ignore
             if self._round_to_step:
                 current_dose = \
                     self._dose_range[0] + self._dose_step * round(  # type: ignore
                         (current_dose - self._dose_range[0]) / self._dose_step)
+        elif 'dose_percent_change_combined' in action_temp:
+            current_dose = (
+                self._decision_points_dose_history[self._decision_points_index - 1] *
+                (1 + action_temp['dose_percent_change_combined'][0]))  # type: ignore
+            if self._round_to_step:
+                current_dose = \
+                    self._dose_range[0] + self._dose_step * round(  # type: ignore
+                        (current_dose - self._dose_range[0]) / self._dose_step)
+            duration = action_temp['dose_percent_change_combined'][1]
         else:
-            raise ValueError('dose/ dose_change/ dose_change_p not found.')
+            raise ValueError(
+                'dose/ dose_change/ dose_percent_change/ dose_percent_change_combined not found.')
 
-        interval = action_temp.get('interval', self._default_interval)
-        current_interval = min(
-            interval, self._max_day - self._day)  # type: ignore
+        if duration is None:
+            duration = action_temp.get('duration', self._default_duration)
+        current_duration = min(
+            duration, self._max_day - self._day)  # type: ignore
 
         measurements_temp = self._patient.model(
             dose={
                 i: current_dose
-                for i in range(self._day, self._day + current_interval)
+                for i in range(self._day, self._day + current_duration)
             },
             measurement_days=list(
-                range(self._day, self._day + current_interval + 1)
+                range(self._day, self._day + current_duration + 1)
             )
         )[self._measurement_name]
 
         self._decision_points_dose_history[self._decision_points_index] = \
             current_dose
-        self._decision_points_interval_history[self._decision_points_index] = \
-            current_interval
+        self._decision_points_duration_history[self._decision_points_index] = \
+            current_duration
         self._decision_points_index += 1
 
         day_temp = self._day
-        self._day += current_interval
+        self._day += current_duration
 
         self._full_dose_history[day_temp:self._day] = \
-            [current_dose] * current_interval
+            [current_dose] * current_duration
         self._full_measurement_history[day_temp +
                                        1:self._day + 1] = measurements_temp
 
