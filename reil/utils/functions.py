@@ -111,6 +111,10 @@ def random_categorical(f: FeatureGenerator) -> Any:
     return categories[0]
 
 
+def diff(x: float, y: Iterable[float]) -> float:
+    return sum(yi - x for yi in y)
+
+
 def dist(x: float, y: Iterable[float]) -> float:
     return sum(abs(x - yi) for yi in y)
 
