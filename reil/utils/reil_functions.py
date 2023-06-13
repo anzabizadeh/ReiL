@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypedDict, TypeVar
 
 from reil.datatypes.feature import FeatureSet
 from reil.logger import Logger
-from reil.utils.functions import dist, in_range, interpolate, square_dist
+from reil.utils.functions import diff, dist, in_range, interpolate, square_dist
 
 # NOTE:
 # `retrospective` was meant to be used to indicate regular reward computation
@@ -62,6 +62,23 @@ class ReilFunction(Generic[TypeY, TypeX]):
     def _default_function(
             self, y: list[TypeY], x: list[TypeX] | None = None) -> float:
         raise NotImplementedError
+
+
+class CompoundReilFunctionComponent(TypedDict):
+    reil_function: ReilFunction
+    weight: float
+
+
+@dataclasses.dataclass
+class CompoundReilFunction(ReilFunction[TypeY, TypeX]):
+    rail_function_list: list[CompoundReilFunctionComponent] = dataclasses.field(
+        default_factory=list)
+
+    def __call__(self, args: FeatureSet) -> float:
+        return sum(
+            fn['weight'] * fn['reil_function'](args)
+            for fn in self.rail_function_list
+        )
 
 
 @dataclasses.dataclass
@@ -181,6 +198,96 @@ class NotEqual(ReilFunction[float, int]):
             result = 0
 
         return result
+
+
+@dataclasses.dataclass
+class CustomDistance(ReilFunction[float, int]):
+    center: float = 0.0
+    band_width: float = 1.0
+    exclude_first: bool = False
+    average: bool = True
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
+
+        l1_distance_list = tuple(
+            dist(self.center, interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x)
+        )
+
+        distance_penalty = (2.0 / self.band_width) ** 2 * sum(
+            dis ** 2
+            for dis, x_i in zip(l1_distance_list, _x))
+
+        if self.average:
+            distance_penalty /= len_y
+
+        average_l1_distance = sum(l1_distance_list) / len_y
+
+        duration_penalty = (
+            len_y / 14 * average_l1_distance if average_l1_distance <= 0.5 else
+            (len_y / 14 - 2) * (average_l1_distance - 0.5))
+
+        return distance_penalty + duration_penalty
+
+
+@dataclasses.dataclass
+class CustomDistance2(ReilFunction[float, int]):
+    center: float = 0.0
+    band_width: float = 1.0
+    exclude_first: bool = False
+    average: bool = True
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
+
+        diff_list = tuple(
+            diff(self.center, interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x)
+        )
+
+        distance_penalty = (2.0 / self.band_width) ** 2 * sum(
+            dis ** 2
+            for dis in diff_list)
+
+        if self.average:
+            distance_penalty /= len_y
+
+        average_diff = sum(diff_list) / len_y
+
+        duration_penalty = (
+            len_y / 14 * average_diff if average_diff > 0.5 else (
+                (len_y / 14 - 2) * (abs(average_diff) - 0.5)
+                if average_diff >= -0.5 else
+                - len_y / 7.0 * average_diff
+            )
+        )
+
+        return distance_penalty + duration_penalty
 
 
 # TODO: not implemented yet!
