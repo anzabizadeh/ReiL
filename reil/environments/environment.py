@@ -704,7 +704,7 @@ class Environment(stateful.Stateful):
             a_s_names
             for a_s_names in self._agent_observers
             if inspect.getgeneratorstate(self._agent_observers[a_s_names])
-            not in [inspect.GEN_CREATED or inspect.GEN_CLOSED]
+            not in [inspect.GEN_CREATED, inspect.GEN_CLOSED]
         )
 
         if open_observers:
