@@ -70,7 +70,6 @@ class PTTRMetric(MetricProtocol):
 
 
 class INRMetric(MetricProtocol):
-
     def __init__(
             self, name: str,
             mode: Literal['scalar', 'histogram'] = 'histogram', **kwargs):
@@ -102,6 +101,21 @@ class INRMetric(MetricProtocol):
     def reset_states(self):
         self.inrs: list[float] = []
         self.durations: list[int] = []
+
+
+class HistogramMetric(MetricProtocol):
+    def __init__(self, name: str, **kwargs):
+        self.name = name
+        self.reset_states()
+
+    def update_state(self, values: tuple[float, ...] | list[float]):
+        self.values.extend(values)
+
+    def result(self) -> float:
+        return self.values
+
+    def reset_states(self):
+        self.values: list[float] = []
 
 
 class ActionMetric(MetricProtocol):

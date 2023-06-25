@@ -18,7 +18,7 @@ from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.feature import FeatureSet
 from reil.learners.ppo_learner import PPOLearner
 from reil.utils.exploration_strategies import NoExploration
-from reil.utils.metrics import MetricProtocol
+from reil.utils.metrics import HistogramMetric, MetricProtocol
 from reil.utils.tf_utils import ActionRank, MeanMetric
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
@@ -65,10 +65,14 @@ class PPO(A2C):
         self._metrics: dict[str, MetricProtocol] = {  # type: ignore
             'action_rank': ActionRank(),
             'advantage_mean': MeanMetric('advantage_mean', dtype=tf.float32),
-            'rewards': MeanMetric('rewards', dtype=tf.float32)
+            'advantage_h': HistogramMetric('advantage_h'),
+            'rewards': MeanMetric('rewards', dtype=tf.float32),
+            'rewards_h': HistogramMetric('rewards_h'),
         }
         if self._summary_writer:
-            self._summary_writer.set_data_types({'last_layer_w': 'histogram'})
+            self._summary_writer.set_data_types({
+                'last_layer_w': 'histogram',
+                'advantage_h': 'histogram', 'rewards_h': 'histogram'})
 
     def _prepare_training(
             self, history: History) -> TrainingData[FeatureSet, int]:
@@ -140,5 +144,7 @@ class PPO(A2C):
                     tf.squeeze(action_lists[i]), yi)
         if advantage is not None:
             self._metrics['advantage_mean'].update_state(advantage)
+            self._metrics['advantage_h'].update_state(advantage)
         if rewards is not None:
             self._metrics['rewards'].update_state(rewards[:-1])
+            self._metrics['rewards_h'].update_state(rewards[:-1])
