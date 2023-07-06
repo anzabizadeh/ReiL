@@ -9,9 +9,36 @@ from reil.utils.tf_utils import JIT_COMPILE
 keras = tf.keras
 
 
-class ScaleFn(Protocol):
-    def __call__(self) -> float | Tensor:
+class ScaleFn:
+    def __init__(self) -> None:
+        self.last_call: float | Tensor = 0.
+
+    def call(self) -> float | Tensor:
         raise NotImplementedError
+
+    def __call__(self) -> float | Tensor:
+        self.last_call = self.call()
+        return self.last_call
+
+
+class Constant(ScaleFn):
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def call(self) -> float:
+        return self._value
+
+    def get_config(self) -> dict[str, Any]:
+        return {'value': self._value}
+
+    def from_config(self, config: dict[str, Any]):
+        return Constant(config.pop('value'))
+
+    def __getstate__(self) -> dict[str, Any]:
+        return self.get_config()
+
+    def __setstate__(self, config: dict[str, Any]):
+        self._value = config.pop('value')
 
 
 @keras.utils.register_keras_serializable(package='reil.utils.action_dist_modifier')
@@ -21,7 +48,7 @@ class N_over_N_plus_n(ScaleFn):
         self._n: int = 0
 
     @tf.function(jit_compile=JIT_COMPILE)
-    def __call__(self) -> Tensor:
+    def call(self) -> Tensor:
         self._n += 1
         return tf.cast(
             self._N / (self._N + self._n), tf.float32, name='N_over_N_plus_n')  # type: ignore
@@ -38,26 +65,29 @@ class N_over_N_plus_n(ScaleFn):
     def __getstate__(self) -> dict[str, Any]:
         return self.get_config()
 
-    def __setstate__(self, config: dict[str, Any]) -> 'N_over_N_plus_n':
-        return self.from_config(config)
+    def __setstate__(self, config: dict[str, Any]):
+        self._N = config.pop('N')
+        self._n = config.pop('n')
 
 
 class Sigmoid(ScaleFn):
-    def __init__(self, c1: float, c2: float) -> None:
-        self._c1, self._c2 = c1, c2
-        self._exp_c1_c2 = tf.math.exp(c1 * c2)
+    def __init__(self, steepness: float, endpoint: float) -> None:
+        self._steepness, self._endpoint = steepness, endpoint
         self._n: int = 0
 
-    @tf.function(jit_compile=JIT_COMPILE)
-    def __call__(self) -> Tensor:
+    def call(self) -> float:
         self._n += 1
-        return 1. - self._exp_c1_c2 / (tf.math.exp(self._c1 * self._n) + self._exp_c1_c2)
+        return 1 / (1 + math.exp(-self._steepness * (self._n - self._endpoint * 0.5)))
 
     def get_config(self) -> dict[str, Any]:
-        return {'c1': self._c1, 'c2': self._c2, 'n': self._n}
+        return {
+            'steepness': self._steepness,
+            'endpoint': self._endpoint,
+            'n': self._n
+        }
 
     def from_config(self, config: dict[str, Any]):
-        temp = Sigmoid(config.pop('c1'), config.pop('c2'))
+        temp = Sigmoid(config.pop('steepness'), config.pop('endpoint'))
         temp._n = config.pop('n')
 
         return temp
@@ -66,13 +96,16 @@ class Sigmoid(ScaleFn):
         return self.get_config()
 
     def __setstate__(self, config: dict[str, Any]):
-        return self.from_config(config)
+        self._steepness = config.pop('steepness')
+        self._endpoint = config.pop('endpoint')
+        self._n = config.pop('n')
 
 
 class ActionModifier:
     def __init__(
             self, relative_action_distances: tuple[float, ...],
-            scale_fn: ScaleFn):
+            scale_fn: ScaleFn, name: str = 'action_modifier'):
+        self.name = name
         self._relative_action_distances: Tensor = tf.constant(
             relative_action_distances, dtype=tf.float32)
         self._scale_fn = scale_fn
@@ -86,10 +119,11 @@ class PointyHatActionModifier(ActionModifier):
             self, relative_action_distances: tuple[float, ...],
             scale_fn: ScaleFn,
             height: tuple[float, float],
-            width: tuple[float, float] | None = None):
+            width: tuple[float, float] | None = None,
+            name: str = 'pointyhat'):
         super().__init__(
             relative_action_distances=relative_action_distances,
-            scale_fn=scale_fn)
+            scale_fn=scale_fn, name=name)
 
         down, up = height
         if width:
@@ -113,11 +147,11 @@ class PointyHatActionModifier(ActionModifier):
         self._y = tf.tensor_scatter_nd_update(
             self._y, [[relative_action_distances.index(0.)]], [up])
 
-    @tf.function(
-        input_signature=(TensorSpec(
-            shape=[None, None], dtype=tf.float32, name='action_distribution'),),
-        jit_compile=JIT_COMPILE
-    )
+    # @tf.function(
+    #     input_signature=(TensorSpec(
+    #         shape=[None, None], dtype=tf.float32, name='action_distribution'),),
+    #     jit_compile=JIT_COMPILE
+    # )
     def __call__(self, action_distribution: Tensor) -> Tensor:
         scale = self._scale_fn()
         return tf.add(action_distribution, tf.multiply(scale, self._y))
@@ -128,11 +162,12 @@ class RickerWaveletActionModifier(ActionModifier):
     Implements the one dimensional Ricker wavelet, a.k.a. the Mexican hat.
     This implementation assumes `t` to be fixed and `sigma` to change.
     '''
-    fixed_part: Final = tf.divide(2., tf.sqrt(3.) * tf.math.pow(math.pi, 0.25), name='fixed_part')
+    fixed_part: Final = tf.divide(
+        2., tf.sqrt(3.) * tf.math.pow(math.pi, 0.25), name='fixed_part')
 
     def __init__(
             self, relative_action_distances: tuple[float, ...],
-            scale_fn: ScaleFn):
+            scale_fn: ScaleFn, name: str = 'ricker_wavelet'):
         '''
         Initialize the object with a fixed time tensor.
 
@@ -143,7 +178,8 @@ class RickerWaveletActionModifier(ActionModifier):
         Returns:
             None
         '''
-        super().__init__(relative_action_distances, scale_fn)
+        super().__init__(relative_action_distances, scale_fn, name)
+
         self.t: Tensor = self._relative_action_distances
         self.t2: Tensor = tf.math.pow(self.t, 2.)
 
