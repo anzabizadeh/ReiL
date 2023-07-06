@@ -236,7 +236,7 @@ class PPOModel(TF2UtilsMixin):
         #                 tf.gather(self._action_per_head, j)),
         #             axis=1)], axis=1)
 
-        _advantage = tf.divide(
+        advantage_ = tf.divide(
             advantage - tf.math.reduce_mean(advantage),
             tf.math.reduce_std(advantage) + eps,
             name='normalized_advantage')
@@ -258,7 +258,7 @@ class PPOModel(TF2UtilsMixin):
                     #     tf.gather(self._action_per_head, j))
 
                     actor_loss = self._compute_actor_loss(
-                        initial_logprobs, new_logprobs_j, _advantage, j)
+                        initial_logprobs, new_logprobs_j, advantage_, j)
 
                     if tf.cast(self._entropy_loss_coef, tf.bool):
                         entropy_loss = entropy(new_logprobs_j)
@@ -340,7 +340,7 @@ class PPOModel(TF2UtilsMixin):
         return regularizer_loss
 
     @tf.function(jit_compile=JIT_COMPILE)
-    def _compute_actor_loss(self, initial_logprobs, new_logprobs, _advantage, j):
+    def _compute_actor_loss(self, initial_logprobs, new_logprobs, advantage, j):
         ratio: Tensor = tf.exp(
             tf.subtract(
                 new_logprobs, tf.gather(initial_logprobs, j, axis=1),
@@ -349,7 +349,7 @@ class PPOModel(TF2UtilsMixin):
         )
         if self._clip_ratio is None:
             actor_loss = -tf.reduce_mean(
-                tf.multiply(ratio, _advantage), name='actor_loss')
+                tf.multiply(ratio, advantage), name='actor_loss')
         else:
             clipped_ratio = tf.clip_by_value(
                 ratio,
@@ -358,8 +358,8 @@ class PPOModel(TF2UtilsMixin):
                 name='clipped_ratio')
             actor_loss = -tf.reduce_mean(
                 tf.minimum(
-                    tf.multiply(ratio, _advantage, name='ratio_times_adv'),
-                    tf.multiply(clipped_ratio, _advantage,
+                    tf.multiply(ratio, advantage, name='ratio_times_adv'),
+                    tf.multiply(clipped_ratio, advantage,
                                 name='clipped_ratio_times_adv')),
                 name='actor_loss_clipped')
 
@@ -576,7 +576,7 @@ class PPONeighborEffect(PPOModel):
         #                 tf.gather(self._action_per_head, j)),
         #             axis=1)], axis=1)
 
-        _advantage = tf.divide(
+        advantage_ = tf.divide(
             advantage - tf.math.reduce_mean(advantage),
             tf.math.reduce_std(advantage) + eps,
             name='normalized_advantage')
@@ -606,7 +606,7 @@ class PPONeighborEffect(PPOModel):
                         self._action_per_head, False)
                     if tf.equal(effect_width, zero_int32):
                         actor_loss = self._compute_actor_loss(
-                            initial_logprobs, new_logprobs, _advantage, j)
+                            initial_logprobs, new_logprobs, advantage_, j)
                         # ratio = tf.exp(
                         #     new_logprobs - tf.gather(initial_logprobs, j, axis=1))
                         # if self._clip_ratio is not None:
@@ -614,10 +614,10 @@ class PPONeighborEffect(PPOModel):
                         #         ratio, 1. - self._clip_ratio, 1. + self._clip_ratio)
                         #     actor_loss = -tf.reduce_mean(
                         #         tf.minimum(
-                        #             ratio * _advantage, clipped_ratio * _advantage))
+                        #             ratio * advantage_, clipped_ratio * advantage_))
 
                         # else:
-                        #     actor_loss = -tf.reduce_mean(ratio * _advantage)
+                        #     actor_loss = -tf.reduce_mean(ratio * advantage_)
                     else:
                         for diff in tf.range(
                                 tf.negative(effect_width), effect_width):
@@ -637,7 +637,7 @@ class PPONeighborEffect(PPOModel):
                                 in_range_indicator, tf.int32)
 
                             advantage_in_range = tf.dynamic_partition(  # type: ignore
-                                _advantage, in_range_indices, 2,
+                                advantage_, in_range_indices, 2,
                                 name='advantage_in_range')[1]
                             y_in_range = tf.dynamic_partition(  # type: ignore
                                 temp, in_range_indices, 2,
