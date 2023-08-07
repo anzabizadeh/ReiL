@@ -137,11 +137,15 @@ class PointyHatActionModifier(ActionModifier):
         if left == -right:
             self._y = -down / right * tf.abs(x) + down
         else:
-            greater_than_zero = tf.cast(
+            greater_than_zero: tf.Tensor = tf.cast(  # type: ignore
                 tf.math.greater(x, 0.), dtype=tf.float32)
             self._y: Tensor = tf.add(
-                tf.multiply(-down / right * x + down, greater_than_zero),
-                tf.multiply(-down / left * x + down, 1. - greater_than_zero)
+                tf.multiply(
+                    tf.multiply(-down / right, x) + down, greater_than_zero),
+                tf.multiply(
+                    tf.multiply(
+                        -down / left, x) + down,
+                        1. - greater_than_zero)  # type: ignore
             )
 
         self._y = tf.tensor_scatter_nd_update(
@@ -154,7 +158,10 @@ class PointyHatActionModifier(ActionModifier):
     # )
     def __call__(self, action_distribution: Tensor) -> Tensor:
         scale = self._scale_fn()
-        return tf.add(action_distribution, tf.multiply(scale, self._y))
+        return tf.add(
+            action_distribution,
+            tf.expand_dims(tf.multiply(scale, self._y), axis=0)
+        )
 
 
 class RickerWaveletActionModifier(ActionModifier):
