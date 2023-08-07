@@ -10,7 +10,6 @@ from typing import Any, Literal
 
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
-from reil.healthcare.patient import Patient
 from reil.healthcare.subjects.health_subject import HealthSubject
 from reil.serialization import deserialize, serialize
 
@@ -21,20 +20,13 @@ class DosingSubject(HealthSubject):
     '''
     def __init__(  # noqa: C901
             self,
-            patient: Patient,
-            measurement_name: str,
-            measurement_range: tuple[float, float],
-            max_day: int,
-            duration_range: tuple[int, int],
             dose_range: tuple[float, float],
             decision_mode: Literal[
                 'dose', 'dose_change', 'dose_percent_change',
                 'dose_duration', 'dose_change_duration', 'dose_percent_change_duration',
-                'dose_duration_combined', 'dose_change_duration_combined',
-                'dose_percent_change_duration_combined',
+                'dose_duration_joint', 'dose_change_duration_joint',
+                'dose_percent_change_duration_joint',
             ],
-            backfill: bool,
-            duration_step: int = 1,
             dose_step: float | None = None,
             decision_values: tuple[float, ...] | tuple[
                 tuple[float, int], ...] | None = None,
@@ -69,14 +61,7 @@ class DosingSubject(HealthSubject):
             Maximum duration of each trial.
         '''
 
-        super().__init__(
-            patient=patient,
-            measurement_name=measurement_name,
-            measurement_range=measurement_range,
-            max_day=max_day,
-            backfill=backfill,
-            duration_range=duration_range,
-            duration_step=duration_step, **kwargs)
+        super().__init__(**kwargs)
 
         self._dose_range = dose_range
         self._decision_range = decision_range
@@ -86,26 +71,26 @@ class DosingSubject(HealthSubject):
 
         self._decision_mode = decision_mode
         self._duration_mode = 'duration' in decision_mode
-        self._combined = 'combined' in decision_mode
+        self._joint = 'joint' in decision_mode
 
         self._actions_taken: list[FeatureSet] = []
         self._full_dose_history = [0.0] * self._max_day
         self._decision_points_dose_history = [0.0] * self._max_day
 
-        if self._combined:
+        if self._joint:
             if 'dose_percent_change' in decision_mode:
-                self._dose_mode = 'dose_percent_change_combined'
+                self._dose_mode = 'dose_percent_change_joint'
 
                 if self._decision_values is None:
                     raise ValueError(
                         '`decision_values` missing for '
-                        '`decision_mode`=dose_percent_change_combined.')
+                        '`decision_mode`=dose_percent_change_joint.')
 
                 if not isinstance(self._decision_values[0], tuple):
                     raise ValueError(
                         '`decision_values` should be of type '
                         '`tuple[tuple[float, int], ...]` for '
-                        '`decision_mode`=dose_percent_change_combined.')
+                        '`decision_mode`=dose_percent_change_joint.')
 
                 # if self._decision_range is None:
                 #     raise ValueError(
@@ -126,7 +111,7 @@ class DosingSubject(HealthSubject):
                 # )
                 self.feature_gen_set += FeatureGeneratorSet(
                     FeatureGenerator.categorical(
-                        name='dose_percent_change_combined',
+                        name='dose_percent_change_joint',
                         categories=self._decision_values
                     )
                 )
@@ -183,7 +168,7 @@ class DosingSubject(HealthSubject):
             #         )
             #     )
 
-            self.action_gen_set += self.feature_gen_set['dose_percent_change_combined']
+            self.action_gen_set += self.feature_gen_set['dose_percent_change_joint']
 
             # if self._duration_mode:
             #     self.action_gen_set += self.feature_gen_set['duration']
@@ -212,12 +197,14 @@ class DosingSubject(HealthSubject):
                         '`decision_range` should be a tuple of floats for '
                         '`decision_mode`=dose_percent_change.')
 
+                # TODO: This needs to be investigated! I am not sure if tuple
+                # can be in fixed values and in ranges.
                 self.feature_gen_set += FeatureGeneratorSet(
                     FeatureGenerator.numerical_fixed_values(
                         name='dose_percent_change',
-                        fixed_values=self._decision_values,
+                        fixed_values=self._decision_values,  # type: ignore
                         lower=self._decision_range[0],
-                        upper=self._decision_range[1])
+                        upper=self._decision_range[1])  # type: ignore
                 )
 
                 if self._round_to_step:
@@ -342,18 +329,18 @@ class DosingSubject(HealthSubject):
                 current_dose = \
                     self._dose_range[0] + self._dose_step * round(  # type: ignore
                         (current_dose - self._dose_range[0]) / self._dose_step)
-        elif 'dose_percent_change_combined' in action_temp:
+        elif 'dose_percent_change_joint' in action_temp:
             current_dose = (
                 self._decision_points_dose_history[self._decision_points_index - 1] *
-                (1 + action_temp['dose_percent_change_combined'][0]))  # type: ignore
+                (1 + action_temp['dose_percent_change_joint'][0]))  # type: ignore
             if self._round_to_step:
                 current_dose = \
                     self._dose_range[0] + self._dose_step * round(  # type: ignore
                         (current_dose - self._dose_range[0]) / self._dose_step)
-            duration = action_temp['dose_percent_change_combined'][1]
+            duration = action_temp['dose_percent_change_joint'][1]  # type: ignore
         else:
             raise ValueError(
-                'dose/ dose_change/ dose_percent_change/ dose_percent_change_combined not found.')
+                'dose/ dose_change/ dose_percent_change/ dose_percent_change_joint not found.')
 
         if duration is None:
             duration = action_temp.get('duration', self._default_duration)
