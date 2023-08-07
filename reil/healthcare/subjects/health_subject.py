@@ -29,7 +29,8 @@ class HealthSubject(Subject):
             max_day: int,
             duration_range: tuple[int, int],
             backfill: bool,
-            duration_step: int = 1,
+            duration_step: int | None = None,
+            duration_values: tuple[int, ...] | None = None,
             default_duration: int | None = None,
             **kwargs: Any):
         '''
@@ -73,6 +74,7 @@ class HealthSubject(Subject):
 
         self._duration_range = duration_range
         self._duration_step = duration_step
+        self._duration_values = duration_values
         self._default_duration = default_duration
         self._measurement_range = measurement_range
         self._measurement_name = measurement_name
@@ -88,17 +90,31 @@ class HealthSubject(Subject):
                  *self._measurement_range),
                 (f'daily_{self._measurement_name}_history',
                  *self._measurement_range))
-        ) + FeatureGeneratorSet(
-            FeatureGenerator.discrete(
-                name=name, lower=lower, upper=upper, step=step)
-            for name, lower, upper, step in (
-                ('duration_history', *self._duration_range,
-                    self._duration_step),
-                ('duration', *self._duration_range, self._duration_step),
-            )
         ) + FeatureGenerator.discrete(
             name='day', lower=0, upper=self._max_day - 1,
             generator=lambda _: None)
+
+        if self._duration_values is None:
+            if self._duration_step is None:
+                raise ValueError(
+                    'Either `duration_values` or `duration_step` should be provided.')
+            self.feature_gen_set += FeatureGeneratorSet(
+                FeatureGenerator.discrete(
+                    name=name, lower=lower, upper=upper, step=step)
+                for name, lower, upper, step in (
+                    ('duration_history', *self._duration_range, self._duration_step),
+                    ('duration', *self._duration_range, self._duration_step),
+                )
+            )
+        else:
+            if self._duration_step is not None:
+                raise ValueError(
+                    'Either `duration_values` or `duration_step` should be provided, not both.')
+            self.feature_gen_set += FeatureGeneratorSet(
+                FeatureGenerator.numerical_fixed_values(
+                    name=name, lower=self._duration_range[0],
+                    upper=self._duration_range[1], fixed_values=self._duration_values)
+                for name in ('duration_history', 'duration'))
 
         self.action_gen_set = FeatureGeneratorSet()
 
@@ -136,7 +152,10 @@ class HealthSubject(Subject):
             measurement_range=self._measurement_range,
             duration_range=self._duration_range,
             duration_step=self._duration_step,
-            max_day=self._max_day
+            duration_values=self._duration_values,
+            default_duration=self._default_duration,
+            max_day=self._max_day,
+            backfill=self._backfill,
         ))
 
         return config
