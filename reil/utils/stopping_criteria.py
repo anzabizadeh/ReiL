@@ -36,10 +36,10 @@ class StoppingCriteria:
             self, logs: dict[str, float],
             weights_fn: Callable[[], Any] | None = None) -> bool:
         self._call_counter += 1
-        if self._monitor not in logs:
+        if self._call_counter < self._warm_up:
             return False
 
-        if self._call_counter < self._warm_up:
+        if self._monitor not in logs:
             return False
 
         self._buffer.add({self._monitor: logs[self._monitor]})
