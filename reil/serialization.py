@@ -31,6 +31,8 @@ class CustomUnPickler(pickle.Unpickler):
         if name == 'change_array_to_missing':
             from reil.datatypes.feature import change_set_to_missing
             return change_set_to_missing
+        if 'interval' in name:
+            name = name.replace('interval', 'duration')
 
         return super().find_class(module, name)  # type: ignore
 
