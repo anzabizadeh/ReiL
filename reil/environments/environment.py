@@ -14,7 +14,7 @@ from typing import Any, Callable, Generator, Generic, TypeVar
 import pandas as pd
 
 from reil import stateful
-from reil.agents.agent_base import AgentBase
+from reil.agents.base_agent import BaseAgent
 from reil.agents.agent_demon import AgentDemon
 from reil.datatypes.dataclasses import InteractionProtocol
 from reil.datatypes.feature import FeatureSet
@@ -24,10 +24,10 @@ from reil.utils.instance_generator import InstanceGenerator
 from reil.utils.instance_generator_v2 import InstanceGeneratorV2
 
 AgentSubjectTuple = tuple[str, str]
-EntityType = AgentBase | Subject
-EntityGenType = InstanceGenerator[AgentBase] | InstanceGenerator[
+EntityType = BaseAgent | Subject
+EntityGenType = InstanceGenerator[BaseAgent] | InstanceGenerator[
     AgentDemon] | InstanceGenerator[Subject] | InstanceGenerator[
-        SubjectDemon] | InstanceGeneratorV2[AgentBase] | InstanceGeneratorV2[  # type: ignore
+        SubjectDemon] | InstanceGeneratorV2[BaseAgent] | InstanceGeneratorV2[  # type: ignore
             AgentDemon] | InstanceGeneratorV2[Subject] | InstanceGeneratorV2[
                 SubjectDemon]  # type: ignore
 
@@ -76,7 +76,7 @@ class Environment(stateful.Stateful):
         '''
         super().__init__(**kwargs)
 
-        self._agents: dict[str, AgentBase] = {}
+        self._agents: dict[str, BaseAgent] = {}
         self._subjects: dict[str, Subject] = {}
         self._agent_demons: dict[str, AgentDemon] = {}
         self._subject_demons: dict[str, SubjectDemon] = {}
@@ -157,7 +157,7 @@ class Environment(stateful.Stateful):
                 self._instance_generators.update({name: _obj})
 
                 _, instance = next(_obj)
-                if isinstance(instance, AgentBase):
+                if isinstance(instance, BaseAgent):
                     self._agents.update({name: instance})  # type: ignore
                 elif isinstance(instance, Subject):
                     self._subjects.update({name: instance})
@@ -166,7 +166,7 @@ class Environment(stateful.Stateful):
                         f'entity {name} is niether an agent generator nor a '
                         'subject generator.')
 
-            elif isinstance(_obj, AgentBase):
+            elif isinstance(_obj, BaseAgent):
                 self._agents.update({name: _obj})
             elif isinstance(_obj, Subject):  # type: ignore
                 self._subjects.update({name: _obj})

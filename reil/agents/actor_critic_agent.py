@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-A2C class
+A2CAgent class
 =========
 
 An Actor-Critic Policy Gradient `agent`.
@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 import tensorflow as tf
+
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers.buffer import Buffer
@@ -20,7 +21,7 @@ from reil.utils.exploration_strategies import NoExploration
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
 
-class A2C(Agent[FeatureSet, ACLabelType]):
+class A2CAgent(Agent[FeatureSet, ACLabelType]):
     '''
     An actor critic (Policy Gradient) `agent`.
     '''
@@ -37,15 +38,14 @@ class A2C(Agent[FeatureSet, ACLabelType]):
         learner:
             the `Learner` object that does the learning.
 
-        discount_factor:
-            by what factor should future rewards be discounted?
+        buffer:
+            a buffer to store observations before each training pass.
 
-        training_mode:
-            whether the agent is in training mode or not.
+        reward_clip:
+            a tuple to clip the reward. `None` means no clipping for that side.
 
-        tie_breaker:
-            how to choose the `action` if more than one is candidate
-            to be chosen.
+        **kwargs:
+            additional keyword arguments to pass to the `Agent` constructor.
         '''
         super().__init__(
             learner=learner, exploration_strategy=NoExploration(),
@@ -58,6 +58,12 @@ class A2C(Agent[FeatureSet, ACLabelType]):
 
     @classmethod
     def _empty_instance(cls):  # type: ignore
+        '''
+        Returns
+        -------
+        :
+            an empty `A2CAgent` instance.
+        '''
         return cls(Learner._empty_instance(), Buffer())
 
     def _prepare_training(

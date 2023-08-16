@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-PPO class
+PPOAgent class
 =========
 
 A Proximal Policy Optimization Policy Gradient `agent`.
@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import tensorflow as tf
 
-from reil.agents.actor_critic import A2C
+from reil.agents.actor_critic_agent import A2CAgent
 from reil.agents.agent import TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers.buffer import Buffer
@@ -24,7 +24,7 @@ from reil.utils.tf_utils import ActionRank, MeanMetric
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
 
-class PPO(A2C):
+class PPOAgent(A2CAgent):
     '''
     A Proximal Policy Optimization `agent`.
     '''
@@ -53,7 +53,7 @@ class PPO(A2C):
             to be chosen.
         '''
         self._learner: PPOLearner
-        super(A2C, self).__init__(
+        super(A2CAgent, self).__init__(
             learner=learner, exploration_strategy=NoExploration(),
             variable_action_count=False,
             **kwargs)
@@ -62,7 +62,7 @@ class PPO(A2C):
         self._buffer.setup(buffer_names=['state', 'y_r_a'])
         self._reward_clip = reward_clip
         self._gae_lambda = gae_lambda
-        self._metrics: dict[str, MetricProtocol] = {  # type: ignore
+        self._metrics: dict[str, MetricProtocol] = {
             'action_rank': ActionRank(),
             'advantage_mean': MeanMetric('advantage_mean', dtype=tf.float32),
             'advantage_h': HistogramMetric('advantage_h'),
@@ -100,8 +100,8 @@ class PPO(A2C):
             active_history, *self._reward_clip) + [0.0]
         dis_reward = self.discounted_cum_sum(rewards, discount_factor)
 
-        state_list: tuple[FeatureSet, ...] = tuple(  # type: ignore
-            h.state for h in active_history)
+        state_list: tuple[FeatureSet, ...] = tuple(
+            h.state for h in active_history)  # type: ignore
         # add zero to the end to have the correct length of `deltas`
         y, values = self._learner.predict(state_list)
         values = np.append(tf.reshape(values, -1), 0.0)
@@ -131,6 +131,14 @@ class PPO(A2C):
         return temp['state'], temp['y_r_a'], {}  # type: ignore
 
     def _update_metrics(self, **kwargs: Any) -> None:
+        '''
+        updates the metrics.
+
+        Arguments
+        ---------
+        kwargs:
+            keyword arguments.
+        '''
         super()._update_metrics(**kwargs)
         action_indices = kwargs.get('action_indices')
         y = kwargs.get('y')

@@ -9,11 +9,11 @@ An agent that randomly chooses an action
 import random
 from typing import Any
 
-from reil.agents.agent_base import AgentBase
+from reil.agents.base_agent import BaseAgent
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 
 
-class RandomAgent(AgentBase):
+class RandomAgent(BaseAgent):
     '''
     An agent that acts randomly.
     '''

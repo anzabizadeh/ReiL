@@ -1,4 +1,4 @@
-.. automodule:: reil.agents.agent_base
+.. automodule:: reil.agents.base_agent
    :members:
    :undoc-members:
    :inherited-members:

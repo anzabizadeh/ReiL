@@ -7,24 +7,28 @@ This module provides different agents in reinforcement learning context.
 
 Classes
 -------
-AgentBase
-    the base class of all agent classes
+BaseAgent
+    the base class of all agent classes. It only takes actions and does not learn.
 
 Agent
-    the base class of all agent classes that learn from history
+    the base class of all agent classes that learn from history.
 
 AgentDemon:
-    A class that allows an `agent` to be manipulated.
+    A class that allows manipulation of an `agent`'s behavior.
 
-QLearning
+QLearningAgent
     the Q-learning agent that can accept any learner
 
-DeepQLearning
-    the agent with neural network as a learner (derived from
-    `QLearning` class)
+DeepQLearningAgent
+    the agent with a neural network as learner (derived from
+    `QLearningAgent` class)
 
 RandomAgent
     an agent that randomly chooses an action
+
+TwoPhaseAgent
+    an agent consisting of two agents. A switch is used to decide when to switch
+    from the first agent to the second one.
 
 UserAgent
     an agent that shows current state and asks for user's choice

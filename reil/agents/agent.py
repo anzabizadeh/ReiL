@@ -11,7 +11,7 @@ from typing import Any, Generator, Generic, Literal, TypeVar
 
 import scipy.signal
 
-from reil.agents.agent_base import AgentBase
+from reil.agents.base_agent import BaseAgent
 from reil.datatypes import History
 from reil.datatypes.dataclasses import Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
@@ -24,7 +24,7 @@ TrainingData = tuple[
     tuple[InputType, ...], tuple[LabelType, ...], dict[str, Any]]
 
 
-class Agent(AgentBase, Generic[InputType, LabelType]):
+class Agent(BaseAgent, Generic[InputType, LabelType]):
     '''
     The base class of all agent classes that learn from history.
     '''
@@ -87,10 +87,34 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
 
     @classmethod
     def _empty_instance(cls):
+        '''
+        Return an empty instance of the agent.
+
+        Returns
+        -------
+        :
+            an empty instance of the agent.
+        '''
         return cls(Learner._empty_instance(), ConstantEpsilonGreedy())
 
     @staticmethod
     def discounted_cum_sum(r: list[float], discount: float) -> list[float]:
+        '''
+        Compute the discounted cumulative sum of a list of rewards.
+
+        Arguments
+        ---------
+        r:
+            a list of rewards.
+
+        discount:
+            the discount factor.
+
+        Returns
+        -------
+        :
+            the discounted cumulative sum of the rewards.
+        '''
         # Copied from OpenAI SpinUp: algos/tf1/ppo/core.py
         return scipy.signal.lfilter(  # type: ignore
             [1], [1, float(-discount)], r[::-1], axis=0)[::-1]
@@ -100,6 +124,25 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
             history: History,
             min_clip: float | None = None,
             max_clip: float | None = None) -> list[float]:
+        '''
+        Extract rewards from history.
+
+        Arguments
+        ---------
+        history:
+            a `History` object from which the `agent` learns.
+
+        min_clip:
+            clip the rewards to be at least `min_clip`.
+
+        max_clip:
+            clip the rewards to be at most
+
+        Returns
+        -------
+        :
+            a list of rewards.
+        '''
         rewards: list[float] = [
             a.reward for a in history
             if a.reward is not None]
@@ -120,6 +163,16 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
         contains only the terminal state. In this case, we don't have an
         action and a reward for the last observation, so we should clip it in
         Q-learning, actor critic, and similar methods.
+
+        Arguments
+        ---------
+        history:
+            a `History` object from which the `agent` learns.
+
+        Returns
+        -------
+        :
+            the active history.
         '''
         for h in history[:-1]:
             if h.state is None or (
@@ -238,7 +291,7 @@ class Agent(AgentBase, Generic[InputType, LabelType]):
     ) -> Generator[FeatureSet | None, dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
-        Extends `AgentBase.observe`.
+        Extends `BaseAgent.observe`.
 
         This method creates a generator for `subject_id` that
         receives `state`, yields `action` and receives `reward`

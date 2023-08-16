@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-AgentBase class
+BaseAgent class
 ===============
 
 The base class of all `agent` classes.
@@ -16,7 +16,7 @@ from reil.stateful import Stateful
 T = TypeVar('T')
 
 
-class AgentBase(Stateful):
+class BaseAgent(Stateful):
     '''
     The base class of all `agent` classes. This class does not support any
     `learner`.
@@ -30,12 +30,11 @@ class AgentBase(Stateful):
         '''
         Arguments
         ---------
-        default_actions:
-            A list of default actions.
-
         tie_breaker:
             How to choose the `action` if more than one is candidate
-            to be chosen.
+            to be chosen. If `first` is chosen, the first candidate is
+            chosen. If `last` is chosen, the last candidate is chosen. If
+            `random` is chosen, a random candidate is chosen.
 
         variable_action_count:
             Does this `agent` can accept a variable number of `actions`? For
@@ -171,7 +170,7 @@ class AgentBase(Stateful):
                         state=state, subject_id=subject_id,
                         actions=actions, iteration=iteration)
 
-                    # AgentBase do not consider `Lookahead` data, because it
+                    # BaseAgent do not consider `Lookahead` data, because it
                     # has no learning mechanism.
                     new_observation.action_taken = (
                         yield new_observation.action)['action_taken']

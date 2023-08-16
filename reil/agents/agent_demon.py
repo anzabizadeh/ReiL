@@ -11,14 +11,14 @@ import pathlib
 from typing import Any, Callable, Literal, Union
 
 from reil import reilbase
-from reil.agents.agent_base import AgentBase
+from reil.agents.base_agent import BaseAgent
 from reil.datatypes import History
 from reil.datatypes.components import State, Statistic
 from reil.datatypes.entity_register import EntityRegister
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 
 
-class AgentDemon(AgentBase):
+class AgentDemon(BaseAgent):
     '''
     This class accepts a regular `agent`, and intervenes in its interaction
     with the subjects. A substitute `agent` acts whenever a condition is
@@ -27,9 +27,9 @@ class AgentDemon(AgentBase):
 
     def __init__(
             self,
-            sub_agent: AgentBase,
+            sub_agent: BaseAgent,
             condition_fn: Callable[[FeatureSet, int], bool],
-            main_agent: AgentBase | None = None,
+            main_agent: BaseAgent | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -52,8 +52,8 @@ class AgentDemon(AgentBase):
         self._training_trigger: Literal[
             'none', 'termination', 'state', 'action', 'reward']
 
-        self._main_agent: AgentBase | None = main_agent
-        self._sub_agent: AgentBase = sub_agent
+        self._main_agent: BaseAgent | None = main_agent
+        self._sub_agent: BaseAgent = sub_agent
         self._condition_fn = condition_fn
 
         if main_agent is not None:
@@ -61,9 +61,25 @@ class AgentDemon(AgentBase):
 
     @classmethod
     def _empty_instance(cls):
-        return cls(AgentBase(), lambda f, i: True, None)
+        '''
+        Return an empty instance of the class.
+        '''
+        return cls(BaseAgent(), lambda f, i: True, None)
 
-    def __call__(self, main_agent: AgentBase) -> AgentDemon:
+    def __call__(self, main_agent: BaseAgent) -> AgentDemon:
+        '''
+        Set the `main_agent` to be intervened with.
+
+        Arguments
+        ---------
+        main_agent:
+            The `agent` that needs to be intervened with.
+
+        Returns
+        -------
+        :
+            self
+        '''
         self._main_agent = main_agent
         self.state = main_agent.state
         self.statistic = main_agent.statistic
@@ -76,9 +92,20 @@ class AgentDemon(AgentBase):
             self, filename: str,
             path: Union[str, pathlib.PurePath] | None) -> None:
         _path = pathlib.Path(path or self._path)
+        '''
+        Load the agent from a file.
+
+        Arguments
+        ---------
+        filename:
+            The name of the file to load the agent from.
+
+        path:
+            The path to the file to load the agent from.
+        '''
         super().load(filename, _path)
 
-        self._main_agent = (self._main_agent or AgentBase).from_pickle(
+        self._main_agent = (self._main_agent or BaseAgent).from_pickle(
             filename, _path / 'main_agent')
         self._sub_agent = self._sub_agent.from_pickle(
             filename, _path / 'sub_agent')
@@ -90,7 +117,22 @@ class AgentDemon(AgentBase):
             filename: str | None = None,
             path: Union[str, pathlib.PurePath] | None = None
     ) -> pathlib.PurePath:
+        '''
+        Save the agent to a file.
 
+        Arguments
+        ---------
+        filename:
+            The name of the file to save the agent to.
+
+        path:
+            The path to the file to save the agent to.
+
+        Returns
+        -------
+        :
+            The path to the file where the agent was saved
+        '''
         full_path = super().save(filename, path)
         if self._main_agent:
             self._main_agent.save(
@@ -101,6 +143,31 @@ class AgentDemon(AgentBase):
         return full_path
 
     def register(self, entity_name: str, _id: int | None = None) -> int:
+        '''
+        Register a new entity.
+
+        Arguments
+        ---------
+        entity_name:
+            The name of the entity to register.
+
+        _id:
+            The ID to register the entity with.
+
+        Returns
+        -------
+        :
+            The ID of the entity.
+
+        Raises
+        ------
+        ValueError
+            If the main agent is not set.
+
+        RuntimeError
+            If the ID from the main agent does not match the ID from the sub
+            agent.
+        '''
         if self._main_agent is None:
             raise ValueError('main_agent is not set.')
 
@@ -113,6 +180,19 @@ class AgentDemon(AgentBase):
         return from_main
 
     def deregister(self, entity_id: int) -> None:
+        '''
+        Deregister an entity.
+
+        Arguments
+        ---------
+        entity_id:
+            The ID of the entity to deregister.
+
+        Raises
+        ------
+        ValueError
+            If the main agent is not set.
+        '''
         self._sub_agent.deregister(entity_id)
 
         if self._main_agent is None:
@@ -120,6 +200,9 @@ class AgentDemon(AgentBase):
         self._main_agent.deregister(entity_id)
 
     def reset(self):
+        '''
+        Reset the agent.
+        '''
         if self._main_agent:
             self._main_agent.reset()
         self._sub_agent.reset()
@@ -184,6 +267,14 @@ class AgentDemon(AgentBase):
             self._main_agent.learn(history)  # type: ignore
 
     def __getstate__(self):
+        '''
+        Get the state of the agent.
+
+        Returns
+        -------
+        :
+            The state of the agent.
+        '''
         state = super().__getstate__()
 
         state['_main_agent'] = type(self._main_agent)

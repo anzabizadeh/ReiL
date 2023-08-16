@@ -14,9 +14,9 @@ Submodules
    :maxdepth: 4
 
    reil.agents.agent
-   reil.agents.deep_q_learning
-   reil.agents.agent_base
-   reil.agents.q_learning
+   reil.agents.deep_q_agent
+   reil.agents.base_agent
+   reil.agents.q_learning_agent
    reil.agents.random_agent
    reil.agents.user_agent
    reil.agents.warfarin_agent

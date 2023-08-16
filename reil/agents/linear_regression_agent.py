@@ -8,12 +8,13 @@ specifies action using that.
 '''
 from typing import Any, Callable
 
-from reil.agents.agent_base import AgentBase
-from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
 from sklearn.linear_model import LinearRegression
 
+from reil.agents.base_agent import BaseAgent
+from reil.datatypes.feature import Feature, FeatureGeneratorType, FeatureSet
 
-class LRAgent(AgentBase):
+
+class LRAgent(BaseAgent):
     '''
     An agent that acts based on user input.
     '''

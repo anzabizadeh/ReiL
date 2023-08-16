@@ -1,36 +1,34 @@
 # -*- coding: utf-8 -*-
 '''
-QLearning class
-===============
+DeepQLearningAgent class
+===================
 
-A Q-learning `agent`.
-
-
+A Q-learning `agent` with a Neural Network Q-function approximator.
 '''
-
 from typing import Any
 
 import numpy as np
+
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
 from reil.datatypes.dataclasses import LookaheadData
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
-from reil.learners.learner import Learner, LearnerProtocol
+from reil.learners.q_learner import QLearner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
 
 Feature_or_Tuple_of_Feature = tuple[FeatureSet, ...] | FeatureSet
 
 
-class QLearning(Agent[FeatureSet, float]):
+class DeepQLearningAgent(Agent[tuple[FeatureSet, ...], float]):
     '''
-    A Q-learning `agent`.
+    A Deep Q-learning `agent`.
     '''
 
     def __init__(
             self,
-            learner: LearnerProtocol[FeatureSet, float],
+            learner: QLearner,
             buffer: Buffer[FeatureSet, float],
             exploration_strategy: float | ExplorationStrategy,
             # method: Literal['forward', 'backward'] = 'backward',
@@ -64,6 +62,7 @@ class QLearning(Agent[FeatureSet, float]):
             learner=learner, exploration_strategy=exploration_strategy,
             variable_action_count=True,
             **kwargs)
+        self._learner: QLearner
 
         # self._method: Literal['forward', 'backward'] = method
         # if method not in ('backward', 'forward'):
@@ -78,26 +77,26 @@ class QLearning(Agent[FeatureSet, float]):
 
         self._default_actions = default_actions
         self._buffer = buffer
-        self._buffer.setup(buffer_names=['X', 'Y'])
+        self._buffer.setup(buffer_names=['state', 'action', 'Y'])
 
     @classmethod
     def _empty_instance(cls):  # type: ignore
         return cls(
-            Learner._empty_instance(), Buffer(), ConstantEpsilonGreedy())
+            QLearner._empty_instance(), Buffer(), ConstantEpsilonGreedy())
 
     def _q(
-            self, state: Feature_or_Tuple_of_Feature,
-            action: Feature_or_Tuple_of_Feature) -> tuple[float, ...]:
+            self, states: tuple[FeatureSet, ...],
+            actions: tuple[FeatureSet, ...]) -> tuple[float, ...]:
         '''
         Return the Q-value of `state` `action` pairs.
 
         Arguments
         ---------
-        state:
-            One state or a list of states for which Q-value is returned.
+        states:
+            A tuple of states for which Q-value is returned.
 
-        action:
-            One action or a list of actions for which Q-value is returned.
+        actions:
+            A tuple of actions for which Q-value is returned.
             If not supplied, `default_actions` will be used.
 
         Notes
@@ -109,38 +108,10 @@ class QLearning(Agent[FeatureSet, float]):
 
         :meta public:
         '''
-        if isinstance(action, FeatureSet):
-            action_list = (action,)
-            len_action = 1
-        else:
-            action_list = action
-            len_action = len(action_list)
-
-        if isinstance(state, FeatureSet):
-            state_list = [state] * len_action
-            len_state = len_action
-        else:
-            state_list = state
-            len_state = len(state_list)
-
-        if len_state == len_action:
-            x = tuple(s + a
-                      for s, a in zip(state_list, action_list))
-        elif len_state == 1:
-            x = tuple(state_list[0] + a
-                      for a in action_list)
-        elif len_action == 1:
-            x = tuple(s + action_list[0]
-                      for s in state_list)
-        else:
-            raise ValueError(
-                'State and action should be of the same size'
-                ' or at least one should be of size one.')
-
-        return self._learner.predict(x)
+        return self._learner.predict((states, actions))
 
     def _max_q(
-            self, state: Feature_or_Tuple_of_Feature,
+            self, state: FeatureSet,
             possible_actions: FeatureGeneratorType | None = None) -> float:
         '''
         Return `max(Q)` of one state or a list of states.
@@ -158,8 +129,7 @@ class QLearning(Agent[FeatureSet, float]):
         else:
             actions = tuple(possible_actions.send('return feature exclusive'))
         try:
-            q_values = self._q(state, actions)
-            max_q: float = np.max(q_values)  # type: ignore
+            max_q = self._learner.max((state,), actions)
         except ValueError:
             max_q = 0.0
 
@@ -185,7 +155,7 @@ class QLearning(Agent[FeatureSet, float]):
         ) / len(lookahead_data)
 
     def _prepare_training(
-            self, history: History) -> TrainingData[FeatureSet, float]:
+            self, history: History) -> TrainingData[tuple[FeatureSet, ...], float]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -211,53 +181,23 @@ class QLearning(Agent[FeatureSet, float]):
             else self._compute_lookahead_term(h.lookahead, self._discount_factor)
         ) for h in active_history[1:]
         ]
+
         discounted_next_q.append(0.0)
 
         self._buffer.add_iter({
-            'X': h.state + (h.action_taken or h.action),  # type: ignore
+            'state': h.state,  # type: ignore
+            'action': h.action_taken or h.action,
             'Y': (h.reward or 0.0) + _q
         } for h, _q in zip(active_history, discounted_next_q))
 
-        # if self._method == 'forward':
-        #     ...
-        # else:  # backward
-        #     for i in range(len(active_history) - 1, -1, -1):
-        #         state = active_history[i].state  # type: ignore
-        #         action = (
-        #             active_history[i].action_taken or
-        #             active_history[i].action)  # type: ignore
-        #         reward = active_history[i].reward or 0.0
-
-        #         self._buffer.add({
-        #             'X': state + action,
-        #             'Y': reward + discount_factor * next_q[i + 1]})
-
-        #     # This is left here for reference. In the previous implementation
-        #     # only the reward was back-propagated, and Q was not used.
-        #     # But it seems wrong!
-        #     q_list = [0.0] * 2
-        #     for i in range(len(active_history) - 1, -1, -1):
-        #         state = active_history[i].state  # type: ignore
-        #         action = (
-        #             active_history[i].action_taken or
-        #             active_history[i].action)  # type: ignore
-        #         reward = active_history[i].reward or 0.0
-        #         q_list[0] = reward + discount_factor * q_list[1]
-
-        #         self._buffer.add(
-        #             {'X': state + action, 'Y': q_list[0]})
-
-        #         q_list[1] = q_list[0]
-
         temp = self._buffer.pick()
 
-        return temp['X'], temp['Y'], {}  # type: ignore
+        return (temp['state'], temp['action']), temp['Y'], {}  # type: ignore
 
     def best_actions(
             self,
             state: FeatureSet,
-            actions: tuple[FeatureSet, ...]
-    ) -> tuple[FeatureSet, ...]:
+            actions: tuple[FeatureSet, ...]) -> tuple[FeatureSet, ...]:
         '''
         Find the best `action`s for the given `state`.
 
@@ -274,13 +214,16 @@ class QLearning(Agent[FeatureSet, float]):
         :
             A list of best actions.
         '''
-        q_values = self._q(state, actions)
-        max_q: float = np.max(q_values)  # type: ignore
-        result = tuple(
-            actions[i]
-            for i in np.flatnonzero(q_values == max_q))
+        try:
+            return (self._learner.argmax((state,), actions)[1],)
+        except AttributeError:
+            q_values = self._q((state,), actions)
+            max_q: float = np.max(q_values)  # type: ignore
+            result = tuple(
+                actions[i]
+                for i in np.flatnonzero(q_values == max_q))
 
-        return result
+            return result
 
     def reset(self) -> None:
         '''Resets the agent at the end of a learning iteration.'''
