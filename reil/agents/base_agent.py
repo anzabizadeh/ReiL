@@ -7,9 +7,10 @@ The base class of all `agent` classes.
 '''
 
 import random
-from typing import Any, Generator, Literal, TypeVar
+from collections.abc import Generator
+from typing import Any, Literal, TypeVar
 
-from reil.datatypes.dataclasses import History, Observation
+from reil.datatypes import History, Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.stateful import Stateful
 

@@ -9,7 +9,8 @@ type of inputs to be `TableEntry`.
 `QLookupTable` is a lookup table for `Q-learning`.
 '''
 import dataclasses
-from typing import Any, Generic, Hashable, TypeVar
+from collections.abc import Hashable
+from typing import Any, Generic, TypeVar
 
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner

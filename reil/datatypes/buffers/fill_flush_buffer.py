@@ -6,15 +6,13 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import TypeVar
+from typing_extensions import Unpack
 
+from reil.datatypes.buffers.buffer import AnyTs, Ts
 from reil.datatypes.buffers.endless_buffer import EndlessBuffer, PickModes
 
-T1 = TypeVar('T1')
-T2 = TypeVar('T2')
 
-
-class FillFlushBuffer(EndlessBuffer[T1, T2]):
+class FillFlushBuffer(EndlessBuffer[Unpack[Ts]]):
     '''
     A buffer that returns only if it is full, and when any `pick` is called, it
     flushes the buffer.
@@ -38,7 +36,7 @@ class FillFlushBuffer(EndlessBuffer[T1, T2]):
 
     def pick(
             self, count: int | None = None, mode: PickModes | None = None
-    ) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
+    ) -> dict[str, tuple[AnyTs, ...]]:
         '''
         Return items from the buffer.
 

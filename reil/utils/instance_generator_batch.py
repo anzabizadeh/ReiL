@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import pathlib
 import time
+from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any, Iterable, TypeVar
+from typing import Any, TypeVar
 
 import dill as pickle
 
 from reil import stateful
-from reil.datatypes.feature_set_dumper import FeatureSetDumper
+from reil.datatypes.feature import FeatureSetDumper
 from reil.serialization import PickleMe
 from reil.utils.instance_generator import InstanceGenerator
 

@@ -36,19 +36,23 @@ class ReilBase:
         ---------
         name:
             An optional name for the instance that can be used to `save` the
-            instance.
+            instance. If not specified, the class name will be used.
 
         path:
-            An optional path to be used to `save` the instance.
+            An optional path to be used to `save` the instance. If not
+            specified, the current working directory will be used.
 
         logger_name:
-            Name of the `logger` that records logging messages.
+            Name of the `logger` that records logging messages. If not
+            specified, `name` will be used.
 
         logger_level:
-            Level of logging.
+            Level of logging. If not specified, the default setting of
+            `reil.logger.Logger` will be used.
 
         logger_filename:
-            An optional filename to be used by the logger.
+            An optional filename to be used by the logger. If not specified,
+            the default setting of `reil.logger.Logger` will be used.
 
         persistent_attributes:
             A list of attributes that should be preserved when loading an
@@ -70,6 +74,11 @@ class ReilBase:
             >>> instance.load('another_instance')
             >>> instance._name
             my_instance
+
+        save_zipped:
+            whether to save the file as a zip archive.
+
+            If `None`, the value will be set to the value of `reil.FILE_FORMAT`.
         '''
         self._name = name or self.__class__.__qualname__.lower()
         self._path = pathlib.PurePath(path or '.')
@@ -118,6 +127,19 @@ class ReilBase:
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
+        '''
+        Load an instance from a configuration dictionary.
+
+        Arguments
+        ---------
+        config:
+            A dictionary containing the configuration of the instance.
+
+        Returns
+        -------
+        :
+            A `ReilBase` instance.
+        '''
         internal_states = config.pop('internal_states', {})
         args = deserialize(config)
         instance = cls(**args)
@@ -126,6 +148,14 @@ class ReilBase:
         return instance
 
     def get_config(self) -> dict[str, Any]:
+        '''
+        Get the configuration of the instance.
+
+        Returns
+        -------
+        :
+            A dictionary containing the configuration of the instance.
+        '''
         config: dict[str, Any] = dict(
             name=self._name, path=self._path, save_zipped=self._save_zipped)
 
@@ -206,9 +236,25 @@ class ReilBase:
         return self.__class__.__qualname__
 
     def __getstate__(self):
+        '''
+        Return the object state for pickling.
+
+        Returns
+        -------
+        :
+            The object state.
+        '''
         return self.__dict__.copy()
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        '''
+        Set the object state from pickling.
+
+        Arguments
+        ---------
+        state:
+            The object state.
+        '''
         # if '_object_version' not in state:
         #     state['_object_version'] = ReilBase._object_version
         self.__dict__.update(state)

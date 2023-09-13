@@ -3,8 +3,8 @@ import pathlib
 import random
 
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import Entity, InteractionProtocol
-from reil.datatypes.feature_set_dumper import FeatureSetDumper
+from reil.datatypes import Entity, InteractionProtocol
+from reil.datatypes.feature import FeatureSetDumper
 from reil.environments.single import Single
 from reil.environments.task import Task
 from reil.subjects.subject import Subject

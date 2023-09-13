@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pathlib
 import random
+from collections.abc import Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Type
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import tensorflow as tf
 from tensorflow import Tensor, TensorShape, TensorSpec
@@ -66,7 +67,7 @@ def logprobs(logits: Tensor, indices: Tensor, index_count: Tensor) -> Tensor:
 
 class SerializeTF:
     def __init__(
-            self, cls: Type[keras.Model] | None = None,
+            self, cls: type[keras.Model] | None = None,
             temp_path: str | pathlib.PurePath = '.') -> None:
         self.cls = cls
         self._temp_path = (
@@ -137,7 +138,7 @@ class SerializeTF:
 
 class TF2UtilsMixin(reilbase.ReilBase):
     def __init__(
-            self, models: dict[str, Type[keras.Model]], **kwargs):
+            self, models: dict[str, type[keras.Model]], **kwargs):
         super().__init__(**kwargs)
         self._no_model: bool
         self._models = models
@@ -155,9 +156,16 @@ class TF2UtilsMixin(reilbase.ReilBase):
             activation: str | Callable[[Tensor], Tensor] | None,
             layer_name_format: str,
             start_index: int = 1, **kwargs):
+        kernel_initializer = kwargs.pop(
+            'kernel_initializer') if 'kernel_initializer' in kwargs else 'zeros'
+        bias_initializer = kwargs.pop(
+            'bias_initializer') if 'bias_initializer' in kwargs else 'zeros'
+
         return [
             keras.layers.Dense(
                 v, activation=activation, name=layer_name_format.format(i=i),
+                kernel_initializer=kernel_initializer,
+                bias_initializer=bias_initializer,
                 **kwargs)
             for i, v in enumerate(layer_sizes, start_index)]
 
@@ -181,32 +189,73 @@ class TF2UtilsMixin(reilbase.ReilBase):
     @staticmethod
     def mlp_functional_w_concat(
             input_: Tensor,
-            layer_sizes: tuple[tuple[int, ...], ...],
+            layer_sizes: dict[str, tuple[int, ...]],
             activation: str | Callable[[Tensor], Tensor],
+            action_per_head: tuple[int, ...],
+            head_activation: str | None = None,
             layer_name_format: str = 'layer_{i:0>2}',
-            start_index: int = 1, full_backprop: bool = True, **kwargs):
+            output_name_format: str = 'output_{i:0>2}',
+            start_index: int = 1,
+            backprop_mode: Literal['separate', 'shared', 'all'] = 'all',
+            normalize_before_concat: Literal['regular', 'batch', 'none'] = 'none',
+            **kwargs):
         '''Build a feedforward dense network.'''
+        layers_iterable = iter(layer_sizes.items())
+        first_layer_name, first_layer_sizes = next(layers_iterable)
+        index = layer_name_format.find('{i')
+        layer_name_format_new = ''.join(
+            (layer_name_format[:index], '_', first_layer_name, '_',
+             layer_name_format[index:]))
+
+        logit_heads = TF2UtilsMixin.mlp_layers(
+            action_per_head, head_activation, output_name_format)
+        for name, layer in zip(layer_sizes, logit_heads):
+            layer._name = layer.name.replace(
+                'output', f'{name}_output')[:-3]
+
         layers = [
             TF2UtilsMixin.mlp_functional(
-                input_, layer_sizes[0], activation, layer_name_format + '_01',
+                input_, first_layer_sizes, activation,
+                layer_name_format_new,
                 start_index, **kwargs)
         ]
 
-        for i, layer_sizes_i in enumerate(layer_sizes[1:], 1):
-            normalized_previous_layer = tf.math.l2_normalize(layers[-1])
-            if not full_backprop:
+        logits = [
+            logit_heads[0](
+                tf.stop_gradient(layers[-1]) if backprop_mode == 'separate' else layers[-1])
+        ]
+
+        for i, (layer_name_i, layer_sizes_i) in enumerate(layers_iterable, 1):
+            layer_name_format_new = ''.join(
+                (layer_name_format[:index], '_', layer_name_i, '_',
+                 layer_name_format[index:]))
+
+            if normalize_before_concat == 'none':
+                normalized_previous_layer = layers[-1]
+            elif normalize_before_concat == 'regular':
+                normalized_previous_layer = tf.math.l2_normalize(layers[-1])
+            elif normalize_before_concat == 'batch':
+                normalized_previous_layer = tf.keras.layers.BatchNormalization(
+                    name='_'.join(
+                        (layer_name_format[:index], layer_name_i, 'pre_batch_normalization'))
+                )(logits[-1])
+            if backprop_mode == 'separate':
                 normalized_previous_layer = tf.stop_gradient(normalized_previous_layer)
 
             temp = tf.concat([input_, normalized_previous_layer], axis=-1)
 
             layers.append(
                 TF2UtilsMixin.mlp_functional(
-                    temp, layer_sizes_i,
-                    activation, layer_name_format + f'_{i:<02}',
-                    start_index + i, **kwargs)
+                    temp, layer_sizes_i, activation, layer_name_format_new,
+                    start_index, **kwargs)
             )
 
-        return layers[-1]
+            logits.append(
+                logit_heads[i](
+                    tf.stop_gradient(layers[-1]) if backprop_mode == 'separate' else layers[-1])
+            )
+
+        return tuple(logits)
 
     def save(
             self,

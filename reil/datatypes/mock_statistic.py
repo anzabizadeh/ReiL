@@ -1,6 +1,8 @@
 from __future__ import annotations
+from collections import defaultdict
 
-from typing import TYPE_CHECKING, Any, Callable, DefaultDict
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -20,7 +22,7 @@ class MockStatistic:
     def __init__(self, obj: Stateful) -> None:
         '''
 
-        Parameters
+        Arguments
         ----------
         obj:
             The object that provides actual `Statistic` capabilities.
@@ -28,7 +30,7 @@ class MockStatistic:
         self._obj = obj
         self._history: dict[
             int | None,
-            list[tuple[FeatureSet, float]]] = DefaultDict(list)
+            list[tuple[FeatureSet, float]]] = defaultdict(list)
 
     def set_object(self, obj: Stateful) -> None:
         self._obj = obj
@@ -85,6 +87,31 @@ class MockStatistic:
             groupby: tuple[str, ...] | None = None,
             _id: int | None = None,
             reset_history: bool = False):
+        '''
+        Aggregate the history of the component.
+
+        Arguments
+        ---------
+        aggregators:
+            The aggregation function to use.
+
+        groupby:
+            The column names to group by.
+
+        _id:
+            ID of the caller.
+
+        reset_history:
+            Whether to reset the history after aggregation.
+
+        n:
+            The number of instances to aggregate.
+
+        Returns
+        -------
+        :
+            The aggregated result.
+        '''
         temp = self._history[_id]
         if not temp:
             return None
@@ -104,6 +131,6 @@ class MockStatistic:
         if reset_history:
             self._history: dict[
                 int | None,
-                list[tuple[FeatureSet, float]]] = DefaultDict(list)
+                list[tuple[FeatureSet, float]]] = defaultdict(list)
 
         return result

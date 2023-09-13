@@ -10,14 +10,14 @@ in Ravvaz et al (2017).
 from typing import Any, Literal
 
 from reil.healthcare.dosing_protocols.three_phase_dosing_protocol import ThreePhaseDosingProtocol
-from reil.agents.agent_base import AgentBase
+from reil.agents.base_agent import BaseAgent
 from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorType,
                                     FeatureSet)
 from reil.healthcare.dosing_protocols.warfarin import (AAA, CAA, PGAA, PGPGA,
                                                        PGPGI)
 
 
-class WarfarinAgent(AgentBase):
+class WarfarinAgent(BaseAgent):
     '''
     An `agent` that prescribes dose for a warfarin `subject`,
     based on the dosing protocols defined in Ravvaz et al (2017).

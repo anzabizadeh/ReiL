@@ -5,12 +5,13 @@ VanillaExperienceReplay class
 
 A `Buffer` with random pick that picks only if it is full.
 '''
+from typing_extensions import Unpack
 
-from reil.datatypes.buffers.buffer import T1, T2, PickModes
+from reil.datatypes.buffers.buffer import AnyTs, PickModes, Ts
 from reil.datatypes.buffers.circular_buffer import CircularBuffer
 
 
-class VanillaExperienceReplay(CircularBuffer[T1, T2]):
+class VanillaExperienceReplay(CircularBuffer[Unpack[Ts]]):
     '''
     A `Buffer` with random pick that picks only if it is full.
 
@@ -109,7 +110,7 @@ class VanillaExperienceReplay(CircularBuffer[T1, T2]):
 
     def pick(
         self, count: int | None = None, mode: PickModes | None = None
-    ) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
+    ) -> dict[str, tuple[AnyTs, ...]]:
         '''
         Return items from the buffer.
 

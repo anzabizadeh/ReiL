@@ -2,8 +2,9 @@ import argparse
 import collections
 import dataclasses
 import pathlib
+from collections.abc import Callable
 from distutils.util import strtobool
-from typing import Any, Callable, Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 
 from ruamel.yaml import YAML
 

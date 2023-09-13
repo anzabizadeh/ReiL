@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import field
-from typing import (Any, Callable, Generic, Iterable, Iterator, Literal,
-                    Mapping, Sequence, TypeVar, cast, overload)
+from typing import Any, Generic, Literal, TypeVar, cast, overload
 
 T = TypeVar('T')
 

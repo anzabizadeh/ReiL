@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import os
 import pathlib
-from typing import Any, Generic, Iterable, TypeVar
+from collections.abc import Iterable
+from typing import Any, Generic, TypeVar
 
 from reil import reilbase, stateful
-from reil.datatypes.feature_set_dumper import FeatureSetDumper
+from reil.datatypes.feature import FeatureSetDumper
 from reil.datatypes.mock_statistic import MockStatistic
 
 T = TypeVar('T', bound=stateful.Stateful)

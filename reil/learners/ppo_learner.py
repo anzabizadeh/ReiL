@@ -95,7 +95,7 @@ class PPOModel(TF2UtilsMixin):
         else:
             self._max_grad_norm = tf.constant(
                 max_grad_norm, dtype=tf.float32, name='max_gradient_norm')
-        # self._GAE_lambda = GAE_lambda  # see proximal_policy_optimization.py
+        # self._GAE_lambda = GAE_lambda  # see ppo_agent.py
         self._target_kl = target_kl
         self._1_5_target_kl: Tensor = tf.multiply(1.5, target_kl, name='1.5_target_kl')
         self._actor_hidden_activation = actor_hidden_activation
@@ -111,8 +111,10 @@ class PPOModel(TF2UtilsMixin):
         input_: Tensor = keras.Input(self._input_shape)  # type: ignore
         actor_layers = TF2UtilsMixin.mlp_functional(
             input_, self._actor_layer_sizes, actor_hidden_activation, 'actor_{i:0>2}')
+        # for logit_heads, regularizer does not work if weights are all zero
         logit_heads = TF2UtilsMixin.mlp_layers(
-            action_per_head, actor_head_activation, 'actor_output_{i:0>2}')
+            action_per_head, actor_head_activation, 'actor_output_{i:0>2}',
+            kernel_initializer=keras.initializers.Constant(0.1))
         logits = tuple(output(actor_layers) for output in logit_heads)
 
         self.actor = keras.Model(
@@ -425,9 +427,11 @@ class PPOModel(TF2UtilsMixin):
 
         if tf.cast(self._entropy_loss_coef, tf.bool):
             metrics['entropy_loss'] = self._entropy_loss.result()
+            self._entropy_loss.reset_states()
 
         if tf.cast(self._regularizer_coef, tf.bool):
             metrics['regularizer_loss'] = self._regularizer_loss.result()
+            self._regularizer_loss.reset_states()
 
         metrics['total_loss'] = sum(
             x for x in metrics.values())  # type: ignore
@@ -435,8 +439,8 @@ class PPOModel(TF2UtilsMixin):
 
         self._actor_loss.reset_states()
         self._critic_loss.reset_states()
-        self._entropy_loss.reset_states()
         self._actor_accuracy.reset_states()
+        self._kl.reset_states()
 
         return metrics
 

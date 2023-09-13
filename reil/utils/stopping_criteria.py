@@ -1,5 +1,6 @@
 import operator as op
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 from reil.datatypes.buffers.circular_buffer import CircularBuffer
 

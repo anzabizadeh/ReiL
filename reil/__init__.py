@@ -45,6 +45,7 @@ legacy
 '''
 import logging
 import random
+from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Literal
 
@@ -59,7 +60,9 @@ del get_versions
 
 FILE_FORMAT: Literal['pbz2', 'pkl'] = 'pkl'
 
-RandomGeneratorsType = tuple[
+ARandomGenerator = random.Random | np.random.Generator | tf.random.Generator
+
+RandomGeneratorsTuple = tuple[
     random.Random, np.random.Generator, tf.random.Generator]
 
 RANDOM_SEED: int | None = None
@@ -68,20 +71,39 @@ RANDOM_GENERATOR_NP: np.random.Generator = np.random.default_rng()
 RANDOM_GENERATOR_TF: tf.random.Generator = tf.random.get_global_generator()
 
 
-def random_generator():
+def random_generator() -> random.Random:
+    '''
+    Returns a Python random generator.
+    '''
     return RANDOM_GENERATOR
 
 
-def random_generator_np():
+def random_generator_np() -> np.random.Generator:
+    '''
+    Returns a NumPy random generator.
+    '''
     return RANDOM_GENERATOR_NP
 
 
-def random_generator_tf():
+def random_generator_tf() -> tf.random.Generator:
+    '''
+    Returns a TensorFlow random generator.
+    '''
     return RANDOM_GENERATOR_TF
 
 
 def random_generators_from_seed(
-        seed: int | None = None) -> RandomGeneratorsType:
+        seed: int | None = None) -> RandomGeneratorsTuple:
+    '''
+    Returns a tuple of Python, NumPy and TensorFlow random generators.
+
+    Arguments
+    ---------
+    seed:
+        The seed for the random generators. If `None`, the generators are
+        initialized with the default seed.
+
+    '''
     if seed is None:
         return (RANDOM_GENERATOR, RANDOM_GENERATOR_NP, RANDOM_GENERATOR_TF)
 
@@ -94,6 +116,16 @@ def random_generators_from_seed(
 
 
 def set_reil_random_seed(seed: int | None):
+    '''
+    Sets the seed for the random generators.
+
+    Arguments
+    ---------
+    seed:
+        The seed for the random generators. If `None`, the generators are
+        initialized with the default seed.
+
+    '''
     global RANDOM_SEED
     global RANDOM_GENERATOR
     global RANDOM_GENERATOR_NP
@@ -112,9 +144,23 @@ def set_reil_random_seed(seed: int | None):
 
 @contextmanager
 def random_generator_context(
-        gen: random.Random | None = None,
-        gen_np: np.random.Generator | None = None,
-        gen_tf: tf.random.Generator | None = None):
+    gen: random.Random | None = None,
+    gen_np: np.random.Generator | None = None,
+    gen_tf: tf.random.Generator | None = None
+) -> Iterator[ARandomGenerator | list[ARandomGenerator]]:
+    '''
+    Sets the random generators to the given generators.
+
+    Arguments
+    ---------
+    gen:
+        The Python random generator.
+    gen_np:
+        The NumPy random generator.
+    gen_tf:
+        The TensorFlow random generator.
+
+    '''
     global RANDOM_GENERATOR
     global RANDOM_GENERATOR_NP
     global RANDOM_GENERATOR_TF
@@ -123,7 +169,7 @@ def random_generator_context(
     temp_np = RANDOM_GENERATOR_NP
     temp_tf = RANDOM_GENERATOR_TF
     try:
-        gen_list = []
+        gen_list: list[ARandomGenerator] = []
         if gen:
             RANDOM_GENERATOR = gen
             gen_list.append(RANDOM_GENERATOR)
@@ -144,6 +190,15 @@ def random_generator_context(
 
 
 def set_file_format(fmt: Literal['pbz2', 'pkl']):
+    '''
+    Sets the file format for the `ReiL` package.
+
+    Arguments
+    ---------
+    fmt:
+        The file format.
+
+    '''
     global FILE_FORMAT
 
     if fmt not in ('pbz2', 'pkl'):

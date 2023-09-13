@@ -7,7 +7,8 @@ This `warfarin` class implements a two compartment PK/PD model for warfarin.
 '''
 
 import functools
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 from reil.datatypes.feature import (FeatureGenerator, FeatureGeneratorType,
                                     FeatureSet)

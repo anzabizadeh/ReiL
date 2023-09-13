@@ -7,7 +7,8 @@ Contains some useful functions.
 '''
 
 import math
-from typing import Any, Callable, Iterable, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
 import numpy as np
 from scipy.stats import lognorm  # type: ignore
@@ -139,7 +140,7 @@ def generate_modifier(
 ) -> Callable[[FeatureSet, T], T]:
     '''Generate a modifier function for states or actions
 
-    Parameters
+    Arguments
     ----------
     operation:
         What should happen to the input.

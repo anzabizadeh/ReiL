@@ -7,7 +7,8 @@ A warfarin PK/PD model proposed by Hamberg et al. (2007).
 DOI: 10.1038/sj.clpt.6100084
 '''
 import math
-from typing import Any, Callable, Final, Iterable, NamedTuple, NewType
+from collections.abc import Callable, Iterable
+from typing import Any, Final, NamedTuple, NewType
 
 import numpy as np
 

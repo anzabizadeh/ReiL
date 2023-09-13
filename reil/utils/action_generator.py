@@ -8,7 +8,8 @@ of `FeatureSet` objects using the product of these components.
 '''
 import dataclasses
 import itertools
-from typing import Any, Generic, Iterator, TypeVar
+from typing import Any, Generic, TypeVar
+from collections.abc import Iterator
 
 from reil.datatypes.feature import Feature, FeatureGenerator, FeatureSet
 from reil.reilbase import ReilBase

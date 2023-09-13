@@ -9,14 +9,15 @@ on one or more `subjects`.
 import dataclasses
 import inspect
 from collections import defaultdict
-from typing import Any, Callable, Generator, Generic, TypeVar
+from collections.abc import Callable, Generator
+from typing import Any, Generic, TypeVar
 
 import pandas as pd
 
 from reil import stateful
-from reil.agents.base_agent import BaseAgent
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import InteractionProtocol
+from reil.agents.base_agent import BaseAgent
+from reil.datatypes import InteractionProtocol
 from reil.datatypes.feature import FeatureSet
 from reil.subjects.subject import Subject
 from reil.subjects.subject_demon import SubjectDemon
@@ -81,11 +82,11 @@ class Environment(stateful.Stateful):
         self._agent_demons: dict[str, AgentDemon] = {}
         self._subject_demons: dict[str, SubjectDemon] = {}
         self._instance_generators: dict[str, EntityGenType] = {}
-        self._assignment_list: dict[
+        self._assignment_list: defaultdict[
             AgentSubjectTuple,
             tuple[int | None, int | None]] = \
             defaultdict(lambda: (None, None))
-        self._iterations: dict[str, int] = defaultdict(int)
+        self._iterations: defaultdict[str, int] = defaultdict(int)
         self._agent_observers: dict[
             tuple[str, str],
             Generator[FeatureSet | None, Any, None]] = {}
@@ -667,7 +668,7 @@ class Environment(stateful.Stateful):
     ) -> dict[tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
-        Parameters
+        Arguments
         ----------
         unstack:
             Whether to unstack the resulting pivottable or not.

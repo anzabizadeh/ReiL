@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
-PPOLearner class
-================
+PPOTandemModel class
+====================
 
 '''
 from __future__ import annotations
@@ -19,6 +19,7 @@ from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric,
 keras = tf.keras
 from keras.optimizers.schedules.learning_rate_schedule import \
     LearningRateSchedule  # noqa: E402
+from keras.optimizers.legacy.adam import Adam  # noqa: E402
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
@@ -42,13 +43,13 @@ class PPOTandemModel(TF2UtilsMixin):
             action_per_head: tuple[int, ...],
             actor_learning_rate: float | LearningRateSchedule,
             critic_learning_rate: float | LearningRateSchedule,
-            actor_layer_sizes: tuple[tuple[int, ...], ...],
+            actor_layer_sizes: dict[str, tuple[int, ...]],
             critic_layer_sizes: tuple[int, ...],
             actor_train_iterations: int,
             critic_train_iterations: int,
             target_kl: float,
+            training_switch: dict[str, int] | None = None,
             backprop_mode: Literal['separate', 'shared', 'all'] = 'all',
-            # full_backprop: bool = False,
             actor_hidden_activation: str = 'relu',
             actor_head_activation: str | None = None,
             critic_hidden_activation: str = 'relu',
@@ -78,7 +79,14 @@ class PPOTandemModel(TF2UtilsMixin):
         self._critic_layer_sizes = critic_layer_sizes
         self._actor_train_iterations = actor_train_iterations
         self._critic_train_iterations = critic_train_iterations
-        self._backprop_mode = backprop_mode
+
+        self._training_switch = training_switch
+        self._training_counter: int = 0
+        if training_switch is not None:
+            self._training_sequence = list(training_switch)
+            self._current_switch = len(self._training_sequence)
+
+        self._backprop_mode: Literal['separate', 'shared', 'all'] = backprop_mode
         self._clip_ratio: Tensor | None
         self._critic_clip_range: Tensor | None
         self._max_grad_norm: Tensor | None
@@ -109,30 +117,14 @@ class PPOTandemModel(TF2UtilsMixin):
         self._regularizer_coef: Tensor = tf.constant(
             regularizer_coef, dtype=tf.float32, name='regularizer_coef')
 
-        input_: Tensor = keras.Input(self._input_shape)  # type: ignore
-        actor_layers = TF2UtilsMixin.mlp_functional_w_concat(
-            input_, self._actor_layer_sizes, actor_hidden_activation,
-            'actor_{i:0>2}', full_backprop=(self._backprop_mode != 'separate'))
-        logit_heads = TF2UtilsMixin.mlp_layers(
-            action_per_head, actor_head_activation, 'actor_output_{i:0>2}')
-        if self._backprop_mode == 'shared':
-            logits = tuple(output(tf.stop_gradient(actor_layers)) for output in logit_heads[:-1])
-            logits = (*logits, logit_heads[-1](actor_layers))  # type: ignore
-        else:
-            logits = tuple(output(actor_layers) for output in logit_heads)
+        self._build_networks()
 
-        self.actor = keras.Model(
-            inputs=input_,
-            outputs=logits if len(logits) > 1 else tuple(logits))
+        self._training_switch = training_switch
+        if training_switch is not None:
+            self._freeze_layers()
 
-        critic_layers = TF2UtilsMixin.mlp_functional(
-            input_, self._critic_layer_sizes, critic_hidden_activation, 'critic_{i:0>2}')
-        critic_output = keras.layers.Dense(
-            1, name='critic_output')(critic_layers)
-        self.critic = keras.Model(inputs=input_, outputs=critic_output)
-
-        self._actor_optimizer = keras.optimizers.Adam(
-            learning_rate=self._actor_learning_rate)  # type: ignore
+        optimizer = keras.optimizers.Adam if self._training_switch is None else Adam
+        self._actor_optimizer = optimizer(learning_rate=self._actor_learning_rate)  # type: ignore
         self._critic_optimizer = keras.optimizers.Adam(
             learning_rate=self._critic_learning_rate)  # type: ignore
 
@@ -151,9 +143,33 @@ class PPOTandemModel(TF2UtilsMixin):
             'actor': type(self.actor),
             'critic': type(self.critic)}
 
+    def _build_networks(self):
+        input_: Tensor = keras.Input(self._input_shape)  # type: ignore
+        logits = TF2UtilsMixin.mlp_functional_w_concat(
+            input_=input_, layer_sizes=self._actor_layer_sizes,
+            activation=self._actor_hidden_activation,
+            layer_name_format='actor_{i:0>2}',
+            action_per_head=self._action_per_head,
+            head_activation=self._actor_head_activation,
+            output_name_format='actor_output_{i:0>2}',
+            backprop_mode=self._backprop_mode,
+            normalize_before_concat='batch')
+
+        self.actor = keras.Model(
+            inputs=input_,
+            outputs=logits if len(logits) > 1 else tuple(logits))
+
+        critic_layers = TF2UtilsMixin.mlp_functional(
+            input_, self._critic_layer_sizes,
+            self._critic_hidden_activation, 'critic_{i:0>2}')
+        critic_output = keras.layers.Dense(
+            1, name='critic_output')(critic_layers)
+        self.critic = keras.Model(inputs=input_, outputs=critic_output)
+
     def __call__(self, inputs, training: bool | None = None) -> Any:
         logits = self.actor(inputs, training)
         values = self.critic(inputs, training)
+
         return logits, values
 
     @staticmethod
@@ -242,7 +258,7 @@ class PPOTandemModel(TF2UtilsMixin):
         #                 tf.gather(self._action_per_head, j)),
         #             axis=1)], axis=1)
 
-        _advantage = tf.divide(
+        advantage_ = tf.divide(
             advantage - tf.math.reduce_mean(advantage),
             tf.math.reduce_std(advantage) + eps,
             name='normalized_advantage')
@@ -264,7 +280,7 @@ class PPOTandemModel(TF2UtilsMixin):
                     #     tf.gather(self._action_per_head, j))
 
                     actor_loss = self._compute_actor_loss(
-                        initial_logprobs, new_logprobs_j, _advantage, j)
+                        initial_logprobs, new_logprobs_j, advantage_, j)
 
                     if tf.cast(self._entropy_loss_coef, tf.bool):
                         entropy_loss = entropy(new_logprobs_j)
@@ -295,25 +311,6 @@ class PPOTandemModel(TF2UtilsMixin):
 
             new_logprobs = self._logprobs_concat(
                 logits_concat, starts, ends, action_indices, action_per_head, head_count)
-
-            # new_logprobs = tf.expand_dims(
-            #     self.logprobs(
-            #         logits_concat[:, starts[0]:ends[0]],  # type: ignore
-            #         tf.gather(action_indices, 0, axis=1),
-            #         tf.gather(self._action_per_head, 0)),
-            #     axis=1)
-            # for j in tf.range(one_int32, self._head_count):
-            #     tf.autograph.experimental.set_loop_options(
-            #         shape_invariants=(new_logprobs, [None, None])
-            #     )
-            #     new_logprobs = tf.concat([
-            #         new_logprobs,
-            #         tf.expand_dims(
-            #             self.logprobs(
-            #                 logits_concat[:, starts[j]:ends[j]],  # type: ignore
-            #                 tf.gather(action_indices, j, axis=1),
-            #                 tf.gather(self._action_per_head, j)),
-            #             axis=1)], axis=1)
 
             kl = .5 * tf.reduce_mean(
                 tf.square(tf.subtract(new_logprobs, initial_logprobs, name='delta_logprobs')),
@@ -346,7 +343,7 @@ class PPOTandemModel(TF2UtilsMixin):
         return regularizer_loss
 
     @tf.function(jit_compile=JIT_COMPILE)
-    def _compute_actor_loss(self, initial_logprobs, new_logprobs, _advantage, j):
+    def _compute_actor_loss(self, initial_logprobs, new_logprobs, advantage_, j):
         ratio: Tensor = tf.exp(
             tf.subtract(
                 new_logprobs, tf.gather(initial_logprobs, j, axis=1),
@@ -355,7 +352,7 @@ class PPOTandemModel(TF2UtilsMixin):
         )
         if self._clip_ratio is None:
             actor_loss = -tf.reduce_mean(
-                tf.multiply(ratio, _advantage), name='actor_loss')
+                tf.multiply(ratio, advantage_), name='actor_loss')
         else:
             clipped_ratio = tf.clip_by_value(
                 ratio,
@@ -364,8 +361,8 @@ class PPOTandemModel(TF2UtilsMixin):
                 name='clipped_ratio')
             actor_loss = -tf.reduce_mean(
                 tf.minimum(
-                    tf.multiply(ratio, _advantage, name='ratio_times_adv'),
-                    tf.multiply(clipped_ratio, _advantage,
+                    tf.multiply(ratio, advantage_, name='ratio_times_adv'),
+                    tf.multiply(clipped_ratio, advantage_,
                                 name='clipped_ratio_times_adv')),
                 name='actor_loss_clipped')
 
@@ -419,8 +416,25 @@ class PPOTandemModel(TF2UtilsMixin):
             self._critic_optimizer.apply_gradients(
                 zip(value_grads, trainable_vars))
 
+    def _freeze_layers(self):
+        self._training_counter = 0
+        self._current_switch += 1
+        if self._current_switch >= len(self._training_sequence):
+            self._current_switch = 0
+        part = self._training_sequence[self._current_switch]
+        for layer in self.actor.layers:
+            layer.trainable = (part in layer.name) or (part == 'all')
+
     def train_step(self, data):
         x, (action_indices, returns, advantage) = data
+        self._training_counter += 1
+        if self._training_switch is not None and (
+                self._training_counter >= self._training_switch[
+                    self._training_sequence[self._current_switch]]):
+            self._freeze_layers()
+            print({layer.name: layer.trainable for layer in self.actor.layers})
+            # self._actor_optimizer.build(self.actor.trainable_variables)
+
         self.train_actor(x, action_indices, advantage)
         self.train_critic(x, returns)
 

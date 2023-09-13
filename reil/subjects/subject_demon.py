@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-from typing import Any, Callable, Generic, TypeVar
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar
 
 from reil.datatypes.components import Reward, Statistic
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
@@ -93,7 +94,7 @@ class SubjectDemon(ReilBase):
         Generate the component based on the specified `name` for the
         specified caller.
 
-        Parameters
+        Arguments
         ----------
         name:
             The name of the component definition.
@@ -129,7 +130,7 @@ class SubjectDemon(ReilBase):
         Generate the component based on the specified `name` for the
         specified caller.
 
-        Parameters
+        Arguments
         ----------
         name:
             The name of the component definition.

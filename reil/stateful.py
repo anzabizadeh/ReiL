@@ -39,8 +39,7 @@ from typing import Any
 from reil import reilbase
 from reil.datatypes.components import State, Statistic, SubComponentInfo
 from reil.datatypes.entity_register import EntityRegister
-from reil.datatypes.feature import Feature, NoneFeature
-from reil.datatypes.feature_set_dumper import FeatureSetDumper
+from reil.datatypes.feature import Feature, FeatureSetDumper, NoneFeature
 from reil.utils.metrics import MetricProtocol
 from reil.utils.tf_utils import SummaryWriter
 
@@ -58,6 +57,53 @@ class Stateful(reilbase.ReilBase):
             state_dumper: FeatureSetDumper | None = None,
             summary_writer: SummaryWriter | None = None,
             **kwargs: Any):
+        '''
+        Initialize the stateful object and extract sub_components.
+
+        Arguments
+        ---------
+        min_entity_count:
+            minimum number of entities that can be registered.
+
+        max_entity_count:
+            maximum number of entities that can be registered. If -1, there is
+            no limit.
+
+        unique_entities:
+            if True, only one entity can be registered for each `_id`.
+
+        state_dumper:
+            the dumper to use in `State` to dump the state value if needed.
+            For example, `Single` environment calls the dumper of the subjects
+            to dump the subject's state.
+
+        summary_writer:
+            the summary writer to use to dump summaries. `Stateful` does not
+            use the `summary_writer`, but provides it for the children
+            classes. For example, `Agent` uses it to dump the agent's
+            performance metrics.
+
+        kwargs:
+            additional arguments to be passed to the base class.
+
+        Notes
+        -----
+        During the initialization, `_extract_sub_components` is called to
+        extract all sub components.
+
+        Each `Stateful` object has a `state` property (hence "stateful") and
+        a `statistic` property.
+
+        The `state` property if a `State` object that can dynamically compose
+        and return the state of the object using the state name and the object's
+        `sub_component`s. Each derived class from `Stateful` can introduce its
+        own `sub_component`s and state definitions. This base class only defines
+        the `none` state.
+
+        The `statistic` property is a `Statistic` object that
+        can dynamically compute the value of the given statistic for the entity
+        `_id` based on the statistic definition `name`.
+        '''
 
         super().__init__(**kwargs)
 
@@ -80,15 +126,44 @@ class Stateful(reilbase.ReilBase):
             unique_entities=unique_entities)
 
     def _generate_state_defs(self) -> None:
+        '''
+        Generate the state definitions.
+
+        Notes
+        -----
+        See the notes on `_state_def_reference()`.
+        '''
         if 'none' not in self.state.definitions:
             self.state.add_definition('none', ('none', {}))
 
     def _state_def_reference(
             self, name: str) -> tuple[tuple[str, dict[str, Any]], ...] | None:
+        '''
+        Return the state definition reference for the given state name.
+
+        Arguments
+        ---------
+        name:
+            the name of the state definition.
+
+        Notes
+        -----
+        `Stateful` provides two ways to define a state: `_generate_state_defs()`
+        and `_state_def_reference()`. The first one is called at the time of
+        object initialization. Hence, the object's `state` will have the
+        definitions available to use. However, this increases the size of the
+        object. The second method is used by the `state` if it does not find the
+        definition. Therefore, it defines the state if it is used by the object
+        with minimal performance loss (one function call) and without using
+        too much memory. The use of `_state_def_reference()` is generally preferred.
+        '''
         if name == 'none':
             return (('none', {}),)
 
     def _generate_statistic_defs(self) -> None:
+        '''
+        Generate the statistic definitions.
+        '''
         raise NotImplementedError
 
     def _extract_sub_components(self) -> dict[str, SubComponentInfo]:
@@ -163,9 +238,15 @@ class Stateful(reilbase.ReilBase):
     def _sub_comp_none(
             self, _id: int, **kwargs: Any
     ) -> Feature:
+        '''
+        The sub component shared by all `Stateful` objects akin to `None`.
+        '''
         return NoneFeature
 
     def _update_metrics(self, **kwargs: Any) -> None:
+        '''
+        Update the metrics.
+        '''
         pass
 
     def register(self, entity_name: str, _id: int | None = None) -> int:
@@ -213,10 +294,21 @@ class Stateful(reilbase.ReilBase):
         self._entity_list.remove(entity_id)
 
     def reset(self):
+        '''
+        Reset the object to its initial state and clear the entity list.
+        '''
         super().reset()
         self._entity_list.clear()
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        '''
+        Set the object state from pickling.
+
+        Arguments
+        ---------
+        state:
+            The object state.
+        '''
         super().__setstate__(state)
 
         self.state.object_ref = self
@@ -227,7 +319,3 @@ class Stateful(reilbase.ReilBase):
                 'Primary component is already set for `statistic` to .'
                 f'{self.statistic._state}. Resetting the value!')
             self.statistic._state = self.state
-
-        # self.state.set_default_definition(self._default_state_definition)
-        # self.statistic.set_default_definition(
-        #     self._default_statistic_definition)

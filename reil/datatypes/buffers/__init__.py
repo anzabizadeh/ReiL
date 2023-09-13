@@ -19,6 +19,16 @@ EndlessBuffer:
     A buffer without an end! This buffer keeps appending new items,
     so it should be used with memory and performance constraints in mind.
 
+FillFlushBuffer:
+    A buffer that returns only if it is full, and when any `pick` is called, it
+    flushes the buffer.
+
+PickModes:
+    Enum for the different pick modes.
+
+Sink:
+    A dummy buffer that does nothing.
+
 VanilaExperienceReplay:
     A `CircularBuffer` that only picks randomly and returns
     values only if it is full.

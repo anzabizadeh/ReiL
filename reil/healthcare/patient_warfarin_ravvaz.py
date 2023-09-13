@@ -41,7 +41,7 @@ class PatientWarfarinRavvaz(Patient):
             allow_missing_genotypes: bool = True,
             **feature_values: Any) -> None:
         '''
-        Parameters
+        Arguments
         ----------
         model:
             A `HealthMathModel` to be used to model patient's behavior.
@@ -179,7 +179,7 @@ class PatientWarfarinBalanced(PatientWarfarinRavvaz):
             allow_missing_genotypes: bool = True,
             **feature_values: Any) -> None:
         '''
-        Parameters
+        Arguments
         ----------
         model:
             A `HealthMathModel` to be used to model patient's behavior.
@@ -283,7 +283,7 @@ class PatientWarfarinOversampled(PatientWarfarinRavvaz):
             allow_missing_genotypes: bool = True,
             **feature_values: Any) -> None:
         '''
-        Parameters
+        Arguments
         ----------
         model:
             A `HealthMathModel` to be used to model patient's behavior.

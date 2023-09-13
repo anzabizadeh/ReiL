@@ -9,10 +9,11 @@ an iterator.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Generic, Iterable, Iterator, Type, TypeVar
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any, Generic, TypeVar
 
 from reil import reilbase, stateful
-from reil.datatypes.feature_set_dumper import FeatureSetDumper
+from reil.datatypes.feature import FeatureSetDumper
 from reil.datatypes.mock_statistic import MockStatistic
 
 T = TypeVar('T', bound=stateful.Stateful)
@@ -30,7 +31,7 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
 
     def __init__(
             self,
-            cls: Type[T],
+            cls: type[T],
             args_generator: Callable[[], tuple[int, dict[str, Any]]] | Iterator[
                 tuple[int, dict[str, Any]]],
             is_finite: bool = False,

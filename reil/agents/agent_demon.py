@@ -8,7 +8,8 @@ AgentDemon class
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Callable, Literal, Union
+from collections.abc import Callable
+from typing import Any, Literal, Union
 
 from reil import reilbase
 from reil.agents.base_agent import BaseAgent

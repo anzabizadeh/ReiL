@@ -1,21 +1,22 @@
 import copy
-from typing import Any, Generator, Literal
+from collections.abc import Generator
+from typing import Any, Literal
 
 import numpy as np
 import tensorflow as tf
 from tensorflow import Tensor
 
-from reil.agents.agent import AgentBase, TrainingData
-from reil.agents.proximal_policy_optimization import PPO, PPOLearner
+from reil.agents.agent import BaseAgent, TrainingData
+from reil.agents.ppo_agent import PPOAgent, PPOLearner
 from reil.datatypes.buffers.buffer import Buffer
-from reil.datatypes.dataclasses import History, Observation
+from reil.datatypes import History, Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.utils.action_dist_modifier import ActionModifier
 from reil.utils.metrics import ActionMetric, INRMetric, PTTRMetric
 from reil.utils.tf_utils import MeanMetric
 
 
-class PPO4Warfarin(PPO):
+class PPO4WarfarinAgent(PPOAgent):
     def __init__(
             self, learner: PPOLearner,
             buffer: Buffer[FeatureSet, tuple[tuple[int, ...], float, float]],
@@ -125,9 +126,9 @@ class PPO4Warfarin(PPO):
         return super().reset()
 
 
-class PPO4Warfarin2Phase(PPO4Warfarin):
+class PPO4Warfarin2PhaseAgent(PPO4WarfarinAgent):
     def __init__(
-        self, init_agent: AgentBase, switch_day: int,
+        self, init_agent: BaseAgent, switch_day: int,
         init_state_comps: tuple[str, ...], main_state_comps: tuple[str, ...],
         learner: PPOLearner,
         buffer: Buffer[FeatureSet, tuple[tuple[int, ...], float, float]],
@@ -180,14 +181,17 @@ class ActionSplitter:
     def send(self, query: str | None):
         if query is None:
             self._action_gen.send(None)  # type: ignore
-        elif query.startswith('return'):
+            return
+
+        if query.startswith('return'):
             if 'split' not in query:
                 query += ' split'
             result = list(self._action_gen.send(query))
             return [result[self._index]]
-        elif query.startswith('lookup'):
+
+        if query.startswith('lookup'):
             index = int(query.split()[1])
-            features = list(self._action_gen.send('return feature exclusive split'))
+            features: list[FeatureSet] = list(self._action_gen.send('return feature exclusive split'))
             i, f = -1, None
             for i, f in zip(range(index + 1), features[self._index]):
                 pass
@@ -198,10 +202,10 @@ class ActionSplitter:
             raise RuntimeError('query not supported by ActionSplitter.')
 
 
-class PPO4Warfarin2Part(AgentBase):
+class PPO4Warfarin2PartAgent(BaseAgent):
     def __init__(
-            self, dose_agent: PPO4Warfarin | PPO4Warfarin2Phase,
-            duration_agent: PPO4Warfarin | PPO4Warfarin2Phase,
+            self, dose_agent: PPO4WarfarinAgent | PPO4Warfarin2PhaseAgent,
+            duration_agent: PPO4WarfarinAgent | PPO4Warfarin2PhaseAgent,
             training_switch: tuple[tuple[str, int], ...] | None = None,
             dose_first: bool = True):
         super().__init__()
@@ -367,7 +371,7 @@ class PPO4Warfarin2Part(AgentBase):
     ) -> Generator[FeatureSet | None, dict[str, Any], None]:
         '''
         Create a generator to interact with the subject (`subject_id`).
-        Extends `AgentBase.observe`.
+        Extends `BaseAgent.observe`.
 
         This method creates a generator for `subject_id` that
         receives `state`, yields `action` and receives `reward`
@@ -471,11 +475,11 @@ class PPO4Warfarin2Part(AgentBase):
         self._dose_first = parameters.get('dose_first', True)
 
 
-class PPO4WarfarinSeparate(PPO4Warfarin2Part):
+class PPO4WarfarinSeparateAgent(PPO4Warfarin2PartAgent):
     @staticmethod
     def _split_history(
             history: History, dose_first: bool = True) -> tuple[History, History]:
-        dose_history, duration_history = PPO4Warfarin2Part._split_history(
+        dose_history, duration_history = PPO4Warfarin2PartAgent._split_history(
             history, dose_first)
         for h in duration_history:
             if h.state is not None:
@@ -490,11 +494,11 @@ class PPO4WarfarinSeparate(PPO4Warfarin2Part):
         return dose_history, duration_history
 
 
-class PPO4WarfarinSeparateSimpleReward(PPO4Warfarin2Part):
+class PPO4WarfarinSeparateSimpleRewardAgent(PPO4Warfarin2PartAgent):
     @staticmethod
     def _split_history(
             history: History, dose_first: bool = True) -> tuple[History, History]:
-        dose_history, duration_history = PPO4Warfarin2Part._split_history(
+        dose_history, duration_history = PPO4Warfarin2PartAgent._split_history(
             history, dose_first)
         for h in duration_history:
             if h.state is not None:

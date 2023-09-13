@@ -12,7 +12,7 @@ import numpy as np
 from reil.agents.agent import Agent, TrainingData
 from reil.datatypes import History
 from reil.datatypes.buffers import Buffer
-from reil.datatypes.dataclasses import LookaheadData
+from reil.datatypes import LookaheadData
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.q_learner import QLearner
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,

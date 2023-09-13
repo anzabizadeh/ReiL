@@ -1,13 +1,15 @@
 import math
 import random
 import unittest
+from collections.abc import Callable
 from logging import warning
-from typing import Callable, List, Literal
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
+
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
 from reil.healthcare.mathematical_models.hamberg_pkpd_tf import HambergPKPD

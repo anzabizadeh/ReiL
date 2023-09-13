@@ -5,7 +5,7 @@ from typing import Any, Generic, TypedDict, TypeVar
 
 from reil.datatypes.feature import FeatureSet
 from reil.logger import Logger
-from reil.utils.functions import diff, dist, in_range, interpolate, square_dist
+from reil.utils.functions import dist, in_range, interpolate, square_dist
 
 # NOTE:
 # `retrospective` was meant to be used to indicate regular reward computation
@@ -237,7 +237,7 @@ class CustomDistance(ReilFunction[float, int]):
         average_l1_distance = sum(l1_distance_list) / len_y
 
         duration_penalty = (
-            len_y / 14 * average_l1_distance if average_l1_distance <= 0.5 else
+            len_y / 14 * average_l1_distance if average_l1_distance > 0.5 else
             (len_y / 14 - 2) * (average_l1_distance - 0.5))
 
         return distance_penalty + duration_penalty
@@ -265,29 +265,168 @@ class CustomDistance2(ReilFunction[float, int]):
         else:
             _y = y
 
-        diff_list = tuple(
-            diff(self.center, interpolate(_y[i], _y[i + 1], x_i))
+        l1_distance_list = tuple(
+            dist(self.center, interpolate(_y[i], _y[i + 1], x_i))
             for i, x_i in enumerate(_x)
         )
 
         distance_penalty = (2.0 / self.band_width) ** 2 * sum(
             dis ** 2
-            for dis in diff_list)
+            for dis, x_i in zip(l1_distance_list, _x))
 
         if self.average:
             distance_penalty /= len_y
 
-        average_diff = sum(diff_list) / len_y
+        last_l1_distance = l1_distance_list[-1]
 
         duration_penalty = (
-            len_y / 14 * average_diff if average_diff > 0.5 else (
-                (len_y / 14 - 2) * (abs(average_diff) - 0.5)
-                if average_diff >= -0.5 else
-                - len_y / 7.0 * average_diff
-            )
-        )
+            len_y / 14 * last_l1_distance if last_l1_distance > 0.5 else
+            (len_y / 14 - 2) * (last_l1_distance - 0.5))
 
         return distance_penalty + duration_penalty
+
+
+@dataclasses.dataclass
+class CustomDistance3(ReilFunction[float, int]):
+    center: float = 0.0
+    band_width: float = 1.0
+    exclude_first: bool = False
+    average: bool = True
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
+
+        l1_distance_list = tuple(
+            dist(self.center, interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x)
+        )
+
+        distance_penalty = (2.0 / self.band_width) ** 2 * sum(
+            dis ** 2
+            for dis, x_i in zip(l1_distance_list, _x))
+
+        if self.average:
+            distance_penalty /= len_y
+
+        first_l1_distance = l1_distance_list[0]
+
+        duration_penalty = (
+            len_y / 14 * first_l1_distance if first_l1_distance > 0.5 else
+            (len_y / 14 - 2) * (first_l1_distance - 0.5))
+
+        return distance_penalty + duration_penalty
+
+
+@dataclasses.dataclass
+class CustomDistance4(ReilFunction[float, int]):
+    center: float = 0.0
+    band_width: float = 1.0
+    exclude_first: bool = False
+    average: bool = True
+    c_i: float = 1.
+    c_o: float = 0.3
+    kappa: float = -0.3
+    delta: float = -20.2
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
+
+        l1_distance_list = tuple(
+            dist(self.center, interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x)
+        )
+
+        distance_penalty = (2.0 / self.band_width) ** 2 * sum(
+            dis ** 2
+            for dis, x_i in zip(l1_distance_list, _x))
+
+        if self.average:
+            distance_penalty /= len_y
+
+        first_l1_distance = l1_distance_list[0]
+
+        # duration_penalty = (
+        #     len_y / 14 * first_l1_distance + 0.5 if first_l1_distance > 0.5 else
+        #     (len_y / 3.5 - 2) * (first_l1_distance - 1.5))
+        duration_penalty = (
+            len_y * self.c_o * first_l1_distance + self.delta if first_l1_distance > 0.5 else
+            self.c_i * (len_y - 2) * (self.kappa - first_l1_distance))
+
+        return distance_penalty + duration_penalty
+
+
+# @dataclasses.dataclass
+# class CustomDistance4(ReilFunction[float, int]):
+#     center: float = 0.0
+#     band_width: float = 1.0
+#     exclude_first: bool = False
+#     average: bool = True
+#     c_i: float = 0.1
+#     c_o: float = 0.3
+#     kappa: float = 2.5
+#     delta: float = 4.
+
+#     def _default_function(
+#             self, y: list[float], x: list[int] | None = None) -> float:
+#         len_y = len(y)
+#         _x = x or [1] * (len_y - 1)
+
+#         if len_y != len(_x) + 1:
+#             raise ValueError(
+#                 'y should have exactly one item more than x.')
+
+#         if not self.exclude_first:
+#             _x = [1] + _x
+#             _y = [0.0, *y]
+#         else:
+#             _y = y
+
+#         l1_distance_list = tuple(
+#             dist(self.center, interpolate(_y[i], _y[i + 1], x_i))
+#             for i, x_i in enumerate(_x)
+#         )
+
+#         distance_penalty = (2.0 / self.band_width) ** 2 * sum(
+#             dis ** 2
+#             for dis, x_i in zip(l1_distance_list, _x))
+
+#         if self.average:
+#             distance_penalty /= len_y
+
+#         first_l1_distance = l1_distance_list[0]
+
+#         # duration_penalty = (
+#         #     len_y / 14 * first_l1_distance + 0.5 if first_l1_distance > 0.5 else
+#         #     (len_y / 3.5 - 2) * (first_l1_distance - 1.5))
+#         duration_penalty = (
+#             len_y * self.c_o * first_l1_distance + self.delta if first_l1_distance > 0.5 else
+#             self.c_i * (len_y - 2) * (first_l1_distance - self.kappa))
+
+#         return distance_penalty + duration_penalty
 
 
 # TODO: not implemented yet!

@@ -24,7 +24,7 @@ class Patient:
             self, model: HealthMathModel, random_seed: int | None = None,
             **feature_values: Any) -> None:
         '''
-        Parameters
+        Arguments
         ----------
         model:
             A `HealthMathModel` to be used to model patient's behavior.

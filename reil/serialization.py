@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+'''
+Pickling and unpickling functions.
+'''
 from __future__ import annotations
 
 import bz2
@@ -5,13 +9,19 @@ import importlib
 import logging
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path, PurePath
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol, TypeVar
 
 import dill as pickle
 
+T = TypeVar('T')
+
 
 class CustomUnPickler(pickle.Unpickler):
+    '''
+    Custom unpickler to load custom classes.
+    '''
     def find_class(self, module: str, name: str) -> Any:
         if name == 'MockStatistic':
             from reil.datatypes.mock_statistic import MockStatistic
@@ -28,6 +38,9 @@ class CustomUnPickler(pickle.Unpickler):
         if name == 'FeatureArray':
             from reil.datatypes.feature import FeatureSet
             return FeatureSet
+        if name == 'FeatureSetDumper':
+            from reil.datatypes.feature import FeatureSetDumper
+            return FeatureSetDumper
         if name == 'change_array_to_missing':
             from reil.datatypes.feature import change_set_to_missing
             return change_set_to_missing
@@ -38,6 +51,9 @@ class CustomUnPickler(pickle.Unpickler):
 
 
 class LowLevelPickler(Protocol):
+    '''
+    Low level pickler interface.
+    '''
     ext: str
 
     def dump(self, obj: Any, filename: str, path: str | PurePath) -> PurePath:
@@ -47,6 +63,9 @@ class LowLevelPickler(Protocol):
         raise NotImplementedError
 
     def resolve_path(self, filename: str, path: str | PurePath) -> PurePath:
+        '''
+        Resolve the full path of the file.
+        '''
         _filename = (
             filename if filename.endswith(self.ext)
             else f'{filename}.{self.ext}')
@@ -55,6 +74,9 @@ class LowLevelPickler(Protocol):
 
 
 class DefaultPickler(LowLevelPickler):
+    '''
+    Pickler that uses pickle.
+    '''
     ext: str = 'pkl'
 
     @staticmethod
@@ -118,6 +140,9 @@ class DefaultPickler(LowLevelPickler):
 
 
 class ZippedPickler(DefaultPickler):
+    '''
+    Pickler that uses bz2 compression.
+    '''
     ext: str = 'pbz2'
 
     def dump(self, obj: Any, filename: str, path: str | PurePath) -> PurePath:
@@ -132,6 +157,9 @@ class ZippedPickler(DefaultPickler):
 
 
 class PicklerManager:
+    '''
+    Manager for picklers.
+    '''
     def __init__(
             self,
             low_level_picklers: list[LowLevelPickler]) -> None:
@@ -150,6 +178,9 @@ def full_qualname(obj: Any):
 
 
 def get_class_from_name(qualname: str):
+    '''
+    Get class from qualname.
+    '''
     module_name, class_name = qualname.split(sep='>')
     module = sys.modules.get(module_name)
     if module is None:
@@ -158,8 +189,10 @@ def get_class_from_name(qualname: str):
     return getattr(module, class_name)
 
 
-def serialize(obj: Any):
-    # if inspect.isclass(obj):
+def serialize(obj: Any) -> dict[str, Any]:
+    '''
+    Serialize an object by calling its `get_config` method.
+    '''
     if hasattr(obj, 'get_config'):
         return {
             'class_name': full_qualname(obj),
@@ -172,7 +205,10 @@ def serialize(obj: Any):
             f'{obj.__class__.__qualname__}')
 
 
-def deserialize(object_info: dict[str, Any]):
+def deserialize(object_info: T | dict[str, Any]) -> T | dict[str, Any]:
+    '''
+    Deserialize an object by calling its `from_config` method.
+    '''
     # The commented section only goes one layer down which might not be enough.
     # So, better not rely on it, and implement per class instead!
     # for key, value in object_info.items():

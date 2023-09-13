@@ -7,7 +7,8 @@ This class creates a board for players to play the mnk game.
 '''
 
 import math
-from typing import Any, Generic, Iterator, TypeVar, cast, overload
+from typing import Any, Generic, TypeVar, cast, overload
+from collections.abc import Iterator
 
 from reil.datatypes.feature import FeatureSet, FeatureGenerator
 

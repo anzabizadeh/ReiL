@@ -9,17 +9,21 @@ and `statistic`.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Callable, DefaultDict, Generic, TypeVar
+from collections import defaultdict
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar
 
 import pandas as pd
 
-from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
-from reil.datatypes.feature_set_dumper import FeatureSetDumper
+from reil.datatypes.feature import FeatureGeneratorType, FeatureSet, FeatureSetDumper
 
 SubComponentInfo = tuple[Callable[..., dict[str, Any]], tuple[str, ...]]
 
 ArgsType = TypeVar('ArgsType', str, tuple[str, ...], dict[str, Any])
 ComponentReturnType = TypeVar('ComponentReturnType')
+
+PrimaryDefRefType = Callable[[str], tuple[tuple[str, dict[str, Any]], ...] | None]
+SecondaryDefRefType = Callable[[str], tuple[Callable[..., ComponentReturnType], str] | None]
 
 
 @dataclasses.dataclass
@@ -46,17 +50,31 @@ class State:
             dumper: FeatureSetDumper | None = None,
             pickle_stripped: bool = False):
         '''
-        Parameters
+        Arguments
         ----------
+        object_ref:
+            The object to be used as reference for the state.
+
         available_sub_components:
             A dictionary with sub component names as keys and a tuple of
             function and its argument list as values.
+
+        dumper:
+            A dumper to dump the feature set.
+
+        pickle_stripped:
+            Whether to pickle the stripped object or not.
+
+        Notes
+        -----
+        The `object_ref` should be pickleable for `pickle_stripped` to be
+        `False`. Otherwise, the object cannot be reconstructed at time of
+        unpickling.
         '''
         self._available_sub_components: dict[str, SubComponentInfo] = {}
         self._definitions: dict[str, list[
             SubComponentInstance[dict[str, Any]]]] = {}
-        self._definition_reference_function: Callable[
-            [str], tuple[tuple[str, dict[str, Any]]] | None] | None = None
+        self._definition_reference_function: PrimaryDefRefType | None = None
 
         if available_sub_components is not None:
             self.sub_components = available_sub_components
@@ -67,7 +85,8 @@ class State:
 
     @property
     def definitions(self):
-        '''Return the dictionary of component definitions.
+        '''
+        Return the dictionary of component definitions.
 
         Returns
         -------
@@ -78,7 +97,8 @@ class State:
 
     @property
     def sub_components(self) -> dict[str, SubComponentInfo]:
-        '''Get and set the dictionary of sub components.
+        '''
+        Get and set the dictionary of sub components.
 
         Returns
         -------
@@ -94,18 +114,19 @@ class State:
     @sub_components.setter
     def sub_components(self, sub_components: dict[str, SubComponentInfo]):
         if self._available_sub_components:
-            raise ValueError('Available sub components list is already set. '
-                             'Cannot modify it.')
+            raise ValueError(
+                'Available sub components list is already set. Cannot modify it.')
         self._available_sub_components = sub_components
 
     def add_definition(
             self,
             name: str,
             *sub_components: tuple[str, dict[str, Any]]) -> None:
-        '''Add a new component definition.
+        '''
+        Add a new component definition.
 
-        Parameters
-        ----------
+        Arguments
+        ---------
         name:
             The name of the new component.
 
@@ -150,10 +171,18 @@ class State:
                 name=sub_comp_name, fn=fn, args=kwargs))
 
     def definition_reference_function(
-        self,
-        f: Callable[[str], tuple[tuple[str, dict[str, Any]], ...] | None],
-        available_definitions: list[str]
-    ):
+            self, f: PrimaryDefRefType, available_definitions: list[str]):
+        '''
+        Set the function to get the component definition.
+
+        Arguments
+        ---------
+        f:
+            The function to get the component definition.
+
+        available_definitions:
+            The list of available component definitions.
+        '''
         self._definition_reference_function = f
         for d in set(available_definitions).difference(self._definitions):
             self._definitions[d] = []
@@ -163,8 +192,8 @@ class State:
         Generate the component based on the specified `name` for the
         specified caller.
 
-        Parameters
-        ----------
+        Arguments
+        ---------
         name:
             The name of the component definition.
 
@@ -200,6 +229,21 @@ class State:
             self, name: str, _id: int | None = None,
             additional_info: dict[str, Any] | None = None
     ) -> None:
+        '''
+        Dump the component based on the specified `name` for the
+        specified caller.
+
+        Arguments
+        ---------
+        name:
+            The name of the component definition.
+
+        _id:
+            ID of the caller.
+
+        additional_info:
+            Additional information to be dumped.
+        '''
         if self._dumper:
             self._dumper.dump(
                 component=self.__call__(name, _id),
@@ -230,8 +274,8 @@ class SecondayComponent(Generic[ComponentReturnType]):
             pickle_stripped: bool = False):
         '''
 
-        Parameters
-        ----------
+        Arguments
+        ---------
         name:
             The name of the secondary component.
 
@@ -249,8 +293,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
         self._definitions: dict[
             str, SubComponentInstance[str] | None] = {}
-        self._definition_reference_function: Callable[
-            [str], tuple[Callable[..., ComponentReturnType], str] | None] | None = None
+        self._definition_reference_function: SecondaryDefRefType | None = None
 
     @property
     def definitions(self):
@@ -272,7 +315,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
     def set_state(self, state: State) -> None:
         '''Set the primary component.
 
-        Parameters
+        Arguments
         ----------
         state:
             An instance of a `State` from which component
@@ -295,7 +338,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
         '''
         Add a new component definition.
 
-        Parameters
+        Arguments
         ----------
         name:
             The name of the new component.
@@ -330,23 +373,18 @@ class SecondayComponent(Generic[ComponentReturnType]):
             name=name, fn=fn, args=state_name)
 
     def definition_reference_function(
-        self,
-        f: Callable[
-            [str], tuple[Callable[..., ComponentReturnType], str] | None],
-        available_definitions: list[str]
-    ):
+            self, f: SecondaryDefRefType, available_definitions: list[str]):
         self._definition_reference_function = f
         for d in set(available_definitions).difference(self._definitions):
             self._definitions[d] = None
 
     def __call__(  # noqa: C901
-            self, name: str,
-            _id: int | None = None) -> ComponentReturnType | None:
+            self, name: str, _id: int | None = None) -> ComponentReturnType | None:
         '''
         Generate the component based on the specified `name` for the
         specified caller.
 
-        Parameters
+        Arguments
         ----------
         name:
             The name of the component definition.
@@ -412,7 +450,7 @@ class Statistic:
             pickle_stripped: bool = False):
         '''
 
-        Parameters
+        Arguments
         ----------
         name:
             The name of the secondary component.
@@ -438,12 +476,13 @@ class Statistic:
             [str], tuple[Callable[..., Any], str, str] | None] | None = None
 
         self._history: dict[
-            int, list[tuple[FeatureSet, float]]] = DefaultDict(list)
+            int, list[tuple[FeatureSet, float]]] = defaultdict(list)
         self._history_none: list[tuple[FeatureSet, float]] = []
 
     @property
     def definitions(self):
-        '''Return the dictionary of component definitions.
+        '''
+        Return the dictionary of component definitions.
 
         Returns
         -------
@@ -461,10 +500,11 @@ class Statistic:
     def set_state(
             self,
             state: State) -> None:
-        '''Set the primary component.
+        '''
+        Set the primary component.
 
-        Parameters
-        ----------
+        Arguments
+        ---------
         state:
             An instance of a `State` from which component
             definitions are used.
@@ -486,8 +526,8 @@ class Statistic:
         '''
         Add a new component definition.
 
-        Parameters
-        ----------
+        Arguments
+        ---------
         name:
             The name of the new component.
 
@@ -543,7 +583,7 @@ class Statistic:
         Generate the component based on the specified `name` for the
         specified caller.
 
-        Parameters
+        Arguments
         ----------
         name:
             The name of the component definition.
@@ -618,6 +658,31 @@ class Statistic:
             _id: int | None = None,
             reset_history: bool = False,
             n: int | None = None):
+        '''
+        Aggregate the history of the component.
+
+        Arguments
+        ---------
+        aggregators:
+            The aggregation function to use.
+
+        groupby:
+            The column names to group by.
+
+        _id:
+            ID of the caller.
+
+        reset_history:
+            Whether to reset the history after aggregation.
+
+        n:
+            The number of instances to aggregate.
+
+        Returns
+        -------
+        :
+            The aggregated result.
+        '''
         temp = self._history_none if _id is None else self._history[_id]
         if not temp:
             return None
@@ -641,7 +706,7 @@ class Statistic:
 
         if reset_history:
             self._history: dict[
-                int, list[tuple[FeatureSet, float]]] = DefaultDict(list)
+                int, list[tuple[FeatureSet, float]]] = defaultdict(list)
             self._history_none: list[tuple[FeatureSet, float]] = []
 
         return result

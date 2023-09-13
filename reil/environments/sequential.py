@@ -7,12 +7,13 @@ This class provides a learning environment for any reinforcement learning
 `agent` on any `subject`. The interactions between `agents` and `subjects`
 are determined by a fixed `interaction_sequence`.
 '''
-from typing import Any, Generator, NamedTuple, TypedDict
+from collections.abc import Generator
+from typing import Any, NamedTuple, TypedDict
 
 import pandas as pd
 
 from reil.agents.agent_demon import AgentDemon
-from reil.datatypes.dataclasses import InteractionProtocol
+from reil.datatypes import InteractionProtocol
 from reil.datatypes.feature import FeatureSet
 from reil.environments.environment import (EntityGenType, EntityType,
                                            Environment, Plan)
@@ -365,7 +366,7 @@ class Sequential(Environment):
     ) -> dict[tuple[str, str], pd.DataFrame]:
         '''Generate statistics for agents and subjects.
 
-        Parameters
+        Arguments
         ----------
         unstack:
             Whether to unstack the resulting pivottable or not.

@@ -7,13 +7,14 @@ This `agent` class is the base class of all agent classes that can learn from
 `history`.
 '''
 
-from typing import Any, Generator, Generic, Literal, TypeVar
+from collections.abc import Generator
+from typing import Any, Generic, Literal, TypeVar
 
 import scipy.signal
 
 from reil.agents.base_agent import BaseAgent
 from reil.datatypes import History
-from reil.datatypes.dataclasses import Observation
+from reil.datatypes import Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.learner import LabelType, Learner, LearnerProtocol
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,

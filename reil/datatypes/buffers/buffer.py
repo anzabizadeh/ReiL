@@ -6,14 +6,16 @@ Buffer class
 The base class for all buffers in `reil`.
 '''
 
-from typing import Callable, Generic, Iterator, Literal, TypeVar
+from collections.abc import Callable, Iterator
+from typing import Generic, Literal, Union
 
 import numpy as np
+from typing_extensions import TypeVarTuple, Unpack
 
 from reil import reilbase
 
-T1 = TypeVar('T1')
-T2 = TypeVar('T2')
+Ts = TypeVarTuple('Ts')
+AnyTs = Union[Unpack[Ts]]
 
 PickModes = Literal['all', 'random', 'recent', 'old']
 Funcs = Literal['sum', 'min', 'max', 'mean']
@@ -39,7 +41,7 @@ funcs_dict = {
 }
 
 
-class Buffer(reilbase.ReilBase, Generic[T1, T2]):
+class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
     '''
     The base class for all buffers in `reil`.
     '''
@@ -65,7 +67,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
         clear_buffer:
             Whether to clear the buffer when `reset` is called.
         '''
-        self._buffer: dict[str, list[T1] | list[T2]] | None
+        self._buffer: dict[str, list[AnyTs]] | None
         self._buffer_size: int | None = None
         self._buffer_names: list[str] | None = None
         self._pick_mode: PickModes | None = None
@@ -141,7 +143,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
 
         self.reset()
 
-    def add(self, data: dict[str, T1 | T2]) -> None:
+    def add(self, data: dict[str, AnyTs]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -165,7 +167,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
 
         self._count += 1
 
-    def add_iter(self, iter: Iterator[dict[str, T1 | T2]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, AnyTs]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -192,7 +194,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
 
     def pick(
             self, count: int | None = None, mode: PickModes | None = None
-    ) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
+    ) -> dict[str, tuple[AnyTs, ...]]:
         '''
         Return items from the buffer.
 
@@ -239,9 +241,26 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
                 'mode should be one of all, old, recent, or random.')
 
     def aggregate(
-        self, func: Funcs | Callable[[list[T1] | list[T2]], T1 | T2],
+        self, func: Funcs | Callable[[list[AnyTs]], AnyTs],
         names: str | list[str] | None = None
-    ) -> dict[str, T1 | T2]:
+    ) -> dict[str, AnyTs]:
+        '''
+        Aggregate items in the buffer.
+
+        Arguments
+        ---------
+        func:
+            The function to use for aggregation.
+
+        names:
+            The names of the buffer queues to aggregate. If omitted, all buffer
+            queues are aggregated.
+
+        Returns
+        -------
+        :
+            A dictionary with buffer names as keys and aggregated items as values.
+        '''
         if self._buffer is None:
             return {}
 
@@ -268,7 +287,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
             self._buffer_index = -1
             self._count = 0
 
-    def _pick_old(self, count: int) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
+    def _pick_old(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
         '''
         Return the oldest items in the buffer.
 
@@ -290,7 +309,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def _pick_recent(self, count: int) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
+    def _pick_recent(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
         '''
         Return the most recent items in the buffer.
 
@@ -312,7 +331,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def _pick_random(self, count: int) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
+    def _pick_random(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
         '''
         Return a random sample of items in the buffer.
 
@@ -335,7 +354,7 @@ class Buffer(reilbase.ReilBase, Generic[T1, T2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def _pick_all(self) -> dict[str, tuple[T1, ...] | tuple[T2, ...]]:
+    def _pick_all(self) -> dict[str, tuple[AnyTs, ...]]:
         '''
         Return all items in the buffer.
 

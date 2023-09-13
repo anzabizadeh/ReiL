@@ -8,10 +8,12 @@ A `Buffer` without size limit.
 
 from typing import Iterator
 
-from reil.datatypes.buffers.buffer import T1, T2, Buffer, PickModes
+from typing_extensions import Unpack
+
+from reil.datatypes.buffers.buffer import AnyTs, Buffer, PickModes, Ts
 
 
-class EndlessBuffer(Buffer[T1, T2]):
+class EndlessBuffer(Buffer[Unpack[Ts]]):
     '''
     A `Buffer` without size limit.
 
@@ -76,7 +78,7 @@ class EndlessBuffer(Buffer[T1, T2]):
             buffer_names=buffer_names, pick_mode=pick_mode,
             clear_buffer=clear_buffer)
 
-    def add(self, data: dict[str, T1 | T2]) -> None:
+    def add(self, data: dict[str, AnyTs]) -> None:
         '''
         Add a new item to the buffer.
 
@@ -94,7 +96,7 @@ class EndlessBuffer(Buffer[T1, T2]):
         else:
             raise RuntimeError('Buffer is not set up.')
 
-    def add_iter(self, iter: Iterator[dict[str, T1 | T2]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, AnyTs]]) -> None:
         '''
         Append a new item to the buffer.
 

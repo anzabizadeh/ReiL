@@ -45,7 +45,7 @@ class EntityRegister:
         '''
         Add a new `entity` to the end of the list.
 
-        Parameters
+        Arguments
         ----------
         entity_name:
             The name of the `entity` to add.

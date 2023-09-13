@@ -6,8 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from reil.datatypes.feature import FeatureSet
-from reil.datatypes.feature_set_dumper import FeatureSetDumper
+from reil.datatypes.feature import FeatureSet, FeatureSetDumper
 
 
 class TrajectoryDumper(FeatureSetDumper):

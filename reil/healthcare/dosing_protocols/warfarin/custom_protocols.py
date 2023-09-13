@@ -7,7 +7,8 @@ Aurora Dosing Protocol, based on `Ravvaz et al. (2017)
 <https://doi.org/10.1161/circgenetics.117.001804>`_
 '''
 
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 import reil.healthcare.dosing_protocols.three_phase_dosing_protocol as dp
 from reil.healthcare.dosing_protocols.warfarin import IWPC

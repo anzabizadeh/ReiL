@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+'''
+Logger class
+============
+
+Provides the logging capabilities for `ReiL` objects.
+'''
 import logging
 from typing import Any
 
@@ -14,10 +21,32 @@ DEFAULT_FORMAT = ' %(name)s :: %(levelname)-8s :: %(message)s'
 
 
 class Logger:
+    '''
+    Logger class.
+    '''
     def __init__(
             self, logger_name: str, logger_level: int | None = None,
             logger_filename: str | None = None,
             fmt: str | None = None) -> None:
+        '''
+        Initializes a logger.
+
+        Arguments
+        ---------
+        logger_name:
+            The name of the logger.
+
+        logger_level:
+            The level of the logger. If not given, defaults to `WARNING`.
+
+        logger_filename:
+            The filename of the logger. If not given, the logger will be
+            displayed on the standard output.
+
+        fmt:
+            The format of the logger. If not given, defaults to
+            `DEFAULT_FORMAT`.
+        '''
         self._name = logger_name
         self._level = logger_level or logging.WARNING
         self._filename = logger_filename
@@ -39,9 +68,30 @@ class Logger:
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
+        '''
+        Initializes a logger from a configuration dictionary.
+
+        Arguments
+        ---------
+        config:
+            The configuration dictionary.
+
+        Returns
+        -------
+        :
+            A logger object.
+        '''
         return cls(**config)
 
     def get_config(self) -> dict[str, Any]:
+        '''
+        Returns the configuration dictionary of the logger.
+
+        Returns
+        -------
+        :
+            The configuration dictionary of the logger.
+        '''
         return self.__getstate__()
 
     def debug(self, msg: str):
@@ -63,6 +113,14 @@ class Logger:
         self._logger.critical(msg)
 
     def __getstate__(self):
+        '''
+        Return the object state for pickling.
+
+        Returns
+        -------
+        :
+            The object state.
+        '''
         state = dict(
             name=self._name,
             level=self._level,
@@ -74,11 +132,19 @@ class Logger:
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        '''
+        Set the object state from pickling.
+
+        Arguments
+        ---------
+        state:
+            The object state.
+        '''
         try:
             self.__init__(
                 logger_name=state['name'], logger_level=state.get('level'),
                 logger_filename=state.get('filename'), fmt=state.get('fmt'))
-        except KeyError:
+        except KeyError:  # compatibility with old versions
             try:
                 self.__init__(
                     logger_name=state['_name'],
