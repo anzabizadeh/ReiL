@@ -8,12 +8,10 @@ A dummy buffer that does nothing!
 
 from typing import Iterator
 
-from typing_extensions import Unpack
-
-from reil.datatypes.buffers.buffer import AnyTs, Buffer, PickModes, Ts
+from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2
 
 
-class Sink(Buffer[Unpack[Ts]]):
+class Sink(Buffer[T1, T2]):
     '''
     A sink class.
     '''
@@ -70,7 +68,7 @@ class Sink(Buffer[Unpack[Ts]]):
         '''
         super().setup(buffer_names=buffer_names)
 
-    def add(self, data: dict[str, AnyTs]) -> None:
+    def add(self, data: dict[str, tuple[T1, T2]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -87,12 +85,12 @@ class Sink(Buffer[Unpack[Ts]]):
         '''
         return
 
-    def add_iter(self, iter: Iterator[dict[str, AnyTs]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, tuple[T1, T2]]]) -> None:
         return
 
     def pick(
         self, count: int | None = None, mode: PickModes | None = None
-    ) -> dict[str, tuple[AnyTs, ...]]:
+    ) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Raises an exception.
 

@@ -68,7 +68,7 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
         raise NotImplementedError
 
     @abstractmethod
-    def reset(self):
+    def reset(self) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -76,7 +76,7 @@ class LearnerProtocol(Protocol[InputType, LabelType]):
         raise NotImplementedError
 
     @abstractmethod
-    def set_parameters(self, parameters: Any):
+    def set_parameters(self, parameters: Any) -> None:
         raise NotImplementedError
 
 

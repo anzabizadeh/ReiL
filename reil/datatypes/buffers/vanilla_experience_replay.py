@@ -5,13 +5,11 @@ VanillaExperienceReplay class
 
 A `Buffer` with random pick that picks only if it is full.
 '''
-from typing_extensions import Unpack
-
-from reil.datatypes.buffers.buffer import AnyTs, PickModes, Ts
+from reil.datatypes.buffers.buffer import PickModes, T1, T2
 from reil.datatypes.buffers.circular_buffer import CircularBuffer
 
 
-class VanillaExperienceReplay(CircularBuffer[Unpack[Ts]]):
+class VanillaExperienceReplay(CircularBuffer[T1, T2]):
     '''
     A `Buffer` with random pick that picks only if it is full.
 
@@ -86,8 +84,8 @@ class VanillaExperienceReplay(CircularBuffer[Unpack[Ts]]):
         not defined. Attempt to use `setup` to modify size, names or mode will
         result in an exception.
         '''
-        super().setup(buffer_size=buffer_size,
-                      buffer_names=buffer_names)
+        super().setup(
+            buffer_size=buffer_size, buffer_names=buffer_names)
 
         if buffer_size is not None and buffer_size < 1:
             raise ValueError('buffer_size should be at least 1.')
@@ -103,14 +101,13 @@ class VanillaExperienceReplay(CircularBuffer[Unpack[Ts]]):
             if self._batch_size not in (None, batch_size):
                 raise ValueError(
                     'Cannot modify batch_size. The value is already set.')
-            else:
-                self._batch_size = batch_size
+            self._batch_size = batch_size
 
         self._clear_buffer = clear_buffer
 
     def pick(
         self, count: int | None = None, mode: PickModes | None = None
-    ) -> dict[str, tuple[AnyTs, ...]]:
+    ) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return items from the buffer.
 

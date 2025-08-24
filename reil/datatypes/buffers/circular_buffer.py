@@ -9,13 +9,10 @@ A `Buffer` that overflows!
 from collections.abc import Callable
 from typing import Iterator
 
-from typing_extensions import Unpack
-
-from reil.datatypes.buffers.buffer import (AnyTs, Buffer, Funcs, PickModes, Ts,
-                                           funcs_dict)
+from reil.datatypes.buffers.buffer import Buffer, Funcs, PickModes, T1, T2, FUNCTIONS
 
 
-class CircularBuffer(Buffer[Unpack[Ts]]):
+class CircularBuffer(Buffer[T1, T2]):
     '''
     A `Buffer` that overflows.
 
@@ -32,7 +29,7 @@ class CircularBuffer(Buffer[Unpack[Ts]]):
             pick_mode=pick_mode)
         self._buffer_index = 0
 
-    def add(self, data: dict[str, AnyTs]) -> None:
+    def add(self, data: dict[str, tuple[T1, T2]]) -> None:
         '''
         Add a new item to the buffer.
 
@@ -55,7 +52,7 @@ class CircularBuffer(Buffer[Unpack[Ts]]):
         # the size does not change if buffer is full.
         self._count -= self._buffer_full
 
-    def add_iter(self, iter: Iterator[dict[str, AnyTs]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, tuple[T1, T2]]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -84,13 +81,15 @@ class CircularBuffer(Buffer[Unpack[Ts]]):
                 self._buffer_index = 0
                 for key, v in data.items():
                     self._buffer[key][self._buffer_index] = v  # type: ignore
+
         if self._buffer_full:
+            assert self._buffer_size is not None
             self._count = self._buffer_size
 
     def aggregate(
-        self, func: Funcs | Callable[[list[AnyTs]], AnyTs],
+        self, func: Funcs | Callable[[list[tuple[T1, T2]]], tuple[T1, T2]],
         names: str | list[str] | None = None
-    ) -> dict[str, AnyTs]:
+    ) -> dict[str, tuple[T1, T2]]:
         '''
         Aggregate items in the buffer.
 
@@ -120,14 +119,14 @@ class CircularBuffer(Buffer[Unpack[Ts]]):
         else:
             _names = names
 
-        fn = funcs_dict[func] if isinstance(func, str) else func
+        fn = FUNCTIONS[func] if isinstance(func, str) else func
 
         return {
             name: fn(self._buffer[name])  # type: ignore
             for name in _names
         }
 
-    def _pick_old(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
+    def _pick_old(self, count: int) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return the oldest items in the buffer.
 
@@ -137,20 +136,24 @@ class CircularBuffer(Buffer[Unpack[Ts]]):
             The number of items to return.
         '''
         if self._buffer_full:
-            self._buffer_size: int
+            assert self._buffer_size is not None
+            assert self._buffer is not None
+
             slice_pre = slice(self._buffer_index + 1,
                               self._buffer_index + count + 1)
             slice_post = slice(
                 max(0, count - (self._buffer_size - self._buffer_index) + 1))
 
-            return {name: tuple(
-                buffer[slice_pre] + buffer[slice_post])  # type: ignore
-                for name, buffer in self._buffer.items()}
-        else:  # filling starts from the first item, not 0th
-            picks = super()._pick_old(count + 1)
-            return {name: value[1:] for name, value in picks.items()}
+            return {
+                name: tuple(buffer[slice_pre] + buffer[slice_post])  # type: ignore
+                for name, buffer in self._buffer.items()
+            }
 
-    def _pick_recent(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
+        # filling starts from the first item, not 0th
+        picks = super()._pick_old(count + 1)
+        return {name: value[1:] for name, value in picks.items()}
+
+    def _pick_recent(self, count: int) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return the most recent items in the buffer.
 
@@ -161,29 +164,31 @@ class CircularBuffer(Buffer[Unpack[Ts]]):
         '''
         if count - self._buffer_index <= 1 or not self._buffer_full:
             return super()._pick_recent(count)
-        elif self._buffer is not None:
+
+        if self._buffer is not None:
             slice_pre = slice(-(count - self._buffer_index - 1), None)
             slice_post = slice(self._buffer_index + 1)
             return {name: tuple(
                 buffer[slice_pre] + buffer[slice_post])  # type: ignore
                 for name, buffer in self._buffer.items()}
-        else:
-            raise RuntimeError('Buffer is not set up.')
+        raise RuntimeError('Buffer is not set up.')
 
-    def _pick_all(self) -> dict[str, tuple[AnyTs, ...]]:
+    def _pick_all(self) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return all items in the buffer.
         '''
         if self._buffer_full:
-            self._buffer: dict[str, list[AnyTs]]
+            assert self._buffer is not None
+
             slice_pre = slice(self._buffer_index + 1, None)
             slice_post = slice(self._buffer_index + 1)
             return {name: tuple(
                 buffer[slice_pre] + buffer[slice_post])  # type: ignore
                 for name, buffer in self._buffer.items()}
-        else:  # filling starts from the first item, not 0th
-            picks = super()._pick_all()
-            return {name: value[1:] for name, value in picks.items()}
+
+        # filling starts from the first item, not 0th
+        picks = super()._pick_all()
+        return {name: value[1:] for name, value in picks.items()}
 
     def reset(self) -> None:
         '''

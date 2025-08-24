@@ -91,7 +91,7 @@ class AgentDemon(BaseAgent):
 
     def load(
             self, filename: str,
-            path: Union[str, pathlib.PurePath] | None) -> None:
+            path: Union[str, pathlib.PurePath] | None = None) -> None:
         _path = pathlib.Path(path or self._path)
         '''
         Load the agent from a file.

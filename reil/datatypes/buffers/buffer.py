@@ -7,15 +7,14 @@ The base class for all buffers in `reil`.
 '''
 
 from collections.abc import Callable, Iterator
-from typing import Generic, Literal, Union
+from typing import Any, Final, Generic, Literal, TypeVar
 
 import numpy as np
-from typing_extensions import TypeVarTuple, Unpack
 
 from reil import reilbase
 
-Ts = TypeVarTuple('Ts')
-AnyTs = Union[Unpack[Ts]]
+T1 = TypeVar('T1')
+T2 = TypeVar('T2')
 
 PickModes = Literal['all', 'random', 'recent', 'old']
 Funcs = Literal['sum', 'min', 'max', 'mean']
@@ -25,14 +24,12 @@ def mean(x: list[int | float] | list[tuple[int | float, ...]]) -> float:
     if isinstance(x[0], (int, float)):
         return sum(x) / len(x)  # type: ignore
 
-    if isinstance(x[0], (list, tuple)):
-        return sum(
-            sum(x_i) for x_i in x) / sum(len(x_i) for x_i in x)  # type: ignore
-
-    raise TypeError(f'Unsupported type: {type(x[0])}')
+    return (
+        sum(sum(x_i) for x_i in x) / sum(len(x_i) for x_i in x)  # type: ignore
+    )
 
 
-funcs_dict = {
+FUNCTIONS: Final[dict[str, Callable[..., Any]]] = {
     'mean': mean,
     'sum': sum,
     'min': min,
@@ -41,7 +38,7 @@ funcs_dict = {
 }
 
 
-class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
+class Buffer(reilbase.ReilBase, Generic[T1, T2]):
     '''
     The base class for all buffers in `reil`.
     '''
@@ -67,7 +64,7 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
         clear_buffer:
             Whether to clear the buffer when `reset` is called.
         '''
-        self._buffer: dict[str, list[AnyTs]] | None
+        self._buffer: dict[str, list[tuple[T1, T2] | None]] | None
         self._buffer_size: int | None = None
         self._buffer_names: list[str] | None = None
         self._pick_mode: PickModes | None = None
@@ -119,19 +116,19 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
             if self._buffer_size not in (None, buffer_size):
                 raise ValueError(
                     'Cannot modify buffer_size. The value is already set.')
-            else:
-                self._buffer_size = buffer_size
+            self._buffer_size = buffer_size
 
         if buffer_names is not None:
             if self._buffer_names not in (None, buffer_names):
                 raise ValueError(
                     'Cannot modify buffer_names. The value is already set.')
-            else:
-                self._buffer_names = buffer_names
+            self._buffer_names = buffer_names
 
         if self._buffer_size is not None and self._buffer_names is not None:
-            self._buffer = {name: [None] * self._buffer_size  # type: ignore
-                            for name in self._buffer_names}
+            self._buffer = {
+                name: [None] * self._buffer_size
+                for name in self._buffer_names
+            }
         else:
             self._buffer = None
 
@@ -143,7 +140,7 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
 
         self.reset()
 
-    def add(self, data: dict[str, AnyTs]) -> None:
+    def add(self, data: dict[str, tuple[T1, T2]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -167,7 +164,7 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
 
         self._count += 1
 
-    def add_iter(self, iter: Iterator[dict[str, AnyTs]]) -> None:
+    def add_iter(self, iter: Iterator[dict[str, tuple[T1, T2]]]) -> None:
         '''
         Append a new item to the buffer.
 
@@ -194,7 +191,7 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
 
     def pick(
             self, count: int | None = None, mode: PickModes | None = None
-    ) -> dict[str, tuple[AnyTs, ...]]:
+    ) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return items from the buffer.
 
@@ -230,20 +227,20 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
 
         if _mode == 'old':
             return self._pick_old(_count)
-        elif _mode == 'recent':
+        if _mode == 'recent':
             return self._pick_recent(_count)
-        elif _mode == 'random':
+        if _mode == 'random':
             return self._pick_random(_count)
-        elif _mode == 'all':
+        if _mode == 'all':
             return self._pick_all()
-        else:
-            raise ValueError(
-                'mode should be one of all, old, recent, or random.')
+
+        raise ValueError(
+            'mode should be one of all, old, recent, or random.')
 
     def aggregate(
-        self, func: Funcs | Callable[[list[AnyTs]], AnyTs],
+        self, func: Funcs | Callable[[list[tuple[T1, T2]]], tuple[T1, T2]],
         names: str | list[str] | None = None
-    ) -> dict[str, AnyTs]:
+    ) -> dict[str, tuple[T1, T2]]:
         '''
         Aggregate items in the buffer.
 
@@ -272,7 +269,7 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
         else:
             _names = names
 
-        fn = funcs_dict[func] if isinstance(func, str) else func
+        fn = FUNCTIONS[func] if isinstance(func, str) else func
 
         return {
             name: fn(
@@ -287,7 +284,7 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
             self._buffer_index = -1
             self._count = 0
 
-    def _pick_old(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
+    def _pick_old(self, count: int) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return the oldest items in the buffer.
 
@@ -304,12 +301,13 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
         '''
         if self._buffer:
             s = slice(count)
-            return {name: tuple(buffer[s])  # type: ignore
-                    for name, buffer in self._buffer.items()}
-        else:
-            raise RuntimeError('Buffer is not set up.')
+            return {
+                name: tuple(buffer[s])  # type: ignore
+                for name, buffer in self._buffer.items()
+            }
+        raise RuntimeError('Buffer is not set up.')
 
-    def _pick_recent(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
+    def _pick_recent(self, count: int) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return the most recent items in the buffer.
 
@@ -326,12 +324,13 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
         '''
         if self._buffer:
             s = slice(self._buffer_index - count + 1, self._buffer_index + 1)
-            return {name: tuple(buffer[s])  # type: ignore
-                    for name, buffer in self._buffer.items()}
-        else:
-            raise RuntimeError('Buffer is not set up.')
+            return {
+                name: tuple(buffer[s])  # type: ignore
+                for name, buffer in self._buffer.items()
+            }
+        raise RuntimeError('Buffer is not set up.')
 
-    def _pick_random(self, count: int) -> dict[str, tuple[AnyTs, ...]]:
+    def _pick_random(self, count: int) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return a random sample of items in the buffer.
 
@@ -349,12 +348,13 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
         if self._buffer:
             index = np.random.choice(  # type: ignore
                 self._count, count, replace=False)
-            return {name: tuple(buffer[i] for i in index)  # type: ignore
-                    for name, buffer in self._buffer.items()}
-        else:
-            raise RuntimeError('Buffer is not set up.')
+            return {
+                name: tuple(buffer[i] for i in index)  # type: ignore
+                for name, buffer in self._buffer.items()
+            }
+        raise RuntimeError('Buffer is not set up.')
 
-    def _pick_all(self) -> dict[str, tuple[AnyTs, ...]]:
+    def _pick_all(self) -> dict[str, tuple[tuple[T1, T2], ...]]:
         '''
         Return all items in the buffer.
 
@@ -365,10 +365,11 @@ class Buffer(reilbase.ReilBase, Generic[Unpack[Ts]]):
         '''
         if self._buffer:
             s = slice(self._buffer_index + 1)
-            return {name: tuple(buffer[s])  # type: ignore
-                    for name, buffer in self._buffer.items()}
-        else:
-            raise RuntimeError('Buffer is not set up.')
+            return {
+                name: tuple(buffer[s])  # type: ignore
+                for name, buffer in self._buffer.items()
+            }
+        raise RuntimeError('Buffer is not set up.')
 
     def dump(self):
         pass
