@@ -6,7 +6,7 @@ A2CAgent class
 An Actor-Critic Policy Gradient `agent`.
 '''
 
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 import tensorflow as tf
@@ -18,7 +18,7 @@ from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.learner import Learner, LearnerProtocol
 from reil.utils.exploration_strategies import NoExploration
 
-ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
+ACLabelType = tuple[tuple[int | None, ...], float]
 
 
 class A2CAgent(Agent[FeatureSet, ACLabelType]):
@@ -29,7 +29,7 @@ class A2CAgent(Agent[FeatureSet, ACLabelType]):
     def __init__(
             self,
             learner: LearnerProtocol[FeatureSet, ACLabelType],
-            buffer: Buffer[FeatureSet, tuple[tuple[int, ...], float]],
+            buffer: Buffer[FeatureSet, ACLabelType],
             reward_clip: tuple[float | None, float | None] = (None, None),
             **kwargs: Any):
         '''
@@ -57,18 +57,21 @@ class A2CAgent(Agent[FeatureSet, ACLabelType]):
         self._reward_clip = reward_clip
 
     @classmethod
-    def _empty_instance(cls):  # type: ignore
+    def _empty_instance(cls) -> Self:
         '''
         Returns
         -------
         :
             an empty `A2CAgent` instance.
         '''
-        return cls(Learner._empty_instance(), Buffer())
+        # Use the public interface for creating an empty learner and specify types
+        empty_learner: Learner[FeatureSet, ACLabelType] = Learner._empty_instance()  # type: ignore
+        empty_buffer: Buffer[FeatureSet, ACLabelType] = Buffer()
+
+        return cls(empty_learner, empty_buffer)
 
     def _prepare_training(
-            self, history: History) -> TrainingData[
-                FeatureSet, tuple[tuple[int, ...], float]]:
+            self, history: History) -> TrainingData[FeatureSet, ACLabelType]:
         '''
         Use `history` to create the training set in the form of `X` and `y`
         vectors.
@@ -95,13 +98,13 @@ class A2CAgent(Agent[FeatureSet, ACLabelType]):
             {
                 'state': h.state,
                 'y_and_g': (
-                    tuple((h.action_taken or h.action).index.values()),  # type: ignore
+                    tuple((h.action_taken or h.action).index.values()),
                     r)
             } for h, r in zip(active_history, disc_reward))
 
         temp = self._buffer.pick()
 
-        return temp['state'], temp['y_and_g'], {}  # type: ignore
+        return temp['state'], temp['y_and_g'], {}
 
     def act(self,
             state: FeatureSet,

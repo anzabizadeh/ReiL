@@ -293,7 +293,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
 
         self._definitions: dict[
             str, SubComponentInstance[str] | None] = {}
-        self._definition_reference_function: SecondaryDefRefType | None = None
+        self._definition_reference_function: SecondaryDefRefType[ComponentReturnType] | None = None
 
     @property
     def definitions(self):
@@ -373,7 +373,7 @@ class SecondayComponent(Generic[ComponentReturnType]):
             name=name, fn=fn, args=state_name)
 
     def definition_reference_function(
-            self, f: SecondaryDefRefType, available_definitions: list[str]):
+            self, f: SecondaryDefRefType[ComponentReturnType], available_definitions: list[str]):
         self._definition_reference_function = f
         for d in set(available_definitions).difference(self._definitions):
             self._definitions[d] = None

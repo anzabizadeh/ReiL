@@ -6,7 +6,7 @@ Learner class
 The base class for all `learner` classes.
 '''
 from abc import abstractmethod
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol, Self, TypeVar
 
 from reil import reilbase
 from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
@@ -109,5 +109,5 @@ class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
         self._iteration += 1
 
     @classmethod
-    def _empty_instance(cls):
+    def _empty_instance(cls) -> Self:
         return cls(learning_rate=0.0)

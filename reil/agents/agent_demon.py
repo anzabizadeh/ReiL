@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pathlib
 from collections.abc import Callable
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from reil import reilbase
 from reil.agents.base_agent import BaseAgent
@@ -91,7 +91,7 @@ class AgentDemon(BaseAgent):
 
     def load(
             self, filename: str,
-            path: Union[str, pathlib.PurePath] | None = None) -> None:
+            path: str | pathlib.PurePath | None = None) -> None:
         _path = pathlib.Path(path or self._path)
         '''
         Load the agent from a file.
@@ -116,7 +116,7 @@ class AgentDemon(BaseAgent):
     def save(
             self,
             filename: str | None = None,
-            path: Union[str, pathlib.PurePath] | None = None
+            path: str | pathlib.PurePath | None = None
     ) -> pathlib.PurePath:
         '''
         Save the agent to a file.
