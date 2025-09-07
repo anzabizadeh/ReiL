@@ -98,7 +98,10 @@ class BaseAgent(Stateful):
         except NotImplementedError:
             result = possible_actions
 
-        if len(result) > 1:
+        len_result = len(result)
+        if len_result == 0:
+            raise ValueError('No possible actions available to select from.')
+        if len_result > 1:
             action = self._break_tie(result, self._tie_breaker)
         else:
             action = result[0]
@@ -162,7 +165,7 @@ class BaseAgent(Stateful):
                 new_observation = Observation()
                 temp: dict[str, Any] = yield
                 state: FeatureSet = temp['state']
-                actions: FeatureGeneratorType = temp['possible_actions']
+                actions: FeatureGeneratorType | None = temp['possible_actions']
                 iteration: int = temp['iteration']
 
                 new_observation.state = state

@@ -6,7 +6,8 @@ LRAgent class
 An agent that uses a given `scikitlearn` model, and parameter list, and
 specifies action using that.
 '''
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sklearn.linear_model import LinearRegression
 

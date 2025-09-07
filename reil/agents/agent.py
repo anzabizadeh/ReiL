@@ -13,8 +13,7 @@ from typing import Any, Generic, Literal, TypeVar
 import scipy.signal
 
 from reil.agents.base_agent import BaseAgent
-from reil.datatypes import History
-from reil.datatypes import Observation
+from reil.datatypes import History, Observation
 from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.learner import LabelType, Learner, LearnerProtocol
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
@@ -76,7 +75,7 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
                 f'{self.__class__.__qualname__} discount_factor should be in'
                 f' [0.0, 1.0]. Got {discount_factor}. Set to 1.0.')
         self._discount_factor = min(discount_factor, 1.0)
-        if isinstance(exploration_strategy, float):
+        if isinstance(exploration_strategy, (float, int)):
             self._exploration_strategy = ConstantEpsilonGreedy(
                 exploration_strategy)
         else:
@@ -96,7 +95,7 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
         :
             an empty instance of the agent.
         '''
-        return cls(Learner._empty_instance(), ConstantEpsilonGreedy())
+        return cls(Learner._empty_instance(), ConstantEpsilonGreedy())  # type: ignore
 
     @staticmethod
     def discounted_cum_sum(r: list[float], discount: float) -> list[float]:
@@ -222,7 +221,8 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
         if subject_id not in self._entity_list:
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
-        if (self._training_trigger != 'none' and
+        if (
+                self._training_trigger != 'none' and
                 self._exploration_strategy.explore(iteration)):
             action = actions.send('choose feature exclusive')
         else:
@@ -273,11 +273,11 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
             Some methods
         '''
         training_data: TrainingData[Any, Any] = (), (), {}
-        if history is not None:
-            training_data = self._prepare_training(history)
+        # if history is not None:
+        training_data = self._prepare_training(history)
 
         X, Y, kwargs = training_data
-        metrics = {}
+        metrics: dict[str, float] = {}
         if Y:
             for name, m in self._metrics.items():
                 metrics[name] = m.result()
@@ -329,7 +329,7 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
                 new_observation = Observation()
                 temp: dict[str, Any] = yield
                 state: FeatureSet = temp['state']
-                possible_actions: FeatureGeneratorType = temp['possible_actions']
+                possible_actions: FeatureGeneratorType | None = temp['possible_actions']
                 iteration: int = temp['iteration']
 
                 new_observation.state = state
@@ -372,7 +372,7 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
 
                 if self._summary_writer:
                     self._summary_writer.write(
-                        self._computed_metrics, self._learner._iteration)
+                        self._computed_metrics, self._learner._iteration)  # type: ignore
 
                 if stat_name is not None:
                     self.statistic.append(stat_name, subject_id)
