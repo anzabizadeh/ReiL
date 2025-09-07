@@ -14,8 +14,10 @@ from typing import Any, Generic, TypeVar
 
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
-from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
-                                                    LearningRateScheduler)
+from reil.learners.learning_rate_schedulers import (
+    ConstantLearningRate,
+    LearningRateScheduler
+)
 
 T = TypeVar('T')
 
@@ -67,7 +69,7 @@ class QLookupTable(Learner[FeatureSet, float]):
         `minimum_visits`, the computed estimate is returned. For any less
         visited `x`, `initial_estimate` will be returned.
         '''
-        if isinstance(learning_rate, float):
+        if isinstance(learning_rate, (float, int)):
             self._learning_rate = ConstantLearningRate(learning_rate)
         else:
             self._learning_rate = learning_rate

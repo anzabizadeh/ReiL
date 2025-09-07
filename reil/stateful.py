@@ -31,9 +31,7 @@ register:
 deregister:
     Deregister an external `entity` (`agents` for `subjects` and vice versa.)
 '''
-
-from __future__ import annotations
-
+from collections.abc import Callable
 from typing import Any
 
 from reil import reilbase
@@ -212,9 +210,14 @@ class Stateful(reilbase.ReilBase):
         'new valuenew valuenew value'}
         '''
         sub_comp_list: dict[str, SubComponentInfo] = {}
-        for func_name, func in ((f, getattr(self, f).__func__)
-                                for f in dir(self)
-                                if f.startswith('_sub_comp_')):
+        func_generator = (
+            (f, getattr(self, f).__func__)
+            for f in dir(self)
+            if f.startswith('_sub_comp_')
+        )
+
+        func: Callable[..., dict[str, Any]]
+        for func_name, func in func_generator:
             if callable(func):
                 keywords = list(func.__code__.co_varnames)
 
@@ -317,5 +320,5 @@ class Stateful(reilbase.ReilBase):
         except ValueError:
             self._logger.warning(
                 'Primary component is already set for `statistic` to .'
-                f'{self.statistic._state}. Resetting the value!')
-            self.statistic._state = self.state
+                f'{self.statistic._state}. Resetting the value!')  # type: ignore
+            self.statistic._state = self.state  # type: ignore

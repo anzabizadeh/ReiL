@@ -13,7 +13,8 @@ LearningRateScheduler:
 ConstantLearningRate:
     A learning rate scheduler with constant rate.
 '''
-from typing import Callable
+from collections.abc import Callable
+
 from reil import reilbase
 
 

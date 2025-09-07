@@ -9,8 +9,10 @@ from abc import abstractmethod
 from typing import Any, Protocol, Self, TypeVar
 
 from reil import reilbase
-from reil.learners.learning_rate_schedulers import (ConstantLearningRate,
-                                                    LearningRateScheduler)
+from reil.learners.learning_rate_schedulers import (
+    ConstantLearningRate,
+    LearningRateScheduler
+)
 
 LabelType = TypeVar('LabelType')
 InputType = TypeVar('InputType', contravariant=True)
@@ -99,7 +101,7 @@ class Learner(reilbase.ReilBase, LearnerProtocol[InputType, LabelType]):
         super().__init__(**kwargs)
         self._iteration = 0
         if learning_rate:
-            if isinstance(learning_rate, float):
+            if isinstance(learning_rate, (float, int)):
                 self._learning_rate = ConstantLearningRate(learning_rate)
             else:
                 self._learning_rate = learning_rate

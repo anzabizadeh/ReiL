@@ -6,9 +6,6 @@ InstanceGenerator class
 `InstanceGenerator` takes any object derived form `ReilBase` and returns
 an iterator.
 '''
-
-from __future__ import annotations
-
 import os
 import pathlib
 from collections.abc import Iterable
@@ -105,13 +102,13 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
 
         self.rewind()
 
-        if self._object is None:
+        if self._object is None:  # type: ignore
             self._logger.info('Instance Generator initialized with None.')
         else:
             self._object._name = self._filename_pattern.format(
                 n=self._instance_counter)
             if self._state_dumper:
-                self._object.state._dumper = self._state_dumper
+                self._object.state._dumper = self._state_dumper  # type: ignore
 
     @classmethod
     def _empty_instance(cls):
@@ -264,7 +261,7 @@ class InstanceGenerator(Generic[T], reilbase.ReilBase):
         self._object._name = current_instance
         self.statistic.set_object(self._object)
         if self._state_dumper:
-            self._object.state._dumper = self._state_dumper
+            self._object.state._dumper = self._state_dumper  # type: ignore
 
         if self._save_instances and new_instance:
             if (not self._overwrite_instances and
