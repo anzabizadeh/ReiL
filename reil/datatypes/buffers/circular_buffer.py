@@ -6,10 +6,9 @@ CircularBuffer class
 A `Buffer` that overflows!
 '''
 
-from collections.abc import Callable
-from typing import Iterator
+from collections.abc import Callable, Iterator
 
-from reil.datatypes.buffers.buffer import Buffer, Funcs, PickModes, T1, T2, FUNCTIONS
+from reil.datatypes.buffers.buffer import FUNCTIONS, T1, T2, Buffer, Funcs, PickModes
 
 
 class CircularBuffer(Buffer[T1, T2]):

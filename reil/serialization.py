@@ -218,7 +218,7 @@ def deserialize(object_info: T | dict[str, Any]) -> T | dict[str, Any]:
     if not isinstance(object_info, dict):
         return object_info
 
-    if object_info.get('__needs_deserialization__', False):
+    if object_info.get('__needs_deserialization__'):
         return get_class_from_name(
             object_info['class_name']).from_config(object_info['config'])
 

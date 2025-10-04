@@ -657,7 +657,7 @@ class Statistic:
             groupby: tuple[str, ...] | None = None,
             _id: int | None = None,
             reset_history: bool = False,
-            n: int | None = None):
+            n: int | None = None)-> pd.DataFrame | None:
         '''
         Aggregate the history of the component.
 
@@ -696,7 +696,7 @@ class Statistic:
              'value': x[1]}
             for i, x in enumerate(temp))
         temp_group_by = ['instance_id'] if groupby is None else list(groupby)
-        grouped_df = df.groupby(temp_group_by)
+        grouped_df = df.groupby(temp_group_by)  # type: ignore
 
         def no_change(x: Any) -> Any:
             return x
@@ -709,7 +709,7 @@ class Statistic:
                 int, list[tuple[FeatureSet, float]]] = defaultdict(list)
             self._history_none: list[tuple[FeatureSet, float]] = []
 
-        return result
+        return result  # type: ignore
 
     def __getstate__(self):
         if not self._pickle_stripped:

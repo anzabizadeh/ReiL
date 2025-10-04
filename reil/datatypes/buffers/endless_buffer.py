@@ -6,9 +6,9 @@ EndlessBuffer class
 A `Buffer` without size limit.
 '''
 
-from typing import Iterator
+from collections.abc import Iterator
 
-from reil.datatypes.buffers.buffer import Buffer, PickModes, T1, T2
+from reil.datatypes.buffers.buffer import T1, T2, Buffer, PickModes
 
 
 class EndlessBuffer(Buffer[T1, T2]):
