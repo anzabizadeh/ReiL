@@ -18,8 +18,7 @@ from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric, SparseCategoricalAccur
                                  TF2UtilsMixin, entropy, logprobs)
 
 keras = tf.keras
-from keras.optimizers.schedules.learning_rate_schedule import \
-    LearningRateSchedule  # noqa: E402
+from keras.optimizers.schedules import LearningRateSchedule  # noqa: E402
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
