@@ -2,6 +2,22 @@
 
 This document provides high-level guidance for AI assistants working on reinforcement learning projects using ReiL (or projects that apply ReiL to domain problems like warfarin dosing).
 
+## Poetry Environments
+
+- **ReiL repo root**: `c:\Users\sj_an\Documents\codebase\ReiL`
+- **Poetry env**: `reil-l-k_YBAA-py3.13`
+- **Poetry env path**: `C:\Users\sj_an\AppData\Local\pypoetry\Cache\virtualenvs\reil-l-k_YBAA-py3.13`
+- **Python package/import name**: `reil`
+- **Preferred execution pattern**: run ReiL commands from the ReiL repo root with `poetry run ...`
+
+- **warfarin_dosing repo root**: `c:\Users\sj_an\Documents\codebase\warfarin_dosing`
+- **Poetry env**: `warfarin-dosing-UQEwyhbe-py3.13`
+- **Poetry env path**: `C:\Users\sj_an\AppData\Local\pypoetry\Cache\virtualenvs\warfarin-dosing-UQEwyhbe-py3.13`
+- **Python package/import name**: `warfarin_dosing`
+- **Preferred execution pattern**: run warfarin_dosing commands from the warfarin_dosing repo root with `poetry run ...`
+
+When switching between the two repos, do not assume the same interpreter. Use the Poetry environment attached to the repo you are editing or testing.
+
 ## When to Use This Document
 
 - You're designing or modifying an agent, subject, or environment

@@ -379,54 +379,51 @@ class CustomDistance4(ReilFunction[float, int]):
         return distance_penalty + duration_penalty
 
 
-# @dataclasses.dataclass
-# class CustomDistance4(ReilFunction[float, int]):
-#     center: float = 0.0
-#     band_width: float = 1.0
-#     exclude_first: bool = False
-#     average: bool = True
-#     c_i: float = 0.1
-#     c_o: float = 0.3
-#     kappa: float = 2.5
-#     delta: float = 4.
+@dataclasses.dataclass
+class CustomDistance4b(ReilFunction[float, int]):
+    center: float = 0.0
+    band_width: float = 1.0
+    exclude_first: bool = False
+    average: bool = True
+    c_i: float = 0.1
+    c_o: float = 0.3
+    kappa: float = 2.5
+    delta: float = 4.
 
-#     def _default_function(
-#             self, y: list[float], x: list[int] | None = None) -> float:
-#         len_y = len(y)
-#         _x = x or [1] * (len_y - 1)
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
 
-#         if len_y != len(_x) + 1:
-#             raise ValueError(
-#                 'y should have exactly one item more than x.')
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
 
-#         if not self.exclude_first:
-#             _x = [1] + _x
-#             _y = [0.0, *y]
-#         else:
-#             _y = y
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
 
-#         l1_distance_list = tuple(
-#             dist(self.center, interpolate(_y[i], _y[i + 1], x_i))
-#             for i, x_i in enumerate(_x)
-#         )
+        l1_distance_list = tuple(
+            dist(self.center, interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x)
+        )
 
-#         distance_penalty = (2.0 / self.band_width) ** 2 * sum(
-#             dis ** 2
-#             for dis, x_i in zip(l1_distance_list, _x))
+        distance_penalty = (2.0 / self.band_width) ** 2 * sum(
+            dis ** 2
+            for dis, x_i in zip(l1_distance_list, _x))
 
-#         if self.average:
-#             distance_penalty /= len_y
+        if self.average:
+            distance_penalty /= len_y
 
-#         first_l1_distance = l1_distance_list[0]
+        first_l1_distance = l1_distance_list[0]
 
-#         # duration_penalty = (
-#         #     len_y / 14 * first_l1_distance + 0.5 if first_l1_distance > 0.5 else
-#         #     (len_y / 3.5 - 2) * (first_l1_distance - 1.5))
-#         duration_penalty = (
-#             len_y * self.c_o * first_l1_distance + self.delta if first_l1_distance > 0.5 else
-#             self.c_i * (len_y - 2) * (first_l1_distance - self.kappa))
+        duration_penalty = (
+            len_y * self.c_o * first_l1_distance + self.delta if first_l1_distance > 0.5 else
+            self.c_i * (len_y - 2) * (first_l1_distance - self.kappa))
 
-#         return distance_penalty + duration_penalty
+        return distance_penalty + duration_penalty
 
 
 # TODO: not implemented yet!

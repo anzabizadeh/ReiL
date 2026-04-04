@@ -154,6 +154,14 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
             center=2.5, band_width=1.0, exclude_first=False),
         'recent_daily_INR'
     ),
+    custom_distance_4b=(
+        reil_functions.CustomDistance4b(
+            name='custom_distance_4b',
+            y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False),
+        'recent_daily_INR'
+    ),
     dist=(
         reil_functions.NormalizedDistance(
             name='dist', y_var_name='daily_INR_history',

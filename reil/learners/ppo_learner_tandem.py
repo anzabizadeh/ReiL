@@ -17,9 +17,9 @@ from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric,
                                  TF2UtilsMixin, entropy, logprobs)
 
 keras = tf.keras
-from keras.optimizers.schedules.learning_rate_schedule import \
+from keras.optimizers.schedules import \
     LearningRateSchedule  # noqa: E402
-from keras.optimizers.legacy.adam import Adam  # noqa: E402
+from keras.optimizers import Adam  # noqa: E402
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
