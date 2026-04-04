@@ -176,7 +176,7 @@ class HambergPKPD(HealthMathModel):
     @classmethod
     def generate(
             cls,
-            rnd_generators: reil.RandomGeneratorsType,
+            rnd_generators: reil.RandomGeneratorT,
             input_features: FeatureSet | None = None,
             **kwargs: Any) -> FeatureSet:
         with reil.random_generator_context(*rnd_generators):
@@ -208,7 +208,7 @@ class HambergPKPD(HealthMathModel):
         return feature_set
 
     def setup(
-            self, rnd_generators: reil.RandomGeneratorsType,
+            self, rnd_generators: reil.RandomGeneratorT,
             input_features: FeatureSet | None = None) -> None:
         '''
         Set up the model.

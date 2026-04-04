@@ -65,6 +65,8 @@ ARandomGenerator = random.Random | np.random.Generator | tf.random.Generator
 RandomGeneratorsTuple = tuple[
     random.Random, np.random.Generator, tf.random.Generator]
 
+RandomGeneratorT = RandomGeneratorsTuple
+
 RANDOM_SEED: int | None = None
 RANDOM_GENERATOR: random.Random = random.Random()
 RANDOM_GENERATOR_NP: np.random.Generator = np.random.default_rng()
