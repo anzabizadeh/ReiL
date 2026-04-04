@@ -47,7 +47,7 @@ import logging
 import random
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Literal, TypeAlias
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -60,7 +60,7 @@ del get_versions
 
 FILE_FORMAT: Literal['pbz2', 'pkl'] = 'pkl'
 
-RandomGeneratorT: TypeAlias = random.Random | np.random.Generator | tf.random.Generator
+ARandomGenerator = random.Random | np.random.Generator | tf.random.Generator
 
 RandomGeneratorsTuple = tuple[
     random.Random, np.random.Generator, tf.random.Generator]
@@ -147,7 +147,7 @@ def random_generator_context(
     gen: random.Random | None = None,
     gen_np: np.random.Generator | None = None,
     gen_tf: tf.random.Generator | None = None
-) -> Iterator[RandomGeneratorT | list[RandomGeneratorT]]:
+) -> Iterator[ARandomGenerator | list[ARandomGenerator]]:
     '''
     Sets the random generators to the given generators.
 
@@ -169,7 +169,7 @@ def random_generator_context(
     temp_np = RANDOM_GENERATOR_NP
     temp_tf = RANDOM_GENERATOR_TF
     try:
-        gen_list: list[RandomGeneratorT] = []
+        gen_list: list[ARandomGenerator] = []
         if gen:
             RANDOM_GENERATOR = gen
             gen_list.append(RANDOM_GENERATOR)
@@ -207,6 +207,3 @@ def set_file_format(fmt: Literal['pbz2', 'pkl']):
             f'Current format: {FILE_FORMAT}.')
     else:
         FILE_FORMAT = fmt
-
-from . import _version
-__version__ = _version.get_versions()['version']
