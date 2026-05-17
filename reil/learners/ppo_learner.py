@@ -147,8 +147,8 @@ class PPOModel(TF2UtilsMixin):
             'critic': type(self.critic)}
 
     def __call__(self, inputs, training: bool | None = None) -> Any:
-        logits = self.actor(inputs, training)
-        values = self.critic(inputs, training)
+        logits = self.actor(inputs, training=training)
+        values = self.critic(inputs, training=training)
         return logits, values
 
     @staticmethod
