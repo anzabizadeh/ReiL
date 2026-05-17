@@ -549,10 +549,12 @@ class ActionRank(MetricSerializerMixin, keras.metrics.Metric):
         self.count.assign(0)  # type: ignore
 
 
+@keras.utils.register_keras_serializable(package='reil.utils.tf_utils')
 class MeanMetric(MetricSerializerMixin, keras.metrics.Mean):
     pass
 
 
+@keras.utils.register_keras_serializable(package='reil.utils.tf_utils')
 class SparseCategoricalAccuracyMetric(
         MetricSerializerMixin, tf.keras.metrics.SparseCategoricalAccuracy):
     pass
