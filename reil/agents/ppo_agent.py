@@ -147,7 +147,14 @@ class PPOAgent(A2CAgent):
 
         if action_indices is not None and y is not None:
             action_lists = list(zip(*action_indices))
-            for i, yi in enumerate(y):
+            if isinstance(y, (list, tuple)):
+                y_heads = list(y)
+            else:
+                y_heads = [y]
+
+            for i, yi in enumerate(y_heads):
+                if yi.shape.rank == 1:
+                    yi = tf.expand_dims(yi, axis=0)
                 self._metrics['action_rank'].update_state(
                     tf.squeeze(action_lists[i]), yi)
         if advantage is not None:
