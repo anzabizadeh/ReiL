@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import random
+import tempfile
 from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, Protocol
@@ -68,38 +69,45 @@ def logprobs(logits: Tensor, indices: Tensor, index_count: Tensor) -> Tensor:
 class SerializeTF:
     def __init__(
             self, cls: type[keras.Model] | None = None,
-            temp_path: str | pathlib.PurePath = '.') -> None:
+            temp_path: str | pathlib.PurePath | None = None) -> None:
         self.cls = cls
+        parent = pathlib.PurePath(
+            temp_path if temp_path is not None else tempfile.gettempdir())
         self._temp_path = (
-            pathlib.PurePath(temp_path) /
-            '{n:06}'.format(n=random.randint(1, 1000000)))
+            parent / '{n:06}'.format(n=random.randint(1, 1000000)))
 
     def dump(self, model: keras.Model) -> dict[str, list[Any]]:
         path = pathlib.Path(self._temp_path)
         try:
-            model.save(path)  # type: ignore
-            result = self.traverse(path)
-            self.__remove_dir(path)
-            path.rmdir()
-        except ValueError:  # model is not compiled.
-            result = model.get_config()
-
-        return result
+            try:
+                model.save(path)  # type: ignore
+                result = self.traverse(path)
+            except ValueError:  # model is not compiled.
+                result = model.get_config()
+            return result
+        finally:
+            self._cleanup(path)
 
     def load(self, data: dict[str, list[Any]]) -> keras.Model:
         path = pathlib.Path(self._temp_path)
         try:
-            self.generate(path, data)
-            sub_folder = next(iter(data))
+            try:
+                self.generate(path, data)
+                sub_folder = next(iter(data))
+                model = keras.models.load_model(path / sub_folder)
+            except (AttributeError, TypeError):  # model not compiled.
+                cls = self.cls or keras.models.Model
+                model = cls.from_config(data)  # type: ignore
+            return model  # type: ignore
+        finally:
+            self._cleanup(path)
 
-            model = keras.models.load_model(path / sub_folder)
-            self.__remove_dir(path)
-            path.rmdir()
-        except (AttributeError, TypeError):  # model not compiled.
-            cls = self.cls or keras.models.Model
-            model = cls.from_config(data)  # type: ignore
-
-        return model  # type: ignore
+    @staticmethod
+    def _cleanup(path: pathlib.Path) -> None:
+        if not path.exists():
+            return
+        SerializeTF.__remove_dir(path)
+        path.rmdir()
 
     @staticmethod
     def traverse(root: pathlib.Path) -> dict[str, list[Any]]:
