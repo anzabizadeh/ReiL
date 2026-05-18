@@ -21,6 +21,18 @@ EAGER_EXECUTION: bool = False
 JIT_COMPILE: bool = True
 
 
+def reset_metric(metric: Any) -> None:
+    """Reset a Keras metric across the 2.x/3.x API rename.
+
+    Keras 3 renamed `Metric.reset_states()` to `Metric.reset_state()`.
+    Older pickled metrics from Keras 2 still expose the plural form.
+    """
+    if hasattr(metric, 'reset_states'):
+        metric.reset_states()
+    else:
+        metric.reset_state()
+
+
 def set_tf_flags(
         eager_execution: bool | None = None,
         jit_compile: bool | Literal['autoclustering'] | None = None):

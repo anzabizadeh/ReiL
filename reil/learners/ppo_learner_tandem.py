@@ -14,9 +14,10 @@ from tensorflow import Tensor, TensorShape, TensorSpec
 
 from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric,
                                  SparseCategoricalAccuracyMetric,
-                                 TF2UtilsMixin, entropy, logprobs)
+                                 TF2UtilsMixin, entropy, logprobs, reset_metric)
 
 keras = tf.keras
+
 from keras.optimizers.schedules import \
     LearningRateSchedule  # noqa: E402
 from keras.optimizers import Adam  # noqa: E402
@@ -63,6 +64,7 @@ class PPOTandemModel(TF2UtilsMixin):
         super().__init__(models={})
 
         self._input_shape = input_shape
+        self._action_per_head_units = tuple(action_per_head)
         self._action_per_head: list[Tensor] = [
             tf.constant(i, dtype=tf.int32, name=f'action_in_head_{i}')
             for i in action_per_head
@@ -149,7 +151,7 @@ class PPOTandemModel(TF2UtilsMixin):
             input_=input_, layer_sizes=self._actor_layer_sizes,
             activation=self._actor_hidden_activation,
             layer_name_format='actor_{i:0>2}',
-            action_per_head=self._action_per_head,
+            action_per_head=self._action_per_head_units,
             head_activation=self._actor_head_activation,
             output_name_format='actor_output_{i:0>2}',
             backprop_mode=self._backprop_mode,
@@ -167,8 +169,8 @@ class PPOTandemModel(TF2UtilsMixin):
         self.critic = keras.Model(inputs=input_, outputs=critic_output)
 
     def __call__(self, inputs, training: bool | None = None) -> Any:
-        logits = self.actor(inputs, training)
-        values = self.critic(inputs, training)
+        logits = self.actor(inputs, training=training)
+        values = self.critic(inputs, training=training)
 
         return logits, values
 
@@ -453,9 +455,9 @@ class PPOTandemModel(TF2UtilsMixin):
             x for x in metrics.values())  # type: ignore
         metrics['kl'] = self._kl.result()
 
-        self._actor_loss.reset_states()
-        self._critic_loss.reset_states()
-        self._entropy_loss.reset_states()
-        self._actor_accuracy.reset_states()
+        reset_metric(self._actor_loss)
+        reset_metric(self._critic_loss)
+        reset_metric(self._entropy_loss)
+        reset_metric(self._actor_accuracy)
 
         return metrics
