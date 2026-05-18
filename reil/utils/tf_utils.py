@@ -230,7 +230,8 @@ class TF2UtilsMixin(reilbase.ReilBase):
 
         logits = [
             logit_heads[0](
-                tf.stop_gradient(layers[-1]) if backprop_mode == 'separate' else layers[-1])
+                keras.ops.stop_gradient(layers[-1])
+                if backprop_mode == 'separate' else layers[-1])
         ]
 
         for i, (layer_name_i, layer_sizes_i) in enumerate(layers_iterable, 1):
@@ -241,16 +242,16 @@ class TF2UtilsMixin(reilbase.ReilBase):
             if normalize_before_concat == 'none':
                 normalized_previous_layer = layers[-1]
             elif normalize_before_concat == 'regular':
-                normalized_previous_layer = tf.math.l2_normalize(layers[-1])
+                normalized_previous_layer = keras.ops.normalize(layers[-1], axis=-1)
             elif normalize_before_concat == 'batch':
                 normalized_previous_layer = tf.keras.layers.BatchNormalization(
                     name='_'.join(
                         (layer_name_format[:index], layer_name_i, 'pre_batch_normalization'))
                 )(logits[-1])
             if backprop_mode == 'separate':
-                normalized_previous_layer = tf.stop_gradient(normalized_previous_layer)
+                normalized_previous_layer = keras.ops.stop_gradient(normalized_previous_layer)
 
-            temp = tf.concat([input_, normalized_previous_layer], axis=-1)
+            temp = keras.ops.concatenate([input_, normalized_previous_layer], axis=-1)
 
             layers.append(
                 TF2UtilsMixin.mlp_functional(
@@ -260,7 +261,8 @@ class TF2UtilsMixin(reilbase.ReilBase):
 
             logits.append(
                 logit_heads[i](
-                    tf.stop_gradient(layers[-1]) if backprop_mode == 'separate' else layers[-1])
+                    keras.ops.stop_gradient(layers[-1])
+                    if backprop_mode == 'separate' else layers[-1])
             )
 
         return tuple(logits)
@@ -575,18 +577,24 @@ class SummaryWriter:
             tensorboard_filename: str | None = None):
 
         self._data_types = {}
-        self._tensorboard_path: pathlib.PurePath | None = None
+        self._tensorboard_filename: str | None = tensorboard_filename
         if (tensorboard_path or tensorboard_filename) is not None:
-            current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-            self._tensorboard_path = pathlib.PurePath(
+            self._tensorboard_path: pathlib.PurePath | None = pathlib.PurePath(
                 tensorboard_path or './logs')
-            self._tensorboard_filename: str = current_time + (
-                f'-{tensorboard_filename}' or '')
-            self._summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                    str(self._tensorboard_path / self._tensorboard_filename))
         else:
+            self._tensorboard_path = None
+        self._summary_writer: Any = None  # lazy: built on first write()
+
+    def _ensure_writer(self) -> None:
+        if self._summary_writer is not None:
+            return
+        if self._tensorboard_path is None:
             self._summary_writer = tf.summary.create_noop_writer()  # type: ignore
+            return
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        suffix = f'-{self._tensorboard_filename}' if self._tensorboard_filename else ''
+        self._summary_writer = tf.summary.create_file_writer(  # type: ignore
+            str(self._tensorboard_path / (stamp + suffix)))
 
     def set_data_types(
             self, data_types: dict[str, Literal['scalar', 'histogram']]):
@@ -625,6 +633,7 @@ class SummaryWriter:
         #     self._summary_writer = tf.summary.create_noop_writer()  # type: ignore
 
     def write(self, data: dict[str, float], iteration: int | None = None):
+        self._ensure_writer()
         with self._summary_writer.as_default(step=iteration):
             for name, value in data.items():
                 self._data_types.get(name, tf.summary.scalar)(name, value)

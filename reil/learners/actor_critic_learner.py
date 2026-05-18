@@ -612,15 +612,21 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         self._iteration = 0
 
         self._tensorboard_path: pathlib.PurePath | None = None
+        self._tensorboard_filename: str | None = tensorboard_filename
         if (tensorboard_path or tensorboard_filename) is not None:
-            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             self._tensorboard_path = pathlib.PurePath(
                 tensorboard_path or './logs')
-            self._tensorboard_filename = current_time + (
-                f'-{tensorboard_filename}' or '')
-            self._summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                    str(self._tensorboard_path / self._tensorboard_filename))
+        self._summary_writer: Any = None  # lazy: built on first learn()
+
+    def _ensure_summary_writer(self) -> None:
+        if self._summary_writer is not None:
+            return
+        if self._tensorboard_path is None:
+            return
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        suffix = f'-{self._tensorboard_filename}' if self._tensorboard_filename else ''
+        self._summary_writer = tf.summary.create_file_writer(  # type: ignore
+            str(self._tensorboard_path / (stamp + suffix)))
 
     def predict(
             self, X: tuple[FeatureSet, ...], training: bool | None = None
@@ -669,7 +675,8 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
         metrics = self._model.fit(
             x=_X, y=(_Y, G), verbose=0).history  # type: ignore
 
-        if self._summary_writer:
+        self._ensure_summary_writer()
+        if self._summary_writer is not None:
             with self._summary_writer.as_default(step=self._iteration):
                 for name, value in metrics.items():
                     tf.summary.scalar(name, value[0])
@@ -692,8 +699,4 @@ class A2CLearner(TF2UtilsMixin, Learner[FeatureSet, ACLabelType]):
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         super().__setstate__(state)
-
-        if self._tensorboard_path:
-            self._summary_writer = \
-                tf.summary.create_file_writer(  # type: ignore
-                    str(self._tensorboard_path / self._tensorboard_filename))
+        self._summary_writer = None  # lazy: built on first learn()
