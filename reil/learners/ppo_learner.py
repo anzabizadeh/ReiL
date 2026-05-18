@@ -15,9 +15,10 @@ from tensorflow import Tensor, TensorShape, TensorSpec
 from reil.datatypes.feature import FeatureSet
 from reil.learners.learner import Learner
 from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric, SparseCategoricalAccuracyMetric,
-                                 TF2UtilsMixin, entropy, logprobs)
+                                 TF2UtilsMixin, entropy, logprobs, reset_metric)
 
 keras = tf.keras
+
 from keras.optimizers.schedules import LearningRateSchedule  # noqa: E402
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
@@ -426,20 +427,20 @@ class PPOModel(TF2UtilsMixin):
 
         if tf.cast(self._entropy_loss_coef, tf.bool):
             metrics['entropy_loss'] = self._entropy_loss.result()
-            self._entropy_loss.reset_states()
+            reset_metric(self._entropy_loss)
 
         if tf.cast(self._regularizer_coef, tf.bool):
             metrics['regularizer_loss'] = self._regularizer_loss.result()
-            self._regularizer_loss.reset_states()
+            reset_metric(self._regularizer_loss)
 
         metrics['total_loss'] = sum(
             x for x in metrics.values())  # type: ignore
         metrics['kl'] = self._kl.result()
 
-        self._actor_loss.reset_states()
-        self._critic_loss.reset_states()
-        self._actor_accuracy.reset_states()
-        self._kl.reset_states()
+        reset_metric(self._actor_loss)
+        reset_metric(self._critic_loss)
+        reset_metric(self._actor_accuracy)
+        reset_metric(self._kl)
 
         return metrics
 

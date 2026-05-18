@@ -73,8 +73,18 @@ class PPO4WarfarinAgent(PPOAgent):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         training_mode = self._training_trigger != 'none'
-        logits: list[Tensor] = list(  # type: ignore
-            self._learner.predict((state,), training=training_mode)[0])
+        raw_logits = self._learner.predict((state,), training=training_mode)[0]
+        if isinstance(raw_logits, (list, tuple)):
+            logits: list[Tensor] = list(raw_logits)  # type: ignore
+        else:
+            logits = [raw_logits]  # type: ignore
+
+        # Single-head models may return rank-1 tensors (n_actions,).
+        # Normalize to rank-2 (1, n_actions) to keep masking logic uniform.
+        logits = [
+            tf.expand_dims(lo, axis=0) if lo.shape.rank == 1 else lo
+            for lo in logits
+        ]
         if training_mode:
             temp = logits
             for i, x in enumerate(self._previous_action):
@@ -88,10 +98,34 @@ class PPO4WarfarinAgent(PPOAgent):
                         modifier._scale_fn.last_call)
 
         mask = list(actions.send('return mask_vector'))
+        # The mask cardinality must equal the model head's width: one logit
+        # per possible action, one mask bit per possible action. A mismatch
+        # means the actions generator was built against a different action
+        # space than the model — almost always config drift between training
+        # and the current call (e.g., a pickled model loaded against a wider
+        # action set, or init_action_name vs main_action_name disagreement).
+        # We raise here rather than silently clip+fallback, because a silent
+        # fallback violates the environment's mask contract and corrupts
+        # downstream PTTR / trajectory results without leaving an audit trail.
+        for i, (lo, m_vec) in enumerate(zip(logits, mask)):
+            upper = lo.shape[1]
+            if upper is None:
+                continue
+            if len(m_vec) != upper:
+                raise ValueError(
+                    f"Action mask cardinality {len(m_vec)} for head {i} "
+                    f"doesn't match model head width {upper}. "
+                    f"Likely cause: the model's action_per_head doesn't "
+                    f"match the current actions generator. Check that the "
+                    f"model was trained with the same action space as the "
+                    f"current environment (often init_action_name vs "
+                    f"main_action_name, or a stale pickled agent)."
+                )
         mask_index = [
             [i for i, j in enumerate(m) if j]
             for m in mask
         ]
+
         masked_logits = [
             tf.gather(lo, m, axis=1)
             for lo, m in zip(logits, mask_index)
@@ -451,9 +485,13 @@ class PPO4Warfarin2PartAgent(BaseAgent):
                 if self._dose_agent._training_trigger == 'termination':
                     self._computed_metrics.update(self.learn(history))
 
-                # if self._summary_writer:
-                #     self._summary_writer.write(
-                #         self._computed_metrics, self._learner._iteration)
+                if self._summary_writer:
+                    self._summary_writer.write(
+                        self._computed_metrics, self._learner._iteration)
+                    # Flush immediately for visibility
+                    tf_writer = getattr(self._summary_writer, '_summary_writer', None)
+                    if tf_writer is not None:
+                        tf_writer.flush()
 
                 if stat_name is not None:
                     self.statistic.append(stat_name, subject_id)

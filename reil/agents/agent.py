@@ -18,6 +18,7 @@ from reil.datatypes.feature import FeatureGeneratorType, FeatureSet
 from reil.learners.learner import LabelType, Learner, LearnerProtocol
 from reil.utils.exploration_strategies import (ConstantEpsilonGreedy,
                                                ExplorationStrategy)
+from reil.utils.tf_utils import reset_metric
 
 InputType = TypeVar('InputType')
 TrainingData = tuple[
@@ -281,7 +282,7 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
         if Y:
             for name, m in self._metrics.items():
                 metrics[name] = m.result()
-                m.reset_states()
+                reset_metric(m)
 
             metrics.update(self._learner.learn(X, Y, **kwargs))
 

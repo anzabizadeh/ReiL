@@ -557,17 +557,25 @@ class Single(Environment):
         else:
             transform = no_transform
 
+        def aggregate_and_transform(e: StatInfo) -> pd.DataFrame:
+            aggregated = self._instance_generators.get(
+                e.entity_name,
+                self.__dict__[e.obj][e.entity_name]
+            ).statistic.aggregate(  # type: ignore
+                e.aggregators, e.groupby,
+                self._assignment_list[e.a_s_name][e.a_s_name.index(
+                    e.entity_name)],
+                reset_history=reset_history)
+
+            if aggregated is None:
+                if unstack:
+                    return pd.DataFrame(columns=['aggregator', 'value'])
+                return pd.DataFrame()
+
+            return transform(aggregated)
+
         result = {
-            e.a_s_name: transform(  # type: ignore
-                self._instance_generators.get(
-                    e.entity_name,
-                    self.__dict__[e.obj][e.entity_name]
-                ).statistic.aggregate(  # type: ignore
-                    e.aggregators, e.groupby,
-                    self._assignment_list[e.a_s_name][e.a_s_name.index(
-                        e.entity_name)],
-                    reset_history=reset_history)
-            ).assign(
+            e.a_s_name: aggregate_and_transform(e).assign(
                 entity=e.entity_name,
                 assigned_to=e.assigned_to,
                 iteration=self._iterations[e.a_s_name[1]])

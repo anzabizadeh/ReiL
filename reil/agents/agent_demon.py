@@ -86,6 +86,13 @@ class AgentDemon(BaseAgent):
         self.statistic = main_agent.statistic
         self._entity_list = main_agent._entity_list
         self._training_trigger = main_agent._training_trigger
+        # Mirror optional training-related attributes when present so
+        # BaseAgent.observe can write summaries through the demon wrapper.
+        # Guarded because `main_agent: BaseAgent` is not required to have a
+        # `_learner` (only the `Agent` subclass sets one).
+        for attr in ('_summary_writer', '_learner', '_computed_metrics', '_metrics'):
+            if hasattr(main_agent, attr):
+                setattr(self, attr, getattr(main_agent, attr))
 
         return self
 
@@ -248,7 +255,7 @@ class AgentDemon(BaseAgent):
 
         return self._main_agent.act(state, subject_id, actions, iteration)
 
-    def learn(self, history: History) -> None:
+    def learn(self, history: History) -> dict[str, float]:
         '''
         Learn using history.
 
@@ -265,7 +272,10 @@ class AgentDemon(BaseAgent):
             raise ValueError('main_agent is not set.')
 
         if self._training_trigger != 'none':
-            self._main_agent.learn(history)  # type: ignore
+            metrics = self._main_agent.learn(history)  # type: ignore
+            return metrics or {}
+
+        return {}
 
     def __getstate__(self):
         '''
