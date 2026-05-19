@@ -88,30 +88,67 @@ class SerializeTF:
         self._temp_path = (
             parent / '{n:06}'.format(n=random.randint(1, 1000000)))
 
+    # Sentinel key in the dumped dict for the new `.keras` single-file format.
+    # Distinguishes the v2 payload from the legacy directory-tree payload that
+    # earlier pickles embedded, so `load()` can dispatch on format.
+    _KERAS_BYTES_KEY = '__keras_v3__'
+
     def dump(self, model: keras.Model) -> dict[str, list[Any]]:
+        '''Serialize a Keras model to a dict.
+
+        Pre-Keras-3 ReiL wrote `model.save(directory)` and traversed the dir
+        tree to capture file bytes. Keras 3's directory-format `load_model`
+        silently drops weights on round-trip when classes are registered via
+        `@keras.utils.register_keras_serializable` (the model loads, but
+        every kernel reverts to its `kernel_initializer` value — see the
+        "Skipping variable loading" warnings). Switching to the native
+        `.keras` zip format fixes this: weights and optimizer state are
+        preserved end-to-end.
+        '''
         path = pathlib.Path(self._temp_path)
+        keras_file = path.with_suffix('.keras')
         try:
             try:
-                model.save(path)  # type: ignore
-                result = self.traverse(path)
+                model.save(keras_file)  # type: ignore
+                with open(keras_file, 'rb') as f:
+                    blob = f.read()
+                return {self._KERAS_BYTES_KEY: blob}
             except ValueError:  # model is not compiled.
-                result = model.get_config()
-            return result
+                return model.get_config()
         finally:
+            if keras_file.exists():
+                keras_file.unlink()
             self._cleanup(path)
 
     def load(self, data: dict[str, list[Any]]) -> keras.Model:
         path = pathlib.Path(self._temp_path)
+        keras_file = path.with_suffix('.keras')
         try:
+            # New format: single bytes blob under the sentinel key.
+            if isinstance(data, dict) and self._KERAS_BYTES_KEY in data:
+                blob = data[self._KERAS_BYTES_KEY]
+                if not isinstance(blob, (bytes, bytearray)):
+                    raise TypeError(
+                        f'Expected bytes for {self._KERAS_BYTES_KEY}, '
+                        f'got {type(blob).__name__}'
+                    )
+                with open(keras_file, 'wb') as f:
+                    f.write(blob)
+                return keras.models.load_model(keras_file)  # type: ignore
+
+            # Legacy format: directory tree of file bytes. Kept so old pickles
+            # still load (best-effort; weights may not survive the round-trip
+            # on Keras 3, but at least the config will).
             try:
                 self.generate(path, data)
                 sub_folder = next(iter(data))
-                model = keras.models.load_model(path / sub_folder)
+                return keras.models.load_model(path / sub_folder)  # type: ignore
             except (AttributeError, TypeError):  # model not compiled.
                 cls = self.cls or keras.models.Model
-                model = cls.from_config(data)  # type: ignore
-            return model  # type: ignore
+                return cls.from_config(data)  # type: ignore
         finally:
+            if keras_file.exists():
+                keras_file.unlink()
             self._cleanup(path)
 
     @staticmethod
@@ -176,8 +213,15 @@ class TF2UtilsMixin(reilbase.ReilBase):
             activation: str | Callable[[Tensor], Tensor] | None,
             layer_name_format: str,
             start_index: int = 1, **kwargs):
+        # Default kernel_initializer was 'zeros' since commit 74a7808e
+        # (2023-09-12). Combined with ReLU hidden activations, that produces a
+        # dead network: forward output is 0 everywhere, ReLU' at 0 is 0, no
+        # gradient flows back, weights never escape zero. The dissertation
+        # runs (Apr 2022 — Aug 2023, pre-74a7808e) used Keras's then-default
+        # 'glorot_uniform' and trained normally. Restored to 'he_normal' (the
+        # modern convention for ReLU networks) so PPO can train again.
         kernel_initializer = kwargs.pop(
-            'kernel_initializer') if 'kernel_initializer' in kwargs else 'zeros'
+            'kernel_initializer') if 'kernel_initializer' in kwargs else 'he_normal'
         bias_initializer = kwargs.pop(
             'bias_initializer') if 'bias_initializer' in kwargs else 'zeros'
 
