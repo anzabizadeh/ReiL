@@ -79,14 +79,32 @@ def logprobs(logits: Tensor, indices: Tensor, index_count: Tensor) -> Tensor:
 
 
 class SerializeTF:
+    # Module-level counter so successive SerializeTF instances in the same
+    # process can't collide even if both ask the OS for tempfiles in the
+    # same microsecond.
+    _counter: int = 0
+
     def __init__(
             self, cls: type[keras.Model] | None = None,
             temp_path: str | pathlib.PurePath | None = None) -> None:
         self.cls = cls
         parent = pathlib.PurePath(
             temp_path if temp_path is not None else tempfile.gettempdir())
+        # Per-process unique temp filename. Previously this used
+        # `random.randint(1, 1000000)`, but the `random` module is globally
+        # seeded by trainers (reil.set_reil_random_seed) so concurrent TF
+        # processes all drew the SAME integer and collided on the same
+        # `<temp>/<n>.keras` file, raising WinError 32 ("file is being used
+        # by another process") under `schedule --slots > 1`. Use os.getpid +
+        # a class counter + os.urandom-backed token so collisions are
+        # impossible across processes and across calls within one process.
+        import os as _os
+        import secrets as _secrets
+        SerializeTF._counter += 1
+        token = _secrets.token_hex(4)
         self._temp_path = (
-            parent / '{n:06}'.format(n=random.randint(1, 1000000)))
+            parent / f'reil_serialize_{_os.getpid()}_'
+                     f'{SerializeTF._counter:04d}_{token}')
 
     # Sentinel key in the dumped dict for the new `.keras` single-file format.
     # Distinguishes the v2 payload from the legacy directory-tree payload that
