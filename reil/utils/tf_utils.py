@@ -231,15 +231,18 @@ class TF2UtilsMixin(reilbase.ReilBase):
             activation: str | Callable[[Tensor], Tensor] | None,
             layer_name_format: str,
             start_index: int = 1, **kwargs):
-        # Default kernel_initializer was 'zeros' since commit 74a7808e
-        # (2023-09-12). Combined with ReLU hidden activations, that produces a
-        # dead network: forward output is 0 everywhere, ReLU' at 0 is 0, no
-        # gradient flows back, weights never escape zero. The dissertation
-        # runs (Apr 2022 — Aug 2023, pre-74a7808e) used Keras's then-default
-        # 'glorot_uniform' and trained normally. Restored to 'he_normal' (the
-        # modern convention for ReLU networks) so PPO can train again.
+        # Default kernel_initializer history:
+        #   pre-2023-09-12: implicit (Keras 2 default = 'glorot_uniform')
+        #   2023-09-12 (74a7808e): changed to 'zeros' → dead-network regression
+        #   2026-05-19: changed to 'he_normal' to recover training
+        #   2026-05-24: changed back to 'glorot_uniform' — Ch.2 Phase A showed
+        #     `he_normal` recovers most cells but coef=1, coef=1+AF, coef=5+AF
+        #     stay collapsed (32-41% PTTR). The dissertation reports 78%, 84%,
+        #     73% for these. Hypothesis: those original results used Keras 2's
+        #     default `glorot_uniform`, which gives PPO a different init basin
+        #     that doesn't oscillate under the L1-of-L2 regularizer.
         kernel_initializer = kwargs.pop(
-            'kernel_initializer') if 'kernel_initializer' in kwargs else 'he_normal'
+            'kernel_initializer') if 'kernel_initializer' in kwargs else 'glorot_uniform'
         bias_initializer = kwargs.pop(
             'bias_initializer') if 'bias_initializer' in kwargs else 'zeros'
 
