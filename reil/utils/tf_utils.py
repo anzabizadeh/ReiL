@@ -235,14 +235,14 @@ class TF2UtilsMixin(reilbase.ReilBase):
         #   pre-2023-09-12: implicit (Keras 2 default = 'glorot_uniform')
         #   2023-09-12 (74a7808e): changed to 'zeros' → dead-network regression
         #   2026-05-19: changed to 'he_normal' to recover training
-        #   2026-05-24: changed back to 'glorot_uniform' — Ch.2 Phase A showed
-        #     `he_normal` recovers most cells but coef=1, coef=1+AF, coef=5+AF
-        #     stay collapsed (32-41% PTTR). The dissertation reports 78%, 84%,
-        #     73% for these. Hypothesis: those original results used Keras 2's
-        #     default `glorot_uniform`, which gives PPO a different init basin
-        #     that doesn't oscillate under the L1-of-L2 regularizer.
+        #   2026-05-24: brief test of 'glorot_uniform' to see if it would
+        #     reproduce the dissertation's coef∈{1,5} results
+        #   2026-05-26: reverted to 'he_normal'. Phase-B sanity checks showed
+        #     glorot_uniform regresses Base (86%→73%) and coef=0.1 (84%→37%)
+        #     while NOT recovering the high-reg collapsed cells. So
+        #     he_normal is the correct default for this architecture.
         kernel_initializer = kwargs.pop(
-            'kernel_initializer') if 'kernel_initializer' in kwargs else 'glorot_uniform'
+            'kernel_initializer') if 'kernel_initializer' in kwargs else 'he_normal'
         bias_initializer = kwargs.pop(
             'bias_initializer') if 'bias_initializer' in kwargs else 'zeros'
 
