@@ -341,6 +341,21 @@ class PPOModel(TF2UtilsMixin):
 
         return regularizer_loss
 
+    def per_neuron_l2_vector(self) -> Tensor:
+        # Per-output-neuron L2 norm of the last actor layer's (weights + bias).
+        # Returns a 1-D Tensor of length n_actions (output dimension of the
+        # last head). Eager-safe; called once per train_step for diagnostics.
+        #
+        # Mirrors the columns reduced inside `_compute_regularizer_loss` —
+        # both expose only the last head's weights, so multi-head models see
+        # only the final head here.
+        last = self.actor.layers[-1]
+        weights_concat = tf.concat([
+            last.weights[0],
+            tf.expand_dims(last.weights[1], axis=0)
+        ], axis=0)
+        return tf.math.reduce_euclidean_norm(weights_concat, axis=0)
+
     @tf.function(jit_compile=JIT_COMPILE)
     def _compute_actor_loss(self, initial_logprobs, new_logprobs, advantage, j):
         ratio: Tensor = tf.exp(
@@ -800,11 +815,31 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         metrics = self._model.train_step(
             (_X, (action_index, returns, advantage)))
 
-        if self._iteration % 100 == 0:
-            metrics['last_layer_w'] = tf.concat([
-                self._model.actor.layers[-1].weights[0],
-                tf.expand_dims(self._model.actor.layers[-1].weights[1], axis=0)
-            ], axis=0, name='actor_weights')
+        # Action-forging diagnostics. Always logged (regardless of
+        # regularizer_coef) so the no-regularizer baseline is comparable.
+        # See feat/action-forging-instrumentation in CHANGELOG / branch notes.
+        # Replaces the prior `last_layer_w` histogram (full weight+bias
+        # matrix logged every 100 iters): the per-neuron L2 vector below
+        # carries the action-elimination signal more directly.
+        per_neuron_l2 = self._model.per_neuron_l2_vector().numpy()
+        for i, v in enumerate(per_neuron_l2):
+            metrics[f'actor_neuron_l2/{i:02d}'] = float(v)
+        # 1e-4 chosen as the "effectively zero" threshold. The L2-of-L2
+        # regularizer pushes eliminated neurons' norms toward 0; anything
+        # above 1e-4 still produces a non-negligible logit contribution.
+        metrics['n_actions_alive'] = float((per_neuron_l2 > 1e-4).sum())
+
+        # Batch policy entropy on the current training mini-batch. Unlike
+        # `entropy_loss` (logged only when entropy_loss_coef != 0 and computed
+        # inside the actor train loop), this is unconditional and computed
+        # once post-train_step. Catches policy collapse to a single action.
+        batch_logits = self._model.actor(_X, training=False)
+        if isinstance(batch_logits, (list, tuple)):
+            batch_logits_concat = tf.concat(batch_logits, axis=1)
+        else:
+            batch_logits_concat = batch_logits
+        metrics['policy_entropy'] = float(
+            tf.reduce_mean(entropy(batch_logits_concat)))
 
         self._iteration += 1
 

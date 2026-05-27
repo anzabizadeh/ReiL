@@ -18,7 +18,7 @@ from reil.datatypes.buffers.buffer import Buffer
 from reil.datatypes.feature import FeatureSet
 from reil.learners.ppo_learner import PPOLearner
 from reil.utils.exploration_strategies import NoExploration
-from reil.utils.metrics import HistogramMetric, MetricProtocol
+from reil.utils.metrics import MetricProtocol
 from reil.utils.tf_utils import ActionRank, MeanMetric
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
@@ -62,17 +62,18 @@ class PPOAgent(A2CAgent):
         self._buffer.setup(buffer_names=['state', 'y_r_a'])
         self._reward_clip = reward_clip
         self._gae_lambda = gae_lambda
+        # advantage_h / rewards_h histograms dropped — only the scalar means
+        # are needed downstream; the histograms were per-iter overhead under
+        # --slots N contention that no Ch.2 / Ch.3 figure used.
+        # last_layer_w (full last-layer weight matrix, logged every 100 iters)
+        # also dropped — the per-neuron L2 vector added in
+        # PPOLearner.learn() carries the action-elimination signal more
+        # directly, without the (input_dim+1) × n_actions payload.
         self._metrics: dict[str, MetricProtocol] = {
             'action_rank': ActionRank(),
             'advantage_mean': MeanMetric('advantage_mean', dtype=tf.float32),
-            'advantage_h': HistogramMetric('advantage_h'),
             'rewards': MeanMetric('rewards', dtype=tf.float32),
-            'rewards_h': HistogramMetric('rewards_h'),
         }
-        if self._summary_writer:
-            self._summary_writer.set_data_types({
-                'last_layer_w': 'histogram',
-                'advantage_h': 'histogram', 'rewards_h': 'histogram'})
 
     def _prepare_training(
             self, history: History) -> TrainingData[FeatureSet, int]:
@@ -159,7 +160,5 @@ class PPOAgent(A2CAgent):
                     tf.squeeze(action_lists[i]), yi)
         if advantage is not None:
             self._metrics['advantage_mean'].update_state(advantage)
-            self._metrics['advantage_h'].update_state(advantage)
         if rewards is not None:
             self._metrics['rewards'].update_state(rewards[:-1])
-            self._metrics['rewards_h'].update_state(rewards[:-1])

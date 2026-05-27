@@ -654,6 +654,7 @@ class SummaryWriter:
             tensorboard_filename: str | None = None):
 
         self._data_types = {}
+        self._buckets: dict[str, int] = {}
         self._tensorboard_filename: str | None = tensorboard_filename
         if (tensorboard_path or tensorboard_filename) is not None:
             self._tensorboard_path: pathlib.PurePath | None = pathlib.PurePath(
@@ -683,11 +684,17 @@ class SummaryWriter:
             else:
                 raise ValueError(f'Unsupported type: {v}.')
 
+    def set_buckets(self, buckets: dict[str, int]) -> None:
+        # Per-key bucket count, threaded to tf.summary.histogram. Keys without
+        # an entry use TF's default. Ignored for scalar keys.
+        self._buckets.update(buckets)
+
     def __getstate__(self):
         state = dict(
             tensorboard_filename=self._tensorboard_filename,
             tensorboard_path=self._tensorboard_path,
-            data_types={k: v.__name__ for k, v in self._data_types.items()}
+            data_types={k: v.__name__ for k, v in self._data_types.items()},
+            buckets=dict(self._buckets),
         )
 
         return state
@@ -697,6 +704,8 @@ class SummaryWriter:
             tensorboard_filename=state.pop('tensorboard_filename'),
             tensorboard_path=state.pop('tensorboard_path'))
         self.set_data_types(state.pop('data_types'))
+        # `buckets` is absent in pre-feat/action-forging-instrumentation pickles.
+        self.set_buckets(state.pop('buckets', {}))
         # self._tensorboard_filename = state['_tensorboard_filename']
         # self._tensorboard_path = state['_tensorboard_path']
 
@@ -713,4 +722,8 @@ class SummaryWriter:
         self._ensure_writer()
         with self._summary_writer.as_default(step=iteration):
             for name, value in data.items():
-                self._data_types.get(name, tf.summary.scalar)(name, value)
+                fn = self._data_types.get(name, tf.summary.scalar)
+                if fn is tf.summary.histogram and name in self._buckets:
+                    fn(name, value, buckets=self._buckets[name])
+                else:
+                    fn(name, value)

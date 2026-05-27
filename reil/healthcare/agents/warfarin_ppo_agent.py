@@ -26,8 +26,9 @@ class PPO4WarfarinAgent(PPOAgent):
             action_modifiers: list[ActionModifier] | None = None,
             **kwargs: Any):
         super().__init__(learner, buffer, reward_clip, gae_lambda, **kwargs)
-        self._metrics['PTTR_h'] = PTTRMetric('PTTR', mode='histogram')
-        self._metrics['INR_h'] = INRMetric('INR', mode='histogram')
+        # PTTR_h / INR_h histograms dropped — fully reconstructible from
+        # trajectories/ post-hoc, and the per-iter histogram bucketing is
+        # expensive under --slots N contention. Scalar PTTR / INR retained.
         self._metrics['PTTR'] = PTTRMetric('PTTR', mode='scalar')
         self._metrics['INR'] = INRMetric('INR', mode='scalar')
         self._metrics['dose'] = ActionMetric('dose', 0)
@@ -44,17 +45,17 @@ class PPO4WarfarinAgent(PPOAgent):
 
         if self._summary_writer:
             self._summary_writer.set_data_types({
-                'PTTR_h': 'histogram', 'INR_h': 'histogram',
                 'dose': 'histogram', 'duration': 'histogram'
             })
+            # 21 = action_count for the Ch.2 dose-percent-change head.
+            # Exact per-action counts beat the default 30-bin smoothing.
+            self._summary_writer.set_buckets({'dose': 21})
 
     def _update_metrics(self, **kwargs: Any) -> None:
         super()._update_metrics(**kwargs)
 
         state_list = kwargs.get('state_list')
         if state_list:
-            self._metrics['PTTR_h'].update_state(state_list)
-            self._metrics['INR_h'].update_state(state_list)
             self._metrics['PTTR'].update_state(state_list)
             self._metrics['INR'].update_state(state_list)
 
