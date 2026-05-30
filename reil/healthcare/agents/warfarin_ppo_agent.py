@@ -438,6 +438,14 @@ class PPO4Warfarin2PartAgent(BaseAgent):
 
         history: History = []
         new_observation = None
+        # Per-trajectory flag: True iff `learn()` actually produced metrics
+        # this trajectory. Gates the end-of-trajectory TB write so test
+        # passes (trigger='none') don't re-emit the previous training step's
+        # `_computed_metrics` at a frozen learner iteration — which otherwise
+        # shows up as a spurious jump in TB curves at the train→test
+        # boundary. `n_actions_alive` and other in-`learn()` writes
+        # (warfarin_ppo_agent.learn lines 366/377/390) are unaffected.
+        learned_this_trajectory = False
         while True:
             try:
                 new_observation = Observation()
@@ -484,9 +492,12 @@ class PPO4Warfarin2PartAgent(BaseAgent):
                 # if learn_on_termination:
                     # self._computed_metrics = self.learn(history)
                 if self._dose_agent._training_trigger == 'termination':
-                    self._computed_metrics.update(self.learn(history))
+                    m = self.learn(history)
+                    self._computed_metrics.update(m)
+                    learned_this_trajectory = (
+                        learned_this_trajectory or bool(m))
 
-                if self._summary_writer:
+                if self._summary_writer and learned_this_trajectory:
                     self._summary_writer.write(
                         self._computed_metrics, self._learner._iteration)
                     # Flush immediately for visibility
