@@ -26,8 +26,9 @@ class PPO4WarfarinAgent(PPOAgent):
             action_modifiers: list[ActionModifier] | None = None,
             **kwargs: Any):
         super().__init__(learner, buffer, reward_clip, gae_lambda, **kwargs)
-        self._metrics['PTTR_h'] = PTTRMetric('PTTR', mode='histogram')
-        self._metrics['INR_h'] = INRMetric('INR', mode='histogram')
+        # PTTR_h / INR_h histograms dropped — fully reconstructible from
+        # trajectories/ post-hoc, and the per-iter histogram bucketing is
+        # expensive under --slots N contention. Scalar PTTR / INR retained.
         self._metrics['PTTR'] = PTTRMetric('PTTR', mode='scalar')
         self._metrics['INR'] = INRMetric('INR', mode='scalar')
         self._metrics['dose'] = ActionMetric('dose', 0)
@@ -44,17 +45,17 @@ class PPO4WarfarinAgent(PPOAgent):
 
         if self._summary_writer:
             self._summary_writer.set_data_types({
-                'PTTR_h': 'histogram', 'INR_h': 'histogram',
                 'dose': 'histogram', 'duration': 'histogram'
             })
+            # 21 = action_count for the Ch.2 dose-percent-change head.
+            # Exact per-action counts beat the default 30-bin smoothing.
+            self._summary_writer.set_buckets({'dose': 21})
 
     def _update_metrics(self, **kwargs: Any) -> None:
         super()._update_metrics(**kwargs)
 
         state_list = kwargs.get('state_list')
         if state_list:
-            self._metrics['PTTR_h'].update_state(state_list)
-            self._metrics['INR_h'].update_state(state_list)
             self._metrics['PTTR'].update_state(state_list)
             self._metrics['INR'].update_state(state_list)
 
@@ -437,6 +438,14 @@ class PPO4Warfarin2PartAgent(BaseAgent):
 
         history: History = []
         new_observation = None
+        # Per-trajectory flag: True iff `learn()` actually produced metrics
+        # this trajectory. Gates the end-of-trajectory TB write so test
+        # passes (trigger='none') don't re-emit the previous training step's
+        # `_computed_metrics` at a frozen learner iteration — which otherwise
+        # shows up as a spurious jump in TB curves at the train→test
+        # boundary. `n_actions_alive` and other in-`learn()` writes
+        # (warfarin_ppo_agent.learn lines 366/377/390) are unaffected.
+        learned_this_trajectory = False
         while True:
             try:
                 new_observation = Observation()
@@ -483,9 +492,12 @@ class PPO4Warfarin2PartAgent(BaseAgent):
                 # if learn_on_termination:
                     # self._computed_metrics = self.learn(history)
                 if self._dose_agent._training_trigger == 'termination':
-                    self._computed_metrics.update(self.learn(history))
+                    m = self.learn(history)
+                    self._computed_metrics.update(m)
+                    learned_this_trajectory = (
+                        learned_this_trajectory or bool(m))
 
-                if self._summary_writer:
+                if self._summary_writer and learned_this_trajectory:
                     self._summary_writer.write(
                         self._computed_metrics, self._learner._iteration)
                     # Flush immediately for visibility

@@ -325,6 +325,12 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
 
         history: History = []
         new_observation = None
+        # Tracks whether `learn()` produced any new metrics during this
+        # trajectory. Used to gate the end-of-trajectory TB write so test
+        # passes (trigger='none', no learning) don't re-emit stale
+        # `_computed_metrics` at the frozen learner iteration. See discussion
+        # in warfarin_ppo_agent.py for the warfarin-side counterpart.
+        learned_this_trajectory = False
         while True:
             try:
                 new_observation = Observation()
@@ -336,8 +342,9 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
                 new_observation.state = state
                 new_observation.possible_actions = possible_actions
                 if learn_on_state:
-                    self._computed_metrics.update(
-                        self.learn([history[-1], new_observation]))
+                    m = self.learn([history[-1], new_observation])
+                    self._computed_metrics.update(m)
+                    learned_this_trajectory = learned_this_trajectory or bool(m)
 
                 if possible_actions is not None:
                     new_observation.action = self.act(
@@ -350,15 +357,18 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
                     new_observation.lookahead = temp.get('lookahead')
 
                     if learn_on_action:
-                        self._computed_metrics.update(
-                            self.learn([history[-1], new_observation]))
+                        m = self.learn([history[-1], new_observation])
+                        self._computed_metrics.update(m)
+                        learned_this_trajectory = learned_this_trajectory or bool(m)
 
                     new_observation.reward = (yield None)['reward']
 
                     history.append(new_observation)
 
                     if learn_on_reward:
-                        self._computed_metrics.update(self.learn(history[-2:]))
+                        m = self.learn(history[-2:])
+                        self._computed_metrics.update(m)
+                        learned_this_trajectory = learned_this_trajectory or bool(m)
                 else:  # No actions to take, so skip the reward.
                     yield
 
@@ -370,8 +380,11 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
 
                 if learn_on_termination:
                     self._computed_metrics = self.learn(history)
+                    learned_this_trajectory = (
+                        learned_this_trajectory
+                        or bool(self._computed_metrics))
 
-                if self._summary_writer:
+                if self._summary_writer and learned_this_trajectory:
                     self._summary_writer.write(
                         self._computed_metrics, self._learner._iteration)  # type: ignore
 

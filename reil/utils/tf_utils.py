@@ -79,39 +79,94 @@ def logprobs(logits: Tensor, indices: Tensor, index_count: Tensor) -> Tensor:
 
 
 class SerializeTF:
+    # Module-level counter so successive SerializeTF instances in the same
+    # process can't collide even if both ask the OS for tempfiles in the
+    # same microsecond.
+    _counter: int = 0
+
     def __init__(
             self, cls: type[keras.Model] | None = None,
             temp_path: str | pathlib.PurePath | None = None) -> None:
         self.cls = cls
         parent = pathlib.PurePath(
             temp_path if temp_path is not None else tempfile.gettempdir())
+        # Per-process unique temp filename. Previously this used
+        # `random.randint(1, 1000000)`, but the `random` module is globally
+        # seeded by trainers (reil.set_reil_random_seed) so concurrent TF
+        # processes all drew the SAME integer and collided on the same
+        # `<temp>/<n>.keras` file, raising WinError 32 ("file is being used
+        # by another process") under `schedule --slots > 1`. Use os.getpid +
+        # a class counter + os.urandom-backed token so collisions are
+        # impossible across processes and across calls within one process.
+        import os as _os
+        import secrets as _secrets
+        SerializeTF._counter += 1
+        token = _secrets.token_hex(4)
         self._temp_path = (
-            parent / '{n:06}'.format(n=random.randint(1, 1000000)))
+            parent / f'reil_serialize_{_os.getpid()}_'
+                     f'{SerializeTF._counter:04d}_{token}')
+
+    # Sentinel key in the dumped dict for the new `.keras` single-file format.
+    # Distinguishes the v2 payload from the legacy directory-tree payload that
+    # earlier pickles embedded, so `load()` can dispatch on format.
+    _KERAS_BYTES_KEY = '__keras_v3__'
 
     def dump(self, model: keras.Model) -> dict[str, list[Any]]:
+        '''Serialize a Keras model to a dict.
+
+        Pre-Keras-3 ReiL wrote `model.save(directory)` and traversed the dir
+        tree to capture file bytes. Keras 3's directory-format `load_model`
+        silently drops weights on round-trip when classes are registered via
+        `@keras.utils.register_keras_serializable` (the model loads, but
+        every kernel reverts to its `kernel_initializer` value — see the
+        "Skipping variable loading" warnings). Switching to the native
+        `.keras` zip format fixes this: weights and optimizer state are
+        preserved end-to-end.
+        '''
         path = pathlib.Path(self._temp_path)
+        keras_file = path.with_suffix('.keras')
         try:
             try:
-                model.save(path)  # type: ignore
-                result = self.traverse(path)
+                model.save(keras_file)  # type: ignore
+                with open(keras_file, 'rb') as f:
+                    blob = f.read()
+                return {self._KERAS_BYTES_KEY: blob}
             except ValueError:  # model is not compiled.
-                result = model.get_config()
-            return result
+                return model.get_config()
         finally:
+            if keras_file.exists():
+                keras_file.unlink()
             self._cleanup(path)
 
     def load(self, data: dict[str, list[Any]]) -> keras.Model:
         path = pathlib.Path(self._temp_path)
+        keras_file = path.with_suffix('.keras')
         try:
+            # New format: single bytes blob under the sentinel key.
+            if isinstance(data, dict) and self._KERAS_BYTES_KEY in data:
+                blob = data[self._KERAS_BYTES_KEY]
+                if not isinstance(blob, (bytes, bytearray)):
+                    raise TypeError(
+                        f'Expected bytes for {self._KERAS_BYTES_KEY}, '
+                        f'got {type(blob).__name__}'
+                    )
+                with open(keras_file, 'wb') as f:
+                    f.write(blob)
+                return keras.models.load_model(keras_file)  # type: ignore
+
+            # Legacy format: directory tree of file bytes. Kept so old pickles
+            # still load (best-effort; weights may not survive the round-trip
+            # on Keras 3, but at least the config will).
             try:
                 self.generate(path, data)
                 sub_folder = next(iter(data))
-                model = keras.models.load_model(path / sub_folder)
+                return keras.models.load_model(path / sub_folder)  # type: ignore
             except (AttributeError, TypeError):  # model not compiled.
                 cls = self.cls or keras.models.Model
-                model = cls.from_config(data)  # type: ignore
-            return model  # type: ignore
+                return cls.from_config(data)  # type: ignore
         finally:
+            if keras_file.exists():
+                keras_file.unlink()
             self._cleanup(path)
 
     @staticmethod
@@ -176,8 +231,18 @@ class TF2UtilsMixin(reilbase.ReilBase):
             activation: str | Callable[[Tensor], Tensor] | None,
             layer_name_format: str,
             start_index: int = 1, **kwargs):
+        # Default kernel_initializer history:
+        #   pre-2023-09-12: implicit (Keras 2 default = 'glorot_uniform')
+        #   2023-09-12 (74a7808e): changed to 'zeros' → dead-network regression
+        #   2026-05-19: changed to 'he_normal' to recover training
+        #   2026-05-24: brief test of 'glorot_uniform' to see if it would
+        #     reproduce the dissertation's coef∈{1,5} results
+        #   2026-05-26: reverted to 'he_normal'. Phase-B sanity checks showed
+        #     glorot_uniform regresses Base (86%→73%) and coef=0.1 (84%→37%)
+        #     while NOT recovering the high-reg collapsed cells. So
+        #     he_normal is the correct default for this architecture.
         kernel_initializer = kwargs.pop(
-            'kernel_initializer') if 'kernel_initializer' in kwargs else 'zeros'
+            'kernel_initializer') if 'kernel_initializer' in kwargs else 'he_normal'
         bias_initializer = kwargs.pop(
             'bias_initializer') if 'bias_initializer' in kwargs else 'zeros'
 
@@ -589,6 +654,7 @@ class SummaryWriter:
             tensorboard_filename: str | None = None):
 
         self._data_types = {}
+        self._buckets: dict[str, int] = {}
         self._tensorboard_filename: str | None = tensorboard_filename
         if (tensorboard_path or tensorboard_filename) is not None:
             self._tensorboard_path: pathlib.PurePath | None = pathlib.PurePath(
@@ -618,11 +684,17 @@ class SummaryWriter:
             else:
                 raise ValueError(f'Unsupported type: {v}.')
 
+    def set_buckets(self, buckets: dict[str, int]) -> None:
+        # Per-key bucket count, threaded to tf.summary.histogram. Keys without
+        # an entry use TF's default. Ignored for scalar keys.
+        self._buckets.update(buckets)
+
     def __getstate__(self):
         state = dict(
             tensorboard_filename=self._tensorboard_filename,
             tensorboard_path=self._tensorboard_path,
-            data_types={k: v.__name__ for k, v in self._data_types.items()}
+            data_types={k: v.__name__ for k, v in self._data_types.items()},
+            buckets=dict(self._buckets),
         )
 
         return state
@@ -632,6 +704,8 @@ class SummaryWriter:
             tensorboard_filename=state.pop('tensorboard_filename'),
             tensorboard_path=state.pop('tensorboard_path'))
         self.set_data_types(state.pop('data_types'))
+        # `buckets` is absent in pre-feat/action-forging-instrumentation pickles.
+        self.set_buckets(state.pop('buckets', {}))
         # self._tensorboard_filename = state['_tensorboard_filename']
         # self._tensorboard_path = state['_tensorboard_path']
 
@@ -648,4 +722,8 @@ class SummaryWriter:
         self._ensure_writer()
         with self._summary_writer.as_default(step=iteration):
             for name, value in data.items():
-                self._data_types.get(name, tf.summary.scalar)(name, value)
+                fn = self._data_types.get(name, tf.summary.scalar)
+                if fn is tf.summary.histogram and name in self._buckets:
+                    fn(name, value, buckets=self._buckets[name])
+                else:
+                    fn(name, value)
