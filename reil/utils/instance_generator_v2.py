@@ -89,17 +89,22 @@ class InstanceGeneratorV2(Generic[T], reilbase.ReilBase):
         self._is_terminated = False
 
         if isinstance(args_generator, Iterable):
+            # Contract with iterator-style args generators:
+            #   StopIteration  -> soft stop (end of current chunk; the env's
+            #                     follow-up next() call resumes the generator
+            #                     for the next chunk).
+            #   RuntimeError   -> permanently exhausted; V2 marks itself
+            #                     terminated and surfaces StopIteration.
+            # A historical "probe" mechanism here used to call next() a
+            # second time to disambiguate the two cases; that probe silently
+            # discarded one yielded value at every chunk boundary, so it
+            # was removed in favour of the explicit RuntimeError signal.
             def gen():
                 try:
                     return next(args_generator)
-                except (RuntimeError, StopIteration):
-                    try:
-                        next(args_generator)
-                    except StopIteration:
-                        self._is_terminated = True
-                        raise StopIteration
-
-                    raise
+                except RuntimeError:
+                    self._is_terminated = True
+                    raise StopIteration
 
             self._args_generator = gen
         else:
