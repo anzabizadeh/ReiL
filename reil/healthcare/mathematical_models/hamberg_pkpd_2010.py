@@ -7,16 +7,21 @@ HambergPKPD class
 A warfarin PK/PD model proposed by Hamberg et al. (2010).
 DOI: 10.1038/clpt.2010.37
 '''
+import logging
 import math
 from typing import Any, Final
 
 import numpy as np
+from scipy.signal import lfilter
+
 import reil
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
 from reil.healthcare.mathematical_models.health_math_model import \
     HealthMathModel
 from reil.utils.functions import random_lognormal_truncated
+
+_log = logging.getLogger(__name__)
 
 
 class HambergPKPD2010(HealthMathModel):
@@ -124,7 +129,7 @@ class HambergPKPD2010(HealthMathModel):
 
     def __init__(
             self, randomized: bool = True,
-            cache_size: int = 30) -> None:
+            cache_size: int = 100) -> None:
         """
         Arguments
         ---------
@@ -133,7 +138,9 @@ class HambergPKPD2010(HealthMathModel):
 
         cache_size:
             Size of the cache used to store pre-computed values needed for
-            INR computation.
+            INR computation. Default 100 covers the 90-day max trial without
+            triggering `_expand_caches`; pre-2026-06 default was 30, which
+            forced ≥2 expansions per patient on long trials.
         """
         self._randomized = randomized
         self._cache_size = math.ceil(cache_size)
@@ -292,6 +299,13 @@ class HambergPKPD2010(HealthMathModel):
         self._total_A = np.array([0.0] * detailed_cache_size)  # hourly
 
     def _expand_caches(self, segment_count: int = 1):
+        # See note in hamberg_pkpd.py: with the default `cache_size=100`
+        # this should not fire on the Paper-2 path; the log helps catch
+        # silent regressions.
+        _log.debug(
+            'HambergPKPD2010._expand_caches: segment_count=%d, '
+            'current_cache_size=%d',
+            segment_count, self._current_cache_size)
         per_day = self._per_day
         self._current_cache_size += self._cache_size * segment_count
 
@@ -311,14 +325,14 @@ class HambergPKPD2010(HealthMathModel):
             coef=self._coef, k_a=self._k_a, k_e=self._k_e,
             max_time=self._current_cache_size * per_day)
 
-        self._total_A = np.array([0.0] * self._current_cache_size * per_day)
+        total_len = self._current_cache_size * per_day
+        self._total_A = np.zeros(total_len)
 
         for day, dose in self._dose_records.items():
-            cs = self._pad_and_dose(
-                cs=self._cached_A, dose=dose,
-                pad=day * per_day)
-            self._dose_records[day] = dose
-            self._total_A += cs
+            pad = day * per_day
+            n = total_len - pad
+            if n > 0:
+                self._total_A[pad:pad + n] += dose * self._cached_A[:n]
 
     def run(self, **inputs: Any) -> dict[str, Any]:
         '''
@@ -381,24 +395,23 @@ class HambergPKPD2010(HealthMathModel):
             ) // self._cache_size + 1
             self._expand_caches(segment_count=segment_count)
 
+        per_day = self._per_day
+        total_len = self._total_A.shape[0]
         for day, _dose in dose.items():
             if _dose != 0.0:
-                if day in self._dose_records:
-                    prev_dose = self._dose_records[day]
-                else:
-                    prev_dose = 0.0
-
+                prev_dose = self._dose_records.get(day, 0.0)
                 new_dose = prev_dose + _dose
                 if new_dose < 0.0:
                     raise ValueError(
                         'Total dose for a day cannot be negative.')
 
-                cs = self._pad_and_dose(
-                    cs=self._cached_A, dose=new_dose,
-                    pad=day * self._per_day)
+                pad = day * per_day
+                n = total_len - pad
+                if n > 0:
+                    self._total_A[pad:pad + n] += (
+                        new_dose * self._cached_A[:n])
 
                 self._dose_records[day] = new_dose
-                self._total_A += cs
 
     def INR(self, measurement_days: int | list[int]) -> list[float]:
         '''
@@ -440,36 +453,87 @@ class HambergPKPD2010(HealthMathModel):
         self._last_computed_day = stop_points[-1]
 
         start_day = stop_points[0]
-        start_point = start_day * HambergPKPD2010._per_day
-        all_points = list(range(
-            math.floor(start_point),
-            math.ceil(stop_points[-1] * HambergPKPD2010._per_day)))
+        per_day = HambergPKPD2010._per_day
+        start_point = start_day * per_day
+        end_point = stop_points[-1] * per_day
 
-        # NOTE: In the paper's formulation, DR = KDE * A
-        # However, it does not produce the expected INR values.
-        # Using DR = V * KDE * A seem to fix the issue.
-        # self._V *
+        C_init = self._C
 
-        DR_gamma = np.power(  # type: ignore
-            self._V * self._KDE * self._total_A[all_points] * self._err_list[all_points],
-            HambergPKPD2010._gamma)
-        E = 1.0 - np.divide(  # type: ignore  # 22.5 *
-            HambergPKPD2010._E_max * DR_gamma,  # type: ignore
-            self._EDK_50_gamma + DR_gamma)
+        if end_point > start_point:
+            all_points = slice(start_point, end_point)
 
-        C = self._C
-        ktr = self._ktr
+            # NOTE: In the paper's formulation, DR = KDE * A
+            # However, it does not produce the expected INR values.
+            # Using DR = V * KDE * A seem to fix the issue.
+            DR_gamma = np.power(  # type: ignore
+                self._V * self._KDE * self._total_A[all_points]
+                * self._err_list[all_points],
+                HambergPKPD2010._gamma)
+            E = 1.0 - np.divide(  # type: ignore
+                HambergPKPD2010._E_max * DR_gamma,  # type: ignore
+                self._EDK_50_gamma + DR_gamma)
+
+            # Pre-vectorisation recurrence:
+            #     C[0] = E[t]                            # override
+            #     C[1:] += ktr * (C[:-1] - C[1:])         # RHS uses old C
+            #     C = np.clip(C, 0, 1)                    # per-step
+            # numpy evaluates the RHS using post-override C[0], so per chain k:
+            #     C1_k = (1-r_k)*C1_k_old + r_k*E[t]              (direct)
+            #     C2_k = (1-r_k)*C2_k_old + r_k*C1_k_old          (delayed)
+            #     C3_k = (1-r_k)*C3_k_old + r_k*C2_k_old          (delayed)
+            # ktr1=3/MTT_1≈0.105 and ktr2=3/MTT_2≈0.025 are CLASS CONSTANTS
+            # (MTT_1, MTT_2 are not patient-specific in this model), so r ∈ [0,1]
+            # for all patients and the convex-combination invariant keeps
+            # C ∈ [0,1] given E ∈ [0,1] — the per-step clip is mathematically a
+            # no-op and is safely subsumed by lfilter.
+            ktr1 = float(self._ktr[0])
+            ktr2 = float(self._ktr[1])
+            a_pole_1 = [1.0, -(1.0 - ktr1)]
+            a_pole_2 = [1.0, -(1.0 - ktr2)]
+            b_delay_1 = [0.0, ktr1]
+            b_delay_2 = [0.0, ktr2]
+
+            # Chain k=0 (ktr1)
+            C1_0, _ = lfilter(
+                [ktr1], a_pole_1, E,
+                zi=[(1.0 - ktr1) * float(C_init[1, 0])])
+            C2_0, _ = lfilter(
+                b_delay_1, a_pole_1, C1_0,
+                zi=[(1.0 - ktr1) * float(C_init[2, 0])
+                    + ktr1 * float(C_init[1, 0])])
+            C3_0, _ = lfilter(
+                b_delay_1, a_pole_1, C2_0,
+                zi=[(1.0 - ktr1) * float(C_init[3, 0])
+                    + ktr1 * float(C_init[2, 0])])
+
+            # Chain k=1 (ktr2)
+            C1_1, _ = lfilter(
+                [ktr2], a_pole_2, E,
+                zi=[(1.0 - ktr2) * float(C_init[1, 1])])
+            C2_1, _ = lfilter(
+                b_delay_2, a_pole_2, C1_1,
+                zi=[(1.0 - ktr2) * float(C_init[2, 1])
+                    + ktr2 * float(C_init[1, 1])])
+            C3_1, _ = lfilter(
+                b_delay_2, a_pole_2, C2_1,
+                zi=[(1.0 - ktr2) * float(C_init[3, 1])
+                    + ktr2 * float(C_init[2, 1])])
+        else:
+            E = None
+            C3_0 = None
+            C3_1 = None
+
         for d1, d2 in zip(stop_points[:-1], stop_points[1:]):
-            steps = range(
-                math.floor(d1 * HambergPKPD2010._per_day),
-                math.ceil(d2 * HambergPKPD2010._per_day))
-            for dt in steps:
-                C[0] = E[dt - start_point]
-                C[1:] += ktr * (C[:-1] - C[1:])
-                C = np.clip(C, a_min=0.0, a_max=1.0)
+            if d2 == start_day:
+                # Empty steps in the original loop → INR uses C_init
+                C3_mean = 0.5 * (float(C_init[3, 0]) + float(C_init[3, 1]))
+            else:
+                k_end = d2 * per_day - 1 - start_point
+                C3_mean = 0.5 * (
+                    float(C3_0[k_end]) + float(C3_1[k_end]))  # type: ignore[index]
             self._computed_INRs[d2] = (
                 HambergPKPD2010._baseINR +
-                HambergPKPD2010._INR_max * (1.0 - np.mean(C[3]))
+                HambergPKPD2010._INR_max * (1.0 - C3_mean)
             ) + self._exp_e_INR_list[d2]
 
         return [self._computed_INRs[i] for i in days]
@@ -485,13 +549,6 @@ class HambergPKPD2010(HealthMathModel):
         base_cs = np.clip(base_cs, a_min=0.0, a_max=None)
 
         return base_cs
-
-    @staticmethod
-    def _pad_and_dose(cs, dose: float = 1.0, pad: int = 0):
-        cs = np.multiply(cs, [dose])  # type: ignore
-        padded_cs = np.pad(cs, [[pad, 0]], 'constant')
-
-        return padded_cs[:cs.shape[0]]  # type: ignore
 
     def get_config(self) -> dict[str, Any]:
         config: dict[str, Any] = super().get_config()
