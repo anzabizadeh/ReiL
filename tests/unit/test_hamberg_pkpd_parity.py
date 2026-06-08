@@ -132,6 +132,67 @@ class TestHambergPKPDParity(unittest.TestCase):
                       self._multidose_atol, self._multidose_rtol,
                       "HambergPKPD multidose")
 
+    def test_incremental_calls_2010(self) -> None:
+        """13 successive `patient.model()` calls vs one big call (HambergPKPD2010).
+
+        Mirrors the `trajectory_10` final-test pattern: DosingSubject calls
+        `patient.model(dose=..., measurement_days=range(day, day+duration+1))`
+        once per dose decision (~13 calls per patient at default_duration=7).
+        Both call patterns simulate the SAME dose schedule over 90 days —
+        the only difference is whether INR() is called once for the whole
+        90-day window or 13 times for 7-day windows.
+
+        The lfilter rewrite of `HambergPKPD2010.INR()` must preserve
+        `self._C` (transit-compartment state) between calls so subsequent
+        calls resume from the right point. Regression here means the model
+        restarts from `ones([4, 2])` on each call and the simulated INRs
+        drift over the 13 incremental calls — observed 2026-06-08 on
+        `trajectory_10` as a -2% PTTR offset vs the single-call golden.
+
+        Tolerance: bit-equivalent to the constant-dose golden (which is the
+        single-call result) at `atol=rtol=1e-10`.
+        """
+        f = np.load(DATA_DIR / "hamberg_pkpd_2010_golden.npz")
+        seeds = f["seeds"]
+        dose_days = f["dose_days"]
+        dose_vals = f["dose_vals"]
+        golden = f["inr"]
+        dose = {int(d): float(v) for d, v in zip(dose_days, dose_vals)}
+
+        # Mimic DosingSubject's 7-day-window call pattern.
+        DURATION = 7
+        MAX_DAY = 90
+
+        for i, seed in enumerate(seeds[:20]):  # 20 patients is enough
+            model = HambergPKPD2010(cache_size=CACHE_SIZE)
+            patient = PatientWarfarinRavvaz(
+                model=model, random_seed=int(seed))
+
+            inrs: list[float] = [None] * (MAX_DAY + 1)
+            day = 0
+            while day < MAX_DAY:
+                end = min(day + DURATION, MAX_DAY)
+                chunk_dose = {d: dose[d] for d in range(day, end) if d in dose}
+                chunk_measure = list(range(day, end + 1))
+                out = patient.model(
+                    dose=chunk_dose,
+                    measurement_days=chunk_measure)["INR"]
+                for d, v in zip(chunk_measure, out):
+                    inrs[d] = float(v)
+                day = end
+
+            computed = np.asarray(inrs, dtype=np.float64)
+            if not np.allclose(computed, golden[i],
+                               atol=1e-10, rtol=1e-10):
+                diff = np.abs(computed - golden[i])
+                worst = int(diff.argmax())
+                self.fail(
+                    f"seed={seed}: incremental-call INRs diverge from "
+                    f"single-call golden. max |Δ|={diff.max():.3e} at "
+                    f"day {worst} (computed={computed[worst]:.10g}, "
+                    f"golden={golden[i, worst]:.10g})"
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

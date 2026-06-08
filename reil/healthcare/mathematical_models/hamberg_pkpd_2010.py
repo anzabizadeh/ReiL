@@ -536,6 +536,25 @@ class HambergPKPD2010(HealthMathModel):
                 HambergPKPD2010._INR_max * (1.0 - C3_mean)
             ) + self._exp_e_INR_list[d2]
 
+        # Write back the transit-compartment state at `last_computed_day` so
+        # the next incremental `INR()` call resumes from the correct point.
+        # The pre-2026-06-08 per-step loop maintained pseudo-continuity via
+        # `C = self._C` aliasing + post-step `np.clip` rebind that left
+        # `self._C` stuck at a mid-step-0 state; the 2026-06-07 lfilter
+        # rewrite computed C as filter outputs without writing back, so
+        # successive calls restarted from `ones([4, 2])`. Symptom was a
+        # ~2% PTTR drop on `trajectory_10` (13 incremental INR() calls per
+        # patient × 2000 patients × small per-call drift). See git log
+        # 9d1e238d ← f1xxxx for the bug ↔ fix sequence.
+        if end_point > start_point and C3_0 is not None:
+            last_k = int(end_point - start_point) - 1
+            self._C = np.array([
+                [float(E[last_k]),    float(E[last_k])],
+                [float(C1_0[last_k]), float(C1_1[last_k])],
+                [float(C2_0[last_k]), float(C2_1[last_k])],
+                [float(C3_0[last_k]), float(C3_1[last_k])],
+            ])
+
         return [self._computed_INRs[i] for i in days]
 
     @staticmethod
