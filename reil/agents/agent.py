@@ -288,6 +288,58 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
 
         return metrics
 
+    def learn_and_record(
+            self, history: History, stat_name: str | None,
+            subject_id: int,
+            learned_in_trajectory: bool = False,
+            fire_termination_learn: bool = True) -> dict[str, float]:
+        '''Trajectory-end hook: learn → TB write → stat.append → reset.
+
+        Extends `BaseAgent.learn_and_record` by adding the learn() call
+        and TensorBoard write. Used both by `observe()`'s GeneratorExit
+        branch (the original serial path) and by the parallel-rollout
+        main loop (Phase B), so per-patient TB metrics, the LR-schedule
+        advance (via learner.reset()), and statistic.append all fire in
+        exactly the same order regardless of how the trajectory was
+        collected.
+
+        Arguments
+        ---------
+        history:
+            Per-patient trajectory to learn from.
+        stat_name:
+            Subject statistic name to append (matches the observer's
+            `stat_name` parameter).
+        subject_id:
+            Subject id for the statistic append.
+        learned_in_trajectory:
+            Did any earlier learn() call this trajectory return metrics?
+            Used by the TB-write gate to avoid re-emitting stale
+            `_computed_metrics` at the frozen learner iteration when no
+            actual learning happened (matches the original observer
+            logic; see warfarin_ppo_agent.py for context).
+        fire_termination_learn:
+            If True (the default), call `self.learn(history)` here. False
+            corresponds to `_training_trigger != 'termination'`, where
+            the learn calls happened earlier in `observe()` and this hook
+            just needs to do the TB write + stat + reset.
+        '''
+        if fire_termination_learn:
+            self._computed_metrics = self.learn(history)
+            learned_in_trajectory = (
+                learned_in_trajectory or bool(self._computed_metrics))
+
+        if self._summary_writer and learned_in_trajectory:
+            self._summary_writer.write(
+                self._computed_metrics,
+                self._learner._iteration)  # type: ignore
+
+        # super().learn_and_record handles stat.append + self.reset() so
+        # the BaseAgent contract stays the single source of truth for
+        # those two steps.
+        super().learn_and_record(history, stat_name, subject_id)
+        return self._computed_metrics
+
     def observe(  # noqa: C901
             self, subject_id: int, stat_name: str | None,
     ) -> Generator[FeatureSet | None, dict[str, Any], None]:
@@ -378,20 +430,16 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
                 if new_observation.reward is None:  # terminated early!
                     history.append(new_observation)
 
-                if learn_on_termination:
-                    self._computed_metrics = self.learn(history)
-                    learned_this_trajectory = (
-                        learned_this_trajectory
-                        or bool(self._computed_metrics))
-
-                if self._summary_writer and learned_this_trajectory:
-                    self._summary_writer.write(
-                        self._computed_metrics, self._learner._iteration)  # type: ignore
-
-                if stat_name is not None:
-                    self.statistic.append(stat_name, subject_id)
-
-                self.reset()
+                # The TB-write gate depends on whether ANY learn() call
+                # produced metrics during this trajectory (in-trajectory
+                # state/action/reward triggers OR the terminal one). We
+                # pass that signal into learn_and_record so the
+                # termination-path logic can compose with the prior
+                # in-trajectory signal correctly.
+                self.learn_and_record(
+                    history, stat_name, subject_id,
+                    learned_in_trajectory=learned_this_trajectory,
+                    fire_termination_learn=learn_on_termination)
 
                 return
 

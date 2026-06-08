@@ -651,6 +651,42 @@ class Statistic:
             else:
                 self._history[_id].append(s)
 
+    def latest(self, _id: int | None = None
+               ) -> tuple[FeatureSet, float] | None:
+        '''Return the most recently appended `(FeatureSet, value)` tuple.
+
+        Returns `None` if no history exists for `_id`. Note: histories are
+        keyed by `_id` only, NOT by the `name` passed to `append`, so a
+        subject that calls `append` with multiple stat names will see them
+        intermixed here in append order.
+
+        Added for the Phase B parallel-rollout flow (see
+        `reil.environments.parallel_rollout`): workers compute a
+        per-trajectory stat locally via `append`, read it back with
+        `latest`, ship it to the main process, which injects it into the
+        live subject's statistic via `raw_append`.
+        '''
+        history = (
+            self._history_none if _id is None
+            else self._history.get(_id, []))
+        return history[-1] if history else None
+
+    def raw_append(
+            self, value: tuple[FeatureSet, float],
+            _id: int | None = None) -> None:
+        '''Append a precomputed `(FeatureSet, value)` tuple to the history.
+
+        Bypasses `__call__` (which reads from `self._state`); for use in
+        cross-process workflows (e.g. parallel rollouts) where the value
+        was computed in a worker process and the live subject's `_state`
+        no longer reflects the trajectory that produced it. Normal code
+        paths should keep calling `append`.
+        '''
+        if _id is None:
+            self._history_none.append(value)
+        else:
+            self._history[_id].append(value)
+
     def aggregate(
             self,
             aggregators: tuple[str, ...] | None = None,

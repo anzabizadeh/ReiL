@@ -197,6 +197,96 @@ class BaseAgent(Stateful):
 
                 return
 
+    def learn_and_record(
+            self, history: History, stat_name: str | None,
+            subject_id: int) -> dict[str, float]:
+        '''End-of-trajectory hook: bundle stat-append + reset.
+
+        Mirrors the four side-effects of `observe()`'s GeneratorExit branch
+        (learn → TB write → stat.append → reset) for the simple BaseAgent
+        case where there is no learner. `Agent` overrides this to add the
+        learn + TB-write steps.
+
+        Phase B's parallel-rollout flow calls this in the MAIN process for
+        each history returned by workers, so the per-patient observer
+        side-effects (TB metrics x-axis advance, LR schedule advance,
+        statistic.append) all still fire — only the rollout itself moved
+        to a worker. See `reil.environments.parallel_rollout`.
+        '''
+        if stat_name is not None:
+            self.statistic.append(stat_name, subject_id)
+        self.reset()
+        return {}
+
+    def collect_trajectory(
+            self, subject: Any, agent_id: int, subject_id: int,
+            protocol: Any, iteration: int = 0) -> History:
+        '''Drive one `subject` to termination with current weights; return History.
+
+        Flat (no-generator) alternative to `observe()` for use cases that
+        need a plain Python rollout — most importantly, parallel workers
+        that collect trajectories with a frozen policy snapshot, ship them
+        back, and let the main process apply `learn()` sequentially
+        (synchronous parallel PPO; see
+        `reil.environments.parallel_rollout`).
+
+        Behaviour matches the per-step accumulation in
+        `Single.interact` + `observe` for the simple
+        (no-lookahead, single-agent) case: each `Observation` records
+        (state, possible_actions, action, action_taken, reward) where
+        `reward` is the value `subject.reward()` returns AFTER the action
+        has been applied (collected on the next loop iteration). The
+        in-flight observation at termination is appended even if its
+        reward never arrived — matches `observe`'s GeneratorExit branch.
+
+        Action sampling vs. argmax is still gated by `_training_trigger`
+        through `act()` (in `Agent` subclasses), so callers wanting on-
+        policy sampling must keep the trigger at a non-`'none'` value for
+        the duration of the call. This method does NOT call `learn()` —
+        the caller is responsible for that.
+        '''
+        state_name = protocol.state_name
+        action_name = protocol.action_name
+        reward_name = protocol.reward_name
+
+        history: History = []
+        pending: Observation | None = None
+
+        while True:
+            reward = subject.reward(name=reward_name, _id=agent_id)
+            if pending is not None:
+                pending.reward = reward
+                history.append(pending)
+                pending = None
+
+            if subject.is_terminated(None):
+                break
+
+            state = subject.state(name=state_name, _id=agent_id)
+            possible_actions = subject.possible_actions(
+                name=action_name, _id=agent_id)
+            if not possible_actions:
+                break
+            try:
+                next(possible_actions)
+            except TypeError:
+                pass
+
+            new_obs = Observation()
+            new_obs.state = state
+            new_obs.possible_actions = possible_actions
+            new_obs.action = self.act(
+                state=state, subject_id=subject_id,
+                actions=possible_actions, iteration=iteration)
+            new_obs.action_taken = subject.take_effect(
+                new_obs.action, agent_id)
+            pending = new_obs
+
+        if pending is not None:
+            history.append(pending)
+
+        return history
+
     @staticmethod
     def _break_tie(
             input_tuple: tuple[T, ...],
