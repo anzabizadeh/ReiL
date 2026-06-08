@@ -142,13 +142,35 @@ class A2CAgent(Agent[FeatureSet, ACLabelType]):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         training_mode = self._training_trigger != 'none'
-        logits = self._learner.predict((state,), training=training_mode)[0]
-        if training_mode:
-            action_index = [
-                int(tf.random.categorical(logits=lo, num_samples=1))
-                for lo in logits]
+
+        # Fast path: if the model exposes the tf.function-decorated
+        # `act_sample`/`act_argmax` (PPOModel + subclasses), use them so the
+        # actor forward + categorical/argmax run as a single compiled
+        # graph instead of ~50 eager Python→C++ dispatches per call.
+        # Profiling on 2026-06-08 showed this Python-side overhead was the
+        # dominant cost (918K eager-execute calls per training chunk).
+        model = getattr(self._learner, '_model', None)
+        fast_fn = (getattr(model, 'act_sample', None)
+                   if training_mode
+                   else getattr(model, 'act_argmax', None))
+        if fast_fn is not None:
+            from reil.utils.tf_utils import TF2UtilsMixin
+            state_tensor = TF2UtilsMixin.convert_to_tensor((state,))
+            action_idx_tensors = fast_fn(state_tensor)
+            # Each tensor has shape [batch=1]; one .numpy() sync per head
+            # instead of one Python-eager op per layer.
+            action_index = [int(t[0].numpy()) for t in action_idx_tensors]
         else:
-            action_index = [int(np.argmax(lo)) for lo in logits]
+            # Legacy path: per-op eager dispatch. Kept for non-PPO models
+            # (LookupTable, Dense, etc.) that don't define act_sample.
+            logits = self._learner.predict(
+                (state,), training=training_mode)[0]
+            if training_mode:
+                action_index = [
+                    int(tf.random.categorical(logits=lo, num_samples=1))
+                    for lo in logits]
+            else:
+                action_index = [int(np.argmax(lo)) for lo in logits]
 
         if len(action_index) == 1:
             action_index = action_index[0]

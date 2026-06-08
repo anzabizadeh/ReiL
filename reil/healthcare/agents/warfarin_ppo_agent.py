@@ -74,7 +74,21 @@ class PPO4WarfarinAgent(PPOAgent):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         training_mode = self._training_trigger != 'none'
-        raw_logits = self._learner.predict((state,), training=training_mode)[0]
+        # Fast path: if the model exposes a tf.function-decorated
+        # `actor_logits` (PPOModel + subclasses), use it. Saves the
+        # critic forward (not needed for act()) and avoids the per-op
+        # eager-dispatch overhead that dominated the 2026-06-08 profile
+        # (918K eager-execute calls per chunk under the legacy path).
+        model = getattr(self._learner, '_model', None)
+        actor_logits_fn = getattr(model, 'actor_logits', None)
+        if actor_logits_fn is not None:
+            from reil.utils.tf_utils import TF2UtilsMixin
+            state_tensor = TF2UtilsMixin.convert_to_tensor((state,))
+            raw_logits = actor_logits_fn(state_tensor)
+        else:
+            # Legacy path for non-PPO models (LookupTable, Dense, etc.).
+            raw_logits = self._learner.predict(
+                (state,), training=training_mode)[0]
         if isinstance(raw_logits, (list, tuple)):
             logits: list[Tensor] = list(raw_logits)  # type: ignore
         else:

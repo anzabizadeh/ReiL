@@ -152,6 +152,78 @@ class PPOModel(TF2UtilsMixin):
         values = self.critic(inputs, training=training)
         return logits, values
 
+    @tf.function(reduce_retracing=True)
+    def actor_logits(self, x: Tensor) -> tuple[Tensor, ...]:
+        '''
+        Actor forward pass only — returns raw logits per head, no critic,
+        no sampling. Used by warfarin agents that need to apply masking +
+        action modifiers in Python before sampling, but want to avoid the
+        per-op eager-dispatch overhead of the full
+        `predict((state,), training=...)` path.
+
+        Arguments
+        ---------
+        x:
+            State tensor, shape `[batch, input_dim]`.
+
+        Returns
+        -------
+        :
+            Tuple of float32 tensors, one per action head, each shape
+            `[batch, n_actions_in_head]`.
+        '''
+        out = self.actor(x, training=False)
+        if not isinstance(out, (list, tuple)):
+            out = (out,)
+        return tuple(out)
+
+    @tf.function(reduce_retracing=True)
+    def act_sample(self, x: Tensor) -> tuple[Tensor, ...]:
+        '''
+        Sample action indices per head from the actor's policy.
+
+        Used by `Agent.act()` in training mode (`_training_trigger !=
+        'none'`). Wrapping the actor forward + categorical sampling in a
+        single tf.function avoids the per-op eager-dispatch overhead that
+        dominated profiling (917K `TFE_Py_FastPathExecute` calls / chunk
+        in the 2026-06-08 profile run).
+
+        Arguments
+        ---------
+        x:
+            State tensor, shape `[batch, input_dim]`.
+
+        Returns
+        -------
+        :
+            Tuple of `int64` tensors, one per action head, each shape
+            `[batch]`. Caller casts to Python int as needed.
+        '''
+        logits = self.actor(x, training=False)
+        if not isinstance(logits, (list, tuple)):
+            logits = (logits,)
+        return tuple(
+            tf.squeeze(
+                tf.random.categorical(lo, num_samples=1), axis=-1)
+            for lo in logits
+        )
+
+    @tf.function(reduce_retracing=True)
+    def act_argmax(self, x: Tensor) -> tuple[Tensor, ...]:
+        '''
+        Argmax (greedy) action indices per head — frozen-policy path.
+
+        Used by `Agent.act()` when `_training_trigger == 'none'` (validation
+        and final-test passes). Like `act_sample` but deterministic.
+        '''
+        logits = self.actor(x, training=False)
+        if not isinstance(logits, (list, tuple)):
+            logits = (logits,)
+        return tuple(
+            tf.argmax(lo, axis=-1, output_type=tf.int64)
+            for lo in logits
+        )
+
     @staticmethod
     @tf.function  # (jit_compile=False) see tf_utils.logprobs
     def _logprobs_j(
