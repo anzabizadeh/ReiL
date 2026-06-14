@@ -101,6 +101,77 @@ class Sigmoid(ScaleFn):
         self._n = config.pop('n')
 
 
+class ProgressRamp(ScaleFn):
+    '''A schedule that ramps the modifier scale from `start` to `end` as a
+    function of *fraction-of-training-complete*, rather than saturating early.
+
+    Unlike `Sigmoid` — whose per-decision counter `n` saturates inside the
+    first training chunk — this schedule normalises the same per-call counter
+    by `total_steps` (the expected total number of decisions over the whole
+    run), so the scale changes *gradually and observably* across training.
+
+        progress p = clip(n / total_steps, 0, 1)
+        shape='linear': scale = start + (end - start) * p
+        shape='cosine': scale = start + (end - start) * 0.5 * (1 - cos(pi*p))
+                        (ease-in-out S-curve; gradual at both ends)
+
+    `total_steps` is in the same unit as `n` (one increment per call, i.e. per
+    main-phase training decision). Set it from the measured decision budget of
+    a 5K/1K run. The counter is serialized so the ramp survives checkpointing
+    and resumed training (matching `Sigmoid`).
+    '''
+
+    def __init__(
+            self, total_steps: float, shape: str = 'cosine',
+            start: float = 0.0, end: float = 1.0) -> None:
+        if total_steps <= 0:
+            raise ValueError('total_steps must be positive')
+        if shape not in ('linear', 'cosine'):
+            raise ValueError(f"shape must be 'linear' or 'cosine', got {shape!r}")
+        self._total_steps = float(total_steps)
+        self._shape = shape
+        self._start = float(start)
+        self._end = float(end)
+        self._n: int = 0
+
+    def call(self) -> float:
+        self._n += 1
+        p = self._n / self._total_steps
+        if p < 0.0:
+            p = 0.0
+        elif p > 1.0:
+            p = 1.0
+        if self._shape == 'cosine':
+            p = 0.5 * (1.0 - math.cos(math.pi * p))
+        return self._start + (self._end - self._start) * p
+
+    def get_config(self) -> dict[str, Any]:
+        return {
+            'total_steps': self._total_steps,
+            'shape': self._shape,
+            'start': self._start,
+            'end': self._end,
+            'n': self._n,
+        }
+
+    def from_config(self, config: dict[str, Any]):
+        temp = ProgressRamp(
+            config.pop('total_steps'), config.pop('shape'),
+            config.pop('start'), config.pop('end'))
+        temp._n = config.pop('n')
+        return temp
+
+    def __getstate__(self) -> dict[str, Any]:
+        return self.get_config()
+
+    def __setstate__(self, config: dict[str, Any]):
+        self._total_steps = config.pop('total_steps')
+        self._shape = config.pop('shape')
+        self._start = config.pop('start')
+        self._end = config.pop('end')
+        self._n = config.pop('n')
+
+
 class ActionModifier:
     def __init__(
             self, relative_action_distances: tuple[float, ...],
