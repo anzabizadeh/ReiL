@@ -100,3 +100,6 @@ ENV/
 # mypy
 .mypy_cache/
 .vscode/
+
+# stray numbered checkpoint/probe dumps written to repo root by ad-hoc runs
+/[0-9][0-9][0-9][0-9].pkl
