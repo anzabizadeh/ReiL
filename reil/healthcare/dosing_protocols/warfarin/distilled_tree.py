@@ -102,6 +102,43 @@ class _TreeMaintenance(DosingProtocol):
         return DosingDecision(next_dose, 7), additional_info
 
 
+class _TreeMaintenance2D(DosingProtocol):
+    '''Direction-aware maintenance protocol: a classifier mapping the pair
+    (current INR, ΔINR) -> `int(percent_action * 10)`, where ΔINR = INR(now) −
+    INR(previous maintenance decision). Lets an interpretable tree condition on
+    the INR *trend*, which a single-INR tree cannot represent (see the T2.3
+    velocity finding). `prev_inr` is tracked per episode and cleared in `reset()`.
+
+    The classifier is duck-typed: any object exposing
+    `predict([[INR, dINR]]) -> [int]` works (sklearn `DecisionTreeClassifier`
+    fit on two features is the canonical case).
+    '''
+
+    def __init__(self, tree: _TreeLike) -> None:
+        super().__init__()
+        self._tree = tree
+        self._prev_inr: float | None = None
+
+    def reset(self) -> None:
+        super().reset()
+        self._prev_inr = None
+
+    def prescribe(
+            self,
+            patient: dict[str, Any],
+            additional_info: AdditionalInfo
+    ) -> tuple[DosingDecision, AdditionalInfo]:
+        inr: float = patient['INR_history'][-1]
+        previous_dose: float = patient['dose_history'][-1]
+        # First maintenance decision has no prior maintenance reading -> ΔINR = 0.
+        d_inr: float = 0.0 if self._prev_inr is None else inr - self._prev_inr
+        self._prev_inr = inr
+        label = int(self._tree.predict([[inr, d_inr]])[0])
+        action_pct = label / 10.0
+        next_dose = previous_dose * (1.0 + action_pct)
+        return DosingDecision(next_dose, 7), additional_info
+
+
 class DistilledTree(ThreePhaseDosingProtocol):
     '''Three-phase protocol with modified `IWPC` (days 1-3), `Lenzini` (days
     4-5), and a distilled decision tree (day 6+) in maintenance.
@@ -130,3 +167,31 @@ class DistilledTree(ThreePhaseDosingProtocol):
 
     def __repr__(self) -> str:
         return super().__repr__() + '[DistilledTree]'
+
+
+class DistilledTree2D(ThreePhaseDosingProtocol):
+    '''Like `DistilledTree`, but the maintenance tree is direction-aware: it
+    consumes (current INR, ΔINR-since-last-decision). Day-1..5 scaffolding is
+    identical to `PGPGA`/`DistilledTree` so PTTR is directly comparable.
+    '''
+
+    def __init__(self, tree: _TreeLike) -> None:
+        super().__init__(IWPC('modified'), Lenzini(), _TreeMaintenance2D(tree))
+
+    def prescribe(self, patient: dict[str, Any]) -> DosingDecision:
+        day: int = patient['day']
+        if day <= 3:
+            temp, self._additional_info = self._initial_protocol.prescribe(
+                patient, self._additional_info)
+            return DosingDecision(temp.dose, 4 - day)
+        if day <= 5:
+            temp, self._additional_info = self._adjustment_protocol.prescribe(
+                patient, self._additional_info)
+            return DosingDecision(temp.dose, 6 - day)
+        dosing_decision, self._additional_info = \
+            self._maintenance_protocol.prescribe(
+                patient, self._additional_info)
+        return dosing_decision
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '[DistilledTree2D]'
