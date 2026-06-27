@@ -119,9 +119,111 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
 
 
 @dataclasses.dataclass
+class DeadbandSquareDistance(ReilFunction[float, int]):
+    '''Squared distance from `center` with an epsilon-insensitive deadband.
+
+    Identical to `NormalizedSquareDistance` except that no penalty accrues
+    while the value is within `tolerance` of `center`. The per-point penalty
+    is ``(max(0, |center - v| - tolerance))**2``, so ``tolerance = 0``
+    recovers `NormalizedSquareDistance` exactly, while ``tolerance = 0.5``
+    (with ``center = 2.5``) makes the reward flat across the [2, 3]
+    therapeutic band and quadratic only outside it. Used to test whether the
+    inward conservatism of the distilled cut-offs is driven by penalising
+    deviation from the midpoint vs. from the range (EXP-C2-RW1, Paper 2).
+    '''
+    center: float = 0.0
+    band_width: float = 1.0
+    amplifying_factor: float = 1.0
+    tolerance: float = 0.0
+    exclude_first: bool = False
+    average: bool = False
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
+
+        result = sum(
+            (self.amplifying_factor ** i) * sum(
+                max(0.0, abs(self.center - v) - self.tolerance) ** 2
+                for v in interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x))
+
+        # normalize
+        result *= (2.0 / self.band_width) ** 2
+
+        if self.average:
+            result /= len_y
+
+        return result
+
+
+@dataclasses.dataclass
+class AsymmetricSquareDistance(ReilFunction[float, int]):
+    '''Squared distance from `center` with side-dependent weights.
+
+    Per-point penalty is ``w * (center - v)**2`` with ``w = over_weight``
+    when ``v > center`` (supratherapeutic) and ``w = under_weight``
+    otherwise. ``over_weight = under_weight = 1`` recovers
+    `NormalizedSquareDistance`. A heavier `over_weight` encodes the clinical
+    asymmetry that a high INR (bleeding risk) is worse than a low INR
+    (clotting risk); it is expected to pull the policy's effective target —
+    and hence the distilled cut-offs — downward (EXP-C2-RW1, Paper 2).
+    '''
+    center: float = 0.0
+    band_width: float = 1.0
+    amplifying_factor: float = 1.0
+    under_weight: float = 1.0
+    over_weight: float = 1.0
+    exclude_first: bool = False
+    average: bool = False
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
+
+        result = sum(
+            (self.amplifying_factor ** i) * sum(
+                (self.over_weight if v > self.center else self.under_weight)
+                * (self.center - v) ** 2
+                for v in interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x))
+
+        # normalize
+        result *= (2.0 / self.band_width) ** 2
+
+        if self.average:
+            result /= len_y
+
+        return result
+
+
+@dataclasses.dataclass
 class NormalizedDistance(ReilFunction[float, int]):
     center: float = 0.0
     band_width: float = 1.0
+    amplifying_factor: float = 1.0
     exclude_first: bool = False
 
     def _default_function(
@@ -135,12 +237,13 @@ class NormalizedDistance(ReilFunction[float, int]):
 
         if not self.exclude_first:
             _x = [1] + _x
-            _y = [0.0] + y
+            _y = [0.0, *y]
         else:
             _y = y
 
-        result = sum(dist(
-            self.center, interpolate(_y[i], _y[i + 1], x_i))
+        result = sum(
+            (self.amplifying_factor ** i) * dist(
+                self.center, interpolate(_y[i], _y[i + 1], x_i))
             for i, x_i in enumerate(_x))
 
         # normalize
@@ -164,7 +267,7 @@ class PercentInRange(ReilFunction[float, int]):
 
         if not self.exclude_first:
             _x = [1] + _x
-            _y = [0.0] + y
+            _y = [0.0, *y]
         else:
             _y = y
 

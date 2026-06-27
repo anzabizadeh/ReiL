@@ -197,7 +197,153 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
             length=2, multiplier=-1.0,  interpolate=True,
             acceptable_range=(2, 3), exclude_first=True),
         'Measured_INR_2'
-    )
+    ),
+
+    # ------------------------------------------------------------------
+    # Paper-2 reward-shape study (EXP-C2-RW1) — variants of the canonical
+    # `sq_dist_modified` (center=2.5, band_width=1.0, eta=1.05) used to test
+    # whether the quadratic-from-midpoint reward is what places the distilled
+    # cut-offs inside the [2, 3] therapeutic range. Each entry changes exactly
+    # one factor vs. `sq_dist_modified` so the contrast is clean.
+    # See 50_paper1_chapter2_canonical.md#exp-c2-rw1.
+    # ------------------------------------------------------------------
+
+    # #5 center shift (eta held at 1.05): does the target point set the cut-offs?
+    sq_dist_modified_c2p3=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified_c2p3', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.3, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05),
+        'recent_daily_INR'
+    ),
+    sq_dist_modified_c2p7=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified_c2p7', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.7, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05),
+        'recent_daily_INR'
+    ),
+    # #5 eta sweep (center held at 2.5). eta=1.0 is `sq_dist`; eta=1.05 is
+    # `sq_dist_modified`; only eta=1.1 is new.
+    sq_dist_modified_eta1p1=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified_eta1p1', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.1),
+        'recent_daily_INR'
+    ),
+    # #1 deadband sweep (center=2.5, eta=1.05): flat zone of half-width eps.
+    # eps=0 is `sq_dist_modified`; eps=0.5 makes the reward flat across [2, 3].
+    deadband_eps0p1=(
+        reil_functions.DeadbandSquareDistance(
+            name='deadband_eps0p1', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, tolerance=0.1),
+        'recent_daily_INR'
+    ),
+    deadband_eps0p25=(
+        reil_functions.DeadbandSquareDistance(
+            name='deadband_eps0p25', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, tolerance=0.25),
+        'recent_daily_INR'
+    ),
+    deadband_eps0p5=(
+        reil_functions.DeadbandSquareDistance(
+            name='deadband_eps0p5', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, tolerance=0.5),
+        'recent_daily_INR'
+    ),
+    # #3 linear control (center=2.5, eta=1.05): abs instead of square — isolates
+    # curvature from centering. (`dist` is the eta=1.0 version.)
+    dist_modified=(
+        reil_functions.NormalizedDistance(
+            name='dist_modified', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05),
+        'recent_daily_INR'
+    ),
+    # #4 asymmetric (center=2.5, eta=1.05): heavier penalty above center
+    # (supratherapeutic / bleeding side).
+    asym_over2=(
+        reil_functions.AsymmetricSquareDistance(
+            name='asym_over2', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, under_weight=1.0, over_weight=2.0),
+        'recent_daily_INR'
+    ),
+    asym_over4=(
+        reil_functions.AsymmetricSquareDistance(
+            name='asym_over4', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, under_weight=1.0, over_weight=4.0),
+        'recent_daily_INR'
+    ),
+    # #2 in-range indicator: reward = fraction of days in [2, 3] (multiplier
+    # +1.0, MAXIMISED). The existing `PTTR_exact` reward has multiplier=-1.0
+    # (a cost, never selected as a training reward); this is the correctly
+    # signed maximisation reward for the train/eval-aligned arm.
+    pttr_in_range=(
+        reil_functions.PercentInRange(
+            name='pttr_in_range', y_var_name='daily_INR_history',
+            length=-1, multiplier=1.0, interpolate=False,
+            acceptable_range=(2, 3), exclude_first=True),
+        'recent_daily_INR'
+    ),
+
+    # --- EXP-C2-RW1 extension (2026-06-22): higher asymmetry + high eta ---
+    asym_over8=(
+        reil_functions.AsymmetricSquareDistance(
+            name='asym_over8', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, under_weight=1.0, over_weight=8.0),
+        'recent_daily_INR'
+    ),
+    asym_over16=(
+        reil_functions.AsymmetricSquareDistance(
+            name='asym_over16', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.05, under_weight=1.0, over_weight=16.0),
+        'recent_daily_INR'
+    ),
+    # high eta (direction amplifier); compare to sq_dist (1.0), sq_dist_modified
+    # (1.05), sq_dist_modified_eta1p1 (1.1).
+    sq_dist_modified_eta1p2=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified_eta1p2', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.2),
+        'recent_daily_INR'
+    ),
+    sq_dist_modified_eta1p5=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified_eta1p5', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.5),
+        'recent_daily_INR'
+    ),
+    sq_dist_modified_eta2p0=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_modified_eta2p0', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=2.0),
+        'recent_daily_INR'
+    ),
 )
 
 statistic_definition_names = ['PTTR_exact_basic', 'PTTR_exact']
