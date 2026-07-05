@@ -105,6 +105,31 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
             center=2.5, band_width=1.0, exclude_first=False),
         'recent_daily_INR'
     ),
+
+    # ------------------------------------------------------------------
+    # Paper-3 additive dose-duration reward (plan 200 §3):
+    #   r = lambda * tau  -  c * sum_t (mu_t - 2.5)^2 ,  c = 4 (band_width=1)
+    # Same square-distance cost as `sq_dist`, plus a flat +lambda*tau interval
+    # bonus. `lambda` (duration_coef) is the dose-duration trade-off dial; the
+    # indifference deviation is delta* = sqrt(lambda / c). lambda=0 reproduces
+    # `sq_dist` exactly. Grid = the D2 lambda-sweep {0, .15, .25, .5, 1, 1.5}
+    # (delta* ~ 0..0.61). Supersedes `custom_distance_4` for Paper-3 runs.
+    # ------------------------------------------------------------------
+    **{
+        f'sq_dist_dur_l{tag}': (
+            reil_functions.DurationIncentiveSquareDistance(
+                name=f'sq_dist_dur_l{tag}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam),
+            'recent_daily_INR'
+        )
+        for tag, lam in (
+            ('0p00', 0.0), ('0p15', 0.15), ('0p25', 0.25),
+            ('0p50', 0.5), ('1p00', 1.0), ('1p50', 1.5),
+        )
+    },
+
     sq_dist_modified=(
         reil_functions.NormalizedSquareDistance(
             name='sq_dist_modified', y_var_name='daily_INR_history',

@@ -119,6 +119,36 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
 
 
 @dataclasses.dataclass
+class DurationIncentiveSquareDistance(NormalizedSquareDistance):
+    '''Additive dose-duration reward (Paper 3, plan 200 §3).
+
+        r = duration_coef * tau  -  c * sum_t (mu_t - center)^2
+
+    The square-distance term is exactly `NormalizedSquareDistance` (a *cost*,
+    i.e. configured with multiplier=-1 and normalized by band_width so
+    c = (2 / band_width)**2 = 4 at band_width=1). On top of that cost we add a
+    flat `+ duration_coef * tau` reward for a longer monitoring interval tau,
+    so the policy extends tau only while the patient stays near `center` and
+    shortens it when INR drifts. With c fixed by the band-width normalization,
+    `duration_coef` (= lambda) is the single dose-duration trade-off dial;
+    lambda = 0 recovers `sq_dist` exactly and the margin condition gives the
+    "indifference deviation" delta* = sqrt(lambda / c).
+
+    tau is taken as the length of the per-decision daily-INR window `y`
+    (the days elapsed since the previous decision). The `+ duration_coef * tau`
+    term is added *after* the parent's `multiplier`/`constant` are applied, so
+    it stays a positive interval bonus rather than being flipped by the
+    cost's multiplier=-1.
+    '''
+    duration_coef: float = 0.0
+
+    def __call__(self, args: FeatureSet) -> float:
+        base = super().__call__(args)
+        tau = len(args.value[self.y_var_name])  # type: ignore
+        return base + self.duration_coef * tau
+
+
+@dataclasses.dataclass
 class DeadbandSquareDistance(ReilFunction[float, int]):
     '''Squared distance from `center` with an epsilon-insensitive deadband.
 

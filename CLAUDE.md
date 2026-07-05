@@ -24,7 +24,7 @@ The work in `ReiL` ultimately serves two papers being prepared in:
 
 - `C:\Users\sj_an\Documents\Claude\Projects\Dissertation papers\` — canonical reference docs.
 
-When a change to `ReiL` is motivated by a paper / dissertation requirement, link the change to the relevant doc (e.g. "supports `[EXP-C3-002]` per `60_paper2_chapter3_canonical.md` §Tandem Conditional").
+When a change to `ReiL` is motivated by a paper / dissertation requirement, link the change to the relevant doc (e.g. "supports `[EXP-C3-002]` per `60_paper3_chapter3_canonical.md` §Tandem Conditional").
 
 ## Rules specific to this repo
 

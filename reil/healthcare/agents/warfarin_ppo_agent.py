@@ -141,19 +141,30 @@ class PPO4WarfarinAgent(PPOAgent):
             for m in mask
         ]
 
-        masked_logits = [
-            tf.gather(lo, m, axis=1)
-            for lo, m in zip(logits, mask_index)
-        ]
-
-        if training_mode:
-            permissible_action_index = [
-                int(tf.random.categorical(logits=lo, num_samples=1))  # type: ignore
-                for lo in masked_logits]
-        else:
-            permissible_action_index = [
-                int(np.argmax(lo))  # type: ignore
-                for lo in masked_logits]
+        # Mask + sample per head in NumPy. This deliberately does NOT use
+        # per-decision `tf.gather` + `tf.random.categorical`: under Ch.3's
+        # variable dosing interval the policy converges toward short durations,
+        # so decisions-per-patient explodes (~10 early -> ~80+ late) and those
+        # two eager ops leaked ~110 KB of TensorFlow C++ memory *per decision*
+        # in the long training process (not reproducible standalone; RSS grew
+        # ~4.5 MB/patient and OOM'd a 31 GB box on a 5k-patient S1 run,
+        # root-caused 2026-07-04). The forward stays on the traced
+        # `actor_logits` path; only the masking + categorical sampling move to
+        # NumPy. Sampling from `softmax(masked_logits)` is exactly the
+        # distribution `tf.random.categorical(logits=masked_logits)` draws, and
+        # np.random is seeded by `reil.set_reil_random_seed`, so training is
+        # still reproducible (the RNG stream differs from the old tf.random one,
+        # so pre-fix runs won't reproduce bit-for-bit — acceptable for new runs).
+        permissible_action_index = []
+        for lo, mi in zip(logits, mask_index):
+            row = np.asarray(lo)[0][mi]  # gather permissible logits (1-D)
+            if training_mode:
+                e = np.exp(row - row.max())
+                p = e / e.sum()
+                permissible_action_index.append(
+                    int(np.random.choice(len(p), p=p)))
+            else:
+                permissible_action_index.append(int(np.argmax(row)))
 
         if len(permissible_action_index) == 1:
             # In the implementation of feature.byindex(), if index is one dimensional
@@ -162,7 +173,7 @@ class PPO4WarfarinAgent(PPOAgent):
         else:
             action_index = [
                 mask_index[i][permissible_action_index[i]]
-                for i, masked_logit in enumerate(masked_logits)
+                for i in range(len(permissible_action_index))
             ]
 
         action: FeatureSet = actions.send(f'lookup {action_index}')

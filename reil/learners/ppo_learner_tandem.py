@@ -344,6 +344,33 @@ class PPOTandemModel(TF2UtilsMixin):
 
         return regularizer_loss
 
+    def per_neuron_l2_vector(self) -> Tensor:
+        # Per-output-neuron L2 norm of (weights + bias) for every actor head,
+        # concatenated across heads. Length == sum(action_per_head) (e.g. 7+6
+        # = 13 for dose+duration). This is the tandem counterpart of
+        # PPOModel.per_neuron_l2_vector: that single-head version reduces the
+        # one final layer, whereas the tandem actor exposes one Dense output
+        # head per action component. The heads are named 'actor_output_<nn>'
+        # (see _build_networks / mlp_functional_w_concat); sorting by name
+        # yields action_per_head order (head 00/01 -> dose, then duration),
+        # matching the logits-concat order used in train_actor and the
+        # PPOLearner.learn diagnostics. Eager-safe; called once per train_step
+        # like the single-head version.
+        heads = sorted(
+            (layer for layer in self.actor.layers
+             if layer.name.startswith('actor_output_')),
+            key=lambda layer: layer.name)
+        vectors = []
+        for head in heads:
+            weights_concat = tf.concat([
+                head.weights[0],
+                tf.expand_dims(head.weights[1], axis=0)
+            ], axis=0)
+            vectors.append(
+                tf.math.reduce_euclidean_norm(weights_concat, axis=0))
+
+        return tf.concat(vectors, axis=0)
+
     @tf.function(jit_compile=JIT_COMPILE)
     def _compute_actor_loss(self, initial_logprobs, new_logprobs, advantage_, j):
         ratio: Tensor = tf.exp(

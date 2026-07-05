@@ -357,6 +357,20 @@ class DosingSubject(HealthSubject):
             )
         )[self._measurement_name]
 
+        # Clamp the observed measurement to its declared range. Under long
+        # duration intervals (Chapter 3), an under-checked patient's INR can
+        # drift just past the range ceiling — the Hamberg-2010 (OOD) model
+        # produced e.g. INR 15.11 vs the 15.0 cap — which otherwise trips the
+        # INR_history feature's hard upper-bound check mid-trajectory. Capping
+        # at the ceiling is clinically immaterial (therapeutic band is 2-3 and
+        # every >5 / >4 danger threshold is preserved) and, unlike widening the
+        # range, leaves feature normalization identical to the Chapter-2 runs.
+        _m_lo, _m_hi = self._measurement_range
+        measurements_temp = [
+            _m_lo if m < _m_lo else _m_hi if m > _m_hi else m
+            for m in measurements_temp
+        ]
+
         self._decision_points_dose_history[self._decision_points_index] = \
             current_dose
         self._decision_points_duration_history[self._decision_points_index] = \

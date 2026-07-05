@@ -19,7 +19,7 @@ from reil.utils.tf_utils import (JIT_COMPILE, BroadcastAndConcatLayer, MeanMetri
 
 
 keras = tf.keras
-from keras.optimizers.schedules.learning_rate_schedule import \
+from keras.optimizers.schedules import \
     LearningRateSchedule  # noqa: E402
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
@@ -31,7 +31,18 @@ zero_float32: Tensor = tf.constant(0., tf.float32)
 one_float32: Tensor = tf.constant(1., tf.float32)
 
 
-@tf.function(jit_compile=JIT_COMPILE)
+# XLA (jit_compile) is deliberately OFF throughout this model. The training
+# tf.functions have dynamic input_signatures ([None, None]) and are called once
+# per trajectory with a *different* batch size. With jit_compile=True, XLA
+# compiles and caches a separate executable per distinct batch shape (~15 MB
+# each) — a real, if secondary, growth source. NOTE: disabling XLA (here + the
+# autoclustering flag in wd_runner core.py) did NOT resolve the primary S1/S2
+# OOM — the real-run RAM still grows ~5 GB per 1k-patient chunk with XLA fully
+# off (2026-07-04). That dominant leak is elsewhere in the per-trajectory learn
+# path and is still UNRESOLVED. Keeping jit_compile=False anyway: it removes the
+# per-shape XLA cache and the compile overhead on dynamic shapes. See
+# project_paper3_harness_runnable memory.
+@tf.function(jit_compile=False)
 def _less_than_condition(j: Tensor, m: Tensor, *rest) -> Tensor:
     return tf.less(j, m, name='less_than')  # type: ignore
 
@@ -160,12 +171,43 @@ class PPOParallelModel(TF2UtilsMixin):
             'critic': type(self.critic)}
 
     def __call__(self, inputs, training: bool | None = None) -> Any:
-        logits = self.actor(inputs, training)
-        values = self.critic(inputs, training)
+        logits = self.actor(inputs, training=training)
+        values = self.critic(inputs, training=training)
         return logits, values
 
+    @tf.function(reduce_retracing=True)
+    def actor_logits(self, x: Tensor) -> tuple[Tensor, ...]:
+        '''
+        Actor forward pass only — returns raw logits per head, no critic,
+        no sampling. Mirrors ``PPOModel.actor_logits`` so that
+        ``PPO4WarfarinAgent.act`` routes through the fast, ``tf.function``-
+        cached, ``training=False`` path instead of the legacy eager
+        ``predict((state,), training=training_mode)`` fallback (which runs an
+        actor+critic forward with ``training=True`` on every decision).
+
+        This is a speed/consistency win (the forward itself was verified NOT
+        to be the Ch.3 act() RSS leak — that was the per-decision eager
+        ``tf.gather``/``tf.random.categorical`` in ``act()``, now moved to
+        NumPy). ``reduce_retracing`` caches one concrete function for the
+        batch-1 act shape.
+
+        Arguments
+        ---------
+        x:
+            State tensor, shape ``[batch, input_dim]``.
+
+        Returns
+        -------
+        :
+            Tuple of float32 tensors, one per action head.
+        '''
+        out = self.actor(x, training=False)
+        if not isinstance(out, (list, tuple)):
+            out = (out,)
+        return tuple(out)
+
     @staticmethod
-    @tf.function  # (jit_compile=False) see tf_utils.logprobs
+    @tf.function(jit_compile=False)  # see tf_utils.logprobs
     def _logprobs_j(
             j: Tensor, logits_concat: Tensor, starts: Tensor, ends: Tensor,
             action_indices: Tensor, action_per_head: Tensor, expand_dim: bool = True) -> Tensor:
@@ -353,7 +395,30 @@ class PPOParallelModel(TF2UtilsMixin):
 
         return regularizer_loss
 
-    @tf.function(jit_compile=JIT_COMPILE)
+    def per_neuron_l2_vector(self) -> Tensor:
+        # Per-output-neuron L2 norm of (weights + bias) for every actor head,
+        # concatenated across heads -> length == sum(action_per_head). Same
+        # role/shape as PPOModel.per_neuron_l2_vector, spanning the parallel
+        # model's independent output heads ('actor_output_<nn>', built in
+        # __init__); sorting by name gives action_per_head order. Eager-safe;
+        # called once per train_step by PPOLearner.learn for action-forging
+        # diagnostics.
+        heads = sorted(
+            (layer for layer in self.actor.layers
+             if layer.name.startswith('actor_output_')),
+            key=lambda layer: layer.name)
+        vectors = []
+        for head in heads:
+            weights_concat = tf.concat([
+                head.weights[0],
+                tf.expand_dims(head.weights[1], axis=0)
+            ], axis=0)
+            vectors.append(
+                tf.math.reduce_euclidean_norm(weights_concat, axis=0))
+
+        return tf.concat(vectors, axis=0)
+
+    @tf.function(jit_compile=False)
     def _compute_actor_loss(self, initial_logprobs, new_logprobs, _advantage, j):
         ratio: Tensor = tf.exp(
             tf.subtract(
@@ -384,7 +449,7 @@ class PPOParallelModel(TF2UtilsMixin):
             TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
             TensorSpec(shape=[None], dtype=tf.float32, name='returns'),
         ),
-        jit_compile=JIT_COMPILE
+        jit_compile=False
     )
     def train_critic(self, x, returns):
         print(f'tracing {self.__class__.__qualname__}.train_critic')
@@ -447,9 +512,9 @@ class PPOParallelModel(TF2UtilsMixin):
             x for x in metrics.values())  # type: ignore
         metrics['kl'] = self._kl.result()
 
-        self._actor_loss.reset_states()
-        self._critic_loss.reset_states()
-        self._entropy_loss.reset_states()
-        self._actor_accuracy.reset_states()
+        self._actor_loss.reset_state()
+        self._critic_loss.reset_state()
+        self._entropy_loss.reset_state()
+        self._actor_accuracy.reset_state()
 
         return metrics

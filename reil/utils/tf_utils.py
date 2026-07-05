@@ -53,7 +53,13 @@ def set_tf_flags(
             tf.config.optimizer.set_jit(False)
 
 
-@tf.function(jit_compile=JIT_COMPILE)
+# reduce_retracing=True: entropy is called eagerly in PPOLearner.learn on
+# [batch, logits] with a *different* batch size every training step (one
+# trajectory's transitions). Without it, tf.function traces + caches a new graph
+# per batch size -> unbounded Operation/SymbolicTensor accumulation (the Ch3
+# Separate/S1 training RAM leak, 2026-07-04). Relaxing the batch dim bounds the
+# trace cache; results are unchanged.
+@tf.function(reduce_retracing=True)
 def entropy(logits: Tensor) -> Tensor:
     # Adopted the code from OpenAI baseline
     # https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/common/distributions.py
