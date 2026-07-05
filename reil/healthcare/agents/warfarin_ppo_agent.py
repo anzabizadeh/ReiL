@@ -67,6 +67,41 @@ class PPO4WarfarinAgent(PPOAgent):
             except IndexError:
                 pass
 
+    @staticmethod
+    def _sample_head(logits_row, mask_idx: list[int], training_mode: bool) -> int:
+        '''Mask a head's logits to the permissible actions and sample (train:
+        softmax-categorical; eval: argmax), returning the FULL-space action
+        index. NumPy — no per-decision eager TF ops (see the act() leak fix).'''
+        masked = np.asarray(logits_row)[mask_idx]
+        if training_mode:
+            e = np.exp(masked - masked.max())
+            p = e / e.sum()
+            k = int(np.random.choice(len(p), p=p))
+        else:
+            k = int(np.argmax(masked))
+        return mask_idx[k]
+
+    def _act_conditional_tandem(
+            self, state: FeatureSet, actions: FeatureGeneratorType,
+            model, training_mode: bool) -> FeatureSet:
+        '''Two-stage rollout for PPOTandemConditionalModel: sample the dose,
+        then sample the duration conditioned on the prescribed dose. Masks come
+        from the same [dose, duration] mask vector as the non-conditional
+        tandem (head 0 = dose, head 1 = duration).'''
+        from reil.utils.tf_utils import TF2UtilsMixin
+        state_tensor = TF2UtilsMixin.convert_to_tensor((state,))
+        mask = list(actions.send('return mask_vector'))
+        mask_index = [[i for i, j in enumerate(m) if j] for m in mask]
+
+        dose_logits = model.act_dose_logits(state_tensor)[0]
+        dose_idx = self._sample_head(dose_logits, mask_index[0], training_mode)
+
+        dur_logits = model.act_duration_logits(
+            state_tensor, tf.constant([dose_idx], dtype=tf.int32))[0]
+        dur_idx = self._sample_head(dur_logits, mask_index[1], training_mode)
+
+        return actions.send(f'lookup {[dose_idx, dur_idx]}')
+
     def act(
             self, state: FeatureSet, subject_id: int,
             actions: FeatureGeneratorType, iteration: int = 0) -> FeatureSet:
@@ -74,12 +109,19 @@ class PPO4WarfarinAgent(PPOAgent):
             raise ValueError(f'Subject with ID={subject_id} not found.')
 
         training_mode = self._training_trigger != 'none'
+        model = getattr(self._learner, '_model', None)
+        # Conditional tandem (Axis A): the duration head conditions on the
+        # PRESCRIBED dose, so we must sample the dose FIRST, then the duration
+        # given that dose. Two-stage path; the standard single-forward path
+        # below is unchanged for every other model.
+        if getattr(model, 'act_dose_logits', None) is not None:
+            return self._act_conditional_tandem(
+                state, actions, model, training_mode)
         # Fast path: if the model exposes a tf.function-decorated
         # `actor_logits` (PPOModel + subclasses), use it. Saves the
         # critic forward (not needed for act()) and avoids the per-op
         # eager-dispatch overhead that dominated the 2026-06-08 profile
         # (918K eager-execute calls per chunk under the legacy path).
-        model = getattr(self._learner, '_model', None)
         actor_logits_fn = getattr(model, 'actor_logits', None)
         if actor_logits_fn is not None:
             from reil.utils.tf_utils import TF2UtilsMixin

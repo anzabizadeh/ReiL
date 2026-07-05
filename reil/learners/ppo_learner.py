@@ -905,7 +905,13 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         # `entropy_loss` (logged only when entropy_loss_coef != 0 and computed
         # inside the actor train loop), this is unconditional and computed
         # once post-train_step. Catches policy collapse to a single action.
-        batch_logits = self._model.actor(_X, training=False)
+        if hasattr(self._model, 'act_dose_logits'):
+            # Conditional tandem: `actor` is a 2-input model ([state, signal]);
+            # use the model's __call__ (zero-signal) for this batch-entropy
+            # diagnostic rather than calling `actor(_X)` with a single input.
+            batch_logits = self._model(_X, training=False)[0]
+        else:
+            batch_logits = self._model.actor(_X, training=False)
         if isinstance(batch_logits, (list, tuple)):
             batch_logits_concat = tf.concat(batch_logits, axis=1)
         else:

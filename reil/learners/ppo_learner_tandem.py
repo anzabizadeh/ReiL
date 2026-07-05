@@ -174,6 +174,19 @@ class PPOTandemModel(TF2UtilsMixin):
 
         return logits, values
 
+    def _actor_logits_concat(self, x: Tensor, action_indices: Tensor) -> Tensor:
+        '''Concatenated per-head actor logits for `x`.
+
+        Default (soft-coupling) tandem: a single forward of `self.actor(x)`
+        whose duration head reads the dose LOGITS (see `_build_networks` /
+        `mlp_functional_w_concat`). `action_indices` is unused here but is part
+        of the contract so `PPOTandemConditionalModel` can override this to
+        condition the duration head on the *taken* dose instead. Called at all
+        forward sites in `train_actor` so the override applies to initial, per-
+        iteration, and post-update log-probs alike (PPO ratio stays consistent).
+        '''
+        return tf.concat(self.actor(x), axis=1, name='all_logits')
+
     @staticmethod
     @tf.function  # (jit_compile=False) see tf_utils.logprobs
     def _logprobs_j(
@@ -237,7 +250,7 @@ class PPOTandemModel(TF2UtilsMixin):
         starts = self._starts
         ends = self._ends
 
-        logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
+        logits_concat = self._actor_logits_concat(x, action_indices)
 
         initial_logprobs = self._logprobs_concat(
             logits_concat, starts, ends, action_indices, action_per_head, head_count)
@@ -271,7 +284,7 @@ class PPOTandemModel(TF2UtilsMixin):
         for _ in tf.range(self._actor_train_iterations):
             total_loss = zero_float32
             with tf.GradientTape() as tape:
-                logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
+                logits_concat = self._actor_logits_concat(x, action_indices)
                 for j in tf.range(head_count):
                     new_logprobs_j = self._logprobs_j(
                         j, logits_concat, starts, ends, action_indices,
@@ -309,7 +322,7 @@ class PPOTandemModel(TF2UtilsMixin):
                     policy_grads, self._max_grad_norm, name='clipped_policy_grads')
             self._actor_optimizer.apply_gradients(zip(policy_grads, trainable_vars))
 
-            logits_concat = tf.concat(self.actor(x), axis=1, name='all_logits')
+            logits_concat = self._actor_logits_concat(x, action_indices)
 
             new_logprobs = self._logprobs_concat(
                 logits_concat, starts, ends, action_indices, action_per_head, head_count)
@@ -488,3 +501,110 @@ class PPOTandemModel(TF2UtilsMixin):
         reset_metric(self._actor_accuracy)
 
         return metrics
+
+
+@keras.utils.register_keras_serializable(
+    package='reil.learners.ppo_learner_tandem')
+class PPOTandemConditionalModel(PPOTandemModel):
+    '''Tandem where the duration head conditions on the PRESCRIBED (taken) dose
+    value instead of the soft dose logits (Paper-3 Axis-A, user 2026-07-05).
+
+    ``dose_conditioning``:
+      ``'pct_change'`` — duration signal = the sampled % dose change ``p``.
+      ``'new_dose'``   — signal = ``last_dose * (1 + p)`` where ``last_dose`` is
+                         de-normalised from the state dose feature over
+                         ``dose_range``. Mirrors the subject's real new-dose
+                         formula (``warfarin.py`` ``last_dose * (1 + p)``).
+
+    The actor is one 2-input Keras model ``[state, dose_signal] ->
+    (dose_logits, dur_logits)``; the dose branch ignores the signal. During
+    training the signal is recomputed IN-GRAPH from the taken dose index
+    (``action_indices[:, 0]``) via the ``_actor_logits_concat`` override, so no
+    rollout data is carried through the buffer and the PPO ratio stays
+    consistent (old + new duration log-probs condition on the same taken dose).
+    During rollout the agent samples the dose from ``act_dose_logits`` then the
+    duration from ``act_duration_logits`` (two-stage).
+    '''
+
+    def __init__(
+            self, *args,
+            dose_conditioning: Literal['pct_change', 'new_dose'] = 'pct_change',
+            dose_values: tuple[float, ...] = (),
+            dose_feature_index: int = 0,
+            dose_range: tuple[float, float] = (0.0, 15.0),
+            **kwargs: Any) -> None:
+        self._dose_conditioning = dose_conditioning
+        self._dose_values_list = tuple(float(v) for v in dose_values)
+        self._dose_feature_index = int(dose_feature_index)
+        self._dose_range = (float(dose_range[0]), float(dose_range[1]))
+        super().__init__(*args, **kwargs)  # calls _build_networks (overridden)
+        self._dose_values_t: Tensor = tf.constant(
+            self._dose_values_list, dtype=tf.float32, name='dose_values')
+        self._dose_lo: Tensor = tf.constant(
+            self._dose_range[0], dtype=tf.float32, name='dose_lo')
+        self._dose_hi: Tensor = tf.constant(
+            self._dose_range[1], dtype=tf.float32, name='dose_hi')
+
+    def _build_networks(self):
+        input_: Tensor = keras.Input(self._input_shape, name='state')  # type: ignore
+        signal_in: Tensor = keras.Input((1,), name='dose_signal')  # type: ignore
+
+        dose_trunk = TF2UtilsMixin.mlp_functional(
+            input_, self._actor_layer_sizes['dose'],
+            self._actor_hidden_activation, 'actor__dose_{i:0>2}')
+        dose_logits = keras.layers.Dense(
+            self._action_per_head_units[0],
+            activation=self._actor_head_activation,
+            name='actor_output_00')(dose_trunk)
+
+        dur_input = keras.layers.Concatenate(axis=-1)([input_, signal_in])
+        dur_trunk = TF2UtilsMixin.mlp_functional(
+            dur_input, self._actor_layer_sizes['duration'],
+            self._actor_hidden_activation, 'actor__duration_{i:0>2}')
+        dur_logits = keras.layers.Dense(
+            self._action_per_head_units[1],
+            activation=self._actor_head_activation,
+            name='actor_output_01')(dur_trunk)
+
+        self.actor = keras.Model(
+            inputs=[input_, signal_in], outputs=[dose_logits, dur_logits])
+
+        critic_layers = TF2UtilsMixin.mlp_functional(
+            input_, self._critic_layer_sizes,
+            self._critic_hidden_activation, 'critic_{i:0>2}')
+        critic_output = keras.layers.Dense(1, name='critic_output')(critic_layers)
+        self.critic = keras.Model(inputs=input_, outputs=critic_output)
+
+    def _dose_signal(self, x: Tensor, dose_idx: Tensor) -> Tensor:
+        '''dose_idx: int tensor [batch] -> signal [batch, 1] float.'''
+        p = tf.gather(self._dose_values_t, dose_idx)
+        if self._dose_conditioning == 'new_dose':
+            prev = (x[:, self._dose_feature_index]
+                    * (self._dose_hi - self._dose_lo) + self._dose_lo)
+            signal = prev * (one_float32 + p)
+        else:  # pct_change
+            signal = p
+        return tf.expand_dims(signal, axis=1)
+
+    def _actor_logits_concat(self, x: Tensor, action_indices: Tensor) -> Tensor:
+        signal = self._dose_signal(x, action_indices[:, 0])
+        return tf.concat(self.actor([x, signal]), axis=1, name='all_logits')
+
+    def __call__(self, inputs, training: bool | None = None) -> Any:
+        # Diagnostics / critic-value path (no taken dose here): forward with a
+        # zero dose signal. The duration logits from this path are used only for
+        # metrics; the agent's two-stage act() supplies the real conditioning.
+        zeros = tf.zeros((tf.shape(inputs)[0], 1), dtype=tf.float32)
+        logits = self.actor([inputs, zeros], training=training)
+        values = self.critic(inputs, training=training)
+        return logits, values
+
+    def act_dose_logits(self, x: Tensor) -> Tensor:
+        '''Dose-head logits for rollout (dose branch ignores the signal).'''
+        zeros = tf.zeros((tf.shape(x)[0], 1), dtype=tf.float32)
+        return self.actor([x, zeros])[0]
+
+    def act_duration_logits(self, x: Tensor, dose_idx: Tensor) -> Tensor:
+        '''Duration-head logits conditioned on the just-sampled dose index.'''
+        signal = self._dose_signal(x, dose_idx)
+        return self.actor([x, signal])[1]
