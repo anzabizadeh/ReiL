@@ -576,13 +576,22 @@ class PPOTandemConditionalModel(PPOTandemModel):
         self.critic = keras.Model(inputs=input_, outputs=critic_output)
 
     def _dose_signal(self, x: Tensor, dose_idx: Tensor) -> Tensor:
-        '''dose_idx: int tensor [batch] -> signal [batch, 1] float.'''
+        '''dose_idx: int tensor [batch] -> signal [batch, 1] float.
+
+        The signal is kept on the SAME normalised scale as the state features
+        (min-max over dose_range -> ~[0, 1]). Feeding the raw new dose in mg
+        (0-15, ~15x the [0,1] state features) made new_dose training
+        collapse-prone (verified 2026-07-05: entropy crash on 1/3 seeds); the
+        network sees the same information either way, but normalisation keeps
+        the gradients well-scaled.
+        '''
         p = tf.gather(self._dose_values_t, dose_idx)
         if self._dose_conditioning == 'new_dose':
-            prev = (x[:, self._dose_feature_index]
-                    * (self._dose_hi - self._dose_lo) + self._dose_lo)
-            signal = prev * (one_float32 + p)
-        else:  # pct_change
+            prev_mg = (x[:, self._dose_feature_index]
+                       * (self._dose_hi - self._dose_lo) + self._dose_lo)
+            new_dose_mg = prev_mg * (one_float32 + p)
+            signal = (new_dose_mg - self._dose_lo) / (self._dose_hi - self._dose_lo)
+        else:  # pct_change: p is already ~[-1, 1]
             signal = p
         return tf.expand_dims(signal, axis=1)
 
