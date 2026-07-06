@@ -357,7 +357,7 @@ Methods include `train_actor(x, action_indices, advantage)` (`@tf.function`), `t
 **`PPOTandemModel`** ([ppo_learner_tandem.py:46](../reil/learners/ppo_learner_tandem.py#L46)) — staged training. Key differences vs. `PPOModel`:
 - `actor_layer_sizes: dict[str, tuple[int, ...]]` (one entry per backbone name).
 - `training_switch: dict[str, int] | None` — toggles which layers train at which iteration.
-- `backprop_mode: Literal['separate','shared','all'] = 'all'`.
+- `backprop_mode: Literal['separate','shared'] = 'shared'` — `'separate'` stop-gradients the dose↔duration coupling and each head→trunk link (only the output heads train; trunks stay at init); `'shared'` is full backprop (the duration loss also trains the dose trunk). The former `'all'` was a synonym of `'shared'` (removed 2026-07-06; aliased on load for old configs).
 - `_freeze_layers()` enforces the switch schedule per iteration.
 
 **`PPOParallelModel`** ([ppo_learner_parallel.py:40](../reil/learners/ppo_learner_parallel.py#L40)) — shared trunk + parallel actor heads.

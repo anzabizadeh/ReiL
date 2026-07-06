@@ -50,7 +50,7 @@ class PPOTandemModel(TF2UtilsMixin):
             critic_train_iterations: int,
             target_kl: float,
             training_switch: dict[str, int] | None = None,
-            backprop_mode: Literal['separate', 'shared', 'all'] = 'all',
+            backprop_mode: Literal['separate', 'shared'] = 'shared',
             actor_hidden_activation: str = 'relu',
             actor_head_activation: str | None = None,
             critic_hidden_activation: str = 'relu',
@@ -88,7 +88,23 @@ class PPOTandemModel(TF2UtilsMixin):
             self._training_sequence = list(training_switch)
             self._current_switch = len(self._training_sequence)
 
-        self._backprop_mode: Literal['separate', 'shared', 'all'] = backprop_mode
+        # backprop_mode routes gradients through the dose->duration coupling in
+        # mlp_functional_w_concat, which branches ONLY on == 'separate':
+        #   'separate' - stop_gradient before every head AND on the coupling, so
+        #                only the output Dense heads train (both trunks stay at
+        #                init; a random-feature regime). No dose<->duration grad.
+        #   'shared'   - no stop_gradient: full backprop, so the duration loss
+        #                also trains the (upstream) dose trunk. The stabilising
+        #                shared representation.
+        # 'all' was a THIRD name that the code never distinguished from 'shared'
+        # (verified 2026-07-06: bit-identical trained-variable set) — for a
+        # 2-head tandem there is only the one dose trunk to share, so any
+        # "shared vs all" distinction collapses, and the N-head chained-coupling
+        # variant that could differ was never implemented. Removed as a distinct
+        # mode; aliased to 'shared' so older configs / pickles still load.
+        if backprop_mode == 'all':
+            backprop_mode = 'shared'
+        self._backprop_mode: Literal['separate', 'shared'] = backprop_mode
         self._clip_ratio: Tensor | None
         self._critic_clip_range: Tensor | None
         self._max_grad_norm: Tensor | None

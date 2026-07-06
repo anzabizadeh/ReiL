@@ -287,10 +287,16 @@ class TF2UtilsMixin(reilbase.ReilBase):
             layer_name_format: str = 'layer_{i:0>2}',
             output_name_format: str = 'output_{i:0>2}',
             start_index: int = 1,
-            backprop_mode: Literal['separate', 'shared', 'all'] = 'all',
+            backprop_mode: Literal['separate', 'shared'] = 'shared',
             normalize_before_concat: Literal['regular', 'batch', 'none'] = 'none',
             **kwargs):
-        '''Build a feedforward dense network.'''
+        '''Build a feedforward dense network.
+
+        `backprop_mode` branches only on `== 'separate'` (stop_gradient before
+        each head and on the coupling -> only the output heads train). Anything
+        else means full backprop ('shared'). The former third value 'all' was a
+        synonym of 'shared' and has been removed (callers alias it upstream).
+        '''
         layers_iterable = iter(layer_sizes.items())
         first_layer_name, first_layer_sizes = next(layers_iterable)
         index = layer_name_format.find('{i')
