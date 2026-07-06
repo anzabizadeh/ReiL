@@ -626,3 +626,98 @@ class PPOTandemConditionalModel(PPOTandemModel):
         '''Duration-head logits conditioned on the just-sampled dose index.'''
         signal = self._dose_signal(x, dose_idx)
         return self.actor([x, signal])[1]
+
+
+@keras.utils.register_keras_serializable(
+    package='reil.learners.ppo_learner_tandem')
+class ExpectedDoseSignal(keras.layers.Layer):
+    '''Differentiable expected new-dose signal for the duration head.
+
+    signal = normalise( last_dose_mg * (1 + E[p]) ),
+      E[p] = softmax(dose_logits) . dose_values   (expected % dose change)
+      last_dose_mg = de-normalised state dose feature (min-max over dose_range)
+    Output shape [batch, 1], on the same [0, 1] scale as the state features.
+    Because it flows through softmax(dose_logits), gradients propagate from the
+    duration loss back into the dose head — restoring the stabilising
+    dose->duration coupling that the sampled-dose conditioning severs.
+    '''
+
+    def __init__(self, dose_values, dose_feature_index=0,
+                 dose_range=(0.0, 15.0), **kwargs):
+        super().__init__(**kwargs)
+        self.dose_values = [float(v) for v in dose_values]
+        self.dose_feature_index = int(dose_feature_index)
+        self.dose_range = [float(dose_range[0]), float(dose_range[1])]
+
+    def call(self, inputs):
+        state, dose_logits = inputs
+        dv = tf.constant(self.dose_values, dtype=tf.float32)
+        lo, hi = self.dose_range
+        probs = tf.nn.softmax(dose_logits, axis=-1)
+        p_exp = tf.reduce_sum(probs * dv, axis=-1, keepdims=True)  # [b, 1]
+        last_norm = state[:, self.dose_feature_index:self.dose_feature_index + 1]
+        last_mg = last_norm * (hi - lo) + lo
+        new_mg = last_mg * (1.0 + p_exp)
+        return (new_mg - lo) / (hi - lo)
+
+    def get_config(self):
+        c = super().get_config()
+        c.update(dict(dose_values=self.dose_values,
+                      dose_feature_index=self.dose_feature_index,
+                      dose_range=self.dose_range))
+        return c
+
+
+@keras.utils.register_keras_serializable(
+    package='reil.learners.ppo_learner_tandem')
+class PPOTandemExpectedDoseModel(PPOTandemModel):
+    '''Tandem where the duration head conditions on the DIFFERENTIABLE expected
+    new dose (Paper-3 Axis-A, 2026-07-06). Unlike PPOTandemConditionalModel
+    (which conditions on the sampled dose and severs the gradient), the
+    coupling here is `ExpectedDoseSignal(softmax(dose_logits))`, so the duration
+    loss trains the dose trunk too — the stabiliser the logits tandem had, but
+    with a 1-D dose-VALUE signal instead of the 21-D logits.
+
+    Single-input actor (state -> [dose_logits, dur_logits]) with the coupling
+    internal to the forward, so the standard tandem act()/train_actor/__call__
+    paths apply unchanged (no two-stage rollout).
+    '''
+
+    def __init__(self, *args, dose_values: tuple[float, ...] = (),
+                 dose_feature_index: int = 0,
+                 dose_range: tuple[float, float] = (0.0, 15.0),
+                 **kwargs: Any) -> None:
+        self._dose_values_list = tuple(float(v) for v in dose_values)
+        self._dose_feature_index = int(dose_feature_index)
+        self._dose_range = (float(dose_range[0]), float(dose_range[1]))
+        super().__init__(*args, **kwargs)
+
+    def _build_networks(self):
+        input_: Tensor = keras.Input(self._input_shape, name='state')  # type: ignore
+        dose_trunk = TF2UtilsMixin.mlp_functional(
+            input_, self._actor_layer_sizes['dose'],
+            self._actor_hidden_activation, 'actor__dose_{i:0>2}')
+        dose_logits = keras.layers.Dense(
+            self._action_per_head_units[0],
+            activation=self._actor_head_activation,
+            name='actor_output_00')(dose_trunk)
+
+        signal = ExpectedDoseSignal(
+            self._dose_values_list, self._dose_feature_index, self._dose_range,
+            name='expected_dose_signal')([input_, dose_logits])
+        dur_input = keras.layers.Concatenate(axis=-1)([input_, signal])
+        dur_trunk = TF2UtilsMixin.mlp_functional(
+            dur_input, self._actor_layer_sizes['duration'],
+            self._actor_hidden_activation, 'actor__duration_{i:0>2}')
+        dur_logits = keras.layers.Dense(
+            self._action_per_head_units[1],
+            activation=self._actor_head_activation,
+            name='actor_output_01')(dur_trunk)
+
+        self.actor = keras.Model(inputs=input_, outputs=[dose_logits, dur_logits])
+
+        critic_layers = TF2UtilsMixin.mlp_functional(
+            input_, self._critic_layer_sizes,
+            self._critic_hidden_activation, 'critic_{i:0>2}')
+        critic_output = keras.layers.Dense(1, name='critic_output')(critic_layers)
+        self.critic = keras.Model(inputs=input_, outputs=critic_output)
