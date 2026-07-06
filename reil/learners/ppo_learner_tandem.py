@@ -298,10 +298,17 @@ class PPOTandemModel(TF2UtilsMixin):
                         initial_logprobs, new_logprobs_j, advantage_, j)
 
                     if tf.cast(self._entropy_loss_coef, tf.bool):
-                        entropy_loss = entropy(new_logprobs_j)
+                        # Entropy of head j's FULL action distribution (not the
+                        # taken-action log-prob). Subtracted from the loss below
+                        # so a higher coef ENCOURAGES exploration — the standard
+                        # PPO entropy bonus. (Pre-2026-07-06 this called
+                        # `entropy(new_logprobs_j)` on the scalar taken-action
+                        # log-prob and ADDED it, so entropy reg was a no-op /
+                        # mild collapse pressure — verified: entropy still
+                        # crashed to 0 at coef 0.05.)
+                        entropy_loss = tf.reduce_mean(
+                            entropy(logits_concat[:, starts[j]:ends[j]]))
                         entropy_loss.set_shape([])
-                        # entropy_loss = self._entropy_loss_coef * tf.reduce_sum(
-                        #     new_logprobs * tf.math.exp(new_logprobs))
 
                     if tf.cast(self._regularizer_coef, tf.bool):
                         regularizer_loss = self._compute_regularizer_loss()
@@ -310,7 +317,9 @@ class PPOTandemModel(TF2UtilsMixin):
                         [
                             total_loss,
                             actor_loss,
-                            tf.multiply(self._entropy_loss_coef, entropy_loss),
+                            tf.multiply(
+                                tf.negative(self._entropy_loss_coef),
+                                entropy_loss),
                             tf.multiply(self._regularizer_coef, regularizer_loss)
                         ],
                         name='total_loss'
