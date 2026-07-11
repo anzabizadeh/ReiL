@@ -92,6 +92,12 @@ class HealthSubject(Subject):
                  *self._measurement_range))
         ) + FeatureGenerator.discrete(
             name='day', lower=0, upper=self._max_day - 1,
+            generator=lambda _: None
+        ) + FeatureGenerator.discrete(
+            # consecutive most-recent in-range days -- the stability signal `s`
+            # for the Paper-3 dose-duration safety-ramp reward (derived read-only
+            # in DosingSubject._sub_comp_consecutive_in_range; no state mutation).
+            name='consecutive_in_range', lower=0, upper=self._max_day,
             generator=lambda _: None)
 
         if self._duration_values is None:

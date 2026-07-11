@@ -369,6 +369,7 @@ class Environment(stateful.Stateful):
         state_name = protocol.state_name
         action_name = protocol.action_name
         reward_name = protocol.reward_name
+        reward_name_2 = getattr(protocol, 'reward_name_2', None)
 
         for _ in range(times):
             reward = subject_instance.reward(
@@ -378,8 +379,15 @@ class Environment(stateful.Stateful):
             # In such cases, we have to manually feed the generator with a
             # `None`.
             try:
-                agent_observer.send(
-                    None if reward is None else {'reward': reward})
+                if reward is None:
+                    agent_observer.send(None)
+                elif reward_name_2 is None:
+                    agent_observer.send({'reward': reward})
+                else:
+                    agent_observer.send({
+                        'reward': reward,
+                        'reward_2': subject_instance.reward(
+                            name=reward_name_2, _id=agent_id)})
             except TypeError:
                 agent_observer.send(None)
 
@@ -602,7 +610,14 @@ class Environment(stateful.Stateful):
         reward = subject_instance.reward(name=r_func_name, _id=a_id)
         state = subject_instance.state(name=state_name, _id=a_id)
 
-        self._agent_observers[a_s_names].send({'reward': reward})
+        r_func_name_2 = getattr(protocol, 'reward_name_2', None)
+        if r_func_name_2 is None:
+            self._agent_observers[a_s_names].send({'reward': reward})
+        else:
+            self._agent_observers[a_s_names].send({
+                'reward': reward,
+                'reward_2': subject_instance.reward(
+                    name=r_func_name_2, _id=a_id)})
         self._agent_observers[a_s_names].send(
             {'state': state, 'possible_actions': None, 'iteration': None})
 

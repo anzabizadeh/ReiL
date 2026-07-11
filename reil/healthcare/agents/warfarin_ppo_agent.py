@@ -629,3 +629,89 @@ class PPO4WarfarinSeparateSimpleRewardAgent(PPO4Warfarin2PartAgent):
                     h.reward = (tau - 7) / 28
 
         return dose_history, duration_history
+
+
+class PPO4WarfarinTandemPerHeadAgent(PPO4Warfarin2PhaseAgent):
+    '''Two-phase tandem agent that trains each head on its OWN reward (JA-2).
+
+    Extends PPO4Warfarin2PhaseAgent so it keeps the exact NEWDOSE/RAMP training
+    setup (PGAA init for day < switch_day, then the conditional tandem policy;
+    init-phase observations dropped in `_prepare_training`). The ONLY change is
+    the training-data assembly: the dose head uses the primary reward (control)
+    while the duration head uses `Observation.reward_2` — the burden+safety
+    ramp reward the environment fills when the protocol sets `reward_name_2`.
+    Two per-head returns/advantages are computed against the tandem critic's two
+    value outputs and packed as `[·, head_count]` tuples, so a `PPOTandemModel`
+    built with `per_head_advantage=True` routes each head to its own advantage
+    column via `train_actor_per_head`/`train_critic_per_head`. This removes the
+    shared-advantage contamination (dose control variance swamping the duration
+    signal) that pinned the duration head at tau=1.
+
+    Head order is (dose, duration) == action_per_head order == critic column
+    order. `act()` and everything else are inherited unchanged.
+    '''
+
+    def _prepare_training(
+            self, history: History) -> TrainingData[FeatureSet, int]:
+        # Drop the init (PGAA) phase exactly as PPO4Warfarin2PhaseAgent does:
+        # only main-phase observations (state has no 'day' feature) are learned.
+        history = [
+            h for h in history
+            if h.state is not None and 'day' not in h.state.value]
+
+        discount_factor = self._discount_factor
+        active_history = self.get_active_history(history)
+
+        # add a trailing 0 so `deltas` (len N) line up (mirrors PPOAgent).
+        rewards_dose = self.extract_reward(
+            active_history, *self._reward_clip) + [0.0]
+        rewards_dur = [
+            float(h.reward_2) if h.reward_2 is not None else 0.0
+            for h in active_history] + [0.0]
+
+        dis_dose = self.discounted_cum_sum(rewards_dose, discount_factor)
+        dis_dur = self.discounted_cum_sum(rewards_dur, discount_factor)
+
+        state_list: tuple[FeatureSet, ...] = tuple(
+            h.state for h in active_history)  # type: ignore
+        y, values = self._learner.predict(state_list)
+        values = np.asarray(values, dtype=np.float32)  # [N, head_count]
+        if values.ndim == 1:  # scalar critic — per_head_advantage not set
+            raise RuntimeError(
+                'PPO4WarfarinTandemPerHeadAgent needs a per-head critic; build '
+                'the tandem model with per_head_advantage=True.')
+        # terminal bootstrap row of zeros (mirrors the scalar-value path).
+        values = np.vstack(
+            [values, np.zeros((1, values.shape[1]), dtype=np.float32)])
+
+        action_indices = tuple(
+            list((h.action_taken or h.action).index.values())  # type: ignore
+            for h in active_history)
+
+        gl = discount_factor * self._gae_lambda
+        deltas_dose = (
+            np.asarray(rewards_dose[:-1], dtype=np.float32)
+            + discount_factor * values[1:, 0] - values[:-1, 0])
+        adv_dose = self.discounted_cum_sum(list(deltas_dose), gl)
+        deltas_dur = (
+            np.asarray(rewards_dur[:-1], dtype=np.float32)
+            + discount_factor * values[1:, 1] - values[:-1, 1])
+        adv_dur = self.discounted_cum_sum(list(deltas_dur), gl)
+
+        self._buffer.add_iter({
+            'state': h.state,
+            'y_r_a': (
+                tuple((h.action_taken or h.action).index.values()),  # type: ignore
+                (dr_d, dr_u), (a_d, a_u))
+        } for h, dr_d, dr_u, a_d, a_u in zip(
+            active_history, dis_dose, dis_dur, adv_dose, adv_dur))
+
+        temp = self._buffer.pick()
+
+        # advantage metric reports the DURATION head — the one under study.
+        self._update_metrics(
+            rewards=rewards_dose, dis_reward=dis_dose, state_list=state_list,
+            y=y, values=values, action_indices=action_indices,
+            deltas=deltas_dose, advantage=adv_dur)
+
+        return temp['state'], temp['y_r_a'], {}  # type: ignore

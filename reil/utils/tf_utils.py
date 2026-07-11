@@ -217,6 +217,33 @@ class SerializeTF:
                 child.unlink()
 
 
+@keras.utils.register_keras_serializable(package='reil.utils.tf_utils')
+class GradientGate(keras.layers.Layer):
+    '''Identity forward pass with a runtime-switchable gradient path.
+
+    ``y = stop_gradient(x) + gate * (x - stop_gradient(x))`` — numerically
+    ``y == x`` always, but ``dy/dx == gate``. ``gate`` is a non-trainable
+    scalar weight (0 = blocked, 1 = pass-through) that can be reassigned
+    between steps WITHOUT retracing any enclosing `tf.function` (a graph-baked
+    `stop_gradient` cannot be lifted at runtime; this can).
+
+    Used by `mlp_functional_w_concat` for `coupling_gradient='gated'`: the
+    section-to-section coupling starts blocked (each section trains on its
+    own head's loss) and `PPOTandemModel._apply_training_phase` opens it
+    during `'all'`/`'trunk'` schedule phases so upstream parts receive the
+    downstream head's advantage as well.
+    '''
+
+    def build(self, input_shape):
+        self.gate = self.add_weight(
+            name='gate', shape=(), dtype='float32',
+            initializer='zeros', trainable=False)
+
+    def call(self, inputs):
+        detached = keras.ops.stop_gradient(inputs)
+        return detached + self.gate * (inputs - detached)
+
+
 class TF2UtilsMixin(reilbase.ReilBase):
     def __init__(
             self, models: dict[str, type[keras.Model]], **kwargs):
@@ -285,74 +312,99 @@ class TF2UtilsMixin(reilbase.ReilBase):
             action_per_head: tuple[int, ...],
             head_activation: str | None = None,
             layer_name_format: str = 'layer_{i:0>2}',
-            output_name_format: str = 'output_{i:0>2}',
+            output_name_format: str = '{name}_output',
             start_index: int = 1,
-            backprop_mode: Literal['separate', 'shared'] = 'shared',
-            normalize_before_concat: Literal['regular', 'batch', 'none'] = 'none',
+            coupling_gradient: Literal['full', 'blocked', 'gated'] = 'full',
+            normalize_before_concat: Literal[
+                'regular', 'batch', 'layer', 'none'] = 'none',
             **kwargs):
-        '''Build a feedforward dense network.
+        '''Build a chained multi-head ("tandem") feedforward network.
 
-        `backprop_mode` branches only on `== 'separate'` (stop_gradient before
-        each head and on the coupling -> only the output heads train). Anything
-        else means full backprop ('shared'). The former third value 'all' was a
-        synonym of 'shared' and has been removed (callers alias it upstream).
+        `layer_sizes` maps section names to hidden sizes, in head order, with
+        an optional `'trunk'` entry: the trunk MLP produces a shared latent
+        `z` that replaces the raw input as EVERY section's input (the trunk
+        is trained by every head — that is its purpose). Without `'trunk'`,
+        sections read the raw input (`z = input_`). Section j > 0 reads
+        `concat(z, coupling)`, where the coupling is ALWAYS the previous
+        section's logits (the "distribution feedforward"), normalised per
+        `normalize_before_concat`. Prefer `'layer'` (LayerNormalization,
+        per-sample) over `'batch'`: the actor is called with
+        `training=False` everywhere, so BatchNorm moving statistics never
+        update and it degenerates to a learnable affine.
+
+        `coupling_gradient` routes the gradient across the coupling ONLY
+        (sections always train on their own head's loss):
+        - `'full'`    — coupling passes gradient; downstream losses also
+                        train upstream sections.
+        - `'blocked'` — `stop_gradient` on the coupling; own-loss sections.
+        - `'gated'`   — `GradientGate` on the coupling, schedule-driven
+                        (open during 'all'/'trunk' phases; see
+                        `PPOTandemModel._apply_training_phase`).
+
+        Heads are Dense layers named `output_name_format.format(name=
+        <section>)` so whole sections are addressable by name.
+
+        2026-07-06 restart (user decision — Ch. 3 is a guiding document
+        only): clean break. The former `backprop_mode` names map
+        all→'full', shared→'blocked', separate→'gated'; no aliases. The
+        coupling source changed too: `'none'`/`'regular'` previously coupled
+        the previous section's last HIDDEN layer, not its logits.
         '''
-        layers_iterable = iter(layer_sizes.items())
-        first_layer_name, first_layer_sizes = next(layers_iterable)
+        sizes = dict(layer_sizes)
+        trunk_sizes = sizes.pop('trunk', None)
+        if len(sizes) != len(action_per_head):
+            raise ValueError(
+                'layer_sizes needs one non-trunk entry per head: got '
+                f'{list(layer_sizes)} for {len(action_per_head)} heads.')
+
         index = layer_name_format.find('{i')
-        layer_name_format_new = ''.join(
-            (layer_name_format[:index], '_', first_layer_name, '_',
-             layer_name_format[index:]))
 
-        logit_heads = TF2UtilsMixin.mlp_layers(
-            action_per_head, head_activation, output_name_format)
-        for name, layer in zip(layer_sizes, logit_heads):
-            layer._name = layer.name.replace(
-                'output', f'{name}_output')[:-3]
+        def _section_format(name: str) -> str:
+            return ''.join((layer_name_format[:index], '_', name, '_',
+                            layer_name_format[index:]))
 
-        layers = [
-            TF2UtilsMixin.mlp_functional(
-                input_, first_layer_sizes, activation,
-                layer_name_format_new,
-                start_index, **kwargs)
-        ]
+        z: Tensor = input_
+        if trunk_sizes:
+            z = TF2UtilsMixin.mlp_functional(
+                input_, tuple(trunk_sizes), activation,
+                _section_format('trunk'), start_index, **kwargs)
 
-        logits = [
-            logit_heads[0](
-                keras.ops.stop_gradient(layers[-1])
-                if backprop_mode == 'separate' else layers[-1])
-        ]
+        logits: list[Tensor] = []
+        for i, (section, section_sizes) in enumerate(sizes.items()):
+            if i == 0:
+                section_input = z
+            else:
+                coupling = logits[-1]
+                # Gate/sever BEFORE normalising so the normaliser's own
+                # parameters belong to — and train with — the downstream
+                # section that consumes them.
+                if coupling_gradient == 'gated':
+                    coupling = GradientGate(
+                        name='_'.join((layer_name_format[:index], section,
+                                       'coupling_gate')))(coupling)
+                elif coupling_gradient == 'blocked':
+                    coupling = keras.ops.stop_gradient(coupling)
 
-        for i, (layer_name_i, layer_sizes_i) in enumerate(layers_iterable, 1):
-            layer_name_format_new = ''.join(
-                (layer_name_format[:index], '_', layer_name_i, '_',
-                 layer_name_format[index:]))
+                norm_name = '_'.join((layer_name_format[:index], section,
+                                      'coupling_norm'))
+                if normalize_before_concat == 'regular':
+                    coupling = keras.ops.normalize(coupling, axis=-1)
+                elif normalize_before_concat == 'layer':
+                    coupling = keras.layers.LayerNormalization(
+                        name=norm_name)(coupling)
+                elif normalize_before_concat == 'batch':
+                    coupling = keras.layers.BatchNormalization(
+                        name=norm_name)(coupling)
 
-            if normalize_before_concat == 'none':
-                normalized_previous_layer = layers[-1]
-            elif normalize_before_concat == 'regular':
-                normalized_previous_layer = keras.ops.normalize(layers[-1], axis=-1)
-            elif normalize_before_concat == 'batch':
-                normalized_previous_layer = tf.keras.layers.BatchNormalization(
-                    name='_'.join(
-                        (layer_name_format[:index], layer_name_i, 'pre_batch_normalization'))
-                )(logits[-1])
-            if backprop_mode == 'separate':
-                normalized_previous_layer = keras.ops.stop_gradient(normalized_previous_layer)
+                section_input = keras.ops.concatenate(
+                    [z, coupling], axis=-1)
 
-            temp = keras.ops.concatenate([input_, normalized_previous_layer], axis=-1)
-
-            layers.append(
-                TF2UtilsMixin.mlp_functional(
-                    temp, layer_sizes_i, activation, layer_name_format_new,
-                    start_index, **kwargs)
-            )
-
-            logits.append(
-                logit_heads[i](
-                    keras.ops.stop_gradient(layers[-1])
-                    if backprop_mode == 'separate' else layers[-1])
-            )
+            hidden = TF2UtilsMixin.mlp_functional(
+                section_input, tuple(section_sizes), activation,
+                _section_format(section), start_index, **kwargs)
+            logits.append(keras.layers.Dense(
+                action_per_head[i], activation=head_activation,
+                name=output_name_format.format(name=section))(hidden))
 
         return tuple(logits)
 

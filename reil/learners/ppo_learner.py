@@ -899,6 +899,12 @@ class PPOLearner(Learner[FeatureSet, ACLabelType]):
         # 1e-4 chosen as the "effectively zero" threshold. The L2-of-L2
         # regularizer pushes eliminated neurons' norms toward 0; anything
         # above 1e-4 still produces a non-negligible logit contribution.
+        # TANDEM CAVEAT: for PPOTandemModel the regularizer forges the DOSE
+        # head only, so this count includes a CONSTANT offset = the duration
+        # head width (those neurons are never eliminated). Subtract
+        # action_per_head[1] (or count only the dose slice
+        # per_neuron_l2[:action_per_head[0]]) for the true dose-actions-alive.
+        # Single-head models are all-dose, so no offset applies there.
         metrics['n_actions_alive'] = float((per_neuron_l2 > 1e-4).sum())
 
         # Batch policy entropy on the current training mini-batch. Unlike

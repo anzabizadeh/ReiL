@@ -413,7 +413,9 @@ class Agent(BaseAgent, Generic[InputType, LabelType]):
                         self._computed_metrics.update(m)
                         learned_this_trajectory = learned_this_trajectory or bool(m)
 
-                    new_observation.reward = (yield None)['reward']
+                    _r = (yield None)
+                    new_observation.reward = _r['reward']
+                    new_observation.reward_2 = _r.get('reward_2')
 
                     history.append(new_observation)
 

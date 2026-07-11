@@ -55,6 +55,20 @@ state_definitions: dict[str, DefComponents] = {
             ('INR_history', {'length': i + 1}),
             ('duration_history', {'length': i}))
         for i in range(1, 4)},
+
+    # Paper-3 stability-augmented policy state: no_patient_w_dosing_01 PLUS the
+    # decision-time consecutive-in-range-days counter `s` -- the exact signal the
+    # safety-ramp reward's tau_safe depends on. Without it the duration head is
+    # blind to the stability that sets the reward-optimal interval and defaults
+    # to tau=1 (see 230_paper3_duration_reward_findings.md). `at_decision=True`
+    # gives the correct decision-time `s` (offset 0, not the reward offset).
+    **{
+        f'no_patient_w_dosing_stab_{i:02}': (
+            ('dose_history', {'length': i}),
+            ('INR_history', {'length': i + 1}),
+            ('duration_history', {'length': i}),
+            ('consecutive_in_range', {'at_decision': True}))
+        for i in range(1, 4)},
     **{
         f'patient_w_dosing_{i:02}': (
             *patient_basic,
@@ -72,6 +86,22 @@ state_definitions: dict[str, DefComponents] = {
             ('duration_history', {'length': i}))
         for i in range(1, 4)},
 
+    # Paper-3 stability-augmented FULL state (env `state_name`): the 2-phase
+    # agent builds this superset then pops it down to `main_state_def`'s
+    # features, so `consecutive_in_range` must live here too (else it is never
+    # present to keep). Mirror of patient_w_dosing_w_baseline_* + `s`; pairs with
+    # main_state_def=no_patient_w_dosing_stab_*. Keeps `day` for the 2-phase
+    # init/main switch. `at_decision=True` -> decision-time `s`.
+    **{
+        f'patient_w_dosing_w_baseline_stab_{i:02}': (
+            *patient_basic, *patient_extra,
+            ('day', {}),
+            ('dose_history', {'length': i}),
+            ('INR_history', {'length': i + 1}),
+            ('duration_history', {'length': i}),
+            ('consecutive_in_range', {'at_decision': True}))
+        for i in range(1, 4)},
+
     'patient_w_full_dosing': (
         *patient_w_sensitivity,
         ('day', {}),
@@ -82,6 +112,18 @@ state_definitions: dict[str, DefComponents] = {
     'daily_INR': (('daily_INR_history', {'length': -1}),),
 
     'recent_daily_INR': (('INR_within', {'length': 1}),),
+    # Reward state for the dose-duration SAFETY reward: the window's daily INR
+    # (via INR_within) PLUS the last two per-decision doses, so the reward can
+    # read the dose change Delta = |dose[-1]/dose[-2]-1| for its safety ceiling.
+    'recent_daily_INR_w_dose': (
+        ('INR_within', {'length': 1}),
+        ('dose_history', {'length': 2})),
+    # + the consecutive-in-range-days stability counter `s`, for the safety-RAMP
+    # reward (tau_safe climbs a retesting ladder with s, Aurora-style).
+    'recent_daily_INR_w_dose_stab': (
+        ('INR_within', {'length': 1}),
+        ('dose_history', {'length': 2}),
+        ('consecutive_in_range', {})),
 
     'Measured_INR_2': (
         ('INR_history', {'length': 2}),
@@ -105,6 +147,16 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
             center=2.5, band_width=1.0, exclude_first=False),
         'recent_daily_INR'
     ),
+    # Paper-3 per-head DOSE reward (2026-07-09): AVERAGE square distance
+    # (average=True -> -c*mean_t dev^2), so control quality is length-invariant
+    # and a longer interval is not structurally penalised for spanning more days.
+    sq_dist_avg=(
+        reil_functions.NormalizedSquareDistance(
+            name='sq_dist_avg', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0,  interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False, average=True),
+        'recent_daily_INR'
+    ),
 
     # ------------------------------------------------------------------
     # Paper-3 additive dose-duration reward (plan 200 §3):
@@ -112,8 +164,10 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
     # Same square-distance cost as `sq_dist`, plus a flat +lambda*tau interval
     # bonus. `lambda` (duration_coef) is the dose-duration trade-off dial; the
     # indifference deviation is delta* = sqrt(lambda / c). lambda=0 reproduces
-    # `sq_dist` exactly. Grid = the D2 lambda-sweep {0, .15, .25, .5, 1, 1.5}
-    # (delta* ~ 0..0.61). Supersedes `custom_distance_4` for Paper-3 runs.
+    # `sq_dist` exactly. Grid = the D2 lambda-sweep {0, .15, .25, .5, 1, 1.5, 2,
+    # 3, 5} (delta* ~ 0..1.12). Supersedes `custom_distance_4` for Paper-3 runs.
+    # (2/3/5 added 2026-07-06 to explore higher lambda: NEWDOSE lengthens tau at
+    # lambda>=1.5; EXPDOSE does not — see plan 200 §4 / the lambda-sweep memory.)
     # ------------------------------------------------------------------
     **{
         f'sq_dist_dur_l{tag}': (
@@ -127,7 +181,220 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
         for tag, lam in (
             ('0p00', 0.0), ('0p15', 0.15), ('0p25', 0.25),
             ('0p50', 0.5), ('1p00', 1.0), ('1p50', 1.5),
+            ('1p75', 1.75), ('2p00', 2.0), ('2p25', 2.25),
+            ('2p50', 2.5), ('2p75', 2.75), ('3p00', 3.0), ('5p00', 5.0),
         )
+    },
+
+    # ------------------------------------------------------------------
+    # Dose-duration SAFETY reward (Paper 3, 2026-07-07): lambda*tau - c*Sigma
+    # dev^2 - rho*max(0, tau - tau_safe(Delta, mu0))^2. tau_safe = long (28) if
+    # stable (in range, no dose change), medium (7) if small change in range,
+    # short (2) if big change or out-of-range INR. Reads dose_history for Delta
+    # via the `recent_daily_INR_w_dose` state def. Sweep over (lambda, rho).
+    # ------------------------------------------------------------------
+    **{
+        f'dd_safe_l{lt}_r{rt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_safe_l{lt}_r{rt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                dose_var_name='dose_history',
+                tau_short=2.0, tau_med=7.0, tau_long=28.0,
+                delta_zero=0.05, delta_big=0.30,
+                range_lo=2.0, range_hi=3.0),
+            'recent_daily_INR_w_dose'
+        )
+        for lt, lam in (('1p00', 1.0), ('1p50', 1.5), ('2p00', 2.0))
+        for rt, rho in (('1p00', 1.0), ('2p00', 2.0), ('4p00', 4.0))
+    },
+
+    # Form B (symmetric target): r = -c*Sigma dev^2 - rho*(tau - tau_safe)^2,
+    # duration_coef=0 (tau_safe encodes the interval preference). Penalises BOTH
+    # over- and under-shooting tau_safe -> removes the tau=1 safe-harbor that
+    # collapsed Form A (dd_safe_*). Small rho keeps it on the control-term scale.
+    **{
+        f'dd_targ_r{rt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_targ_r{rt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=0.0, safety_coef=rho, symmetric=True,
+                dose_var_name='dose_history',
+                tau_short=2.0, tau_med=7.0, tau_long=28.0,
+                delta_zero=0.05, delta_big=0.30,
+                range_lo=2.0, range_hi=3.0),
+            'recent_daily_INR_w_dose'
+        )
+        for rt, rho in (('0p02', 0.02), ('0p05', 0.05), ('0p10', 0.1), ('0p20', 0.2))
+    },
+
+    # SAFETY-RAMP reward (Paper 3, 2026-07-07, Aurora/Intermountain-informed):
+    # r = lambda*tau - c*Sigma dev^2 - rho*(tau - tau_safe(zone, s))^2. Ramp
+    # tau_safe: big-change/far-off -> 2, mildly off -> 5, in range -> largest
+    # ladder rung <= s (consecutive in-range days). Reads `consecutive_in_range`
+    # via `recent_daily_INR_w_dose_stab`. Small lambda offsets the control term's
+    # short-tau pull; the symmetric penalty centres tau on the current rung.
+    **{
+        f'dd_ramp_l{lt}_r{rt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_ramp_l{lt}_r{rt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                symmetric=True, ramp=True,
+                dose_var_name='dose_history',
+                stab_var_name='consecutive_in_range',
+                delta_big=0.30, tau_short=2.0, tau_mild=5.0,
+                far_lo=1.5, far_hi=4.0, range_lo=2.0, range_hi=3.0,
+                ladder=(1, 3, 7, 14, 28)),
+            'recent_daily_INR_w_dose_stab'
+        )
+        for lt, lam in (('0p30', 0.3), ('0p50', 0.5), ('1p50', 1.5))
+        for rt, rho in (('0p10', 0.1), ('0p30', 0.3), ('0p50', 0.5), ('1p00', 1.0))
+    },
+
+    # Paper-3 per-head DURATION reward (2026-07-09): ramp safety reward with the
+    # control term DROPPED (include_control=False) -> r = lambda*tau - rho*(tau -
+    # tau_safe(s))^2. Pure burden vs safety; control is the dose head's job.
+    **{
+        f'dd_ramp_nc_l{lt}_r{rt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_ramp_nc_l{lt}_r{rt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                symmetric=True, ramp=True, include_control=False,
+                dose_var_name='dose_history',
+                stab_var_name='consecutive_in_range',
+                delta_big=0.30, tau_short=2.0, tau_mild=5.0,
+                far_lo=1.5, far_hi=4.0, range_lo=2.0, range_hi=3.0,
+                ladder=(1, 3, 7, 14, 28)),
+            'recent_daily_INR_w_dose_stab'
+        )
+        for lt, lam in (('0p50', 0.5), ('1p50', 1.5))
+        for rt, rho in (('0p50', 0.5), ('1p00', 1.0))
+    },
+
+    # Paper-3 per-head DURATION reward with HUBER safety penalty (2026-07-09):
+    #   r = lambda*tau - rho*Huber_delta(tau - tau_safe(s))   (no control term)
+    # Quadratic near tau_safe, linear beyond delta -> bounded gradient removes
+    # the catastrophic-guess variance that pinned tau=1 under the quadratic
+    # penalty. lambda(lt) x rho(rt) x delta(dt) grid.
+    **{
+        f'dd_huber_l{lt}_r{rt}_d{dt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_huber_l{lt}_r{rt}_d{dt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                symmetric=True, ramp=True, include_control=False,
+                penalty_shape='huber', huber_delta=float(dd),
+                dose_var_name='dose_history',
+                stab_var_name='consecutive_in_range',
+                delta_big=0.30, tau_short=2.0, tau_mild=5.0,
+                far_lo=1.5, far_hi=4.0, range_lo=2.0, range_hi=3.0,
+                ladder=(1, 3, 7, 14, 28)),
+            'recent_daily_INR_w_dose_stab'
+        )
+        for lt, lam in (('1p50', 1.5), ('2p50', 2.5), ('3p50', 3.5))
+        for rt, rho in (('0p50', 0.5), ('1p00', 1.0))
+        for dt, dd in (('2', 2.0), ('3', 3.0))
+    },
+
+    # Paper-3 per-head DURATION reward, Huber + IN-RANGE FLOOR of 7 (2026-07-10).
+    # ladder=(7,14,28): in-range tau_safe = 7 (Paper-2's constant-7 default),
+    # climbing to 14 (s>=14) / 28 (s>=28); mildly-off -> tau_mild(5), far-off /
+    # big-change -> tau_short(2). So durations default to WEEKLY when in range and
+    # drop <7 only for genuine instability -- the "mostly >=7 with flexibility"
+    # target. lambda(lt) x rho(rt) x delta(dt) grid.
+    **{
+        f'dd_hub7_l{lt}_r{rt}_d{dt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_hub7_l{lt}_r{rt}_d{dt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                symmetric=True, ramp=True, include_control=False,
+                penalty_shape='huber', huber_delta=float(dd),
+                dose_var_name='dose_history',
+                stab_var_name='consecutive_in_range',
+                delta_big=0.30, tau_short=2.0, tau_mild=5.0,
+                far_lo=1.5, far_hi=4.0, range_lo=2.0, range_hi=3.0,
+                ladder=(7, 14, 28)),
+            'recent_daily_INR_w_dose_stab'
+        )
+        for lt, lam in (('1p00', 1.0), ('1p50', 1.5), ('2p50', 2.5))
+        for rt, rho in (('0p50', 0.5), ('1p00', 1.0))
+        for dt, dd in (('3', 3.0),)
+    },
+
+    # Paper-3 reward-form sweep (2026-07-11) — floor-7 variants for a clean
+    # joint-vs-separate x huber-vs-quadratic comparison on the dense 1..28 grid.
+    #   dd_q7   : separate/per-head, QUADRATIC penalty, no control term
+    #             (the non-huber analogue of dd_hub7 at the same floor-7 ladder).
+    **{
+        f'dd_q7_l{lt}_r{rt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_q7_l{lt}_r{rt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                symmetric=True, ramp=True, include_control=False,
+                penalty_shape='quadratic',
+                dose_var_name='dose_history',
+                stab_var_name='consecutive_in_range',
+                delta_big=0.30, tau_short=2.0, tau_mild=5.0,
+                far_lo=1.5, far_hi=4.0, range_lo=2.0, range_hi=3.0,
+                ladder=(7, 14, 28)),
+            'recent_daily_INR_w_dose_stab'
+        )
+        for lt, lam in (('1p50', 1.5), ('2p50', 2.5))
+        for rt, rho in (('0p50', 0.5), ('1p00', 1.0))
+    },
+    #   dd_hub7c / dd_q7c : JOINT (shared) — keep the control term (average=True
+    #             for length-invariance) so a single shared reward drives BOTH
+    #             heads (dose via avg control, duration via lambda*tau - safety).
+    #             c=huber, q=quadratic penalty. For reward_name= (no per-head).
+    **{
+        f'dd_hub7c_l{lt}_r{rt}_d{dt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_hub7c_l{lt}_r{rt}_d{dt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                symmetric=True, ramp=True, include_control=True, average=True,
+                penalty_shape='huber', huber_delta=float(dd),
+                dose_var_name='dose_history',
+                stab_var_name='consecutive_in_range',
+                delta_big=0.30, tau_short=2.0, tau_mild=5.0,
+                far_lo=1.5, far_hi=4.0, range_lo=2.0, range_hi=3.0,
+                ladder=(7, 14, 28)),
+            'recent_daily_INR_w_dose_stab'
+        )
+        for lt, lam in (('2p50', 2.5),)
+        for rt, rho in (('1p00', 1.0),)
+        for dt, dd in (('3', 3.0),)
+    },
+    **{
+        f'dd_q7c_l{lt}_r{rt}': (
+            reil_functions.DoseDurationSafetyReward(
+                name=f'dd_q7c_l{lt}_r{rt}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                duration_coef=lam, safety_coef=rho,
+                symmetric=True, ramp=True, include_control=True, average=True,
+                penalty_shape='quadratic',
+                dose_var_name='dose_history',
+                stab_var_name='consecutive_in_range',
+                delta_big=0.30, tau_short=2.0, tau_mild=5.0,
+                far_lo=1.5, far_hi=4.0, range_lo=2.0, range_hi=3.0,
+                ladder=(7, 14, 28)),
+            'recent_daily_INR_w_dose_stab'
+        )
+        for lt, lam in (('2p50', 2.5),)
+        for rt, rho in (('1p00', 1.0),)
     },
 
     sq_dist_modified=(
@@ -1204,3 +1471,47 @@ class Warfarin(DosingSubject):
         durations = self._get_history('duration_history', length).value
         return self._get_history(
             'daily_INR_history', sum(durations))  # type: ignore
+
+    def _sub_comp_consecutive_in_range(
+            self, _id: int, lo: float = 2.0, hi: float = 3.0,
+            at_decision: bool = False, **kwargs: Any
+    ) -> Feature:
+        '''Consecutive in-range (INR in [lo, hi]) days -- the stability signal
+        `s` (a daily-INR-derived proxy for Aurora's `number_of_stable_days`).
+
+        Two evaluation contexts, selected by `at_decision`:
+
+        * `at_decision=False` (default -- REWARD use): the reward runs AFTER
+          `_take_effect` advanced `self._day` to the END of the just-chosen
+          window, so counting from `self._day` would fold in the current
+          window's outcome and retroactively excuse an over-long interval that
+          happened to stay in range. We start the backward count from the
+          DECISION day, `self._day - <current window duration>`, so `s`
+          reflects stability BEFORE this interval was chosen.
+
+        * `at_decision=True` (OBSERVATION use -- the Paper-3 stability-augmented
+          policy state): the state is queried at decision time, BEFORE
+          `_take_effect`, so `self._day` IS the decision day and the daily INRs
+          up to it are already recorded. Counting from `self._day` (offset 0) is
+          the correct decision-time `s` -- the same value the reward will see
+          for THIS decision one iteration later. Using the reward offset here
+          would return a stale `s` (one decision behind).
+
+        Read-only over `_full_measurement_history`; no state mutation.
+        '''
+        if at_decision:
+            start = self._day
+        else:
+            idx = self._decision_points_index
+            cur_dur = (self._decision_points_duration_history[idx - 1]
+                       if idx > 0 else 0)
+            start = self._day - cur_dur
+        hist = self._full_measurement_history
+        s = 0
+        for i in range(start, 0, -1):
+            if lo <= hist[i] <= hi:
+                s += 1
+            else:
+                break
+        return self.feature_gen_set['consecutive_in_range'](
+            value=min(s, self._max_day))

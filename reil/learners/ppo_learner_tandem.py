@@ -12,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import Tensor, TensorShape, TensorSpec
 
-from reil.utils.tf_utils import (JIT_COMPILE, MeanMetric,
+from reil.utils.tf_utils import (JIT_COMPILE, GradientGate, MeanMetric,
                                  SparseCategoricalAccuracyMetric,
                                  TF2UtilsMixin, entropy, logprobs, reset_metric)
 
@@ -20,7 +20,6 @@ keras = tf.keras
 
 from keras.optimizers.schedules import \
     LearningRateSchedule  # noqa: E402
-from keras.optimizers import Adam  # noqa: E402
 
 ACLabelType = tuple[tuple[tuple[int, ...], ...], float]
 
@@ -49,8 +48,9 @@ class PPOTandemModel(TF2UtilsMixin):
             actor_train_iterations: int,
             critic_train_iterations: int,
             target_kl: float,
-            training_switch: dict[str, int] | None = None,
-            backprop_mode: Literal['separate', 'shared'] = 'shared',
+            training_schedule: dict[str, int] | None = None,
+            coupling_gradient: Literal['full', 'blocked', 'gated'] = 'full',
+            head_loss_weights: tuple[float, ...] | None = None,
             actor_hidden_activation: str = 'relu',
             actor_head_activation: str | None = None,
             critic_hidden_activation: str = 'relu',
@@ -59,10 +59,34 @@ class PPOTandemModel(TF2UtilsMixin):
             max_grad_norm: float | None = None,
             critic_loss_coef: float = 1.0,
             entropy_loss_coef: float = 0.0,
-            regularizer_coef: float = 0.0) -> None:
+            regularizer_coef: float = 0.0,
+            per_head_advantage: bool = False,
+            separate_critics: bool = False) -> None:
 
         super().__init__(models={})
 
+        # per_head_advantage (Paper-3 JA-2): when True, each actor head is
+        # trained on its OWN reward/advantage stream and the critic outputs one
+        # value per head (dose value, duration value). The agent
+        # (PPO4WarfarinTandemPerHeadAgent) supplies returns/advantage as
+        # [batch, head_count] tensors and train_step routes them through the
+        # *_per_head train methods. Default False -> single shared advantage +
+        # scalar critic == the original tandem behaviour, byte-for-byte.
+        self._per_head_advantage = bool(per_head_advantage)
+        self._critic_output_dim = (
+            len(action_per_head) if self._per_head_advantage else 1)
+        # separate_critics (2026-07-11): build ONE independent critic body per
+        # head (fully separate value networks) instead of a single shared body
+        # with a per-head output layer. Only the input state vector is shared;
+        # each head's value function has its own hidden stack. Requires
+        # per_head_advantage (per-head returns/values). self.critic keeps the
+        # same input->[batch, head_count] signature (the per-head 1-D outputs are
+        # concatenated), so training/agent/serialization are unchanged.
+        self._separate_critics = bool(separate_critics)
+        if self._separate_critics and not self._per_head_advantage:
+            raise ValueError(
+                'separate_critics=True requires per_head_advantage=True '
+                '(separate value networks need per-head returns).')
         self._input_shape = input_shape
         self._action_per_head_units = tuple(action_per_head)
         self._action_per_head: list[Tensor] = [
@@ -82,29 +106,52 @@ class PPOTandemModel(TF2UtilsMixin):
         self._actor_train_iterations = actor_train_iterations
         self._critic_train_iterations = critic_train_iterations
 
-        self._training_switch = training_switch
-        self._training_counter: int = 0
-        if training_switch is not None:
-            self._training_sequence = list(training_switch)
-            self._current_switch = len(self._training_sequence)
+        # Training-design axes (2026-07-06 restart, user spec; Ch. 3 is a
+        # guiding document only — no back-compat with the retired
+        # backprop_mode/training_switch vocabulary):
+        #
+        # coupling_gradient — gradient routing across the section-to-section
+        #   coupling in mlp_functional_w_concat. Sections always train on
+        #   their own head's loss; a trunk (optional 'trunk' entry in
+        #   actor_layer_sizes) always trains from every head:
+        #   'full' (was 'all'), 'blocked' (was 'shared'),
+        #   'gated' (was 'separate'; schedule-driven, == 'blocked' without a
+        #   training_schedule).
+        #
+        # head_loss_weights — per-head multiplier on the PPO + entropy loss
+        #   (None = all 1.0). E.g. (0.0, 1.0) with coupling_gradient='full'
+        #   = "downstream-only": everything trains solely through the last
+        #   head's loss (dissertation §3.2.2's 'shared', now expressible).
+        #
+        # training_schedule — alternating-freeze phases {name: train steps},
+        #   cycled in key order (was training_switch, which never worked:
+        #   layer.trainable toggles cannot reach the once-traced train_actor).
+        #   Phase names: 'all', 'trunk', 'heads', a section name, or any
+        #   layer-name substring. See _apply_training_phase.
+        if coupling_gradient not in ('full', 'blocked', 'gated'):
+            raise ValueError(
+                f'Unknown coupling_gradient {coupling_gradient!r}. Use '
+                "'full' (was backprop_mode 'all'), 'blocked' (was 'shared') "
+                "or 'gated' (was 'separate').")
+        self._coupling_gradient: Literal['full', 'blocked', 'gated'] = \
+            coupling_gradient
 
-        # backprop_mode routes gradients through the dose->duration coupling in
-        # mlp_functional_w_concat, which branches ONLY on == 'separate':
-        #   'separate' - stop_gradient before every head AND on the coupling, so
-        #                only the output Dense heads train (both trunks stay at
-        #                init; a random-feature regime). No dose<->duration grad.
-        #   'shared'   - no stop_gradient: full backprop, so the duration loss
-        #                also trains the (upstream) dose trunk. The stabilising
-        #                shared representation.
-        # 'all' was a THIRD name that the code never distinguished from 'shared'
-        # (verified 2026-07-06: bit-identical trained-variable set) — for a
-        # 2-head tandem there is only the one dose trunk to share, so any
-        # "shared vs all" distinction collapses, and the N-head chained-coupling
-        # variant that could differ was never implemented. Removed as a distinct
-        # mode; aliased to 'shared' so older configs / pickles still load.
-        if backprop_mode == 'all':
-            backprop_mode = 'shared'
-        self._backprop_mode: Literal['separate', 'shared'] = backprop_mode
+        if head_loss_weights is None:
+            head_loss_weights = tuple(1.0 for _ in action_per_head)
+        if len(head_loss_weights) != len(action_per_head):
+            raise ValueError(
+                f'head_loss_weights needs one weight per head: got '
+                f'{head_loss_weights} for {len(action_per_head)} heads.')
+        self._head_loss_weights = tuple(float(w) for w in head_loss_weights)
+        self._head_loss_weights_t: Tensor = tf.constant(
+            self._head_loss_weights, dtype=tf.float32,
+            name='head_loss_weights')
+
+        self._training_schedule = training_schedule
+        self._training_counter: int = 0
+        if training_schedule is not None:
+            self._training_sequence = list(training_schedule)
+            self._current_phase = len(self._training_sequence)
         self._clip_ratio: Tensor | None
         self._critic_clip_range: Tensor | None
         self._max_grad_norm: Tensor | None
@@ -137,12 +184,16 @@ class PPOTandemModel(TF2UtilsMixin):
 
         self._build_networks()
 
-        self._training_switch = training_switch
-        if training_switch is not None:
-            self._freeze_layers()
+        self._init_training_schedule_state()
+        if training_schedule is not None:
+            self._advance_training_phase()
+        elif coupling_gradient == 'gated':
+            self._logger.warning(
+                "coupling_gradient='gated' without a training_schedule "
+                "behaves exactly like 'blocked' (the gate stays closed).")
 
-        optimizer = keras.optimizers.Adam if self._training_switch is None else Adam
-        self._actor_optimizer = optimizer(learning_rate=self._actor_learning_rate)  # type: ignore
+        self._actor_optimizer = keras.optimizers.Adam(
+            learning_rate=self._actor_learning_rate)  # type: ignore
         self._critic_optimizer = keras.optimizers.Adam(
             learning_rate=self._critic_learning_rate)  # type: ignore
 
@@ -161,6 +212,36 @@ class PPOTandemModel(TF2UtilsMixin):
             'actor': type(self.actor),
             'critic': type(self.critic)}
 
+    def _make_critic(self, input_: Tensor) -> keras.Model:
+        '''Build the critic network.
+
+        Default: a single shared body with a `critic_output_dim`-wide output
+        layer (one shared value net; per-head values are just output columns).
+
+        `separate_critics`: one INDEPENDENT body per head — only `input_` is
+        shared; each head's value function has its own hidden stack. The 1-D
+        outputs are concatenated so `self.critic(x) -> [batch, head_count]`
+        keeps the same signature (train_critic_per_head / the agent / saving
+        are unchanged).
+        '''
+        if self._separate_critics and self._critic_output_dim > 1:
+            columns = []
+            for h in range(self._critic_output_dim):
+                body = TF2UtilsMixin.mlp_functional(
+                    input_, self._critic_layer_sizes,
+                    self._critic_hidden_activation, f'critic_h{h}_{{i:0>2}}')
+                columns.append(
+                    keras.layers.Dense(1, name=f'critic_output_h{h}')(body))
+            critic_output = keras.layers.Concatenate(
+                axis=-1, name='critic_output')(columns)
+        else:
+            critic_layers = TF2UtilsMixin.mlp_functional(
+                input_, self._critic_layer_sizes,
+                self._critic_hidden_activation, 'critic_{i:0>2}')
+            critic_output = keras.layers.Dense(
+                self._critic_output_dim, name='critic_output')(critic_layers)
+        return keras.Model(inputs=input_, outputs=critic_output)
+
     def _build_networks(self):
         input_: Tensor = keras.Input(self._input_shape)  # type: ignore
         logits = TF2UtilsMixin.mlp_functional_w_concat(
@@ -169,20 +250,20 @@ class PPOTandemModel(TF2UtilsMixin):
             layer_name_format='actor_{i:0>2}',
             action_per_head=self._action_per_head_units,
             head_activation=self._actor_head_activation,
-            output_name_format='actor_output_{i:0>2}',
-            backprop_mode=self._backprop_mode,
-            normalize_before_concat='batch')
+            output_name_format='actor_{name}_output',
+            coupling_gradient=self._coupling_gradient,
+            normalize_before_concat='layer')
+        # Head layers in action_per_head order — the single source of truth
+        # for per_neuron_l2_vector, the regularizer, and 'heads' phases.
+        self._head_layer_names = [
+            f'actor_{name}_output'
+            for name in self._actor_layer_sizes if name != 'trunk']
 
         self.actor = keras.Model(
             inputs=input_,
             outputs=logits if len(logits) > 1 else tuple(logits))
 
-        critic_layers = TF2UtilsMixin.mlp_functional(
-            input_, self._critic_layer_sizes,
-            self._critic_hidden_activation, 'critic_{i:0>2}')
-        critic_output = keras.layers.Dense(
-            1, name='critic_output')(critic_layers)
-        self.critic = keras.Model(inputs=input_, outputs=critic_output)
+        self.critic = self._make_critic(input_)
 
     def __call__(self, inputs, training: bool | None = None) -> Any:
         logits = self.actor(inputs, training=training)
@@ -326,22 +407,41 @@ class PPOTandemModel(TF2UtilsMixin):
                             entropy(logits_concat[:, starts[j]:ends[j]]))
                         entropy_loss.set_shape([])
 
-                    if tf.cast(self._regularizer_coef, tf.bool):
-                        regularizer_loss = self._compute_regularizer_loss()
+                    # head_loss_weights scales head j's PPO + entropy terms
+                    # (weight 0 removes the head's own losses entirely; with
+                    # coupling_gradient='full' the head still trains through
+                    # downstream losses — the "downstream-only" regime).
+                    total_loss = tf.add(
+                        total_loss,
+                        tf.multiply(
+                            tf.gather(self._head_loss_weights_t, j),
+                            tf.add(
+                                actor_loss,
+                                tf.multiply(
+                                    tf.negative(self._entropy_loss_coef),
+                                    entropy_loss))),
+                        name='total_loss')
 
-                    total_loss = tf.add_n(
-                        [
-                            total_loss,
-                            actor_loss,
-                            tf.multiply(
-                                tf.negative(self._entropy_loss_coef),
-                                entropy_loss),
-                            tf.multiply(self._regularizer_coef, regularizer_loss)
-                        ],
-                        name='total_loss'
-                    )
+                if tf.cast(self._regularizer_coef, tf.bool):
+                    # Dose-head group-lasso, added once per iteration outside
+                    # the head loop (pre-restart it was added once per head,
+                    # scaling the coefficient by head_count). Duration is not
+                    # regularised — see _compute_regularizer_loss.
+                    regularizer_loss = self._compute_regularizer_loss()
+                    total_loss = tf.add(
+                        total_loss,
+                        tf.multiply(
+                            self._regularizer_coef, regularizer_loss),
+                        name='total_loss_w_regularizer')
 
             policy_grads = tape.gradient(total_loss, trainable_vars)
+            if self._grad_masks is not None:
+                # training_schedule freeze: masks are tf.Variables captured by
+                # this (single) trace; `_apply_training_phase` re-assigns them
+                # eagerly, so phase changes take effect without a retrace.
+                policy_grads = [
+                    None if g is None else tf.multiply(g, m)
+                    for g, m in zip(policy_grads, self._grad_masks)]
             if self._max_grad_norm is not None:
                 policy_grads, _ = tf.clip_by_global_norm(
                     policy_grads, self._max_grad_norm, name='clipped_policy_grads')
@@ -370,36 +470,48 @@ class PPOTandemModel(TF2UtilsMixin):
 
     @tf.function  # (jit_compile=False)
     def _compute_regularizer_loss(self):
+        # Group-lasso (per-output-neuron L2 of weights+bias) on the DOSE head
+        # ONLY. The regularizer is the action-forging / dose-table
+        # explainability mechanism carried over from Paper 2: it drives whole
+        # DOSE output neurons to zero to eliminate dose actions. The duration
+        # head is DELIBERATELY NOT regularized — Paper 3 does not forge or
+        # eliminate durations — so `regularizer_coef` never touches its
+        # weights. Consequence for diagnostics: the duration slice of
+        # per_neuron_l2_vector stays ~constant and inflates n_actions_alive by
+        # a fixed offset (see per_neuron_l2_vector). dose head is head 0
+        # (`_head_layer_names[0]`; the tandem is dose-first).
+        # (Pre-restart this read `actor.layers[-1]` — whichever head was
+        # topologically last, i.e. usually duration — an unintended target;
+        # a brief all-heads variant on 2026-07-06 was likewise wrong.)
+        head = self.actor.get_layer(self._head_layer_names[0])
         weights_concat = tf.concat([
-            self.actor.layers[-1].weights[0],
-            tf.expand_dims(self.actor.layers[-1].weights[1], axis=0)
-        ], axis=0, name='actor_weights')
-        regularizer_loss = tf.reduce_sum(
+            head.weights[0],
+            tf.expand_dims(head.weights[1], axis=0)
+        ], axis=0, name='dose_head_weights')
+        return tf.reduce_sum(
             tf.math.reduce_euclidean_norm(weights_concat, axis=0),
-            name='regularizer_loss'
-            # tf.reduce_max(tf.math.abs(weights_concat), axis=0)
-        )
-
-        return regularizer_loss
+            name='regularizer_loss')
 
     def per_neuron_l2_vector(self) -> Tensor:
         # Per-output-neuron L2 norm of (weights + bias) for every actor head,
-        # concatenated across heads. Length == sum(action_per_head) (e.g. 7+6
-        # = 13 for dose+duration). This is the tandem counterpart of
-        # PPOModel.per_neuron_l2_vector: that single-head version reduces the
-        # one final layer, whereas the tandem actor exposes one Dense output
-        # head per action component. The heads are named 'actor_output_<nn>'
-        # (see _build_networks / mlp_functional_w_concat); sorting by name
-        # yields action_per_head order (head 00/01 -> dose, then duration),
-        # matching the logits-concat order used in train_actor and the
-        # PPOLearner.learn diagnostics. Eager-safe; called once per train_step
-        # like the single-head version.
-        heads = sorted(
-            (layer for layer in self.actor.layers
-             if layer.name.startswith('actor_output_')),
-            key=lambda layer: layer.name)
+        # concatenated across heads in `_head_layer_names` order (==
+        # action_per_head order == the logits-concat order in train_actor).
+        # Length == sum(action_per_head) (e.g. 7+6 = 13 for dose+duration).
+        # Tandem counterpart of PPOModel.per_neuron_l2_vector. Eager-safe;
+        # called once per train_step by PPOLearner.learn diagnostics.
+        #
+        # ANALYSIS CAVEAT (action forging is DOSE-only): only the first
+        # `action_per_head[0]` entries — the DOSE slice — carry the
+        # action-elimination signal, because `_compute_regularizer_loss`
+        # penalises the dose head alone. The trailing duration entries are
+        # NEVER regularised: their norms stay ~constant, effectively never
+        # cross the 1e-4 "dead" threshold, and so add a CONSTANT offset of
+        # `action_per_head[1]` (e.g. +6) to `n_actions_alive`. For any
+        # dose-action-count analysis, slice `[:action_per_head[0]]` and treat
+        # the duration tail as a fixed baseline, not a learned quantity.
         vectors = []
-        for head in heads:
+        for name in self._head_layer_names:
+            head = self.actor.get_layer(name)
             weights_concat = tf.concat([
                 head.weights[0],
                 tf.expand_dims(head.weights[1], axis=0)
@@ -483,27 +595,276 @@ class PPOTandemModel(TF2UtilsMixin):
             self._critic_optimizer.apply_gradients(
                 zip(value_grads, trainable_vars))
 
-    def _freeze_layers(self):
+    @tf.function(
+        input_signature=(
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
+            TensorSpec(shape=[None, None], dtype=tf.int32, name='action_indices'),
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='advantage'),
+        ),
+        jit_compile=False
+    )
+    def train_actor_per_head(self, x, action_indices, advantage):  # noqa: C901
+        # Per-head twin of train_actor (JA-2). Identical body EXCEPT: advantage
+        # arrives as [batch, head_count], is normalised per-column (each head's
+        # advantage standardised on its own, so the small-variance duration
+        # signal is not swamped by the dose control variance), and head j is
+        # trained on advantage column j. Kept as a separate traced fn so the
+        # single-advantage train_actor above is untouched (fixed input sig).
+        print(f'tracing {self.__class__.__qualname__}.train_actor_per_head')
+        action_per_head = self._action_per_head
+        head_count = self._head_count
+        starts = self._starts
+        ends = self._ends
+
+        logits_concat = self._actor_logits_concat(x, action_indices)
+        initial_logprobs = self._logprobs_concat(
+            logits_concat, starts, ends, action_indices, action_per_head, head_count)
+
+        advantage_ = tf.divide(
+            advantage - tf.math.reduce_mean(advantage, axis=0),
+            tf.math.reduce_std(advantage, axis=0) + eps,
+            name='normalized_advantage_per_head')
+
+        trainable_vars = self.actor.trainable_variables
+
+        actor_loss = entropy_loss = regularizer_loss = kl = zero_float32
+        for _ in tf.range(self._actor_train_iterations):
+            total_loss = zero_float32
+            with tf.GradientTape() as tape:
+                logits_concat = self._actor_logits_concat(x, action_indices)
+                for j in tf.range(head_count):
+                    new_logprobs_j = self._logprobs_j(
+                        j, logits_concat, starts, ends, action_indices,
+                        self._action_per_head, False)
+
+                    actor_loss = self._compute_actor_loss(
+                        initial_logprobs, new_logprobs_j,
+                        tf.gather(advantage_, j, axis=1), j)
+
+                    if tf.cast(self._entropy_loss_coef, tf.bool):
+                        entropy_loss = tf.reduce_mean(
+                            entropy(logits_concat[:, starts[j]:ends[j]]))
+                        entropy_loss.set_shape([])
+
+                    total_loss = tf.add(
+                        total_loss,
+                        tf.multiply(
+                            tf.gather(self._head_loss_weights_t, j),
+                            tf.add(
+                                actor_loss,
+                                tf.multiply(
+                                    tf.negative(self._entropy_loss_coef),
+                                    entropy_loss))),
+                        name='total_loss')
+
+                if tf.cast(self._regularizer_coef, tf.bool):
+                    regularizer_loss = self._compute_regularizer_loss()
+                    total_loss = tf.add(
+                        total_loss,
+                        tf.multiply(
+                            self._regularizer_coef, regularizer_loss),
+                        name='total_loss_w_regularizer')
+
+            policy_grads = tape.gradient(total_loss, trainable_vars)
+            if self._grad_masks is not None:
+                policy_grads = [
+                    None if g is None else tf.multiply(g, m)
+                    for g, m in zip(policy_grads, self._grad_masks)]
+            if self._max_grad_norm is not None:
+                policy_grads, _ = tf.clip_by_global_norm(
+                    policy_grads, self._max_grad_norm, name='clipped_policy_grads')
+            self._actor_optimizer.apply_gradients(zip(policy_grads, trainable_vars))
+
+            logits_concat = self._actor_logits_concat(x, action_indices)
+            new_logprobs = self._logprobs_concat(
+                logits_concat, starts, ends, action_indices, action_per_head, head_count)
+            kl = .5 * tf.reduce_mean(
+                tf.square(tf.subtract(new_logprobs, initial_logprobs, name='delta_logprobs')),
+                name='kl')
+            if tf.greater(kl, self._1_5_target_kl):  # Early Stopping
+                break
+
+        self._kl.update_state(kl)
+        self._actor_loss.update_state(actor_loss)
+        if tf.cast(self._entropy_loss_coef, tf.bool):
+            self._entropy_loss.update_state(entropy_loss)
+        if tf.cast(self._regularizer_coef, tf.bool):
+            self._regularizer_loss.update_state(regularizer_loss)
+
+    @tf.function(
+        input_signature=(
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='returns'),
+        ),
+        jit_compile=JIT_COMPILE
+    )
+    def train_critic_per_head(self, x, returns):
+        # Per-head twin of train_critic. The critic outputs head_count values
+        # (self._critic_output_dim); returns is [batch, head_count]; the MSE is
+        # element-wise over both dims (column j fits head j's return stream).
+        print(f'tracing {self.__class__.__qualname__}.train_critic_per_head')
+        old_values = self.critic(x)
+        for _ in tf.range(self._critic_train_iterations):
+            with tf.GradientTape() as tape:
+                new_values = self.critic(x)
+                if self._critic_clip_range is not None:
+                    values_clipped = tf.add(
+                        old_values,
+                        tf.clip_by_value(
+                            tf.subtract(new_values, old_values, name='delta_values'),
+                            tf.negative(self._critic_clip_range, name='neg_critic_clip_range'),
+                            self._critic_clip_range),
+                        name='clipped_values'
+                    )
+                    loss_unclipped = tf.square(
+                        tf.subtract(returns, new_values, name='delta_return'),
+                        name='square_delta_return')
+                    loss_clipped = tf.square(
+                        tf.subtract(returns, values_clipped, name='delta_clipped_return'),
+                        name='square_delta_clipped_return')
+                    critic_loss = tf.multiply(
+                        0.5,
+                        tf.reduce_mean(tf.maximum(loss_unclipped, loss_clipped)),
+                        name='clipped_critic_loss'
+                    )
+                else:
+                    critic_loss = tf.reduce_mean(
+                        tf.square(tf.subtract(returns, new_values, name='delta_return')),
+                        name='critic_loss')
+
+            self._critic_loss.update_state(critic_loss)
+            trainable_vars = self.critic.trainable_variables
+            value_grads = tape.gradient(critic_loss, trainable_vars)
+            if self._max_grad_norm is not None:
+                value_grads, _ = tf.clip_by_global_norm(
+                    value_grads, self._max_grad_norm, name='clipped_value_grads')
+
+            self._critic_optimizer.apply_gradients(
+                zip(value_grads, trainable_vars))
+
+    def _init_training_schedule_state(self) -> None:
+        '''(Re)create the runtime freeze state for `training_schedule`.
+
+        One non-trainable 0/1 mask variable per actor trainable variable.
+        `train_actor` is a `tf.function` traced ONCE (fixed input signature),
+        so toggling `layer.trainable` can never reach the traced graph — the
+        retired training_switch silently did nothing after the first trace.
+        Mask variables are captured by the trace and re-assigned eagerly on a
+        phase change, so what trains changes at runtime without a retrace and
+        without disturbing the optimizer's variable list.
+
+        Not pickled — `__setstate__` rebuilds this against the reloaded actor.
+        '''
+        self._has_trunk = any(
+            '_trunk_' in layer.name for layer in self.actor.layers)
+        if self._training_schedule is None:
+            self._grad_masks: list[tf.Variable] | None = None
+            self._mask_index: dict[Any, int] = {}
+            self._gate_layers: list[GradientGate] = []
+            return
+
+        trainable_vars = self.actor.trainable_variables
+        self._grad_masks = [
+            tf.Variable(1.0, trainable=False, dtype=tf.float32,
+                        name=f'grad_mask_{i:03d}')
+            for i in range(len(trainable_vars))]
+        # Keyed by id(): Keras-3 Variables have no .ref(); the map only ever
+        # addresses these exact live objects and is rebuilt on load.
+        self._mask_index = {
+            id(v): i for i, v in enumerate(trainable_vars)}
+        self._gate_layers = [
+            layer for layer in self.actor.layers
+            if isinstance(layer, GradientGate)]
+
+    def _advance_training_phase(self):
         self._training_counter = 0
-        self._current_switch += 1
-        if self._current_switch >= len(self._training_sequence):
-            self._current_switch = 0
-        part = self._training_sequence[self._current_switch]
+        self._current_phase += 1
+        if self._current_phase >= len(self._training_sequence):
+            self._current_phase = 0
+        self._apply_training_phase()
+
+    def _phase_trains_layer(self, phase: str, layer_name: str) -> bool:
+        '''Whether `phase` (a `training_schedule` key) trains `layer_name`.
+
+        - `'all'`     — every layer.
+        - `'heads'`   — the Dense output heads (`'_output'` in the name).
+        - `'trunk'`   — the shared trunk (`'_trunk_'` layers) when one
+                        exists; without a trunk, every non-head layer (the
+                        hidden stacks — the de-facto trunk).
+        - otherwise   — substring match; sections are addressable by name
+                        because heads carry their section ('dose' matches
+                        'actor__dose_01' AND 'actor_dose_output').
+        '''
+        if phase == 'all':
+            return True
+        if phase == 'heads':
+            return '_output' in layer_name
+        if phase == 'trunk':
+            if self._has_trunk:
+                return '_trunk_' in layer_name
+            return '_output' not in layer_name
+        return phase in layer_name
+
+    def _apply_training_phase(self) -> None:
+        '''Set gradient masks (and coupling gates) for the current phase.
+
+        Gates ('gated' coupling only) OPEN during `'all'` and `'trunk'`
+        phases — the trunk absorbs every head's advantage, including through
+        the coupling — and stay closed in every other phase (own-loss
+        training). Frozen == zero gradient; with Adam, a group that trained
+        in the previous phase keeps a decaying momentum tail for a few steps
+        (~0.9^t); a group frozen from the start never moves.
+        '''
+        part = self._training_sequence[self._current_phase]
+        assert self._grad_masks is not None
+        matched = 0
         for layer in self.actor.layers:
-            layer.trainable = (part in layer.name) or (part == 'all')
+            flag = 1.0 if self._phase_trains_layer(part, layer.name) else 0.0
+            for weight in layer.trainable_weights:
+                self._grad_masks[self._mask_index[id(weight)]].assign(flag)
+                matched += flag != 0.0
+        if not matched:
+            self._logger.warning(
+                f'training_schedule phase {part!r} matches no trainable '
+                'actor weights — nothing will train until the next phase.')
+
+        gate_value = 1.0 if part in ('all', 'trunk') else 0.0
+        for gate_layer in self._gate_layers:
+            gate_layer.gate.assign(gate_value)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        # Runtime handles into the live actor graph — rebuilt on load.
+        for key in ('_grad_masks', '_mask_index', '_gate_layers'):
+            state.pop(key, None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        super().__setstate__(state)
+        self._init_training_schedule_state()
+        if self._training_schedule is not None:
+            self._apply_training_phase()
 
     def train_step(self, data):
         x, (action_indices, returns, advantage) = data
         self._training_counter += 1
-        if self._training_switch is not None and (
-                self._training_counter >= self._training_switch[
-                    self._training_sequence[self._current_switch]]):
-            self._freeze_layers()
-            print({layer.name: layer.trainable for layer in self.actor.layers})
-            # self._actor_optimizer.build(self.actor.trainable_variables)
+        if self._training_schedule is not None and (
+                self._training_counter >= self._training_schedule[
+                    self._training_sequence[self._current_phase]]):
+            self._advance_training_phase()
+            print(
+                'training schedule -> phase '
+                f'{self._training_sequence[self._current_phase]!r}')
 
-        self.train_actor(x, action_indices, advantage)
-        self.train_critic(x, returns)
+        if self._per_head_advantage:
+            # advantage / returns arrive as [batch, head_count]; each head
+            # trains on its own column (dose -> control reward, duration ->
+            # burden+safety reward).
+            self.train_actor_per_head(x, action_indices, advantage)
+            self.train_critic_per_head(x, returns)
+        else:
+            self.train_actor(x, action_indices, advantage)
+            self.train_critic(x, returns)
 
         metrics = {
             'actor_loss': self._actor_loss.result(),
@@ -574,31 +935,38 @@ class PPOTandemConditionalModel(PPOTandemModel):
         input_: Tensor = keras.Input(self._input_shape, name='state')  # type: ignore
         signal_in: Tensor = keras.Input((1,), name='dose_signal')  # type: ignore
 
-        dose_trunk = TF2UtilsMixin.mlp_functional(
-            input_, self._actor_layer_sizes['dose'],
+        # Optional shared trunk: z replaces the raw state as both sections'
+        # input. The dose signal stays derived from the RAW state (the
+        # normalised dose feature lives there, not in z).
+        z: Tensor = input_
+        trunk_sizes = self._actor_layer_sizes.get('trunk')
+        if trunk_sizes:
+            z = TF2UtilsMixin.mlp_functional(
+                input_, tuple(trunk_sizes),
+                self._actor_hidden_activation, 'actor__trunk_{i:0>2}')
+
+        dose_stack = TF2UtilsMixin.mlp_functional(
+            z, self._actor_layer_sizes['dose'],
             self._actor_hidden_activation, 'actor__dose_{i:0>2}')
         dose_logits = keras.layers.Dense(
             self._action_per_head_units[0],
             activation=self._actor_head_activation,
-            name='actor_output_00')(dose_trunk)
+            name='actor_dose_output')(dose_stack)
 
-        dur_input = keras.layers.Concatenate(axis=-1)([input_, signal_in])
-        dur_trunk = TF2UtilsMixin.mlp_functional(
+        dur_input = keras.layers.Concatenate(axis=-1)([z, signal_in])
+        dur_stack = TF2UtilsMixin.mlp_functional(
             dur_input, self._actor_layer_sizes['duration'],
             self._actor_hidden_activation, 'actor__duration_{i:0>2}')
         dur_logits = keras.layers.Dense(
             self._action_per_head_units[1],
             activation=self._actor_head_activation,
-            name='actor_output_01')(dur_trunk)
+            name='actor_duration_output')(dur_stack)
 
+        self._head_layer_names = ['actor_dose_output', 'actor_duration_output']
         self.actor = keras.Model(
             inputs=[input_, signal_in], outputs=[dose_logits, dur_logits])
 
-        critic_layers = TF2UtilsMixin.mlp_functional(
-            input_, self._critic_layer_sizes,
-            self._critic_hidden_activation, 'critic_{i:0>2}')
-        critic_output = keras.layers.Dense(1, name='critic_output')(critic_layers)
-        self.critic = keras.Model(inputs=input_, outputs=critic_output)
+        self.critic = self._make_critic(input_)
 
     def _dose_signal(self, x: Tensor, dose_idx: Tensor) -> Tensor:
         '''dose_idx: int tensor [batch] -> signal [batch, 1] float.
@@ -710,30 +1078,38 @@ class PPOTandemExpectedDoseModel(PPOTandemModel):
 
     def _build_networks(self):
         input_: Tensor = keras.Input(self._input_shape, name='state')  # type: ignore
-        dose_trunk = TF2UtilsMixin.mlp_functional(
-            input_, self._actor_layer_sizes['dose'],
+
+        # Optional shared trunk (z feeds both sections). ExpectedDoseSignal
+        # keeps reading the RAW state — the dose feature index addresses the
+        # state layout, not the latent.
+        z: Tensor = input_
+        trunk_sizes = self._actor_layer_sizes.get('trunk')
+        if trunk_sizes:
+            z = TF2UtilsMixin.mlp_functional(
+                input_, tuple(trunk_sizes),
+                self._actor_hidden_activation, 'actor__trunk_{i:0>2}')
+
+        dose_stack = TF2UtilsMixin.mlp_functional(
+            z, self._actor_layer_sizes['dose'],
             self._actor_hidden_activation, 'actor__dose_{i:0>2}')
         dose_logits = keras.layers.Dense(
             self._action_per_head_units[0],
             activation=self._actor_head_activation,
-            name='actor_output_00')(dose_trunk)
+            name='actor_dose_output')(dose_stack)
 
         signal = ExpectedDoseSignal(
             self._dose_values_list, self._dose_feature_index, self._dose_range,
             name='expected_dose_signal')([input_, dose_logits])
-        dur_input = keras.layers.Concatenate(axis=-1)([input_, signal])
-        dur_trunk = TF2UtilsMixin.mlp_functional(
+        dur_input = keras.layers.Concatenate(axis=-1)([z, signal])
+        dur_stack = TF2UtilsMixin.mlp_functional(
             dur_input, self._actor_layer_sizes['duration'],
             self._actor_hidden_activation, 'actor__duration_{i:0>2}')
         dur_logits = keras.layers.Dense(
             self._action_per_head_units[1],
             activation=self._actor_head_activation,
-            name='actor_output_01')(dur_trunk)
+            name='actor_duration_output')(dur_stack)
 
+        self._head_layer_names = ['actor_dose_output', 'actor_duration_output']
         self.actor = keras.Model(inputs=input_, outputs=[dose_logits, dur_logits])
 
-        critic_layers = TF2UtilsMixin.mlp_functional(
-            input_, self._critic_layer_sizes,
-            self._critic_hidden_activation, 'critic_{i:0>2}')
-        critic_output = keras.layers.Dense(1, name='critic_output')(critic_layers)
-        self.critic = keras.Model(inputs=input_, outputs=critic_output)
+        self.critic = self._make_critic(input_)

@@ -149,6 +149,146 @@ class DurationIncentiveSquareDistance(NormalizedSquareDistance):
 
 
 @dataclasses.dataclass
+class DoseDurationSafetyReward(DurationIncentiveSquareDistance):
+    '''Duration reward with a state-dependent SAFETY CEILING (Paper 3, 2026-07-07).
+
+        r = duration_coef * tau
+            - c * sum_t (mu_t - center)^2                      (control)
+            - safety_coef * max(0, tau - tau_safe(Delta, mu0))^2   (safety)
+
+    The first two terms are exactly `DurationIncentiveSquareDistance`
+    (lambda*tau minus the normalized square-distance cost). The third term
+    penalises scheduling the next test LATER than is clinically prudent given
+    the decision state, encoding the clinical rule that a blood draw is a
+    burden but is needed sooner when the patient is unstable. `tau_safe` is the
+    longest prudent interval:
+
+      * out of range OR big dose change      -> tau_short   (quick revision)
+      * in range AND small dose change       -> tau_med     (~ weekly)
+      * in range AND no dose change (stable)  -> tau_long    (long interval)
+
+    This gives an interior optimum at tau_safe (unlike the pure lambda*tau term,
+    which is linear and bangs to an extreme), so the medium interval (tau_med,
+    e.g. 7) becomes reward-optimal for the small-adjustment regime. It is a
+    smooth, learnable generalisation of Aurora's stable-days -> retest ladder.
+
+    Inputs beyond `y_var_name` (= daily_INR_history): the decision INR is taken
+    as the first day of the window (mu0 = y[0]); the dose change Delta is read
+    from `dose_var_name` (per-decision dose_history, length >= 2) as
+    |dose[-1]/dose[-2] - 1|. The reward's state definition must therefore
+    include `dose_history` (see `recent_daily_INR_w_dose` in warfarin.py).
+    '''
+    safety_coef: float = 0.0                 # rho
+    dose_var_name: str = 'dose_history'
+    tau_short: float = 2.0
+    tau_med: float = 7.0
+    tau_long: float = 28.0
+    delta_zero: float = 0.05                  # |Delta| below this = "no change"
+    delta_big: float = 0.30                   # |Delta| at/above this = "big change"
+    range_lo: float = 2.0
+    range_hi: float = 3.0
+    # symmetric=False (default): penalise only OVER-shooting tau_safe (the
+    #   burden-vs-safety "Form A"). This makes tau=1 a risk-free safe-harbor and
+    #   empirically collapses the policy to tau=1 (2026-07-07). symmetric=True
+    #   ("Form B"): penalise (tau - tau_safe)^2 in BOTH directions so the policy
+    #   tracks tau_safe (tau=1 is penalised when the state warrants 7). Use with
+    #   duration_coef=0 (tau_safe already encodes "long when stable") and a small
+    #   safety_coef so the penalty is on the scale of the control term.
+    symmetric: bool = False
+    # ramp=True: Aurora/Intermountain-informed tau_safe. Instead of the tiered
+    #   Form-A/B logic (stable->tau_long, small-change->tau_med, else tau_short),
+    #   tau_safe is a zone-graded reset + an IN-RANGE STABILITY RAMP that climbs
+    #   `ladder` by `s` = consecutive in-range days (read from `stab_var_name`):
+    #     big change or far off (< far_lo / > far_hi)  -> tau_short
+    #     mildly off (in [far_lo, range_lo)/(range_hi, far_hi])  -> tau_mild
+    #     in range [range_lo, range_hi]  -> largest ladder rung <= s
+    #   This reproduces Aurora's graded 7-centred distribution (the tiered form
+    #   gave a bimodal 2/28 target on real data). Use with symmetric=True.
+    ramp: bool = False
+    stab_var_name: str = 'consecutive_in_range'
+    tau_mild: float = 5.0
+    far_lo: float = 1.5
+    far_hi: float = 4.0
+    ladder: tuple = (1, 3, 7, 14, 28)
+    # include_control=True (default): keep the parent's -c*sum dev^2 control
+    #   term (r = lambda*tau - c*sum dev^2 - safety). include_control=False
+    #   (Paper-3 per-head split, 2026-07-09): DROP the control term so the
+    #   duration head's reward is PURELY burden + safety (r = lambda*tau -
+    #   safety) -- control is the dose head's job, and dropping the sum-over-days
+    #   term also removes its hidden short-tau pull.
+    include_control: bool = True
+    # penalty_shape: how the safety term penalises the gap g = tau - tau_safe.
+    #   'quadratic' (default): rho * g^2 -- gradient 2*rho*g grows without bound,
+    #       so a far-off exploration guess yields a catastrophic gradient that
+    #       collapses the policy to the tau=1 safe boundary (2026-07-09 diagnosis).
+    #   'linear': rho * |g| -- constant gradient rho; kills the variance but has
+    #       a kink at tau_safe and (since gradient is constant) bang-bangs to
+    #       tau_max whenever lambda > rho. Baseline only.
+    #   'huber': rho * g^2 for |g| <= huber_delta, else rho*(2*delta*|g| -
+    #       delta^2). Quadratic bowl near tau_safe (smooth, tunable interior
+    #       optimum) + LINEAR arms beyond delta (gradient capped at 2*rho*delta),
+    #       so rare far guesses cost a bounded amount. Tolerates lambda up to
+    #       2*rho*delta before banging. Paper-3 fix for the residual tau=1 pull.
+    penalty_shape: str = 'quadratic'
+    huber_delta: float = 3.0
+
+    def _tau_safe(self, delta: float, mu0: float, s: float) -> float:
+        if not self.ramp:
+            # tiered (Form A/B): stable->long, small change->med, else short
+            in_range = self.range_lo <= mu0 <= self.range_hi
+            if (not in_range) or (delta >= self.delta_big):
+                return self.tau_short
+            if delta >= self.delta_zero:
+                return self.tau_med
+            return self.tau_long
+        # RAMP: zone-graded reset + in-range stability ramp over `s`.
+        if delta >= self.delta_big or mu0 < self.far_lo or mu0 > self.far_hi:
+            return self.tau_short                     # big correction / far off
+        if mu0 < self.range_lo or mu0 > self.range_hi:
+            return self.tau_mild                      # mildly off
+        ts = float(self.ladder[0])                    # in range: climb by s
+        for rung in self.ladder:
+            if rung <= s:
+                ts = float(rung)
+            else:
+                break
+        return ts
+
+    def __call__(self, args: FeatureSet) -> float:
+        val = args.value
+        inr = val[self.y_var_name]           # daily INR over the window
+        tau = len(inr)                       # type: ignore
+        if self.include_control:
+            base = super().__call__(args)    # lambda*tau - c*sum dev^2
+        else:
+            base = self.duration_coef * tau  # lambda*tau only (no control term)
+        if not tau or self.safety_coef == 0.0:
+            return base
+        mu0 = float(inr[0])                   # type: ignore  decision-day INR
+        doses = val.get(self.dose_var_name)
+        delta = 0.0
+        if doses is not None and len(doses) >= 2 and doses[-2]:
+            delta = abs(float(doses[-1]) / float(doses[-2]) - 1.0)
+        s = 0.0
+        if self.ramp:
+            sv = val.get(self.stab_var_name)
+            if sv is not None:
+                s = float(sv[0] if hasattr(sv, '__len__') else sv)
+        gap = tau - self._tau_safe(delta, mu0, s)
+        if not self.symmetric:
+            gap = max(0.0, gap)
+        g = abs(gap)
+        if self.penalty_shape == 'linear':
+            penalty = g
+        elif self.penalty_shape == 'huber':
+            d = self.huber_delta
+            penalty = g * g if g <= d else (2.0 * d * g - d * d)
+        else:  # 'quadratic'
+            penalty = g * g
+        return base - self.safety_coef * penalty
+
+
+@dataclasses.dataclass
 class DeadbandSquareDistance(ReilFunction[float, int]):
     '''Squared distance from `center` with an epsilon-insensitive deadband.
 

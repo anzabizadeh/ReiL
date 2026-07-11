@@ -149,6 +149,10 @@ class InteractionProtocol:
     n: int
     unit: Literal['interaction', 'instance', 'iteration']
     lookahead: LookaheadPlan | None = None
+    # optional second reward function name (Paper-3 per-head tandem). When set,
+    # the environment also computes subject.reward(name=reward_name_2) and puts
+    # it on Observation.reward_2. Optional -> single-reward protocols unchanged.
+    reward_name_2: str | None = None
 
 
 @dataclasses.dataclass
@@ -165,6 +169,13 @@ class Observation:
     lookahead: 'LookaheadData' | None = None
     # the reward of taking the action at the state
     reward: float | None = None
+    # optional SECOND reward stream (Paper-3 per-head tandem reward): when an
+    # InteractionProtocol sets `reward_name_2`, the environment fills this with
+    # subject.reward(name=reward_name_2). Used by PPO4WarfarinTandemPerHeadAgent
+    # to give the duration head its own (burden+safety) advantage, separate from
+    # the dose head's control reward. None everywhere else -> zero behaviour
+    # change for the single-reward path (Paper 2 and default tandem).
+    reward_2: float | None = None
 
 
 History = list[Observation]
