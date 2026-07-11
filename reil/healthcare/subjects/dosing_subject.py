@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 from reil.datatypes.feature import (Feature, FeatureGenerator,
                                     FeatureGeneratorSet, FeatureSet)
+from reil.healthcare.adherence import AdherenceModel
 from reil.healthcare.subjects.health_subject import HealthSubject
 from reil.serialization import deserialize, serialize
 
@@ -33,6 +34,7 @@ class DosingSubject(HealthSubject):
             decision_range: tuple[float, float] | tuple[
                 tuple[float, float], tuple[int, int]] | None = None,
             round_to_step: bool = True,
+            adherence: AdherenceModel | None = None,
             **kwargs: Any):
         '''
         Arguments
@@ -40,6 +42,14 @@ class DosingSubject(HealthSubject):
         patient:
             A patient object that generates new patients and models
             interaction between dose and INR.
+
+        adherence:
+            An optional `AdherenceModel`. When provided (and enabled), the
+            *prescribed* daily doses are transformed into *administered* doses
+            (missed / holiday / overuse) before they reach the PK model, while
+            the recorded dose history the agent observes stays the prescribed
+            dose (adherence is hidden). `None` (default) is a no-op — the
+            simulation is identical to the pre-adherence behaviour.
 
         measurement_name:
             Name of the measured value after dose administration, e.g. BGL,
@@ -68,6 +78,11 @@ class DosingSubject(HealthSubject):
         self._dose_step = dose_step
         self._decision_values = decision_values
         self._round_to_step = round_to_step
+        self._adherence = adherence
+        # Seed the adherence phenotype for the patient built in __init__ (the
+        # first episode's patient); reset() re-seeds for each subsequent one.
+        if self._adherence is not None and self._patient is not None:
+            self._adherence.new_patient(self._patient.random_seed)
 
         self._decision_mode = decision_mode
         self._duration_mode = 'duration' in decision_mode
@@ -347,11 +362,20 @@ class DosingSubject(HealthSubject):
         current_duration = min(
             duration, self._max_day - self._day)  # type: ignore
 
+        # Prescribed daily doses for this interval. The agent records these as
+        # the dose history it observes; adherence (if any) perturbs only what
+        # is *administered* to the PK model below, staying hidden from the agent.
+        prescribed_dose = {
+            i: current_dose
+            for i in range(self._day, self._day + current_duration)
+        }
+        administered_dose = (
+            self._adherence.administer(prescribed_dose)
+            if self._adherence is not None and self._adherence.enabled
+            else prescribed_dose)
+
         measurements_temp = self._patient.model(
-            dose={
-                i: current_dose
-                for i in range(self._day, self._day + current_duration)
-            },
+            dose=administered_dose,
             measurement_days=list(
                 range(self._day, self._day + current_duration + 1)
             )
@@ -396,6 +420,10 @@ class DosingSubject(HealthSubject):
         self._full_dose_history = [0.0] * self._max_day
         self._decision_points_dose_history = [0.0] * self._max_day
         self._actions_taken = []
+        # HealthSubject.reset regenerated the patient; redraw this patient's
+        # adherence phenotype from its seed (reproducible, independent stream).
+        if self._adherence is not None and self._patient is not None:
+            self._adherence.new_patient(self._patient.random_seed)
 
     def _get_history(
             self, list_name: str, length: int, backfill: bool = False

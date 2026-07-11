@@ -49,6 +49,12 @@ class Patient:
                 self._rnd_generators, self.feature_set, **feature_values))
         self._model.setup(self._rnd_generators, self.feature_set)
 
+    @property
+    def random_seed(self) -> int | None:
+        '''The seed this patient was constructed with (identifies the patient
+        cohort member; used e.g. to seed a reproducible adherence stream).'''
+        return self._random_seed
+
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         # Created a model first to initiate the Patient. Then here replace
