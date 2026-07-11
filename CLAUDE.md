@@ -31,6 +31,11 @@ When a change to `ReiL` is motivated by a paper / dissertation requirement, link
 - **Backwards compatibility matters.** Older serialized agents (`.pkl`) need to load. If you rename or move a class, update `reil/serialization.py` with the mapping rather than breaking deserialization.
 - **No new abstractions without a justified need.** Three similar lines is better than a premature abstraction (per the project's standing rules).
 - **Tests live in `tests/`.** Run them under the Poetry env before declaring a change done.
+- **Adherence model** (`reil/healthcare/adherence.py`, `AdherenceModel`): opt-in dose-intake transform
+  hooked in `DosingSubject._take_effect` (prescribed→administered; hidden from the agent). Default off is
+  byte-identical (Hamberg parity holds). When touching the dose/subject/PK path run **both**
+  `tests/unit/test_hamberg_pkpd_parity.py` and `tests/unit/test_adherence.py`. Config surface + train/test
+  decoupling (`adherence_mode`, `test_adherence_mode`) lives in the sibling `warfarin_dosing` runner.
 - **Don't edit `warfarin_dosing/` from this repo.** If a change requires coordination, propose it and let the user run it in the sibling repo.
 
 ## Pointer back
