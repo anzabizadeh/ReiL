@@ -13,7 +13,8 @@ BATCH = 6
 
 
 def _build_model(coupling_gradient='full', training_schedule=None,
-                 head_loss_weights=None, trunk=None) -> PPOTandemModel:
+                 head_loss_weights=None, trunk=None,
+                 regularizer_coef=0.0) -> PPOTandemModel:
     layer_sizes = {'dose': (8,), 'duration': (6,)}
     if trunk:
         layer_sizes = {'trunk': trunk, **layer_sizes}
@@ -30,6 +31,7 @@ def _build_model(coupling_gradient='full', training_schedule=None,
         training_schedule=training_schedule,
         coupling_gradient=coupling_gradient,
         head_loss_weights=head_loss_weights,
+        regularizer_coef=regularizer_coef,
         clip_ratio=0.2,
     )
 
@@ -236,24 +238,37 @@ class TestDiagnostics(unittest.TestCase):
         self.assertEqual(vec.shape, (sum(HEADS),))
         self.assertTrue(np.all(np.isfinite(vec)))
 
-    def test_regularizer_targets_dose_head_only(self):
-        # Action forging is dose-only: the regularizer loss must depend on the
-        # dose head's weights and NOT the duration head's (duration actions
-        # are never eliminated). Verify via gradients.
-        model = _build_model('full')
+    def _reg_grads(self, model):
         dose_head = model.actor.get_layer('actor_dose_output')
         dur_head = model.actor.get_layer('actor_duration_output')
         with tf.GradientTape() as tape:
             reg = model._compute_regularizer_loss()
         g_dose = tape.gradient(reg, dose_head.trainable_weights)
-        # Second tape: duration-head gradient (fresh tape, reg is a new call).
         with tf.GradientTape() as tape2:
             reg2 = model._compute_regularizer_loss()
         g_dur = tape2.gradient(reg2, dur_head.trainable_weights)
-        self.assertTrue(any(
-            g is not None and float(tf.reduce_max(tf.abs(g))) > 0.0
-            for g in g_dose))
+        return g_dose, g_dur
+
+    @staticmethod
+    def _has_grad(gs):
+        return any(g is not None and float(tf.reduce_max(tf.abs(g))) > 0.0
+                   for g in gs)
+
+    def test_regularizer_scalar_targets_dose_head_only(self):
+        # A SCALAR regularizer_coef regularizes the DOSE head only (Paper-2
+        # forging default, back-compat): dose gradient present, duration None.
+        g_dose, g_dur = self._reg_grads(_build_model('full', regularizer_coef=0.1))
+        self.assertTrue(self._has_grad(g_dose))
         self.assertTrue(all(g is None for g in g_dur))
+
+    def test_regularizer_per_head_duration_only(self):
+        # A per-head [0, coef] regularizes the DURATION head only (Paper-3):
+        # duration gradient present, dose None. This is "act on each head
+        # separately".
+        g_dose, g_dur = self._reg_grads(
+            _build_model('full', regularizer_coef=[0.0, 0.5]))
+        self.assertTrue(self._has_grad(g_dur))
+        self.assertTrue(all(g is None for g in g_dose))
 
 
 if __name__ == '__main__':

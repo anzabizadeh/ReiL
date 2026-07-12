@@ -179,8 +179,29 @@ class PPOTandemModel(TF2UtilsMixin):
             critic_loss_coef, dtype=tf.float32, name='critic_loss_coef')
         self._entropy_loss_coef: Tensor = tf.constant(
             entropy_loss_coef, dtype=tf.float32, name='entropy_loss_coef')
+        # regularizer_coef: a scalar regularizes the DOSE head only (head 0 —
+        # the Paper-2 dose-forging default, back-compatible). A per-head
+        # sequence [dose_coef, duration_coef] regularizes each head separately,
+        # so Paper 3 can group-lasso the DURATION head (prune unused intervals)
+        # WITHOUT pruning the dose head.
+        if isinstance(regularizer_coef, (list, tuple)):
+            coef_list = [float(c) for c in regularizer_coef]
+            if len(coef_list) != len(action_per_head):
+                raise ValueError(
+                    f'regularizer_coef list length {len(coef_list)} != head '
+                    f'count {len(action_per_head)}')
+        else:
+            coef_list = ([float(regularizer_coef)]
+                         + [0.0] * (len(action_per_head) - 1))
+        self._reg_coef_list: list[float] = coef_list   # Python floats
+        self._regularizer_coef_vec: Tensor = tf.constant(
+            coef_list, dtype=tf.float32, name='regularizer_coef_vec')
+        # Scalar bool (constant per model) gating the regularizer branch.
+        self._regularizer_active: bool = any(c != 0.0 for c in coef_list)
+        # Back-compat scalar alias (a nonzero indicator for any external reader).
         self._regularizer_coef: Tensor = tf.constant(
-            regularizer_coef, dtype=tf.float32, name='regularizer_coef')
+            max((abs(c) for c in coef_list), default=0.0),
+            dtype=tf.float32, name='regularizer_coef')
 
         self._build_networks()
 
@@ -422,16 +443,12 @@ class PPOTandemModel(TF2UtilsMixin):
                                     entropy_loss))),
                         name='total_loss')
 
-                if tf.cast(self._regularizer_coef, tf.bool):
-                    # Dose-head group-lasso, added once per iteration outside
-                    # the head loop (pre-restart it was added once per head,
-                    # scaling the coefficient by head_count). Duration is not
-                    # regularised — see _compute_regularizer_loss.
+                if self._regularizer_active:
+                    # Per-head group-lasso added once per iteration; the per-head
+                    # coef is applied inside _compute_regularizer_loss.
                     regularizer_loss = self._compute_regularizer_loss()
                     total_loss = tf.add(
-                        total_loss,
-                        tf.multiply(
-                            self._regularizer_coef, regularizer_loss),
+                        total_loss, regularizer_loss,
                         name='total_loss_w_regularizer')
 
             policy_grads = tape.gradient(total_loss, trainable_vars)
@@ -465,32 +482,32 @@ class PPOTandemModel(TF2UtilsMixin):
         self._actor_loss.update_state(actor_loss)
         if tf.cast(self._entropy_loss_coef, tf.bool):
             self._entropy_loss.update_state(entropy_loss)
-        if tf.cast(self._regularizer_coef, tf.bool):
+        if self._regularizer_active:
             self._regularizer_loss.update_state(regularizer_loss)
 
     @tf.function  # (jit_compile=False)
     def _compute_regularizer_loss(self):
-        # Group-lasso (per-output-neuron L2 of weights+bias) on the DOSE head
-        # ONLY. The regularizer is the action-forging / dose-table
-        # explainability mechanism carried over from Paper 2: it drives whole
-        # DOSE output neurons to zero to eliminate dose actions. The duration
-        # head is DELIBERATELY NOT regularized — Paper 3 does not forge or
-        # eliminate durations — so `regularizer_coef` never touches its
-        # weights. Consequence for diagnostics: the duration slice of
-        # per_neuron_l2_vector stays ~constant and inflates n_actions_alive by
-        # a fixed offset (see per_neuron_l2_vector). dose head is head 0
-        # (`_head_layer_names[0]`; the tandem is dose-first).
-        # (Pre-restart this read `actor.layers[-1]` — whichever head was
-        # topologically last, i.e. usually duration — an unintended target;
-        # a brief all-heads variant on 2026-07-06 was likewise wrong.)
-        head = self.actor.get_layer(self._head_layer_names[0])
-        weights_concat = tf.concat([
-            head.weights[0],
-            tf.expand_dims(head.weights[1], axis=0)
-        ], axis=0, name='dose_head_weights')
-        return tf.reduce_sum(
-            tf.math.reduce_euclidean_norm(weights_concat, axis=0),
-            name='regularizer_loss')
+        # Per-head group-lasso (per-output-neuron L2 of weights+bias), each
+        # head weighted by its own `regularizer_coef_vec[h]` (0 = not
+        # regularized). Drives whole output neurons of the regularized head(s)
+        # to zero to eliminate actions — the action-forging / explainability
+        # mechanism. Paper-2 dose forging uses [coef, 0]; Paper-3 duration
+        # forging uses [0, coef]. Heads are `_head_layer_names` in
+        # action_per_head order (dose head 0, duration head 1).
+        total = tf.constant(0.0, dtype=tf.float32)
+        for h, name in enumerate(self._head_layer_names):
+            coef = self._reg_coef_list[h]   # Python float; unrolled at trace
+            if coef == 0.0:
+                continue                    # head not regularized -> not referenced
+            head = self.actor.get_layer(name)
+            weights_concat = tf.concat([
+                head.weights[0],
+                tf.expand_dims(head.weights[1], axis=0)
+            ], axis=0)
+            head_loss = tf.reduce_sum(
+                tf.math.reduce_euclidean_norm(weights_concat, axis=0))
+            total = total + coef * head_loss
+        return total
 
     def per_neuron_l2_vector(self) -> Tensor:
         # Per-output-neuron L2 norm of (weights + bias) for every actor head,
@@ -657,12 +674,11 @@ class PPOTandemModel(TF2UtilsMixin):
                                     entropy_loss))),
                         name='total_loss')
 
-                if tf.cast(self._regularizer_coef, tf.bool):
+                if self._regularizer_active:
+                    # coef is applied per-head inside _compute_regularizer_loss.
                     regularizer_loss = self._compute_regularizer_loss()
                     total_loss = tf.add(
-                        total_loss,
-                        tf.multiply(
-                            self._regularizer_coef, regularizer_loss),
+                        total_loss, regularizer_loss,
                         name='total_loss_w_regularizer')
 
             policy_grads = tape.gradient(total_loss, trainable_vars)
@@ -688,7 +704,7 @@ class PPOTandemModel(TF2UtilsMixin):
         self._actor_loss.update_state(actor_loss)
         if tf.cast(self._entropy_loss_coef, tf.bool):
             self._entropy_loss.update_state(entropy_loss)
-        if tf.cast(self._regularizer_coef, tf.bool):
+        if self._regularizer_active:
             self._regularizer_loss.update_state(regularizer_loss)
 
     @tf.function(
@@ -874,7 +890,7 @@ class PPOTandemModel(TF2UtilsMixin):
         if tf.cast(self._entropy_loss_coef, tf.bool):
             metrics['entropy_loss'] = self._entropy_loss.result()
 
-        if tf.cast(self._regularizer_coef, tf.bool):
+        if self._regularizer_active:
             metrics['regularizer_loss'] = self._regularizer_loss.result()
 
         metrics['total_loss'] = sum(
