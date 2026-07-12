@@ -235,6 +235,55 @@ class PointyHatActionModifier(ActionModifier):
         )
 
 
+class CombActionModifier(ActionModifier):
+    '''Periodic "pointy-comb" — Action Focus toward action VALUES that are
+    multiples of `period` (Paper-3 duration forging onto {7, 14, 21, 28}).
+
+    Unlike `PointyHatActionModifier` (one hat at the 0-index no-change action),
+    the bias vector `y` is built directly from the action *values* (e.g. the
+    duration grid 1..28) with a per-value rule (height = (down, up)):
+
+        y_v = up     if v is a nonzero multiple of `period`   (7, 14, 21, 28)
+        y_v = down   if v > period and v is NOT a multiple     (8..13, 15..20, …)
+        y_v = 0      if v < period                             (1..6 left untouched)
+
+    So it ATTRACTS the policy onto the weekly-multiple intervals and SUPPRESSES
+    the non-multiple intervals above one period, while leaving the short
+    "test-soon" intervals (< period) unbiased. Applied to the actor logits as
+    `logits + scale * y` (training-only, scheduled by `scale_fn`), exactly like
+    the pointy hat.
+    '''
+    def __init__(
+            self, action_values: tuple[float, ...],
+            scale_fn: ScaleFn,
+            period: float,
+            height: tuple[float, float],
+            name: str = 'comb'):
+        super().__init__(
+            relative_action_distances=action_values,
+            scale_fn=scale_fn, name=name)
+        if period <= 0:
+            raise ValueError('period must be positive')
+        down, up = height
+        y: list[float] = []
+        for v in action_values:
+            vi = int(round(v))
+            if vi != 0 and vi % int(round(period)) == 0:
+                y.append(float(up))
+            elif v > period:
+                y.append(float(down))
+            else:
+                y.append(0.0)
+        self._y: Tensor = tf.constant(y, dtype=tf.float32)
+
+    def __call__(self, action_distribution: Tensor) -> Tensor:
+        scale = self._scale_fn()
+        return tf.add(
+            action_distribution,
+            tf.expand_dims(tf.multiply(scale, self._y), axis=0)
+        )
+
+
 class RickerWaveletActionModifier(ActionModifier):
     '''
     Implements the one dimensional Ricker wavelet, a.k.a. the Mexican hat.

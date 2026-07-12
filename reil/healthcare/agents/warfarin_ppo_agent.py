@@ -39,7 +39,11 @@ class PPO4WarfarinAgent(PPOAgent):
         self._momentum_coef = momentum_coef
         self._carry = momentum_mode == 'carry'
         self._action_modifiers = action_modifiers or []
+        # None entries are valid placeholders for heads with no modifier (e.g.
+        # a duration-only comb passes [None, comb]); act() skips them too.
         for modifier in self._action_modifiers:
+            if modifier is None:
+                continue
             self._metrics[f'modifier_{modifier.name}'] = MeanMetric(
                 f'modifier_{modifier.name}_scale', dtype=tf.float32)
 
@@ -94,13 +98,33 @@ class PPO4WarfarinAgent(PPOAgent):
         mask_index = [[i for i, j in enumerate(m) if j] for m in mask]
 
         dose_logits = model.act_dose_logits(state_tensor)[0]
+        if training_mode:
+            dose_logits = self._apply_head_modifier(0, dose_logits)
         dose_idx = self._sample_head(dose_logits, mask_index[0], training_mode)
 
         dur_logits = model.act_duration_logits(
             state_tensor, tf.constant([dose_idx], dtype=tf.int32))[0]
+        if training_mode:
+            dur_logits = self._apply_head_modifier(1, dur_logits)
         dur_idx = self._sample_head(dur_logits, mask_index[1], training_mode)
 
         return actions.send(f'lookup {[dose_idx, dur_idx]}')
+
+    def _apply_head_modifier(self, head: int, logits_row):
+        '''Apply the action modifier for `head` (e.g. the duration comb) to a
+        1-D logits row, before sampling. The two-stage conditional-tandem
+        rollout samples inside `_act_conditional_tandem` and returns before the
+        standard act() modifier loop, so modifiers must be applied here to take
+        effect on the sampled action. No-op when no modifier is set for `head`.'''
+        if head >= len(self._action_modifiers):
+            return logits_row
+        modifier = self._action_modifiers[head]
+        if modifier is None:
+            return logits_row
+        out = modifier(tf.expand_dims(logits_row, axis=0))[0]
+        self._metrics[f'modifier_{modifier.name}'].update_state(
+            modifier._scale_fn.last_call)
+        return out
 
     def act(
             self, state: FeatureSet, subject_id: int,
