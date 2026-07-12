@@ -36,6 +36,12 @@ When a change to `ReiL` is motivated by a paper / dissertation requirement, link
   byte-identical (Hamberg parity holds). When touching the dose/subject/PK path run **both**
   `tests/unit/test_hamberg_pkpd_parity.py` and `tests/unit/test_adherence.py`. Config surface + train/test
   decoupling (`adherence_mode`, `test_adherence_mode`) lives in the sibling `warfarin_dosing` runner.
+- **Paper-3 tandem (`PPOTandemModel` family) knobs** — all default-off / back-compat, tested in
+  `tests/unit/test_tandem_backprop_modes.py`: `per_head_advantage` (per-head reward+critic column),
+  `separate_critics` (independent critic body per head; needs per_head_advantage), **`regularizer_coef` as
+  a per-head list `[dose,dur]`** (scalar = dose-only), and `CombActionModifier` (Action Focus toward
+  multiples of a period) in `reil/utils/action_dist_modifier.py`. The settled Paper-3 recipe: sampled-dose
+  tandem + separate per-head reward (`sq_dist_avg` dose + `dd_hub7` duration) + dense duration grid.
 - **Don't edit `warfarin_dosing/` from this repo.** If a change requires coordination, propose it and let the user run it in the sibling repo.
 
 ## Pointer back
