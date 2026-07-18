@@ -111,11 +111,8 @@ class PPOModel(TF2UtilsMixin):
         input_: Tensor = keras.Input(self._input_shape)  # type: ignore
         actor_layers = TF2UtilsMixin.mlp_functional(
             input_, self._actor_layer_sizes, actor_hidden_activation, 'actor_{i:0>2}')
-        # for logit_heads, regularizer does not work if weights are all zero
-        logit_heads = TF2UtilsMixin.mlp_layers(
-            action_per_head, actor_head_activation, 'actor_output_{i:0>2}',
-            kernel_initializer=keras.initializers.Constant(0.1))
-        logits = tuple(output(actor_layers) for output in logit_heads)
+        logits = self._build_actor_logits(
+            actor_layers, action_per_head, actor_head_activation)
 
         self.actor = keras.Model(
             inputs=input_,
@@ -146,6 +143,19 @@ class PPOModel(TF2UtilsMixin):
         self._models = {
             'actor': type(self.actor),
             'critic': type(self.critic)}
+
+    def _build_actor_logits(
+            self, actor_layers, action_per_head, actor_head_activation):
+        '''Build the actor output logits from the shared trunk `actor_layers`.
+
+        Default: one Dense head per entry in `action_per_head`, constant-0.1
+        kernel init (so the group-lasso regularizer has non-zero weights to act
+        on). Subclasses override to produce a structured head (e.g. the low-rank
+        joint dose×duration head, `PPOLowRankJointModel`).'''
+        logit_heads = TF2UtilsMixin.mlp_layers(
+            action_per_head, actor_head_activation, 'actor_output_{i:0>2}',
+            kernel_initializer=keras.initializers.Constant(0.1))
+        return tuple(output(actor_layers) for output in logit_heads)
 
     def __call__(self, inputs, training: bool | None = None) -> Any:
         logits = self.actor(inputs, training=training)
@@ -815,6 +825,230 @@ class PPONeighborEffect(PPOModel):
             self._entropy_loss.update_state(entropy_loss)
         if tf.cast(self._regularizer_coef, tf.bool):
             self._regularizer_loss.update_state(regularizer_loss)
+
+
+@keras.utils.register_keras_serializable(package='reil.learners.ppo_learner')
+class LowRankJointHead(keras.layers.Layer):
+    '''Structured logit head for a JOINT (dose × duration) categorical.
+
+    Produces `n_dose * n_dur` logits from the trunk features `h` as a PURE
+    low-rank bilinear interaction (Paper-3 EA, doc 220 §9.5):
+
+        L[i, j] = s * <P̂_i(h), Q̂_j(h)>
+
+    `P̂`, `Q̂` are the rank-`r` dose / duration embeddings L2-normalised to unit
+    length, so `<P̂_i, Q̂_j> ∈ [-1, 1]` (a cosine), scaled by a FIXED `s`
+    (`interaction_scale`, default 4). Bounding the interaction is the KL-explosion
+    fix (2026-07-12): the raw dot product `<P_i, Q_j>` is quadratic in the learned
+    weights and unbounded, so a single Adam step blew the logits up (KL ~1e11) and
+    PPO's `kl>1.5·target_kl` early-stop killed the actor. The grid is flattened
+    ROW-MAJOR to `i * n_dur + j`, matching the joint action order built in the
+    runner (`(dose, dur) for dose in dose_values for dur in duration_values`).
+
+    NO independent marginals. An earlier version added per-dose `u_i` + per-duration
+    `v_j` marginals plus keep-gates for sparsification (doc 220 §9.5). Both were
+    removed (2026-07-13): the (dose,duration) value is an irreducible coupled ridge
+    — the safe interval shrinks as the dose gets aggressive — which a separable
+    `u_i + v_j` cannot represent, and the gate-L1 sparsifier never selected (it
+    either left every gate ~0.6 or collapsed all to 0). A pure low-rank cosine at
+    small `r` IS that coupled model: each dose maps to a preferred point on the
+    interval axis (rank 2 = a circular 1-D interval ordering). Sparsity /
+    interpretability come from the low rank + the policy argmax, not from marginals
+    or gates. A single sampled `(i, j)` still updates a whole dose-embedding row and
+    duration-embedding column, so credit is shared across both axes. Output is a
+    single head, so all of `PPOModel`'s sampling / log-prob / training machinery is
+    unchanged.
+    '''
+
+    def __init__(self, n_dose: int, n_dur: int, rank: int = 4,
+                 interaction_scale: float = 4.0, **kwargs):
+        super().__init__(**kwargs)
+        self.n_dose = int(n_dose)
+        self.n_dur = int(n_dur)
+        self.rank = int(rank)
+        # FIXED scale on the bounded cosine interaction (KL-explosion fix).
+        self.interaction_scale = float(interaction_scale)
+        self._P = keras.layers.Dense(self.n_dose * self.rank, name='lr_P')
+        self._Q = keras.layers.Dense(self.n_dur * self.rank, name='lr_Q')
+
+    def build(self, input_shape):
+        # Build the Dense sublayers explicitly (they otherwise build lazily on
+        # first call, which leaves them unbuilt after a keras from_config rebuild
+        # and breaks weight loading).
+        for layer in (self._P, self._Q):
+            if not layer.built:
+                layer.build(input_shape)
+        super().build(input_shape)
+
+    def call(self, h):
+        b = tf.shape(h)[0]
+        P = tf.math.l2_normalize(
+            tf.reshape(self._P(h), (b, self.n_dose, self.rank)), axis=-1)
+        Q = tf.math.l2_normalize(
+            tf.reshape(self._Q(h), (b, self.n_dur, self.rank)), axis=-1)
+        cos = tf.einsum('bik,bjk->bij', P, Q)                     # (b,D,T) in [-1,1]
+        grid = self.interaction_scale * cos                       # (b, D, T)
+        return tf.reshape(grid, (b, self.n_dose * self.n_dur))    # (b, D*T)
+
+    def get_config(self):
+        cfg = super().get_config()
+        cfg.update(n_dose=self.n_dose, n_dur=self.n_dur, rank=self.rank,
+                   interaction_scale=self.interaction_scale)
+        return cfg
+
+
+@keras.utils.register_keras_serializable(package='reil.learners.ppo_learner')
+class PPOLowRankJointModel(PPOModel):
+    '''`PPOModel` whose single head is a `LowRankJointHead` (dose × duration).
+
+    Identical to `PPOModel` except the actor output logits are the pure low-rank
+    2-D cosine grid instead of a flat `Dense`. `action_per_head` must be
+    `[n_dose * n_dur]` (one joint head). All other behaviour (plain `train_actor`,
+    sampling, log-probs, critic) is inherited unchanged.
+    '''
+
+    def __init__(self, *, n_dose: int, n_dur: int, rank: int = 4, **kwargs):
+        self._n_dose = int(n_dose)
+        self._n_dur = int(n_dur)
+        self._rank = int(rank)
+        expected = self._n_dose * self._n_dur
+        aph = kwargs.get('action_per_head')
+        if aph is None or tuple(aph) != (expected,):
+            raise ValueError(
+                f'PPOLowRankJointModel needs a single joint head of size '
+                f'n_dose*n_dur={expected}; got action_per_head={aph!r}.')
+        super().__init__(**kwargs)
+
+    def _build_actor_logits(
+            self, actor_layers, action_per_head, actor_head_activation):
+        self._head = LowRankJointHead(
+            self._n_dose, self._n_dur, self._rank, name='lowrank_joint_head')
+        return (self._head(actor_layers),)
+
+    def get_config(self) -> dict[str, Any]:
+        config = super().get_config()
+        config.update(dict(
+            n_dose=self._n_dose, n_dur=self._n_dur, rank=self._rank))
+        return config
+
+
+@keras.utils.register_keras_serializable(package='reil.learners.ppo_learner')
+class PPOLowRankJointNeighborModel(PPOLowRankJointModel):
+    '''Pure low-rank joint head + a 2-D (dose × duration) NEIGHBOUR EFFECT.
+
+    Spreads each transition's PPO credit over the grid neighbourhood of the taken
+    `(dose i, duration j)`: for offset `(di, dj)` the surrogate loss of neighbour
+    `(i+di, j+dj)` is added with weight `dose_decay**|di| · dur_decay**|dj|`,
+    clamped to the valid grid (no row-major wrap — the reason the flat 1-D
+    `PPONeighborEffect` can't do this: its ±1 neighbours are duration-only and
+    wrap across dose rows, and dose neighbours sit ±n_dur apart). This injects the
+    "a slightly higher/lower dose (or duration) is also good, but less so"
+    smoothness prior as explicit credit-sharing — the sample-efficiency aid the
+    pure cosine head lacks (doc 220 §9.5, 2026-07-13). Widths are STATIC ints
+    (0 on an axis = that axis off); `(0, 0)` reduces to plain PPO on the joint head.
+    '''
+
+    def __init__(self, *, n_dose: int, n_dur: int, rank: int = 4,
+                 neighbor_dose_width: int = 1, neighbor_dur_width: int = 1,
+                 neighbor_dose_decay: float = 0.5, neighbor_dur_decay: float = 0.5,
+                 **kwargs):
+        super().__init__(n_dose=n_dose, n_dur=n_dur, rank=rank, **kwargs)
+        self._nb_dose_w = int(neighbor_dose_width)
+        self._nb_dur_w = int(neighbor_dur_width)
+        self._nb_dose_decay = float(neighbor_dose_decay)
+        self._nb_dur_decay = float(neighbor_dur_decay)
+
+    @tf.function(
+        input_signature=(
+            TensorSpec(shape=[None, None], dtype=tf.float32, name='x'),
+            TensorSpec(shape=[None, None], dtype=tf.int32, name='action_indices'),
+            TensorSpec(shape=[None], dtype=tf.float32, name='advantage'),
+        ),
+        jit_compile=False)
+    def train_actor(self, x: Tensor, action_indices: Tensor, advantage: Tensor):
+        print(f'tracing {self.__class__.__qualname__}.train_actor')
+        n_dose = self._n_dose
+        n_dur = self._n_dur
+        n_act = n_dose * n_dur
+        y = action_indices[:, 0]                                  # (b,) flat taken
+        i = tf.math.floordiv(y, n_dur)                            # dose index
+        j = tf.math.floormod(y, n_dur)                            # duration index
+        advantage_ = tf.divide(
+            advantage - tf.reduce_mean(advantage),
+            tf.math.reduce_std(advantage) + eps, name='normalized_advantage')
+        old_lp = logprobs(tf.concat(self.actor(x), axis=1), y, n_act)  # (b,)
+
+        trainable_vars = self.actor.trainable_variables
+        actor_loss = entropy_loss = regularizer_loss = kl = zero_float32
+        for _ in tf.range(self._actor_train_iterations):
+            with tf.GradientTape() as tape:
+                logits = tf.concat(self.actor(x), axis=1, name='all_logits')
+                new_lp_taken = logprobs(logits, y, n_act)
+                actor_loss = zero_float32
+                # STATIC double loop over the 2-D neighbourhood (unrolled at trace).
+                for di in range(-self._nb_dose_w, self._nb_dose_w + 1):
+                    for dj in range(-self._nb_dur_w, self._nb_dur_w + 1):
+                        ni = i + di
+                        nj = j + dj
+                        valid = tf.cast(tf.logical_and(
+                            tf.logical_and(ni >= 0, ni < n_dose),
+                            tf.logical_and(nj >= 0, nj < n_dur)), tf.float32)
+                        k = (tf.clip_by_value(ni, 0, n_dose - 1) * n_dur
+                             + tf.clip_by_value(nj, 0, n_dur - 1))   # (b,) clamped
+                        new_lp = logprobs(logits, k, n_act)
+                        ratio = tf.exp(new_lp - old_lp)
+                        surr = ratio * advantage_
+                        if self._clip_ratio is not None:
+                            clipped = tf.clip_by_value(
+                                ratio, 1.0 - self._clip_ratio, 1.0 + self._clip_ratio)
+                            surr = tf.minimum(surr, clipped * advantage_)
+                        w = ((self._nb_dose_decay ** abs(di))
+                             * (self._nb_dur_decay ** abs(dj)))
+                        # weight by decay, mask out-of-grid neighbours, mean over valid
+                        loss_ij = tf.divide(
+                            -tf.reduce_sum(valid * w * surr),
+                            tf.reduce_sum(valid) + eps)
+                        actor_loss = actor_loss + loss_ij
+
+                if tf.cast(self._entropy_loss_coef, tf.bool):
+                    entropy_loss = entropy(new_lp_taken)
+                    entropy_loss.set_shape([])
+                if tf.cast(self._regularizer_coef, tf.bool):
+                    regularizer_loss = self._compute_regularizer_loss()
+                total_loss = tf.add_n([
+                    actor_loss,
+                    tf.multiply(self._entropy_loss_coef, entropy_loss),
+                    tf.multiply(self._regularizer_coef, regularizer_loss)],
+                    name='total_loss')
+
+            policy_grads = tape.gradient(total_loss, trainable_vars)
+            if self._max_grad_norm is not None:
+                policy_grads, _ = tf.clip_by_global_norm(
+                    policy_grads, self._max_grad_norm)
+            self._actor_optimizer.apply_gradients(
+                zip(policy_grads, trainable_vars))
+
+            new_lp_after = logprobs(
+                tf.concat(self.actor(x), axis=1), y, n_act)
+            kl = .5 * tf.reduce_mean(tf.square(new_lp_after - old_lp))
+            if tf.greater(kl, self._1_5_target_kl):
+                break
+
+        self._kl.update_state(kl)
+        self._actor_loss.update_state(actor_loss)
+        if tf.cast(self._entropy_loss_coef, tf.bool):
+            self._entropy_loss.update_state(entropy_loss)
+        if tf.cast(self._regularizer_coef, tf.bool):
+            self._regularizer_loss.update_state(regularizer_loss)
+
+    def get_config(self) -> dict[str, Any]:
+        config = super().get_config()
+        config.update(dict(
+            neighbor_dose_width=self._nb_dose_w,
+            neighbor_dur_width=self._nb_dur_w,
+            neighbor_dose_decay=self._nb_dose_decay,
+            neighbor_dur_decay=self._nb_dur_decay))
+        return config
 
 
 class PPOLearner(Learner[FeatureSet, ACLabelType]):

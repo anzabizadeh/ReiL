@@ -98,7 +98,13 @@ class HealthSubject(Subject):
             # for the Paper-3 dose-duration safety-ramp reward (derived read-only
             # in DosingSubject._sub_comp_consecutive_in_range; no state mutation).
             name='consecutive_in_range', lower=0, upper=self._max_day,
-            generator=lambda _: None)
+            generator=lambda _: None
+        ) + FeatureGenerator.continuous(
+            # Paper-3 extrapolated exit-day (doc 220 §9.5): linear extrapolation of
+            # the recent INR trend to the therapeutic-range edge, a model-free tau*
+            # estimate. Read-only, derived in _sub_comp_extrap_exit; bounded
+            # [0, max_day]. Additive -- absent from any state def by default.
+            name='extrap_exit', lower=0.0, upper=float(self._max_day))
 
         if self._duration_values is None:
             if self._duration_step is None:

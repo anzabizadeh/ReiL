@@ -102,6 +102,30 @@ state_definitions: dict[str, DefComponents] = {
             ('consecutive_in_range', {'at_decision': True}))
         for i in range(1, 4)},
 
+    # Paper-3 EXTRAP-augmented stability states (doc 220 §9.5, 2026-07-18): the
+    # stab state + the linear-extrapolation exit-day feature `extrap_exit` (a
+    # model-free tau* estimate). main_state_def=no_patient_w_dosing_stab_extrap_*
+    # (6-dim: dose,INR,INR,duration,s,extrap); env state_name pairs the FULL
+    # superset so the 2-phase pop-down keeps extrap_exit.
+    **{
+        f'no_patient_w_dosing_stab_extrap_{i:02}': (
+            ('dose_history', {'length': i}),
+            ('INR_history', {'length': i + 1}),
+            ('duration_history', {'length': i}),
+            ('consecutive_in_range', {'at_decision': True}),
+            ('extrap_exit', {}))
+        for i in range(1, 4)},
+    **{
+        f'patient_w_dosing_w_baseline_stab_extrap_{i:02}': (
+            *patient_basic, *patient_extra,
+            ('day', {}),
+            ('dose_history', {'length': i}),
+            ('INR_history', {'length': i + 1}),
+            ('duration_history', {'length': i}),
+            ('consecutive_in_range', {'at_decision': True}),
+            ('extrap_exit', {}))
+        for i in range(1, 4)},
+
     'patient_w_full_dosing': (
         *patient_w_sensitivity,
         ('day', {}),
@@ -157,6 +181,54 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
             center=2.5, band_width=1.0, exclude_first=False, average=True),
         'recent_daily_INR'
     ),
+
+    # ------------------------------------------------------------------
+    # Paper-3 EB monitoring-cost reward (doc 220 §9, 2026-07-12):
+    #   r = -c * sum_t (mu_t - 2.5)^2  -  kappa        (c = 4, band_width=1)
+    # The SUMMED square-distance control (average=False) makes a longer interval
+    # accrue more out-of-range days under the adherence sim, and `kappa`
+    # (monitoring_coef) is a flat per-VISIT cost. Together they give the interval
+    # a genuine control-vs-visits optimum with NO tau_safe / lambda scaffolding
+    # (the scaffolding that caused the tau=1 collapse + s>=14 inversion, doc 230).
+    # Sweeping kappa traces the PTTR-vs-visits Pareto frontier (EC); kappa=0
+    # reproduces `sq_dist` exactly (the zero-burden anchor). A single shared
+    # reward: drives a flat (dose,tau) joint head, or the duration head of a
+    # per-head tandem (pair with `sq_dist_avg` on the dose head). Reads only
+    # daily_INR_history, so it uses the plain `recent_daily_INR` state def.
+    # ------------------------------------------------------------------
+    **{
+        f'sq_dist_kap{tag}': (
+            reil_functions.NormalizedSquareDistance(
+                name=f'sq_dist_kap{tag}', y_var_name='daily_INR_history',
+                length=-1, multiplier=-1.0, interpolate=False,
+                center=2.5, band_width=1.0, exclude_first=False,
+                monitoring_coef=kap),
+            'recent_daily_INR'
+        )
+        for tag, kap in (
+            ('0p00', 0.0), ('0p25', 0.25), ('0p50', 0.5), ('0p75', 0.75),
+            ('1p00', 1.0), ('2p00', 2.0), ('4p00', 4.0), ('8p00', 8.0),
+        )
+    },
+
+    # ------------------------------------------------------------------
+    # Paper-3 LOOKAHEAD duration reward (doc 220 §9.5, 2026-07-14): opportunity-cost
+    # time-in-range. r = sum_t [+1 if INR in [2,3] else -pen] over the window; its
+    # optimum interval is exactly tau* (the longest interval that stays in range),
+    # so it realises the lookahead objective from the OBSERVED window (no separate
+    # forward roll). Pair on the DURATION head (duration_reward_name=tir_p{pen}) with
+    # sq_dist_avg on the dose head; `pen` = overshoot severity (alpha, beta=1).
+    # ------------------------------------------------------------------
+    **{
+        f'tir_p{tag}': (
+            reil_functions.TimeInRangeReward(
+                name=f'tir_p{tag}', y_var_name='daily_INR_history',
+                length=-1, interpolate=False, lo=2.0, hi=3.0,
+                overshoot_penalty=pen),
+            'recent_daily_INR'
+        )
+        for tag, pen in (('2', 2.0), ('4', 4.0), ('8', 8.0), ('16', 16.0))
+    },
 
     # ------------------------------------------------------------------
     # Paper-3 additive dose-duration reward (plan 200 §3):
@@ -1515,3 +1587,40 @@ class Warfarin(DosingSubject):
                 break
         return self.feature_gen_set['consecutive_in_range'](
             value=min(s, self._max_day))
+
+    def _sub_comp_extrap_exit(
+            self, _id: int, lo: float = 2.0, hi: float = 3.0, **kwargs: Any
+    ) -> Feature:
+        '''Linear-extrapolation expected exit-day (Paper-3, doc 220 §9.5).
+
+        Extrapolate the recent INR trend to the nearest range edge:
+          velocity = (INR_now - INR_prev_decision) / last_interval_tau
+          exit = (hi - INR_now)/velocity      if rising  (velocity > 0)
+               = (INR_now - lo)/|velocity|     if falling (velocity < 0)
+               = max_day (cap)                 if ~flat
+               = 0                             if already out of range.
+        A model-free tau* estimate the policy can use to pick the interval.
+        Read-only over `_full_measurement_history` / `_decision_points_*`; queried
+        at decision time (`self._day` is the decision day). Bounded [0, max_day].
+        '''
+        cap = float(self._max_day)
+        hist = self._full_measurement_history
+        day = self._day
+        inr2 = hist[day]
+        idx = self._decision_points_index
+        last_tau = (self._decision_points_duration_history[idx - 1]
+                    if idx > 0 else 0)
+        if last_tau <= 0 or day - last_tau < 0:
+            v = 0.0
+        else:
+            v = (inr2 - hist[day - last_tau]) / last_tau
+        if inr2 < lo or inr2 > hi:
+            e = 0.0
+        elif v > 1e-3:
+            e = (hi - inr2) / v
+        elif v < -1e-3:
+            e = (inr2 - lo) / (-v)
+        else:
+            e = cap
+        return self.feature_gen_set['extrap_exit'](
+            value=max(0.0, min(e, cap)))

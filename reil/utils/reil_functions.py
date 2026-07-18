@@ -88,6 +88,19 @@ class NormalizedSquareDistance(ReilFunction[float, int]):
     amplifying_factor: float = 1.0
     exclude_first: bool = False
     average: bool = False
+    # monitoring_coef (kappa): a flat per-DECISION monitoring cost subtracted
+    #   once per reward call (i.e. once per blood draw / retest), independent of
+    #   the interval length. Paper-3 EB (doc 220 §9): with the summed control
+    #   term (average=False) under the adherence sim a longer interval already
+    #   accrues more out-of-range days, so kappa supplies the burden side of the
+    #   trade-off and the interval gains a genuine control-vs-visits optimum;
+    #   sweeping kappa traces the PTTR-vs-visits Pareto curve (EC). Applied after
+    #   multiplier/constant and inherited by every subclass. Default 0.0 is
+    #   byte-identical to the pre-kappa reward (parity).
+    monitoring_coef: float = 0.0
+
+    def __call__(self, args: FeatureSet) -> float:
+        return super().__call__(args) - self.monitoring_coef
 
     def _default_function(
             self, y: list[float], x: list[int] | None = None) -> float:
@@ -259,9 +272,13 @@ class DoseDurationSafetyReward(DurationIncentiveSquareDistance):
         inr = val[self.y_var_name]           # daily INR over the window
         tau = len(inr)                       # type: ignore
         if self.include_control:
-            base = super().__call__(args)    # lambda*tau - c*sum dev^2
+            base = super().__call__(args)    # lambda*tau - c*sum dev^2 - kappa
         else:
-            base = self.duration_coef * tau  # lambda*tau only (no control term)
+            # lambda*tau only (no control term). This branch bypasses
+            # super().__call__, so re-apply the per-visit monitoring cost
+            # (kappa) here explicitly; otherwise it would be silently dropped
+            # for the per-head duration reward (Paper-3 EB, doc 220 §9).
+            base = self.duration_coef * tau - self.monitoring_coef
         if not tau or self.safety_coef == 0.0:
             return base
         mu0 = float(inr[0])                   # type: ignore  decision-day INR
@@ -286,6 +303,35 @@ class DoseDurationSafetyReward(DurationIncentiveSquareDistance):
         else:  # 'quadratic'
             penalty = g * g
         return base - self.safety_coef * penalty
+
+
+@dataclasses.dataclass
+class TimeInRangeReward(ReilFunction[float, int]):
+    '''Opportunity-cost / lookahead DURATION reward (Paper 3, 2026-07-14).
+
+        r = sum_t [ +1                      if lo <= INR_t <= hi
+                    -overshoot_penalty      otherwise ]
+
+    over the per-decision daily-INR window `y` (`daily_INR_history`). Every day the
+    held dose keeps INR in range scores +1 (rewarding a LONGER safe interval), and
+    every out-of-range day costs `-overshoot_penalty`. Its optimum interval is
+    exactly tau* = the longest interval that stays in range ("go as long as you can,
+    overshoot is costly") — the lookahead objective, realised from the OBSERVED
+    window with no separate forward roll. Pair on the DURATION head of a per-head
+    tandem (dose head keeps `sq_dist_avg`). `overshoot_penalty` >> 1 makes drifting
+    out costlier than stopping a day early (asymmetry alpha >> beta=1).
+    '''
+    lo: float = 2.0
+    hi: float = 3.0
+    overshoot_penalty: float = 4.0
+
+    def _no_inter(self, y: list[float]) -> float:
+        return sum(1.0 if self.lo <= v <= self.hi else -self.overshoot_penalty
+                   for v in y)
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        return self._no_inter(y)
 
 
 @dataclasses.dataclass
