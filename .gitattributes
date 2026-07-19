@@ -1,1 +1,29 @@
 reil/_version.py export-subst
+
+# Normalize line endings. Text files are stored with LF in the repository;
+# the working-tree ending is left native (CRLF on Windows checkouts).
+* text=auto
+
+# Explicit text types
+*.py    text
+*.md    text
+*.rst   text
+*.txt   text
+*.yaml  text
+*.yml   text
+*.toml  text
+*.cfg   text
+*.ini   text
+*.json  text
+*.sh    text eol=lf
+
+# Binary — never convert or diff
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.pdf   binary
+*.pkl   binary
+*.npz   binary
+*.npy   binary
+*.h5    binary
+*.zip   binary
