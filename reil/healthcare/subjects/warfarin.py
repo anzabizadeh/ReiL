@@ -682,6 +682,27 @@ reward_definitions: dict[str, tuple[reil_functions.ReilFunction[float, int], str
             amplifying_factor=1.05, under_weight=1.0, over_weight=16.0),
         'recent_daily_INR'
     ),
+    # EXP-C2-IJ9 (Paper 2): severe-excursion hinge on top of the eta=1.0 anchor
+    # `sq_dist`. Zero inside the therapeutic range, so unlike asym_over* it does
+    # not move the effective target; it only prices the bleed-risk tail that the
+    # -30 reward_clip floor otherwise renders invisible. Pair with a relaxed
+    # reward_clip -- see SevereExcursionSquareDistance's docstring.
+    hipen_hi4_w4=(
+        reil_functions.SevereExcursionSquareDistance(
+            name='hipen_hi4_w4', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.0, hi=4.0, hi_weight=4.0),
+        'recent_daily_INR'
+    ),
+    hipen_hi3p5_w4=(
+        reil_functions.SevereExcursionSquareDistance(
+            name='hipen_hi3p5_w4', y_var_name='daily_INR_history',
+            length=-1, multiplier=-1.0, interpolate=False,
+            center=2.5, band_width=1.0, exclude_first=False,
+            amplifying_factor=1.0, hi=3.5, hi_weight=4.0),
+        'recent_daily_INR'
+    ),
     # high eta (direction amplifier); compare to sq_dist (1.0), sq_dist_modified
     # (1.05), sq_dist_modified_eta1p1 (1.1).
     sq_dist_modified_eta1p2=(

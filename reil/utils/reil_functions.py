@@ -436,6 +436,69 @@ class AsymmetricSquareDistance(ReilFunction[float, int]):
 
 
 @dataclasses.dataclass
+class SevereExcursionSquareDistance(ReilFunction[float, int]):
+    '''Squared distance from `center` plus a hinge on *severe* excursions.
+
+    Per-point penalty is ``(center - v)**2 + hi_weight * max(0, v - hi)**2``,
+    i.e. the canonical maintenance penalty with an extra term that is exactly
+    zero until `v` exceeds `hi`. ``hi_weight = 0`` recovers
+    `NormalizedSquareDistance` exactly.
+
+    Distinct from `AsymmetricSquareDistance`, which scales the *entire*
+    supratherapeutic side and so lowers the policy's effective target for every
+    patient (EXP-C2-RW1 found that buys an in-sample-only highly-sensitive nudge
+    while significantly harming normal metabolisers). A hinge anchored at `hi`
+    well above the therapeutic range leaves in-range behaviour untouched and
+    prices only the bleed-risk tail.
+
+    Motivation (EXP-C2-IJ9, Paper 2): with the canonical reward and the
+    ``reward_clip`` floor of -30 per decision, every sustained INR at or above
+    ~3.5 yields the *same* clipped return, so the training signal cannot
+    distinguish a moderate excursion from a dangerous one. Raising the clip is
+    the minimal fix; this term additionally makes the tail strictly steeper than
+    quadratic. Use with a relaxed `reward_clip`, or the hinge is truncated away
+    along with the signal it is meant to restore.
+    '''
+    center: float = 0.0
+    band_width: float = 1.0
+    amplifying_factor: float = 1.0
+    hi: float = 4.0
+    hi_weight: float = 0.0
+    exclude_first: bool = False
+    average: bool = False
+
+    def _default_function(
+            self, y: list[float], x: list[int] | None = None) -> float:
+        len_y = len(y)
+        _x = x or [1] * (len_y - 1)
+
+        if len_y != len(_x) + 1:
+            raise ValueError(
+                'y should have exactly one item more than x.')
+
+        if not self.exclude_first:
+            _x = [1] + _x
+            _y = [0.0, *y]
+        else:
+            _y = y
+
+        result = sum(
+            (self.amplifying_factor ** i) * sum(
+                (self.center - v) ** 2
+                + self.hi_weight * max(0.0, v - self.hi) ** 2
+                for v in interpolate(_y[i], _y[i + 1], x_i))
+            for i, x_i in enumerate(_x))
+
+        # normalize
+        result *= (2.0 / self.band_width) ** 2
+
+        if self.average:
+            result /= len_y
+
+        return result
+
+
+@dataclasses.dataclass
 class NormalizedDistance(ReilFunction[float, int]):
     center: float = 0.0
     band_width: float = 1.0

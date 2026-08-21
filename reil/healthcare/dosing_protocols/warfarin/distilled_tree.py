@@ -107,7 +107,16 @@ class _TreeMaintenance2D(DosingProtocol):
     (current INR, ΔINR) -> `int(percent_action * 10)`, where ΔINR = INR(now) −
     INR(previous maintenance decision). Lets an interpretable tree condition on
     the INR *trend*, which a single-INR tree cannot represent (see the T2.3
-    velocity finding). `prev_inr` is tracked per episode and cleared in `reset()`.
+    velocity finding).
+
+    `prev_inr` is per episode, and the episode boundary is detected from the
+    patient's own clock rather than from `reset()`. This is deliberate:
+    `WarfarinAgent.reset()` is called once per learning *iteration*, not once
+    per patient, so a `reset()`-cleared field leaks across patients. Before this
+    was fixed, only the first patient of an evaluation pass saw
+    :math:`\Delta INR = 0` on its first maintenance decision; every subsequent
+    patient's first :math:`\Delta INR` was measured against the *previous*
+    patient's final INR.
 
     The classifier is duck-typed: any object exposing
     `predict([[INR, dINR]]) -> [int]` works (sklearn `DecisionTreeClassifier`
@@ -118,10 +127,12 @@ class _TreeMaintenance2D(DosingProtocol):
         super().__init__()
         self._tree = tree
         self._prev_inr: float | None = None
+        self._prev_day: int | None = None
 
     def reset(self) -> None:
         super().reset()
         self._prev_inr = None
+        self._prev_day = None
 
     def prescribe(
             self,
@@ -130,6 +141,15 @@ class _TreeMaintenance2D(DosingProtocol):
     ) -> tuple[DosingDecision, AdditionalInfo]:
         inr: float = patient['INR_history'][-1]
         previous_dose: float = patient['dose_history'][-1]
+        day = int(patient['day'])
+
+        # A new episode restarts the patient clock, so a day that does not
+        # advance means we are looking at a different patient. Do NOT rely on
+        # `reset()` for this: it fires per learning iteration, not per patient.
+        if self._prev_day is None or day <= self._prev_day:
+            self._prev_inr = None
+        self._prev_day = day
+
         # First maintenance decision has no prior maintenance reading -> ΔINR = 0.
         d_inr: float = 0.0 if self._prev_inr is None else inr - self._prev_inr
         self._prev_inr = inr
